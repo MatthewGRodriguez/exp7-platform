@@ -41,7 +41,8 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.7** | PR #32 | WebGPU keepalive (no display:none) |
 | **1.8.8** | PR #33 | Opaque Back cover; visible-only reveal; state-table rings and inset light in the draw list |
 | **1.8.9** | PR #34 | Debug handoff. Copy debug on the bar. |
-| **1.8.10** | this branch | Wire the style pass into View.show. Stop Exp7 tabs from hiding Budget sections. |
+| **1.8.10** | PR #35 | Wire the style pass into View.show. Stop Exp7 tabs from hiding Budget sections. |
+| **1.8.11** | this branch | Apps picker cards are two lines at a real size. Header icon stays put across an app switch. |
 
 ### Current manifest (verbatim) [MEAS]
 
@@ -49,9 +50,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.10",
+"version": "1.8.11",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "0a69d8206e0747d9d72270331d954b5a956c92ec4718db9c358f6d742021a0cb",
+"sha256": "43f411056136e70b19dbf39394dbe9756f5c063f18dfe7b0a052094eb52dc0c8",
 "minLauncherMajor": 1
 ```
 

@@ -1,11 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.10",
+  "version": "1.8.11",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "0a69d8206e0747d9d72270331d954b5a956c92ec4718db9c358f6d742021a0cb",
+  "sha256": "43f411056136e70b19dbf39394dbe9756f5c063f18dfe7b0a052094eb52dc0c8",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "1.8.10: View.show uses the state-table layout. Exp7 tabs no longer hide Budget sections. Debug handoff remains.",
+    "app": "1.8.11: Apps picker cards are two lines at a real size. Header icon is kept across an app switch. Debug handoff includes chromeJr.",
     "appSha256": "f513cca4bed61c267681b04bf27ab65f9b2c914f18632b097c9a6fc677c126e2",
     "budgetSha256": "673372b101ea5342552ec16a2e5d3820e322411031c52d808b68c35c3d494c67",
     "budgetMode": "exp7-views",

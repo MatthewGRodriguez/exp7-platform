@@ -1,5 +1,15 @@
 # Visual delivery (1.8.8)
 
+## Apps picker and icon flicker (1.8.11)
+
+1.8.10 made the Apps overlay opaque and the JR canvas the thing on screen. That canvas was not the DOM cards. Its buttons used `min-height:4.5rem`, which layout read as 4.5px, and the label and hint were joined with ` | ` on one line. Each button also sat in a full-width section frame. 1.8.11 draws two-line cards at least about 220×70.
+
+The header canvas was the layout height of a padded document, 90px, inside the 44px bar, and every app switch called `drawBar`, which freed the photo and loaded it again. 1.8.11 lays the bar out at 44px and keeps a ready photo across that redraw.
+
+Cloud Node, calling `JRViews.layout` with a stub text measure (not WebGPU, not Mac Safari): bar height 44, avatar circle inside that box; both app cards two lines, hit at least 220×70, including a 360px-wide wrap. Mac is not verified. This does not add the gaussian shadow, translated lift, or the rest of the physical pipeline listed below.
+
+## Earlier delivery (1.8.8–1.8.10)
+
 The 1.8.9 Mac paste showed `hook: true` and `ux: false` on every view. `View.show` called the local `layout` function, not `JRViews.layout`, so the state-table pass never ran. 1.8.10 calls the exported layout. Idle days had no border in that paste; the pass now adds the state-table border plus the inset light.
 
 The same paste showed the return to Budget skipping `budget-vf-cal` because `budget-t-cal` was `display:none`. Exp7 `show()` queried every `section` in the document and removed `.on` from Budget's sections. 1.8.10 limits that query to `#appSlot-exp7` and restores Budget's current tab before reveal.

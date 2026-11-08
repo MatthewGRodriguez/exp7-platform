@@ -12,7 +12,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 #members{padding-left:1.1rem}#members li{margin:.2rem 0}
 /* Reserved top platform bar — not a floating overlay over app content */
 #topChrome{position:fixed;top:0;left:0;right:0;z-index:40;display:flex;align-items:center;gap:8px;height:var(--bar-h);padding:0 8px;background:#fff;border-bottom:1px solid var(--line);box-sizing:border-box}
-#jrChromeHost{display:none;position:absolute;inset:0;pointer-events:none;z-index:0}
+#jrChromeHost{display:none;position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden}
 #jrChromeHost canvas{display:block;width:100%;height:100%;touch-action:none}
 /* When PlatformChromeJR paints: canvas is both paint + hit target (avoids DOM/JR layout offset).
  * DOM buttons stay for keyboard/a11y but do not receive pointer hits. */
@@ -97,7 +97,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.10. style.note says whether the draw list actually contains the new rings and light bands. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.11. chromeJr.appsButtons should be two text lines and at least about 220×70. chromeJr.barLayoutH should be 44, and avatar.y+avatar.h should sit inside it. bar-draw says kept:true when a switch did not reload the icon. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -9914,6 +9914,16 @@ function col(s,dflt){ if(!s) return dflt; s=s.trim(); let m=s.match(/^#([0-9a-f]
 function over(fg,bg){ const a=fg[3]/255; return [0,1,2].map(i=>Math.round(fg[i]*a+bg[i]*(1-a))).concat(255); }
 function dim(fg,bg,o){ return [0,1,2].map(i=>Math.round(fg[i]*o+bg[i]*(1-o))).concat(255); }
 function styleOf(el){ const o={}; (el.getAttribute&&el.getAttribute('style')||'').split(';').forEach(d=>{ const i=d.indexOf(':'); if(i>0) o[d.slice(0,i).trim()]=d.slice(i+1).trim(); }); return o; }
+/* rem/em are root-relative here (16px). parseFloat("4.5rem") is 4.5, which collapsed the Apps cards to one text line. */
+function cssPx(v){ const n=parseFloat(v); if(!(n>0)) return 0; const s=String(v).trim(); if(/rem$/i.test(s)||/em$/i.test(s)) return n*16; return n; }
+function buttonLines(n){ const lines=[]; let buf='';
+  const flush=()=>{ const s=buf.replace(/\s+/g,' ').trim(); if(s) lines.push(s); buf=''; };
+  (function walk(node){ if(!node||!node.childNodes) return; node.childNodes.forEach(ch=>{
+    if(ch.nodeType===3) buf+=ch.textContent;
+    else if(ch.nodeType===1&&String(ch.tagName).toUpperCase()==='BR') flush();
+    else if(ch.nodeType===1) walk(ch);
+  }); })(n);
+  flush(); return lines; }
 const BLOCK=/^(div|section|header|h1|h2|h3|p|table|tbody|thead|tr|ul|ol|li|details|summary|footer|nav)$/i;
 const ROW=['ja-top','ja-calnav','ja-bar','ja-calsel','ja-alts','ja-brow','ja-prow','ja-switch','ja-legend','ja-step'];
 const BOXED={'ja-joy':1,'ja-alt':1,'ja-sw':1,'ja-lg':1,'ja-chip':1,'ja-tog':1};
@@ -9954,8 +9964,8 @@ function layout(root,width,opt){ opt=opt||{}; const ctx={bg:[255,255,255,255],fg
       /* TextField host boxes: empty .ja-tf must become layout nodes with hit+tf (ROW flow via atoms previously skipped them → 0 fields) */
       if(has(n,'ja-tf')){ out.push({t:'',el:n,tf:n.getAttribute('data-tf')||'f',ph:n.getAttribute('data-ph')||'',fg:c2.fg,size:c2.size||FS,box:true,tfBox:true,
         bg:c2.boxbg||[255,255,255,255],border:c2.border||[138,150,170,255],on:false,ac:c.ac,bold:false,italic:false}); return; }
-      if(n.tagName==='BUTTON'||Object.keys(BOXED).some(k=>has(n,k))){ const t=n.textContent.replace(/\s+/g,' ').trim(); if(has(n,'ja-item')) items++;
-        out.push({t,el:n,fg:c2.fg,size:c2.size,box:true,bg:c2.boxbg||over([36,88,166,10],c.bg),border:c2.border||[138,150,170,255],on:has(n,'on')||n.getAttribute('data-sm')==='selected',ac:c.ac,bold:!!c2.bold,italic:!!c2.italic}); return; }
+      if(n.tagName==='BUTTON'||Object.keys(BOXED).some(k=>has(n,k))){ const lines=buttonLines(n); const t=(lines.length?lines.join(' '):n.textContent.replace(/\s+/g,' ').trim()); if(has(n,'ja-item')) items++;
+        out.push({t,lines:lines.length>1?lines:null,el:n,fg:c2.fg,size:c2.size,box:true,bg:c2.boxbg||over([36,88,166,10],c.bg),border:c2.border||[138,150,170,255],on:has(n,'on')||n.getAttribute('data-sm')==='selected',ac:c.ac,bold:!!c2.bold,italic:!!c2.italic}); return; }
       if(has(n,'ja-item')) items++; atoms(n,c2,out); }); return out; }
   /* flow atoms into lines inside [x, x+w]; text goes to the owner's text node; boxed atoms get their own fill (hit) / border / text nodes
      uniform style → DL.textBox; mixed style (bold/italic/color) without boxes → one DL.richText (v3, no JS wrap) */
@@ -9977,17 +9987,25 @@ function layout(root,width,opt){ opt=opt||{}; const ctx={bg:[255,255,255,255],fg
         const k=key(a.el), fn=nd(k,a.el,null), bn=fn; R(fn,cx,cy,bw,bh,4,a.bg); B(bn,cx,cy,bw,bh,4,a.border);
         /* JS-side hit+tf only (no NF.HIT) so TextField's own frame receives clicks; coords drive attachFormFields */
         fn.hit=[cx,cy,bw,bh]; fn.tf=a.tf; cx+=bw+6; lh=Math.max(lh,bh); return; }
-        /* Honor inline min-width/min-height (chrome 36×36, apps 4.5rem) — styleOf only; no getComputedStyle */
-        const stBox=a.el?styleOf(a.el):{}, mnW=parseFloat(stBox['min-width'])||0, mnH=parseFloat(stBox['min-height'])||0;
-        let bw=Math.min(Math.max(full+12,mnW||0),w), bh=Math.max(sz+9,mnH||0); if(column&&cx>x) nl(); else if(cx>x&&cx+bw>x+w) nl();
+        /* Honor inline min-width/min-height (chrome 36px, apps 4.5rem→72px). rem is 16px, not parseFloat's 4.5. */
+        const lines=(a.lines&&a.lines.length>1)?a.lines:null;
+        const widest=lines?lines.reduce((m,s)=>Math.max(m,tw(s,sz,a.bold?FONTB:FONT)),0):full;
+        const stBox=a.el?styleOf(a.el):{}, mnW=cssPx(stBox['min-width']), mnH=cssPx(stBox['min-height']);
+        let bw=Math.min(Math.max(widest+(lines?16:12),mnW||0),w), bh=Math.max(sz+9,lines?lines.length*Math.max(LH,sz*1.45)+10:0,mnH||0); if(column&&cx>x) nl(); else if(cx>x&&cx+bw>x+w) nl();
         const k=key(a.el), act=actOf(a.el), fn=nd(k,a.el,act), bn=fn, xn=fn; /* one node: fill (item 0), border, text */
-        R(fn,cx,cy+1,bw,bh-2,5,a.bg); if(act){ fn.flags=NF.HIT; fn.hit=[cx,cy+1,bw,bh-2]; fn.base=U(a.bg); fn.hov=U(over([36,88,166,18],a.bg)); }
-        B(bn,cx,cy+1,bw,bh-2,5,a.on?a.ac:a.border); T(xn,cx+6,cy+1+(bh-2)/2+sz*0.36,sz,a.fg,a.t,full+12>w?w-12:0); cx+=bw+6; lh=Math.max(lh,bh); return; }
+        const boxR=parseFloat(stBox['border-radius'])>=999?Math.min(bw,bh)/2:5;
+        R(fn,cx,cy+1,bw,bh-2,boxR,a.bg); if(act){ fn.flags=NF.HIT; fn.hit=[cx,cy+1,bw,bh-2]; fn.base=U(a.bg); fn.hov=U(over([36,88,166,18],a.bg)); }
+        B(bn,cx,cy+1,bw,bh-2,boxR,a.on?a.ac:a.border);
+        if(lines){ const lineH=Math.max(LH,sz*1.45), blockH=lines.length*lineH, top=cy+1+Math.max(0,(bh-2-blockH)/2);
+          lines.forEach((line,i)=>{ const szL=i===0?sz:Math.max(11,sz-1); T(xn,cx+8,top+i*lineH+szL*0.75,szL,i===0?a.fg:[73,85,106,255],line,Math.max(0,bw-16)); }); }
+        else T(xn,cx+6,cy+1+(bh-2)/2+sz*0.36,sz,a.fg,a.t,full+12>w?w-12:0);
+        cx+=bw+6; lh=Math.max(lh,bh); return; }
       const bh=Math.max(LH,sz*1.45); if(column&&cx>x) nl(); else if(cx>x&&cx+full>x+w) nl(); if(cx===x&&a.t===' ') return;
       T(tn,cx,cy+bh*0.72,sz,a.fg,a.t,full>x+w-cx?x+w-cx:0); cx+=Math.min(full,x+w-cx); lh=Math.max(lh,bh); });
     return (cx>x||lh?cy+(lh||0):cy)-y; }
   function block(el,x,y,w,c){ const c2=cstyle(el,c); let pad=0, bgc=null, brd=null, rad=6, minH=0;
-    if(has(el,'ja-comp')){ pad=11; bgc=c2.cbg||[255,255,255,255]; brd=[138,150,170,255]; rad=10; }
+    if(el.getAttribute&&el.getAttribute('data-plat')==='bar'){ pad=4; bgc=c2.boxbg||[255,255,255,255]; brd=null; rad=0; minH=cssPx(styleOf(el)['min-height'])||44; }
+    else if(has(el,'ja-comp')){ pad=11; bgc=c2.cbg||[255,255,255,255]; brd=[138,150,170,255]; rad=10; }
     else if(has(el,'ja-day')){ pad=3; brd=c2.border||[138,150,170,255]; bgc=c2.boxbg||c.bg; minH=64;
       if(has(el,'ja-today')&&!has(el,'ja-sel')) brd=c2.ac;
       /* selection / drag-range: blue wash + ring (CSS outline is ignored by layout) */
@@ -10093,7 +10111,10 @@ function layout(root,width,opt){ opt=opt||{}; const ctx={bg:[255,255,255,255],fg
       R(fn,x,cy,w,rh,0,rc.bg); if(act){ fn.flags=NF.HIT; fn.hit=[x,cy,w,rh]; fn.base=U(rc.bg); fn.hov=U(over([36,88,166,14],rc.bg)); }
       R(ln,x,cy+rh-1,w,1,0,isH?c.ac:over([36,88,166,32],c.bg)); cy+=rh; rows++; });
     return cy-y; }
-  const bg=nd('root:bg',null); const H=Math.ceil(children(root,16,16,width-32,{bg:ctx.bg,fg:ctx.fg,ac:ctx.ac,size:FS},false)+32); /* transparent outer backdrop: retain root node/IDs, emit no fill */
+  /* App documents keep a 16px margin. The reserved bar is exactly 44px; that margin made its canvas 90px and cropped the icon. */
+  const chromeBar=!!(root.querySelector&&root.querySelector('[data-plat="bar"]'));
+  const inset=chromeBar?0:16;
+  const bg=nd('root:bg',null); const H=Math.ceil(children(root,inset,inset,width-inset*2,{bg:ctx.bg,fg:ctx.fg,ac:ctx.ac,size:FS},false)+inset*2); /* transparent outer backdrop: retain root node/IDs, emit no fill */
   const miss=[...new Set([...root.textContent].filter(ch=>ch.codePointAt(0)>=32&&!/\s/.test(ch)&&!CORE.hasGlyph(FONT,ch.codePointAt(0))))];
   return {nodes,H:Math.max(40,H),items,rows,glyphs,hits:nodes.filter(n=>n.flags&NF.HIT).length,tboxes:TB,notdef:miss}; }
 /* emit one node into a DL / Patch builder */
@@ -10485,7 +10506,9 @@ window.x7 = window.x7 || function (t) {
       }
       /* One light (params elevation 50, from above): inset highlight + contact shade.
          Stays inside the fill so neighbors do not overlap. Not a Blender bitmap. */
-      if (interactive && n.items.length) {
+      /* A circular avatar is a photo clip. Square inset bands sit on top of it and flash when the bar redraws. */
+      var avatarDisc = st === 'photo' || st === 'pending' || st === 'initials' || /border-radius:\s*999/.test((n.el.getAttribute && n.el.getAttribute('style')) || '');
+      if (interactive && n.items.length && !avatarDisc) {
         var fill = null, fillAt = -1, hasBorder = false;
         for (var fi = 0; fi < n.items.length; fi++) {
           var fk = n.items[fi][0];
@@ -12009,34 +12032,35 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     var label = p.showInitials ? (state.initials || '?') : '';
     var bg = p.showSoftDisc ? 'background:#eef1f6;' : 'background:transparent;';
     /* Exclusive: photo has no initials text; pending has neither; soft-disc only with initials. */
+    /* One 44px row. A ja-comp plus the document margin made this canvas 90px and cropped the icon under the bar. */
     return '' +
-      '<div class="ja-comp" data-plat="bar" style="background:#ffffff;min-height:' + BAR_H + 'px">' +
-      '<div class="ja-bar" style="padding:4px 8px;gap:8px">' +
+      '<div class="ja-bar" data-plat="bar" style="background:#ffffff;min-height:' + BAR_H + 'px">' +
       '<button type="button" data-jv-act="plat:back" class="ja-joy" data-jr-state="idle" style="min-width:36px;min-height:36px">&larr;</button>' +
       '<button type="button" data-jv-act="plat:avatar" class="ja-joy" data-jr-state="' + p.mode +
       '" aria-busy="' + (p.mode === 'pending' ? 'true' : 'false') +
       '" style="min-width:' + AVATAR + 'px;min-height:' + AVATAR + 'px;border-radius:999px;' + bg + '">' +
       label + '</button>' +
       '<span class="ja-dim">Exp7</span>' +
-      '</div></div>';
+      '</div>';
   }
 
   function appsHtml() {
-    var apps = [
-      { id: 'exp7', label: 'Exp7', hint: 'Planner / atlas' },
-      { id: 'budget', label: 'Budget', hint: 'Calendar | Board | Plan' }
+    var apps = (typeof root.availableApps === 'function') ? root.availableApps() : [
+      { id: 'exp7', label: 'Exp7', hint: 'Planner / atlas (lean v17)' },
+      { id: 'budget', label: 'Budget', hint: 'Calendar · Board · Plan (local atlas)' }
     ];
     var cur = (root.__platUi && root.__platUi.mountedAppId) || (root.UI && root.UI.mountedAppId) || '';
-    var h = '<div class="ja-comp" data-plat="apps" style="background:#f6f7f9;padding:12px">';
-    h += '<div class="ja-section"><b>Apps</b></div>';
+    var h = '<div data-plat="apps" style="background:#f6f7f9">';
+    h += '<div><b>Apps</b></div>';
+    h += '<div class="ja-bar">';
     apps.forEach(function (a) {
       var on = cur === a.id ? ' on' : '';
       var st = cur === a.id ? 'selected' : 'idle';
-      h += '<div class="ja-section" style="margin-top:10px">' +
-        '<button type="button" data-jv-act="plat:app:' + a.id + '" data-jr-state="' + st + '" class="ja-joy' + on + '" style="min-width:12rem;min-height:4.5rem;text-align:left">' +
-        '<b>' + a.label + '</b> | ' + a.hint + '</button></div>';
+      /* Two lines and px sizes. 12rem/4.5rem were parsed as 12px and 4.5px, so each card was one text line inside an empty section frame. */
+      h += '<button type="button" data-jv-act="plat:app:' + a.id + '" data-jr-state="' + st + '" class="ja-joy' + on + '" style="min-width:220px;min-height:72px;text-align:left">' +
+        '<b>' + a.label + '</b><br><span class="ja-dim">' + a.hint + '</span></button>';
     });
-    h += '</div>';
+    h += '</div></div>';
     return h;
   }
 
@@ -12093,7 +12117,9 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     var node = findAvatarNode(view);
     if (!node) return false;
     var b = avatarBounds(node);
+    var prev = state.avatarNodeId;
     state.avatarNodeId = node.id;
+    if (prev != null && prev !== node.id) view.r.images.clear(prev);
     view.r.images.set(node.id, {
       handle: state.avatarHandle,
       x: b.x, y: b.y, w: b.w, h: b.h,
@@ -12161,9 +12187,17 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     return id === state.avatarNodeId;
   }
 
+  function dbg(kind, detail) {
+    try { if (root.__exp7Dbg) root.__exp7Dbg.push(kind, detail); } catch (_) {}
+  }
+
   async function drawBar() {
-    if (state.unmounted || state.drawing) return;
+    if (state.drawing) { dbg('bar-draw-skip', { drawing: true, mode: state.avatarMode }); return; }
+    if (state.unmounted) return;
     state.drawing = true;
+    var modeBefore = state.avatarMode;
+    var kept = false;
+    var reloaded = false;
     try {
       if (!root.JRViews || !root.JRender) throw new Error('JRViews/JRender missing');
       await root.JRViews.boot();
@@ -12176,7 +12210,9 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         state.barView = new root.JRViews.View();
         wireViewActs(state.barView);
       }
-      if (state.avatarUrl && state.avatarMode !== 'photo') state.avatarMode = 'pending';
+      /* A switch calls redraw. Reloading the photo (and drawing the empty disc first) is the icon flicker. */
+      var photoReady = !!(state.avatarUrl && state.avatarMode === 'photo' && state.avatarHandle && state.avatarHandle.state === 'ready');
+      if (state.avatarUrl && !photoReady) state.avatarMode = 'pending';
       if (!state.avatarUrl) {
         state.avatarMode = 'initials';
         clearPhotoOverlay();
@@ -12185,7 +12221,11 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       await state.barView.show(cv, doc, W);
       if (state.unmounted) return;
       setBarMode(true);
-      if (state.avatarUrl) {
+      if (photoReady) {
+        kept = true;
+        placePhotoOverlay();
+      } else if (state.avatarUrl) {
+        reloaded = true;
         var gen = ++state.loadGen;
         try {
           var h = await ensureAvatarHandle(state.avatarUrl);
@@ -12219,6 +12259,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       try { console.warn('PlatformChromeJR bar:', root.__platformChromeJrError); } catch (x) {}
     } finally {
       state.drawing = false;
+      dbg('bar-draw', { modeBefore: modeBefore, mode: state.avatarMode, kept: kept, reloaded: reloaded, chrome: chromeDebug() });
     }
   }
 
@@ -12243,6 +12284,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       var doc = parseApp(appsHtml());
       await state.appsView.show(cv, doc, W);
       setAppsMode(true);
+      dbg('apps-draw', chromeDebug());
       try { if (root.Exp7Slabs && root.Exp7Slabs.notify) root.Exp7Slabs.notify(); } catch (e) {}
     } catch (e) {
       setAppsMode(false);
@@ -12267,15 +12309,20 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     }
     var same = next === state.avatarUrl;
     state.avatarUrl = next;
+    if (same && next && (state.avatarMode === 'photo' || state.avatarMode === 'pending')) {
+      /* Same picture already on screen or already loading. Do not drop it back to pending. */
+      return;
+    }
     state.avatarMode = next ? 'pending' : 'initials';
     state.loadGen++;
     if (!next) {
       freeHandle();
       clearPhotoOverlay();
-    } else if (!same) {
+    } else {
       /* Update: drop previous photo immediately so exclusive pending holds. */
       clearPhotoOverlay();
     }
+    dbg('avatar-url', { same: same, mode: state.avatarMode, hasUrl: !!next });
     if (state.on && !state.unmounted) drawBar();
   }
 
@@ -12315,6 +12362,43 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     return drawBar();
   }
 
+  function chromeDebug() {
+    var cv = $('jrChromeCanvas');
+    var host = $('jrChromeHost');
+    var appsHost = $('jrAppsHost');
+    var acv = appsHost && appsHost.querySelector('canvas');
+    var b = null;
+    try { var node = findAvatarNode(state.barView); b = node ? avatarBounds(node) : null; } catch (_) {}
+    var buttons = [];
+    var L = state.appsView && state.appsView.L;
+    if (L && L.nodes) {
+      for (var i = 0; i < L.nodes.length; i++) {
+        var n = L.nodes[i];
+        if (!n.el || !n.el.classList || !n.el.classList.contains('ja-joy')) continue;
+        var hit = n.hit || [0, 0, 0, 0];
+        var texts = [];
+        var items = n.items || [];
+        for (var j = 0; j < items.length; j++) if (items[j][0] === 'text') texts.push(String(items[j][5]).slice(0, 48));
+        buttons.push({ act: n.el.getAttribute('data-jv-act'), w: Math.round(hit[2]), h: Math.round(hit[3]), lines: texts });
+      }
+    }
+    var barH = null;
+    try { var chrome = $('topChrome'); if (chrome) barH = Math.round(chrome.getBoundingClientRect().height); } catch (_) {}
+    return {
+      avatarMode: state.avatarMode,
+      photoReady: !!(state.avatarHandle && state.avatarHandle.state === 'ready'),
+      loadGen: state.loadGen,
+      barH: barH,
+      barCanvas: cv ? [cv.clientWidth, cv.clientHeight] : null,
+      barHost: host ? [host.clientWidth, host.clientHeight] : null,
+      barLayoutH: state.barView && state.barView.L ? state.barView.L.H : null,
+      avatar: b ? { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) } : null,
+      appsCanvas: acv ? [acv.clientWidth, acv.clientHeight] : null,
+      appsLayoutH: L ? L.H : null,
+      appsButtons: buttons
+    };
+  }
+
   root.PlatformChromeJR = {
     start: start,
     redraw: drawBar,
@@ -12323,6 +12407,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     unmount: unmount,
     onContextLost: onContextLost,
     avatarCircleHit: avatarCircleHit,
+    debugState: chromeDebug,
     active: function () { return !!state.on; },
     appsActive: function () { return !!state.appsOn; },
     avatarMode: function () { return state.avatarMode; },
@@ -12631,6 +12716,7 @@ function exp7Handoff(){
  const canvases=[].map.call(document.querySelectorAll("#appShell canvas,#jrChromeCanvas,#appsOverlay canvas"),function(c){ var cs; try{cs=getComputedStyle(c)}catch(e){cs={display:""}} return {parent:c.parentElement&&(c.parentElement.id||c.parentElement.className), display:cs.display, client:[c.clientWidth,c.clientHeight], px:[c.width,c.height]}; });
  return {shell:SHELL_VERSION, ua:navigator.userAgent, gpu:!!navigator.gpu, dpr:window.devicePixelRatio||1, when:new Date().toISOString(),
   mounted:UI.mountedAppId||null, appsOpen:!!UI.appsOpen,
+  chromeJr:(window.PlatformChromeJR&&PlatformChromeJR.debugState)?PlatformChromeJR.debugState():null,
   chrome:{overlay:dbgBox($("appsOverlay")), shell:dbgBox($("appShell")), slots:["exp7","budget"].map(function(id){return dbgBox(slotEl(id))})},
   topEl:topEl, canvases:canvases, jrerr:[].map.call(document.querySelectorAll(".jrerr"),function(e){return String(e.textContent||"").slice(0,200)}),
   pageerr:(window.PAGEERR||[]).slice(-8), style:styleProbe(), log:(window.__exp7Dbg&&window.__exp7Dbg.log||[]).slice()};
@@ -12686,7 +12772,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.10",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.11",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
