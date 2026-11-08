@@ -26,6 +26,14 @@ Personal **data** stays in a separate user GitHub repo. Software updates must ne
 - Light theme; transparent backgrounds; panels/text must stay readable.  
 - **No message to the Artist is authorized** in this documentation pass. Storage renames wait on coordinated Artist codec naming. [REQ]
 
+## Views standard — one JRender everywhere [REQ 2026-11-08 direction]
+
+See **[views-jrender-standard.md](./views-jrender-standard.md)** for the accepted path:
+
+- **Universal views, per-app data** — one Exp7Views design for Cal/Board/Plan; each app keeps its own atlas.  
+- **One renderer, many views** — same or different view kinds; app-owned scene content in the same composition.  
+- **Destination:** apps and the platform shell draw entirely with JRender (one JRender for everywhere). Shell-in-JRender is **not** claimed done on `main` yet **[OPEN]**.
+
 ## Verified `main` mount model (1.5.0) [MEAS 2026-11-08]
 
 On commit `69a2cd9bb34a18926ee1e4b8db73b56406e6a6fb`:
@@ -54,9 +62,9 @@ Do not document platform sync as “full app sync.”
 
 ## Budget — requirement vs `main`
 
-**[REQ]** Budget uses **real** Exp7 Calendar / Board / Plan (`calHtml` / `boardHtml` / plan+`depsHtml`), Board adapted for expense/income/debt/asset, optional per-joy harmonic shares (not auto-dollars).
+**[REQ]** Budget uses **real** Exp7 Calendar / Board / Plan (`calHtml` / `boardHtml` / plan+`depsHtml`) via the **same** Exp7Views module as demo — universal view design, Budget’s own IDB atlas (data not shared). Optional finance tags / harmonic shares stay outside forked builders (not auto-dollars).
 
-**[MEAS on main 1.5.0]** Embedded `budgetpkg` (~19 789 B decoded) defines **`renderCal` / `renderBoard` / `renderPlan`** and does **not** contain `calHtml`, `boardHtml`, `JAtlasModel`, or `moneyCalendarTemplate`. It is a **substitute worksheet**, not the real Exp7 view stack. Manifest text saying “calendar/board/plan” is easy to misread as real views — it is not proof of `calHtml` reuse.
+**[MEAS on main 1.5.0]** Embedded `budgetpkg` (~19 789 B decoded) defined **`renderCal` / `renderBoard` / `renderPlan`** stubs. Later `main` releases (1.7.x) re-packed Budget onto Exp7Views; **re-measure tip** before treating any substitute claim as current. See [views-jrender-standard.md](./views-jrender-standard.md).
 
 ## Security shape [REQ]
 
