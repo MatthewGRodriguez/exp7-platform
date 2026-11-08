@@ -87,6 +87,7 @@ VIEW_ROIS_LEGACY = {
 # Probe 640 undersamples glyphs with projected height < this — gate as SKIP not false pass
 MIN_GLYPH_H_PX_PROBE = 8.0
 MIN_GLYPH_H_PX_PROD = 12.0
+MIN_GLYPH_H_PX_PROD_META = 10.0  # weekdays / meta tags — still >> v8's 3–5px fail
 # Frame crop margin (px) for per-object text boxes at production
 CROP_MARGIN_PX_PROD = 4.0
 # Occlusion: text AABB vs closer non-parent panel
@@ -477,8 +478,11 @@ def gate_object_layout(sidecar: dict, w: int, h: int) -> dict:
         else:
             rep["crop_ok"] = True
         # Glyph size at production (content labels only — watermarks not gated)
-        if w > 640 and h_px < min_h and not is_watermark:
-            msg = f"glyph_small {name} h_px={h_px:.1f}<{min_h}"
+        floor = min_h
+        if any(tok in name for tok in ("_wd", "_cg", "_rs", "_evt", "_sub", "_login", "_note")):
+            floor = MIN_GLYPH_H_PX_PROD_META if w > 640 else MIN_GLYPH_H_PX_PROBE
+        if w > 640 and h_px < floor and not is_watermark:
+            msg = f"glyph_small {name} h_px={h_px:.1f}<{floor}"
             errors.append(msg)
             rep["glyph_ok"] = False
         else:

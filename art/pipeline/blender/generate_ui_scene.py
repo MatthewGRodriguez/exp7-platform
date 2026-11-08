@@ -460,10 +460,11 @@ def _collect_content_pts(objects):
 
 
 def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_name: str | None = None):
-    """Content-aware framing from full MESH+FONT extent; crop-hard + min-fill push-in.
+    """Orthographic content framing for DESIGN-STUDY views.
 
-    Includes parented label bounds so production text anchors stay in-frame.
-    Chrome uses a flatter view_dir so the nav bar is not foreshortened to ~10% fill.
+    Perspective foreshortening made wide boards fill NDC while glyphs stayed 3–6px.
+    Ortho scale maps world extent → pixels uniformly so parented labels stay legible.
+    Slight look-down keeps panel thickness readable without crushing type.
     """
     assert bpy is not None
     if not objects:
@@ -481,32 +482,24 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_n
     xs = [p.x for p in pts]
     ys = [p.y for p in pts]
     zs = [p.z for p in pts]
-    span_x = max(xs) - min(xs)
-    span_y = max(ys) - min(ys)
-    span_z = max(zs) - min(zs)
-    extent = max(span_x, span_y, span_z, 0.5) * 0.5
-    sensor = float(getattr(cam.data, "sensor_width", 36.0) or 36.0)
-    lens = float(cam.data.lens)
+    span_x = max(max(xs) - min(xs), 0.5)
+    span_y = max(max(ys) - min(ys), 0.5)
     aspect = float(res[0]) / max(1.0, float(res[1]))
-    fov_x = 2.0 * math.atan((sensor * 0.5) / max(1e-6, lens))
-    fov_y = 2.0 * math.atan((sensor * 0.5 / aspect) / max(1e-6, lens))
-    fit = extent * (1.0 + 2.0 * margin) * 1.12
-    dist = max(fit / max(1e-6, math.tan(min(fov_x, fov_y) * 0.5)), 3.8)
 
-    # Prefer frontal study angle so glyphs project larger (elevated view foreshortens type)
-    flat = (view_name == "chrome") or (span_x > 2.5 * max(span_y, 0.01) and span_z < 0.8)
-    if flat or view_name == "chrome":
-        view_dir = Vector((0.0, -0.98, 0.20)).normalized()
-        min_fill = 0.70
-        min_cam_dist = 2.0
-    else:
-        view_dir = Vector((0.0, -0.88, 0.38)).normalized()
-        min_fill = 0.68
-        min_cam_dist = 2.2
-
-    # Start well back so content always fits; then dolly in for fill + glyph size
-    cam.location = target + view_dir * max(dist * 1.6, 8.0)
+    # Slight elevated look so cards still read as 3D plates
+    view_dir = Vector((0.0, -0.92, 0.40)).normalized()
+    cam.data.type = "ORTHO"
+    cam.location = target + view_dir * 12.0
     cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
+
+    # Ortho scale = larger of world width vs height*aspect, with margin
+    pad = 1.0 + 2.0 * margin
+    scale_x = span_x * pad
+    scale_y = span_y * pad * aspect
+    ortho = max(scale_x, scale_y) * 1.08
+    # Prefer filling ~78% of the frame (tighten from padded fit)
+    ortho = ortho / 0.78
+    cam.data.ortho_scale = float(ortho)
 
     def _fit(mx0, mx1, my0, my1, mz):
         return (
@@ -515,8 +508,9 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_n
             and mz > 0
         )
 
+    # Iteratively adjust ortho_scale until content fits with margin, then tighten for fill
     minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
-    for _ in range(60):
+    for _ in range(24):
         if _fit(minx, maxx, miny, maxy, minz):
             break
         overflow = max(
@@ -524,65 +518,38 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_n
             maxx - (1.0 - margin),
             margin - miny,
             maxy - (1.0 - margin),
-            0.02,
+            0.01,
         )
-        cam.location = cam.location + view_dir * max(0.6, overflow * 12.0)
-        cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
+        cam.data.ortho_scale = float(cam.data.ortho_scale) * (1.0 + overflow * 1.8)
         minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
 
-    # Always finish with a fitted camera even if fill later fails (avoid blank chrome)
-    if not _fit(minx, maxx, miny, maxy, minz):
-        for _ in range(40):
-            overflow = max(
-                margin - minx,
-                maxx - (1.0 - margin),
-                margin - miny,
-                maxy - (1.0 - margin),
-                0.01,
-            )
-            cam.location = cam.location + view_dir * max(1.0, overflow * 14.0)
-            cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
-            minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
-            if _fit(minx, maxx, miny, maxy, minz):
-                break
-
-    # Dolly-in for canvas fill (readable compositions, not 10% chrome)
     pushed = 0
-    for _ in range(40):
+    min_fill = 0.72
+    for _ in range(20):
         minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
-        span_nx = maxx - minx
-        span_ny = maxy - miny
-        fill = max(span_nx, span_ny)
+        fill = max(maxx - minx, maxy - miny)
         slack = min(minx - margin, 1.0 - margin - maxx, miny - margin, 1.0 - margin - maxy)
-        dist_now = (cam.location - target).length
-        if fill >= min_fill or slack < 0.015 or dist_now <= min_cam_dist:
+        if fill >= min_fill or slack < 0.02:
             break
-        loc = cam.location.copy()
-        step = min(0.65, max(0.18, (min_fill - fill) * 3.5), slack * 3.0)
-        trial = loc - view_dir * step
-        if (trial - target).length < min_cam_dist:
-            break
-        cam.location = trial
-        cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
+        trial = float(cam.data.ortho_scale) * max(0.92, 1.0 - (min_fill - fill) * 0.5)
+        prev = float(cam.data.ortho_scale)
+        cam.data.ortho_scale = trial
         minx2, maxx2, miny2, maxy2, minz2 = _project_pts(scene, cam, pts)
         if not _fit(minx2, maxx2, miny2, maxy2, minz2):
-            cam.location = loc
-            cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
+            cam.data.ortho_scale = prev
             break
         pushed += 1
         minx, maxx, miny, maxy, minz = minx2, maxx2, miny2, maxy2, minz2
 
     minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
-    span_nx = maxx - minx
-    span_ny = maxy - miny
-    fill = max(span_nx, span_ny)
+    fill = max(maxx - minx, maxy - miny)
     crop_ok = _fit(minx, maxx, miny, maxy, minz)
     scene.render.resolution_x, scene.render.resolution_y = old_res
-    ok = crop_ok and fill >= (min_fill - 0.12)
+    ok = crop_ok and fill >= (min_fill - 0.10)
     errors = []
     if not crop_ok:
         errors.append(f"crop ndc=[{minx:.3f},{miny:.3f},{maxx:.3f},{maxy:.3f}]")
-    if fill < (min_fill - 0.12):
+    if fill < (min_fill - 0.10):
         errors.append(f"underscale fill={fill:.3f} < min_fill={min_fill:.2f}")
     return {
         "ok": ok,
@@ -594,8 +561,9 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_n
         "push_in_steps": pushed,
         "fill": fill,
         "min_fill": min_fill,
-        "flat_view": flat,
-        "method": "extent_mesh_glyphfill_v9",
+        "ortho_scale": float(cam.data.ortho_scale),
+        "camera_type": "ORTHO",
+        "method": "ortho_mesh_extent_v9",
     }
 
 
@@ -1524,13 +1492,14 @@ def main():
                 for o in bpy.data.objects:
                     if o.name.startswith("View") and o not in objs:
                         objs.append(o)
-                # Reset camera each view — prior push-in must not poison board/chrome framing
+                # Reset camera each view — ortho framing recomputes scale from mesh extent
+                view_cam.data.type = "ORTHO"
                 view_cam.location = Vector((0.0, -7.2, 5.4))
                 view_cam.rotation_euler = (
                     Vector((0.0, 0.1, 0.15)) - view_cam.location
                 ).to_track_quat("-Z", "Y").to_euler()
                 frame = frame_camera_to_objects(
-                    view_cam, objs, (rx, ry), margin=0.05, view_name=view_name
+                    view_cam, objs, (rx, ry), margin=0.06, view_name=view_name
                 )
                 inv = VC.content_inventory("View")
                 vval = VC.validate_view_content(inv, view_name)
