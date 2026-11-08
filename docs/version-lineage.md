@@ -45,7 +45,8 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.11** | PR #36 | Apps picker cards are two lines at a real size. Header icon stays put across an app switch. |
 | **1.8.12** | PR #37 | Header is the outer parallax slab. Each Apps card is an inner slab. |
 | **1.8.13** | PR #38 | Free controls lift. Days and rows keep a contact shadow in the gap. |
-| **1.8.14** | this branch | Sampled penumbra. Dark glass read. Exp7 show stays in its slot. |
+| **1.8.14** | PR #39 | Sampled penumbra. Dark glass read. Exp7 show stays in its slot. |
+| **1.8.15** | this branch | Soft face lip. Click poses ease, then the frame loop stops. |
 
 ### Current manifest (verbatim) [MEAS]
 
@@ -53,9 +54,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.14",
+"version": "1.8.15",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "62836c299594da164ca76c035b15bb84bc35b10a2ea1909bc0b217d0cccb7e7e",
+"sha256": "0c842a322a8dfa591c7712af089b4a12a43b71d6b7ac5680207312c4bc5a81ec",
 "minLauncherMajor": 1
 ```
 

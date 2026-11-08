@@ -54,12 +54,18 @@ The 85 mm scale (0.06% per px of lift, distance 2099 px) is applied only when th
 
 Cloud Node called `View.show` and checked the decorated list: day y, fading penumbra, clip, button lift and hit, avatar disc, dark-glass read, contrast, reduced motion, a missing `matchMedia`, hidden pause, and Exp7 `show` leaving Budget sections alone. That check is not a file in this repo. It did not paint pixels on a GPU.
 
+## Face lip and click ease (1.8.15)
+
+The hard inset bar is gone. The bottom of the card uses the same sampled kernel as the cast shadow, drawn up into the cell so it cannot cover the next day. Hover and press ease over the state-table times (90 ms, 60 ms, and the other click-path times, all at or under 120 ms). The click handler runs first. The frame loop stops when the ease arrives. Reduced motion and a hidden page drop the transform. This is not Moho playback.
+
+Cloud Node, on `View.show`: a selected day stayed put, the face rows faded and ended at the cell bottom, and the cast shadow stopped at the next row. A button ease was partway up at the middle of the 90 ms and finished with no frame left running. Mac paint is not verified.
+
 ## Still not implemented
 
 - A GPU gaussian filter. 1.8.14’s shadow is the sampled kernel in display-list rows. The shipped wasm has no blur op.
 - Translated lift on calendar days and stacked rows. The next fill is too close. Free controls still rise, capped at 2px.
 - A refraction shader, and any caustic speck. The static glass read is the published brightening on a dark fill only. Specks stay out. There is no new on/off render in this build.
-- Moho SVG frame playback inside the wasm renderer. The wasm has no SVG or timeline op. An idle frame loop is not added. Click poses still snap, inside the 120 ms budget.
+- Moho SVG frame playback inside the wasm renderer. The wasm has no SVG or timeline op. Click poses ease on the state-table times and the frame loop stops. That ease is not the Moho timeline.
 - The 85 mm perspective scale on the lifts that fit. It is under half a pixel there, so it is not drawn. Parallax remains the existing slab motion.
 - Face images on Cal / Board / Plan cells. JRDI remains the chrome-bar avatar.
 - Atlas and Roster as separate lean apps.
