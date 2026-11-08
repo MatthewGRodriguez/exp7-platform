@@ -14,6 +14,8 @@ Statuses: **Accepted [REQ]** · **Rejected** · **Substituted (must replace)** �
 | Chrome = back + whole-avatar only | Exclusive image **or** fallback |
 | Reserved header, never overlaying app | Solid layout reservation under bar |
 | Budget = real Exp7 Cal/Board/Plan | No DIY substitute views |
+| Views universal; data per-app | One Exp7Views design everywhere; atlases stay app-local [REQ 2026-11-08] |
+| One JRender for everywhere | One renderer; many same/different views + app scene content; platform shell destination = JRender too [REQ direction] — see [views-jrender-standard.md](./views-jrender-standard.md) |
 | Joy units ≠ automatic dollars | Harmonic portions use joy pool units |
 | Sync honesty | Proposal-ops ≠ full app sync; say so |
 | No Artist contact without authorization | Still unauthorized as of this docs pass |

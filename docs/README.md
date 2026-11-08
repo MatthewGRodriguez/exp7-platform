@@ -38,6 +38,7 @@ Every substantive claim should carry an evidence class (see [EVIDENCE.md](./EVID
 | [foundations.md](./foundations.md) | Living-core, JFactor, Lore VCS, Atlas, outside-process connection |
 | [vocabulary.md](./vocabulary.md) | Joy vs money, Atlas, Board shares, platform terms |
 | [architecture.md](./architecture.md) | Platform shell, apps, mount model, sync boundary, JRender |
+| [views-jrender-standard.md](./views-jrender-standard.md) | **Direction:** universal views, one JRender everywhere (many views + scene + platform) |
 | [decisions.md](./decisions.md) | Accepted / rejected / substituted approaches |
 | [version-lineage.md](./version-lineage.md) | Demo lean history + platform release lineage on GitHub |
 | [distribution-launcher.md](./distribution-launcher.md) | Software vs data repos, launcher gate, handoff |
