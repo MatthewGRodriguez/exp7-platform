@@ -229,6 +229,10 @@ Drag start eases a free control toward the dragging pose and leaves a day or a s
 
 The first move of a board row snaps its edge to gold `[117, 81, 15]`. Invalid stays caution red `[170, 0, 0]`. A day, a plan row, and a button do not take that edge. Drag end restores it. The row does not grow or rise.
 
+## Soft top light and pressed edge (1.8.18)
+
+The top of a card fades through the same sampled kernel as the shadow. Press turns the edge navy `[36, 88, 166]`, and release restores it. A day still does not rise.
+
 ## Debug handoff (1.8.9)
 
 1.8.9 does not change painting. The bar has a **Debug** button (Shift+D) that stays clickable above the chrome canvas. It copies a JSON snapshot: shell version, overlay and slot opacity, which element is on top of the content, canvas sizes, GPU and view errors, and whether the live display list contains the 1.8.8 inset bands and gold rings. `style.note` states that in one sentence. No keys or account text.

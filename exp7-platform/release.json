@@ -1,11 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.17",
+  "version": "1.8.18",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "11a93e3fc0a5c30c9e7c9e47fb633d5ebfe7e2a7f435cd7c50e6c58d9cffe4e3",
+  "sha256": "7a4ca524ec2c8273ae548c0a9dcab688533698a415bf64c520c7d8574439f6b4",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "1.8.17: A board row's first drag move snaps a gold edge. A day stays unmarked. Drag end restores the edge.",
+    "app": "1.8.18: The top of a card fades. Press turns the edge navy, then the edge returns.",
     "appSha256": "4e19bdeeb76818a6a96b9cb6655d48c950d429b17d3680184231e5a67755508b",
     "budgetSha256": "673372b101ea5342552ec16a2e5d3820e322411031c52d808b68c35c3d494c67",
     "budgetMode": "exp7-views",
