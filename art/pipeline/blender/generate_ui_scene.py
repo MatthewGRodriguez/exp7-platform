@@ -420,25 +420,37 @@ def _project_pts(scene, cam, pts):
 
 
 def _collect_content_pts(objects):
-    """Full content extent: MESH + FONT + avatar, including parented children.
+    """Frame from MESH + avatar bounds (incl. parented mesh children).
 
-    v8 excluded FONT and missed parented labels → plan left-column crop / chrome underscale.
+    FONT bound_boxes are notoriously oversized in Blender and push the camera so far
+    that glyphs collapse to 3–6px (v9b/c). Parented labels ride on panel meshes, so
+    mesh AABB is the production content extent. Only unparented FONT titles/banners
+    are added via their evaluated mesh verts (not bound_box).
     """
     assert bpy is not None
     seen = set()
     pts = []
 
+    def add_mesh_bb(ob):
+        try:
+            for c in ob.bound_box:
+                pts.append(ob.matrix_world @ Vector(c))
+        except Exception:
+            pts.append(ob.location.copy())
+
+    def add_font_verts(ob):
+        # Tight glyph extent — avoid FONT bound_box inflation
+        for p in _object_world_points(ob):
+            pts.append(p)
+
     def visit(ob):
         if ob is None or id(ob) in seen:
             return
         seen.add(id(ob))
-        useful = ob.type in ("MESH", "FONT", "CURVE") or ("avatar" in ob.name.lower())
-        if useful:
-            try:
-                for c in ob.bound_box:
-                    pts.append(ob.matrix_world @ Vector(c))
-            except Exception:
-                pts.append(ob.location.copy())
+        if ob.type == "MESH" or ("avatar" in ob.name.lower()):
+            add_mesh_bb(ob)
+        elif ob.type == "FONT" and ob.parent is None:
+            add_font_verts(ob)
         for ch in getattr(ob, "children", []) or []:
             visit(ch)
 
@@ -640,12 +652,25 @@ def make_box(name, sx, sy, sz, loc, bevel_w, mat):
     return obj
 
 
+# Darker solid faces for states that use light on-face ink (wash-only blues were ~L0.9
+# and failed independent worst-BG against INK_ON_FACE).
+FACE_SOLID_FOR_LIGHT_INK = {
+    "selected": (0.12, 0.28, 0.55),
+    "dragging": (0.14, 0.32, 0.60),
+    "pressed": (0.10, 0.24, 0.48),
+    "focus": (0.16, 0.34, 0.58),
+    "drop-pending": (0.42, 0.30, 0.08),
+    "invalid": (0.58, 0.06, 0.06),
+}
+
+
 def face_color_for_state(st_name: str, st: dict, palette: dict):
-    """JRViews wash over surface (or selectionWash base for selected)."""
+    """JRViews wash over surface; saturated states use darker solids for light ink."""
+    if st_name in FACE_SOLID_FOR_LIGHT_INK:
+        return FACE_SOLID_FOR_LIGHT_INK[st_name]
     bg_key = st.get("bg", "surface")
     base = list(palette["_rgba"].get(bg_key) or palette["_rgba"]["surface"])
     wash = WASH_RGBA.get(st_name) or WASH_RGBA.get(st.get("washKey", ""), None)
-    # selected already uses selectionWash bg; still apply wash for parity with JRViews
     return over_wash(tuple(base), wash)
 
 

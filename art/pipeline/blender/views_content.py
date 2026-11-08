@@ -302,9 +302,14 @@ def compose_calendar(make_panel, palette, geom, element_states, font_id, prefix=
 
     weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     cell_w, cell_h = 0.44, 0.40
+    wd_bar, *_ = make_panel(
+        f"{prefix}_wdbar", element_states["idle"], palette, geom, st_name="idle",
+        size=(3.6, 0.28), origin=(0.0, 1.12), content_lines=0,
+    )
+    objs.append(wd_bar)
     for i, wd in enumerate(weekdays):
         x = (i - 3) * (cell_w + gap * 0.55)
-        objs.append(make_text(f"{prefix}_wd{i}", wd, (x - 0.14, 1.12, 0.05), BODY_SIZE, INK, font_id))
+        objs.append(label_on_panel(wd_bar, f"{prefix}_wd{i}", wd, (x - 0.14, 0.0), BODY_SIZE, INK, font_id))
 
     states_cycle = [
         "idle", "hover", "selected", "focus", "pressed", "idle", "disabled",
@@ -356,8 +361,13 @@ def compose_calendar(make_panel, palette, geom, element_states, font_id, prefix=
 def compose_board(make_panel, palette, geom, element_states, font_id, prefix="ViewBoard"):
     gap = float(geom.get("gap", 8)) * float(geom.get("scenePxScale", 0.01))
     objs = []
-    objs.append(make_text(f"{prefix}_title", "Board · Expenses", (-1.75, 1.55, 0.06), TITLE_SIZE, INK, font_id))
-    objs.append(make_text(f"{prefix}_sub", "design-study · shared state-table", (-1.75, 1.35, 0.06), SUB_SIZE, INK_SECONDARY, font_id))
+    header, *_ = make_panel(
+        f"{prefix}_header", element_states["idle"], palette, geom, st_name="idle",
+        size=(4.2, 0.42), origin=(0.0, 1.55), content_lines=0,
+    )
+    objs.append(header)
+    objs.append(label_on_panel(header, f"{prefix}_title", "Board · Expenses", (-1.90, 0.06), TITLE_SIZE, INK, font_id))
+    objs.append(label_on_panel(header, f"{prefix}_sub", "design-study · shared state-table", (-1.90, -0.10), SUB_SIZE, INK_SECONDARY, font_id))
     cols = [
         ("Inbox", ["idle", "hover", "pressed"]),
         ("Active", ["selected", "dragging", "drop-pending"]),
@@ -421,8 +431,13 @@ def compose_board(make_panel, palette, geom, element_states, font_id, prefix="Vi
 
 def compose_plan(make_panel, palette, geom, element_states, font_id, prefix="ViewPlan"):
     objs = []
-    objs.append(make_text(f"{prefix}_title", "Plan · Dependencies", (-1.55, 1.50, 0.06), TITLE_SIZE, INK, font_id))
-    objs.append(make_text(f"{prefix}_sub", "what-if isolation · design-study", (-1.55, 1.30, 0.06), SUB_SIZE, INK_SECONDARY, font_id))
+    header, *_ = make_panel(
+        f"{prefix}_header", element_states["idle"], palette, geom, st_name="idle",
+        size=(3.4, 0.40), origin=(0.0, 1.45), content_lines=0,
+    )
+    objs.append(header)
+    objs.append(label_on_panel(header, f"{prefix}_title", "Plan · Dependencies", (-1.50, 0.06), TITLE_SIZE, INK, font_id))
+    objs.append(label_on_panel(header, f"{prefix}_sub", "what-if isolation · design-study", (-1.50, -0.10), SUB_SIZE, INK_SECONDARY, font_id))
     rows = [
         ("selected", "Kickoff brief", "Owner: Alex · Due Fri"),
         ("focus", "Vendor shortlist", "3 options · needs review"),
@@ -535,25 +550,19 @@ def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="V
     # Far-right avatar; login below with clearance — never over disc
     av = make_avatar(f"{prefix}_avatar", (1.60, 0.0), avatar, path, z=0.12)
     objs.append(av)
-    objs.append(make_text(f"{prefix}_login", "you", (1.48, -0.42, 0.06), BODY_SIZE, INK_SECONDARY, font_id))
     objs.append(
-        make_text(
-            f"{prefix}_banner",
-            "DESIGN-STUDY chrome · fixture",
-            (-1.60, -0.75, 0.04),
-            BODY_SIZE,
-            INK_SECONDARY,
-            font_id,
+        label_on_panel(bar, f"{prefix}_login", "you", (1.48, -0.55), BODY_SIZE, INK_SECONDARY, font_id)
+    )
+    objs.append(
+        label_on_panel(
+            bar, f"{prefix}_banner", "DESIGN-STUDY chrome · fixture",
+            (-1.60, -0.70), META_SIZE, INK_SECONDARY, font_id,
         )
     )
     objs.append(
-        make_text(
-            f"{prefix}_note",
-            "Best≠Selected · PAT stays DOM",
-            (-1.60, -0.95, 0.04),
-            BODY_SIZE * 0.9,
-            INK_SECONDARY,
-            font_id,
+        label_on_panel(
+            bar, f"{prefix}_note", "Best≠Selected · PAT stays DOM",
+            (-1.60, -0.90), META_SIZE, INK_SECONDARY, font_id,
         )
     )
     return objs
