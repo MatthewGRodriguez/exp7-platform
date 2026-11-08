@@ -1,0 +1,18 @@
+{
+  "id": "joy_debt_urgency",
+  "title": "Debt payment urgency",
+  "polarity": "cost",
+  "status": "testing",
+  "relates_to": [
+    "joy_money",
+    "joy_surplus_freedom",
+    "joy_age_happiness",
+    "joy_external",
+    "joy_calendar"
+  ],
+  "methods": [
+    "score"
+  ],
+  "author": "living-core",
+  "at": "2026-08-04T17:45:36.090Z"
+}

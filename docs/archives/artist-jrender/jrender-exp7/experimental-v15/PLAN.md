@@ -1,0 +1,1 @@
+Experimental v15: inspect live compiler/ranking/dependency/history APIs; add four opt-in native JRender tabs; instrument real proposals without changing checker/merge; isolate persistent fork preview; exact embedded CPU/regression and adversarial test fixtures only; checkpoint residuals. Preserve v13/v14. No engine algorithm port.

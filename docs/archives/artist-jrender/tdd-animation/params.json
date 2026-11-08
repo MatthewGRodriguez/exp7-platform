@@ -1,0 +1,270 @@
+{
+ "_doc": "Pipeline parameters (edit here, everything downstream regenerates). Units: CSS px, degrees, mm (35mm-equivalent, 36 mm sensor width).",
+ "panel": {
+  "W": 640,
+  "H": 420
+ },
+ "light": {
+  "type": "AREA DISK",
+  "size_px": 300,
+  "energy": 650,
+  "azimuth_deg": 90,
+  "elevation_deg": 50,
+  "distance_px": 600,
+  "caustics_reflective": true,
+  "caustics_refractive": true,
+  "filter_glossy": 0.0,
+  "mnee_shadow_caustics": false,
+  "bounces": {
+   "max": 16,
+   "transmission": 12,
+   "glossy": 8,
+   "diffuse": 4,
+   "transparent": 16
+  }
+ },
+ "frustum": {
+  "focal_mm": 85,
+  "sensor_mm": 36,
+  "framing": 0.9,
+  "near_px": 50,
+  "far_margin_px": 200,
+  "study_focals_mm": [
+   18,
+   35,
+   50,
+   85,
+   200
+  ],
+  "_why": "85 mm at matched framing: corner convergence < 1.5 deg on the 640 px panel, lifts still scale measurably; wide angles bend the inner parts toward the corners and move the highlight per pixel; near clip just in front of the highest lifted item, far just behind the ground plane (tight range = best depth precision)"
+ },
+ "points": {
+  "one": {
+   "pitch_deg": 0,
+   "yaw_deg": 0
+  },
+  "two": {
+   "pitch_deg": 40,
+   "yaw_deg": 0
+  },
+  "three": {
+   "pitch_deg": 40,
+   "yaw_deg": 30
+  },
+  "vp_tolerance_px": 1.5,
+  "parallel_tolerance_deg": 0.25
+ },
+ "ground": {
+  "page_z": 0,
+  "panel_top_z": 2.25,
+  "inner_bottom_z": 3.4,
+  "_note": "ground = page plane (platter + tiger live here); the panel top is the receiving plane for inner-part contact shadows"
+ },
+ "parallax": {
+  "anchor": "panel",
+  "virtual_camera_shift_px": 60,
+  "layer_depth_px": {
+   "platter": -120,
+   "tiger": -110,
+   "panel": 0,
+   "inner": 4,
+   "lifted": 12
+  },
+  "max_offset_px": 6,
+  "inputs": [
+   "pointermove",
+   "scroll"
+  ],
+  "scroll_k": 0.02,
+  "off_when": [
+   "prefers-reduced-motion",
+   "document.hidden",
+   "loading"
+  ],
+  "no_loop": false,
+  "ambient": {
+   "_doc": "self-running slow drift of the DEPTH LAYERS only (platter, tiger); glass lighting stays static (no looping shine)",
+   "layers": [
+    "platter",
+    "tiger"
+   ],
+   "amp_px": [
+    4,
+    3
+   ],
+   "period_s": [
+    31,
+    23
+   ],
+   "easing": "ease-in-out",
+   "pause_when": [
+    "document.hidden",
+    "html.tds-uh"
+   ],
+   "off_when": [
+    "prefers-reduced-motion",
+    "loading"
+   ],
+   "axes": {
+    "platter": "y",
+    "tiger": "xy"
+   },
+   "_axes_why": "fetch4b shipped SM1 with smDx+smDy both on translate without composition, so the platter only ever drifted in Y; SM1b keeps that motion identical",
+   "tiger_base_transform": "translate(-50%,-50%)",
+   "compositor_rule": "one RUNNING animation per property per element, composite replace; paused composite:add parallax only on a property with no running animation (tested: anything else puts the drift on the main thread)"
+  },
+  "slots": {
+   "platter": {
+    "drift": "transform",
+    "parallax": "translate (body::before)"
+   },
+   "tiger": {
+    "drift_x": "translate (#tg-g)",
+    "drift_y": "transform with the TG4 base (#tg-g)",
+    "parallax": "translate on each #tg-g>i window (no running translate there)"
+   }
+  }
+ },
+ "blender": {
+  "samples": 48,
+  "scale": 1.5,
+  "mac": "f4fcd018-5ea1-4447-9f5b-f95e55108969",
+  "stage_dir": "[REDACTED-HOME]/AnimationPipeline/tdd/pipeline2"
+ },
+ "gates": {
+  "contrast_min": 4.5,
+  "clipcheck_max": 0,
+  "frame_p95_ms": 16.8,
+  "apply_ms": 100,
+  "click_path_ms": 120,
+  "banned_words": [
+   "trainee",
+   "instructor"
+  ],
+  "ascii_only": true,
+  "idle_recalc_per_s": 1.0,
+  "parallax_side_min_px": 0.5,
+  "render_cost_max_ratio": 1.05
+ },
+ "belt_waves": {
+  "_what": "Header belt (the yellow reflective runway strip, #td-stripe) gets rolling waves like a flexible reflective fabric. Shading only on the yellow; geometry from 09_belt/draw_belt.py, lit by params.light in Blender, traced to bands, timed in Moho, shipped as one translating gradient layer (compositor transform only).",
+  "tile_css": [
+   820,
+   20
+  ],
+  "tile_art": [
+   656,
+   16
+  ],
+  "waves_per_tile": 5,
+  "crest_slant_deg": 20,
+  "max_slope": 0.32,
+  "travel": "+x relative to the fabric",
+  "period_s": 10,
+  "phases": [
+   0,
+   0.25,
+   0.5,
+   0.75
+  ],
+  "yellow": {
+   "hex": "#fcd669",
+   "roughness": 0.32,
+   "coat": 0.5,
+   "coat_roughness": 0.08,
+   "retro_gain": 0.35,
+   "retro_power": 6,
+   "_retro": "Cycles has no retroreflective BSDF; the retro lobe is (N.L)^power*gain driven by the same single light direction, added to the Principled response"
+  },
+  "blue": {
+   "hex": "#0b2b99",
+   "roughness": 0.7,
+   "_role": "matte print on the same fabric; rendered with the same waves to decide whether the waves visibly change it"
+  },
+  "blue_keep_threshold_dL": 0.02,
+  "band_stops": 12,
+  "render_px_per_css": 4
+ },
+ "caustics_layer": {
+  "_what": "CA1: static soft caustic light on the INNER glass boxes (GL4 inner glass, glass material), traced from on512/off512 (03c). No animation: at inner depth (+4 px) the SM1b parallax model gives <=0.16 px, and SM1b holds the inner layer fixed (only platter and tiger move).",
+  "targets": {
+   "A_gradient_fill": {
+    "sel": ".day-sched-block.k-shift:not(#z#z),.tr-mv:not(#z#z)",
+    "under": "linear-gradient(rgb(73 80 88/.574),rgb(55 61 69/.574))",
+    "base_srgb": [
+     48,
+     53,
+     59
+    ],
+    "_base": "measured mid k-shift block, plan view, fetch4b+SM1b"
+   },
+   "B_color_fill": {
+    "sel": ":is(.mc,.cal-m):not(#cal-card *):not(#z#z#z#z)",
+    "under": null,
+    "base_srgb": [
+     31,
+     35,
+     39
+    ],
+    "_base": "GL4 rgb(26 30 34/.594) over the card body #24282c..#2b3035"
+   }
+  },
+  "excluded": {
+   "#cal-card .cal-m": "sits over the see-through platter (PL1), not over the lit panel; transmission capped at .2 for contrast",
+   "buttons": "button material in the trace (ratio 1.18), not glass",
+   "coloured agenda blocks": "agenda materials, not glass"
+  },
+  "parallax_depth_px": 4
+ },
+ "px2": {
+  "_doc": "PX2: 3D-sided parallax. Backdrop (platter + tiger) is screen-fixed; UI parts are slabs with drawn thickness; fronts move <= text_max_px, back faces (rings) show the sides.",
+  "camera_shift_px": 60,
+  "text_max_px": 1.0,
+  "classes": {
+   "outer": {
+    "part": "panel",
+    "text": true,
+    "sel": ".card:not(.card .card)",
+    "clip": false,
+    "mat": "panel"
+   },
+   "inner": {
+    "part": "card1",
+    "text": true,
+    "sel": ".card .card,.tr-mv,.mc,.cal-m",
+    "clip": false,
+    "mat": "glass"
+   },
+   "block": {
+    "part": "ag1",
+    "text": true,
+    "sel": ".day-sched-block",
+    "clip": true,
+    "mat": "agenda_green"
+   },
+   "button": {
+    "part": "btn1",
+    "text": true,
+    "sel": "button",
+    "clip": false,
+    "mat": "button"
+   }
+  },
+  "exclude": ".ux-gh,.ds-ghost,.cal-days button",
+  "ambient": {
+   "amp": 0.5,
+   "period_x_s": 34.5,
+   "period_y_s": 23,
+   "keyframes": 36,
+   "_why": "3:2 Lissajous closes in 69 s; never repeats a straight back-and-forth; amp 0.5 of a full pointer swing"
+  },
+  "scroll": {
+   "k_per_px": 0.012,
+   "decay_ms": 260,
+   "_why": "scroll tilts the view by its velocity and eases back; position-based tilt saturates on the 1M page"
+  },
+  "backdrop": "fixed",
+  "_backdrop_why": "Matthew: the tiger stays put; a single moving background is not parallax. The platter is the same backdrop plane, so it stays fixed too.",
+  "_exclude_why": "calendar day keys (~365 per view) ride on the month glass (.cal-m, which has its own sides); measured: 400 rings add ~1.5 ms to every style recalc while the loader runs"
+ }
+}

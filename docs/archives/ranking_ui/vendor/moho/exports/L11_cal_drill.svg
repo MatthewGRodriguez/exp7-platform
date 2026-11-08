@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <title>L11 calendar drill</title>
+  <style>
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; }
+      animate, animateTransform, animateMotion { display: none; }
+    }
+  </style>
+  <rect x="24" y="30" width="72" height="56" rx="8" fill="none" stroke="#bb9af7" stroke-width="2" opacity="0">
+    <animate attributeName="opacity" values="0;1;0" dur="0.8s" fill="freeze"/>
+    <animate attributeName="y" values="40;30;28" dur="0.8s" fill="freeze"/>
+  </rect>
+  <path d="M48 58 L68 58 M60 50 L70 58 L60 66" fill="none" stroke="#7dcfff" stroke-width="2.5" stroke-linecap="round" opacity="0">
+    <animate attributeName="opacity" values="0;1;0" dur="0.8s" fill="freeze"/>
+    <animateTransform attributeName="transform" type="translate" values="-8 0;0 0;4 0" dur="0.8s" fill="freeze"/>
+  </path>
+</svg>

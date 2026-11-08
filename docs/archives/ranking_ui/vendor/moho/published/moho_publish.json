@@ -1,0 +1,77 @@
+{
+  "at": "2026-08-05T15:02:33.841Z",
+  "law": "Moho Pro designs light. lighting_sot.json → WebGPU 3D scene. HTML structure/$. design_bindings place function.",
+  "designer": "Moho.app Pro CLI",
+  "project": "vendor/moho/project/JWorkbook_chrome.moho",
+  "motion_timeline": "vendor/moho/published/motion_timeline.json",
+  "sequence_dir": "vendor/moho/published/sequence",
+  "frames_n": 72,
+  "render_ok": true,
+  "animate_ok": true,
+  "design_upgrade_ok": true,
+  "motion_ok": true,
+  "bindings_rev": 3,
+  "bindings_fail_closed": true,
+  "events": [
+    {
+      "when": "tab-change",
+      "layer": "L6_tab_switch",
+      "region": "tab_active",
+      "place": "cover"
+    },
+    {
+      "when": "save-ok",
+      "layer": "L12_save_ok",
+      "region": "status",
+      "place": "highlight"
+    },
+    {
+      "when": "live-badge.on",
+      "layer": "L4_run_pulse",
+      "region": "live_badge",
+      "place": "badge"
+    },
+    {
+      "when": "money-update",
+      "layer": "L5_money_spark",
+      "region": "graph_bar",
+      "place": "badge"
+    },
+    {
+      "when": "calendar-drill",
+      "layer": "L11_cal_drill",
+      "region": "pane",
+      "place": "badge"
+    },
+    {
+      "when": "review-decision",
+      "layer": "L10_review",
+      "region": "pane",
+      "place": "badge"
+    },
+    {
+      "when": "relation-graph",
+      "layer": "L13_relation_graph",
+      "region": "joy_graph",
+      "place": "highlight"
+    }
+  ],
+  "anti_drift": {
+    "source": "moho_pro",
+    "open_gui": "disabled",
+    "placement": "design_bindings.json",
+    "motion": "published/motion_timeline.json",
+    "pixels": "published/sequence/frame_*.jpeg",
+    "lighting": "published/lighting_sot.json",
+    "render": "webgpu"
+  },
+  "lighting_anim_ok": true,
+  "lighting_at": "2026-08-05T16:20:52.434Z",
+  "lighting_script": "scripts/AnimateUiLighting.lua",
+  "note": "Pipeline: Moho Pro CLI → motion_timeline → lighting_sot → jworkbook_webgpu (depth). CSS bevel is fallback only.",
+  "perspective_anim": true,
+  "lighting_sot": "vendor/moho/published/lighting_sot.json",
+  "lighting_sot_ok": true,
+  "lighting_sot_at": "2026-08-05T17:29:24.188Z",
+  "render": "webgpu"
+}

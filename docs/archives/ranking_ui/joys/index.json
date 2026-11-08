@@ -1,0 +1,136 @@
+{
+  "project": "ranking_ui",
+  "law": "joys live in ranking_ui; living-core authors via bridge",
+  "joys": [
+    {
+      "id": "joy_age_happiness",
+      "title": "Age ↔ happiness weight",
+      "polarity": "neutral",
+      "status": "testing",
+      "relates_to": [
+        "joy_money",
+        "joy_external",
+        "joy_surplus_freedom",
+        "joy_debt_urgency",
+        "joy_calendar"
+      ],
+      "methods": [
+        "score"
+      ],
+      "author": "living-core",
+      "at": "2026-08-04T17:45:36.090Z"
+    },
+    {
+      "id": "joy_calendar",
+      "title": "Calendar time (editable cadences · work CST)",
+      "polarity": "neutral",
+      "status": "testing",
+      "relates_to": [
+        "joy_money",
+        "joy_age_happiness",
+        "joy_external",
+        "joy_debt_urgency",
+        "joy_surplus_freedom"
+      ],
+      "methods": [
+        "score"
+      ],
+      "author": "living-core",
+      "at": "2026-08-04T18:04:06.049Z"
+    },
+    {
+      "id": "joy_debt_urgency",
+      "title": "Debt payment urgency",
+      "polarity": "cost",
+      "status": "testing",
+      "relates_to": [
+        "joy_money",
+        "joy_surplus_freedom",
+        "joy_age_happiness",
+        "joy_external",
+        "joy_calendar"
+      ],
+      "methods": [
+        "score"
+      ],
+      "author": "living-core",
+      "at": "2026-08-04T17:45:36.090Z"
+    },
+    {
+      "id": "joy_external",
+      "title": "External noise (does not settle with age)",
+      "polarity": "neutral",
+      "status": "testing",
+      "relates_to": [
+        "joy_money",
+        "joy_age_happiness",
+        "joy_debt_urgency",
+        "joy_surplus_freedom",
+        "joy_calendar"
+      ],
+      "methods": [
+        "score"
+      ],
+      "author": "living-core",
+      "at": "2026-08-04T17:45:36.090Z"
+    },
+    {
+      "id": "joy_money",
+      "title": "Money (depreciation / spend utility)",
+      "polarity": "cost",
+      "status": "testing",
+      "relates_to": [
+        "joy_age_happiness",
+        "joy_external",
+        "joy_debt_urgency",
+        "joy_surplus_freedom",
+        "joy_calendar"
+      ],
+      "methods": [
+        "score"
+      ],
+      "author": "living-core",
+      "at": "2026-08-04T17:45:36.090Z"
+    },
+    {
+      "id": "joy_surplus_freedom",
+      "title": "Surplus freedom (cash after living + debt)",
+      "polarity": "produce",
+      "status": "testing",
+      "relates_to": [
+        "joy_money",
+        "joy_debt_urgency",
+        "joy_age_happiness",
+        "joy_external",
+        "joy_calendar"
+      ],
+      "methods": [
+        "score"
+      ],
+      "author": "living-core",
+      "at": "2026-08-04T17:45:36.090Z"
+    }
+  ],
+  "views": [
+    "calendar_actions.md",
+    "calendar_editable.md",
+    "calendar_hierarchy.md",
+    "calendar_layers.md",
+    "calendar_money_law.md",
+    "calendar_paint.md",
+    "calendar_schedule.md",
+    "jworkbook.md",
+    "moho_full_ui.md",
+    "moho_layers.md",
+    "moho_roadmap.md",
+    "motion.md",
+    "optimal_vs_actual.md",
+    "pi_chat.md",
+    "research_calendar_apps.md",
+    "research_svg_motion.md",
+    "review_gate.md",
+    "svg_first_motion.md",
+    "use_vs_expected.md"
+  ],
+  "updated_at": "2026-08-05T00:39:06.523Z"
+}

@@ -1,0 +1,197 @@
+{
+  "project": "ranking_ui",
+  "author": "living-core probe_app_moho",
+  "law": "HTML = structure + money. Moho.app = motion art design SoT. living-core = bridge only (bindings, map, catalog). design_bindings fail_closed.",
+  "moho": {
+    "app": "/Applications/Moho.app",
+    "app_name": "Moho",
+    "invoke": "living_invoke external_id=app:Moho",
+    "invoke_with_map": "living_invoke app:Moho args=[vendor/moho/design/design_map.svg]",
+    "project_dir": "vendor/moho/project",
+    "project_file": "vendor/moho/project/JWorkbook_chrome.moho",
+    "open_guide": "vendor/moho/project/OPEN_IN_MOHO.md",
+    "scene_hint": "Author in Moho.app · save JWorkbook_chrome.moho · export SVG basenames"
+  },
+  "design_law": {
+    "artboard": {
+      "w": 1280,
+      "h": 800
+    },
+    "designer": "Moho.app Pro",
+    "bindings": "design_bindings.json",
+    "master": "design/ui_master.svg",
+    "map": "design/design_map.svg",
+    "project": "vendor/moho/project/JWorkbook_chrome.moho",
+    "fail_closed": true,
+    "note": "Moho.app designs art. Bindings place art. No binding ⇒ no float.",
+    "published_motion": "published/motion_timeline.json",
+    "published_sequence": "published/sequence/"
+  },
+  "at": "2026-08-05T14:09:30.309Z",
+  "rev": 10,
+  "always_on": true,
+  "layers": [
+    {
+      "id": "L0_void",
+      "name": "Void (bg depth)",
+      "role": "background",
+      "z": 0,
+      "ambient": true,
+      "css_class": "moho-L0",
+      "moho_layer": "Void",
+      "export": "exports/L0_void.svg",
+      "note": "Near-black GrokNight plate"
+    },
+    {
+      "id": "L1_accent_wave",
+      "name": "Accent wave",
+      "role": "accent",
+      "z": 1,
+      "ambient": true,
+      "css_class": "moho-L1",
+      "moho_layer": "AccentWave",
+      "export": "exports/L1_accent_wave.svg",
+      "note": "Grok Build thinking accent — always drifting"
+    },
+    {
+      "id": "L2_chrome",
+      "name": "Chrome frame",
+      "role": "chrome",
+      "z": 2,
+      "ambient": true,
+      "css_class": "moho-L2",
+      "moho_layer": "Chrome",
+      "export": "exports/L2_chrome.svg",
+      "note": "Header/tabs silhouette; optional Moho vector export"
+    },
+    {
+      "id": "L3_panel_breathe",
+      "name": "Panel breathe",
+      "role": "surface",
+      "z": 3,
+      "ambient": true,
+      "css_class": "moho-L3",
+      "moho_layer": "PanelBreathe",
+      "export": "exports/L3_panel.svg",
+      "note": "Soft scale on side/kpi — Moho bone idle"
+    },
+    {
+      "id": "L4_run_pulse",
+      "name": "run() pulse",
+      "role": "status",
+      "z": 4,
+      "ambient": false,
+      "when": "live-badge.on",
+      "css_class": "moho-L4",
+      "moho_layer": "RunPulse",
+      "export": "exports/L4_run_pulse.svg",
+      "note": "Only while Exp6 run() live"
+    },
+    {
+      "id": "L5_money_spark",
+      "name": "Money spark",
+      "role": "fx",
+      "z": 5,
+      "ambient": false,
+      "when": "money-update",
+      "css_class": "moho-L5",
+      "moho_layer": "MoneySpark",
+      "export": "exports/L5_money_spark.svg",
+      "note": "Gain/spend flash — short Moho burst"
+    },
+    {
+      "id": "L6_tab_switch",
+      "name": "Tab switch",
+      "role": "transition",
+      "z": 6,
+      "ambient": false,
+      "when": "tab-change",
+      "css_class": "moho-L6",
+      "moho_layer": "TabSwitch",
+      "export": "exports/L6_tab.svg",
+      "note": "Pane enter — layer wipe"
+    },
+    {
+      "id": "L10_review",
+      "name": "Review flash",
+      "role": "fx",
+      "z": 10,
+      "ambient": false,
+      "when": "review-decision",
+      "css_class": "moho-L10",
+      "moho_layer": "ReviewFlash",
+      "export": "exports/L10_review.svg",
+      "note": "Accept/reject flash"
+    },
+    {
+      "id": "L11_cal_drill",
+      "name": "Calendar drill",
+      "role": "fx",
+      "z": 11,
+      "ambient": false,
+      "when": "calendar-drill",
+      "css_class": "moho-L11",
+      "moho_layer": "CalDrill",
+      "export": "exports/L11_cal_drill.svg",
+      "note": "Calendar drill-down"
+    },
+    {
+      "id": "L12_save_ok",
+      "name": "Save ok",
+      "role": "fx",
+      "z": 12,
+      "ambient": false,
+      "when": "save-ok",
+      "css_class": "moho-L12",
+      "moho_layer": "SaveOk",
+      "export": "exports/L12_save_ok.svg",
+      "note": "Save success"
+    },
+    {
+      "id": "L13_relation_graph",
+      "name": "Relation graph",
+      "role": "graph",
+      "z": 13,
+      "ambient": false,
+      "when": "relation-graph",
+      "css_class": "moho-L13",
+      "moho_layer": "RelationGraph",
+      "export": "exports/L13_relation_graph.svg",
+      "note": "Design reference orbit; runtime never floats — live #joy-relation-graph is SoT",
+      "float": false
+    }
+  ],
+  "events": {
+    "tab-change": "L6_tab_switch",
+    "live-badge.on": "L4_run_pulse",
+    "money-update": "L5_money_spark",
+    "review-decision": "L10_review",
+    "calendar-drill": "L11_cal_drill",
+    "save-ok": "L12_save_ok",
+    "relation-graph": "L13_relation_graph"
+  },
+  "pipeline": [
+    "1. living_invoke app:Moho — design on 1280×800 artboard (design_map regions)",
+    "2. Export SVG layers → vendor/moho/exports/",
+    "3. Bind when→region→place in design_bindings.json",
+    "4. living_reload / Best probe_app_moho refreshes layers + bindings",
+    "5. ranking_ui loads bindings; fail_closed placement",
+    "6. REVIEW if motion/bindings law changes"
+  ],
+  "svg_first": true,
+  "prefer": "svg",
+  "optional_webp": {
+    "status": "runtime_ready",
+    "law": "SVG SMIL is densest SoT; WebP optional same basenames under exports/",
+    "pattern": "exports/L*_*.webp",
+    "note": "Runtime: SVG inline first; same-basename .webp only if SVG 404"
+  },
+  "rev_note": "Phase12 Moho.app is design SoT · living-core bridge only · design_bindings fail_closed",
+  "moho_publish": {
+    "at": "2026-08-05T15:02:33.841Z",
+    "stamp": "published/moho_publish.json",
+    "motion": "published/motion_timeline.json",
+    "sequence": "published/sequence/",
+    "project": "vendor/moho/project/JWorkbook_chrome.moho"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "id": "joy_calendar",
+  "title": "Calendar time (editable cadences · work CST)",
+  "polarity": "neutral",
+  "status": "testing",
+  "relates_to": [
+    "joy_money",
+    "joy_age_happiness",
+    "joy_external",
+    "joy_debt_urgency",
+    "joy_surplus_freedom"
+  ],
+  "methods": [
+    "score"
+  ],
+  "author": "living-core",
+  "at": "2026-08-04T18:04:06.049Z"
+}
