@@ -33,8 +33,8 @@ Handoff reports the 7 055 B launcher had an invalid nested Register control 
 
 ## Public fetch spot-check [MEAS 2026-11-08]
 
-`GET https://raw.githubusercontent.com/MatthewGRodriguez/exp7-platform/main/exp7-platform/release.json` → HTTP **200**, body matches git `origin/main` 1.5.0 manifest (CORS/`Access-Control-Allow-Origin` not re-validated in this docs pass; earlier 1.2.0 handoff noted `*` [MEAS historical]).
+`GET https://raw.githubusercontent.com/MatthewGRodriguez/exp7-platform/main/exp7-platform/release.json` → HTTP **200**, body matches git `origin/main` **1.8.3** manifest (SHA `2033acab…`; CORS/`Access-Control-Allow-Origin` not re-validated in this docs pass; earlier 1.2.0 handoff noted `*` [MEAS historical]).
 
 ## Platform ↔ launcher compatibility
 
-Verified `main` shell documents launcher handoff acceptance (one-shot, sign-out must not silently reuse stale handoff). Full end-to-end launcher→platform on Matthew’s Safari remains **[USER-HW] / [OPEN]** for current 1.5.0 pairing with whatever launcher file he actually opens.
+Verified `main` shell documents launcher handoff acceptance (one-shot, sign-out must not silently reuse stale handoff). Full end-to-end launcher→platform on Matthew’s Safari remains **[USER-HW] / [OPEN]** for current **1.8.3** pairing with whatever launcher file he actually opens.

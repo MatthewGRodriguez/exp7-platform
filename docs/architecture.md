@@ -1,6 +1,6 @@
 # Architecture
 
-## Layers (as designed)
+## Layers (as designed / shipped 1.8.3)
 
 ```
 Launcher HTML (tiny, no platform embedded)
@@ -8,63 +8,76 @@ Launcher HTML (tiny, no platform embedded)
     │  same-window postMessage key handoff (once, 15s)
     ▼
 Platform shell (release payload HTML)
-    ├── Top chrome: back + avatar only  [REQ]
-    ├── Account / share / Add user (behind avatar)
-    ├── App picker (via back)
+    ├── Top chrome: back + avatar — JRViews paint + canvas hits when GPU  [MEAS 1.8.3]
+    ├── Account / share / Add user / packages (behind avatar) — DOM (PAT)  [REQ]
+    ├── App picker (via back) — JRViews when GPU; DOM fallback
     └── Direct-mounted apps in #appSlot-* (no iframe)  [REQ]
-            ├── Exp7 lean (embedded apppkg) — Atlas + JRender views
-            └── Budget — MUST reuse real Exp7 Cal/Board/Plan  [REQ]
+            ├── Exp7 lean (embedded apppkg) — Atlas + Exp7Views → JRender
+            └── Budget (embedded budgetpkg) — same Exp7Views module; own IDB atlas
+                    Cal + 4 Board roots + Plan; tabs in-scene when JR paints
 ```
 
-Personal **data** stays in a separate user GitHub repo. Software updates must never overwrite personal data. [REQ]
+Personal **data** stays in a separate user GitHub repo. Software updates must never overwrite personal data. **[REQ]**
+
+Chrome / parallax detail: [platform-chrome-jrender.md](./platform-chrome-jrender.md).  
+Views direction: [views-jrender-standard.md](./views-jrender-standard.md).
 
 ## JRender [REQ 2026-11-03 … 11-06]
 
 - All genuine Exp7 views are drawn by **real JRender** (Artist’s renderer), never a reimplementation.  
-- **No fallback renderer:** without WebGPU / wasm, show a plain error with diagnostics.  
+- **No fallback renderer:** without WebGPU / wasm, show a plain error with diagnostics (`.jrerr`).  
 - Shipped path: core wasm (`wasm32-unknown-unknown`, 0 imports) + thin JS host. WASI 0.3 migration **not done**.  
 - Light theme; transparent backgrounds; panels/text must stay readable.  
-- **No message to the Artist is authorized** in this documentation pass. Storage renames wait on coordinated Artist codec naming. [REQ]
+- Motion: **Exp7Slabs** wraps `JRViews.View.show` (pointer parallax + ambient).  
+- **No message to the Artist is authorized** unless Matthew opens it. **[REQ]**
 
-## Views standard — one JRender everywhere [REQ 2026-11-08 direction]
-
-See **[views-jrender-standard.md](./views-jrender-standard.md)** for the accepted path:
+## Views standard — one JRender everywhere [REQ 2026-11-08]
 
 - **Universal views, per-app data** — one Exp7Views design for Cal/Board/Plan; each app keeps its own atlas.  
-- **One renderer, many views** — same or different view kinds; app-owned scene content in the same composition.  
-- **Destination:** apps and the platform shell draw entirely with JRender (one JRender for everywhere). Shell-in-JRender is **not** claimed done on `main` yet **[OPEN]**.
+- **One renderer, many views** — `Exp7Views.mountSurface`; shared Core / `GPUContext`.  
+- **Platform chrome on JRViews (1.8.3)** — bar + apps + Budget tabs; account/key DOM.  
+- Still open: single DisplayList for bar+app; Exp7 demo nav in-scene; Mac USER-HW parallax proof.
 
-## Verified `main` mount model (1.5.0) [MEAS 2026-11-08]
+## Verified `main` mount model (1.8.3) [MEAS 2026-11-08]
 
-On commit `69a2cd9bb34a18926ee1e4b8db73b56406e6a6fb`:
+Tip commit: `d8f6ccdc171b49385e0a738e7451714741f5dd99` (merge PR #26).  
+Release: **1.8.3** · SHA-256 `2033acab6ed923098b4ab37b52581a7490cb0da5b77ef05016593ff9015d6c98` · lean **1 868 344** B.
 
-- Shell boundary string documents **“app-first direct mount (no iframe)”**.  
-- Apps inject into `#appSlot-exp7` and `#appSlot-budget` via DOMParser + script execution in-page.  
-- `iframe` appears only inside that boundary comment string (not as an embedding element in the shell markup checked).  
-- Exp7 package is base64 `apppkg`. Budget is a **separate** base64 `budgetpkg`.
+- Shell boundary: app-first direct mount (no iframe); shell hosts Exp7Views/JRender once; JRViews bar/apps; Budget tabs in-scene.  
+- Apps inject into `#appSlot-exp7` / `#appSlot-budget` via `DOMParser` + `scopeAppCss(#appSlot-*)` + script execution.  
+- Exp7 = base64 `apppkg`; Budget = base64 `budgetpkg` (shared views stripped; live from shell).  
+- Module id: `exp7-views@1`.
 
-## Sync boundary (incomplete by requirement honesty) [REQ] + [MEAS]
+## Sync boundary (honest incompleteness) [REQ] + [MEAS]
 
-| Path | On verified `main` 1.5.0 |
-|------|---------------------------|
+| Path | On `main` 1.8.3 |
+|------|-----------------|
 | Exp7 | Automatic **proposal-op** sync under `exp7-app-v1/` when key+target ready |
-| Budget | **Local IndexedDB only** — not proposal-synced |
-| Full application-level sync | **Required direction**, **not** claimed complete |
-| Cross-device | Matthew treated as “good enough / assumed” (2026-11-07); **not measured** [OPEN] |
+| Budget | **Local IndexedDB only** (`budget-app-v1`) — not proposal-synced |
+| Full application-level sync | **Required direction**, **not** complete **[OPEN]** |
+| Cross-device | Not measured **[OPEN]** |
 
 Do not document platform sync as “full app sync.”
 
-## Chrome layout — requirement vs `main`
+## Chrome layout [REQ] + [MEAS 1.8.3]
 
 **[REQ]** Reserved fixed header: back + avatar; app content starts **below** the bar; never floating overlays covering tabs/content.
 
-**[MEAS on main 1.5.0]** `#topChrome` is `position:fixed` with `background:transparent` and `pointer-events:none` (controls re-enable pointer events). `#appShell` uses `inset:0` with `padding-top: var(--bar-h)`. That reserves some vertical padding but keeps a **transparent overlay** pattern — **not** the solid reserved bar called out in later corrections (t1738u). See [requirements-vs-main.md](./requirements-vs-main.md).
+**[MEAS]** `#topChrome` fixed height `var(--bar-h)`; `#appShell` / `#appsOverlay` start at `top: var(--bar-h)`. When GPU works, `PlatformChromeJR` paints the bar on a JRViews canvas and that canvas takes pointer hits (`jr-on`). Account menu remains DOM.
 
-## Budget — requirement vs `main`
+## Budget [REQ] + [MEAS 1.8.3]
 
-**[REQ]** Budget uses **real** Exp7 Calendar / Board / Plan (`calHtml` / `boardHtml` / plan+`depsHtml`) via the **same** Exp7Views module as demo — universal view design, Budget’s own IDB atlas (data not shared). Optional finance tags / harmonic shares stay outside forked builders (not auto-dollars).
+**[REQ]** Budget uses **real** Exp7 Calendar / Board / Plan via the **same** Exp7Views module; own atlas; no forked `boardHtml` / `calHtml`.
 
-**[MEAS on main 1.5.0]** Embedded `budgetpkg` (~19 789 B decoded) defined **`renderCal` / `renderBoard` / `renderPlan`** stubs. Later `main` releases (1.7.x) re-packed Budget onto Exp7Views; **re-measure tip** before treating any substitute claim as current. See [views-jrender-standard.md](./views-jrender-standard.md).
+**[MEAS]** Budget mounts:
+
+| Pane | Roots |
+|------|--------|
+| Calendar | one calendar component |
+| Board | four boards: `board_expense` / `board_income` / `board_debt` / `board_asset` (`ensureBudgetBoards`) |
+| Plan | `comp:reqs` (depsHtml) |
+
+Cal/Plan see combined membership. Tab chrome is in-scene when JR paints; DOM tabs are the no-adapter fallback. See [platform-chrome-jrender.md](./platform-chrome-jrender.md).
 
 ## Security shape [REQ]
 
@@ -73,4 +86,5 @@ Do not document platform sync as “full app sync.”
 - Validate read-only: GitHub `/user` + user’s public data repo.  
 - Network: `api.github.com` only, `credentials:'omit'`, refuse redirects; release reads unauthenticated + commit-pinned.  
 - Refuse a key that can write the **software** repo.  
-- Trust limit: SHA proves integrity of fetched bytes, not publisher benevolence → branch protection + 2FA recommended.
+- Trust limit: SHA proves integrity of fetched bytes, not publisher benevolence → branch protection + 2FA recommended.  
+- **PAT never enters JRender canvas text** — account/key UI stays DOM.

@@ -9,22 +9,28 @@ Intended to prevent recurrence of failures already seen.
 | Register that does nothing (invalid nested control) | Real control + handler; same-tab GitHub; Back resumes; test bindings. |
 | Release PRs with unrelated files/dirs | Diff = `release.json` + platform HTML only (**except** authorized docs-only PR). |
 | Avatar + fallback both visible; chrome overlaying app | Exclusive fallback; **reserved** fixed header; screenshot from Matthew’s device. |
-| Substitute Budget views | Budget **must** reuse actual Exp7 Cal/Board/Plan view code (`calHtml` / `boardHtml` / plan+`depsHtml`). |
+| Substitute Budget views | Budget **must** reuse actual Exp7 Cal/Board/Plan (`exp7-views@1`). |
 | Iframe embedding | Direct in-page load only. |
 | Shared unscoped IndexedDB leaking another account’s ops | Per account+repo+client namespacing; immutable op ownership. |
 | Multi-file user install | One small launcher HTML; platform is one HTML release payload. |
 | Resuming canceled search/scheduler | Do not, unless Matthew asks again. |
 | Inferring repo state from PR descriptions | Verify `main` commit + files directly. |
 | Claiming full app sync | Only claim what is implemented (today: Exp7 proposal-ops; Budget local). |
-| Mixing docs into app/release PRs | Separate documentation PR. |
+| Mixing docs into app/release PRs | Prefer separate documentation PR. |
 | Contacting Artist without authorization | Forbidden until Matthew authorizes. |
-| Secrets in docs, logs, or commits | Never. |
+| Secrets in docs, logs, or commits | Never. PAT never in JRender canvas text. |
+| Doubled Budget tabs (DOM + JR) | When JR paints, hide DOM via `#budgetRoot.jr-chrome` + inline `!important`; never rely on `html`/`body` selectors under `scopeAppCss`. |
+| Plan tab missing Cal/Board/Plan controls | Apply `budgetChromeDoc` **after** `planDoc`. |
+| Upper bar clicks offset from paint | When `jr-on`, JR **canvas** takes pointer hits; do not leave opaque DOM hit targets misaligned with JR layout. |
+| Cloud VM `no-adapter` treated as product failure | Expected without GPU; DOM / `.jrerr` fallback. Mac Safari is acceptance. |
 
 ## Outstanding product gaps relative to [REQ]
 
-See the full matrix in [requirements-vs-main.md](./requirements-vs-main.md). Headline gaps on verified **1.5.0** `main`:
+See [requirements-vs-main.md](./requirements-vs-main.md). Headline gaps on verified **1.8.3** `main`:
 
-1. Budget is a **stub**, not real Exp7 views.  
-2. Top chrome is a **transparent overlay**, not the required reserved solid bar.  
-3. Avatar exclusivity CSS pattern required by later corrections is **not** present as the exclusive `.is-on` gate described in handoff/agent follow-ups.  
-4. Application-level sync remains **incomplete** (honesty required).
+1. Mac **[USER-HW]** acceptance of parallax chrome + multi-board Budget (not done in cloud).  
+2. Application-level sync remains **incomplete** (honesty required).  
+3. Account / share panel still DOM (acceptable while PAT-safe; optional future JR).  
+4. GPU/performance QA never done.
+
+Historical 1.5.0 gaps (stub Budget, transparent overlay chrome) are **closed** on tip — do not re-open them as current.

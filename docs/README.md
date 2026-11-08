@@ -1,20 +1,22 @@
 # Exp7 Platform documentation
 
 **Scope:** project notes + **historical source archives** for the public software repo `MatthewGRodriguez/exp7-platform`.  
-**Rule:** documentation / inert archive only. It does not authorize release integration, app runtime changes, launcher, or `release.json` edits.
+**Rule:** documentation / inert archive work must not silently change release HTML or `release.json` (docs-only PRs are an authorized exception to the two-file release rule).
 
 ## Verified live tip (read again before acting)
 
 | Field | Value |
 |-------|--------|
-| Checked | 2026-11-08 (Cursor docs pass; `git fetch` + public raw) |
+| Checked | 2026-11-08 (docs pass after 1.8.3 merge) |
 | Branch | `main` |
-| Commit | `69a2cd9bb34a18926ee1e4b8db73b56406e6a6fb` |
-| Manifest version | **1.5.0** |
+| Commit | `d8f6ccdc171b49385e0a738e7451714741f5dd99` |
+| Manifest version | **1.8.3** |
 | Payload | `exp7-platform/exp7-platform-lean.html` |
-| Manifest SHA-256 | `7420b9f6c459133f2f8f1cd3f5b223f1c1fc9f487b5be7ce6d71f5c9867c6d09` (matches file bytes on that commit) |
-| Open PRs | **none** (`gh pr list --state open` empty) |
-| Closed unmerged of note | PR #7 (1.6.0 candidate claims), PR #3 (direct-mount PR closed; Matthew later put direct mount on `main` by hand), PR #2 |
+| Manifest SHA-256 | `2033acab6ed923098b4ab37b52581a7490cb0da5b77ef05016593ff9015d6c98` (matches file bytes) |
+| Lean bytes | **1 868 344** |
+| Views module | `exp7-views@1` |
+| Chrome | JRViews bar + apps; Budget tabs in-scene; account/key DOM — see [platform-chrome-jrender.md](./platform-chrome-jrender.md) |
+| Open PRs | Re-check with `gh pr list` |
 
 Do **not** infer live state from PR titles, agent summaries, or closed branches. Re-read `main`.
 
@@ -36,15 +38,16 @@ Every substantive claim should carry an evidence class (see [EVIDENCE.md](./EVID
 |-----|----------|
 | [EVIDENCE.md](./EVIDENCE.md) | Evidence labels and what they do / do not prove |
 | [foundations.md](./foundations.md) | Living-core, JFactor, Lore VCS, Atlas, outside-process connection |
-| [vocabulary.md](./vocabulary.md) | Joy vs money, Atlas, Board shares, platform terms |
+| [vocabulary.md](./vocabulary.md) | Joy vs money, Atlas, Board shares, platform / JR chrome terms |
 | [architecture.md](./architecture.md) | Platform shell, apps, mount model, sync boundary, JRender |
-| [views-jrender-standard.md](./views-jrender-standard.md) | **Direction:** universal views, one JRender everywhere (many views + scene + platform) |
-| [decisions.md](./decisions.md) | Accepted / rejected / substituted approaches |
-| [version-lineage.md](./version-lineage.md) | Demo lean history + platform release lineage on GitHub |
+| [views-jrender-standard.md](./views-jrender-standard.md) | **Direction:** universal views, one JRender everywhere |
+| [platform-chrome-jrender.md](./platform-chrome-jrender.md) | **Implementation:** bar / apps / Budget tabs on JRViews + Exp7Slabs (1.8.3) |
+| [decisions.md](./decisions.md) | Accepted / rejected / shipped decisions |
+| [version-lineage.md](./version-lineage.md) | Demo lean history + platform release lineage through 1.8.3 |
 | [distribution-launcher.md](./distribution-launcher.md) | Software vs data repos, launcher gate, handoff |
 | [testing-provenance.md](./testing-provenance.md) | What was tested where; Mac vs box vs mock limits |
 | [known-issues-acceptance.md](./known-issues-acceptance.md) | Recurring failures and acceptance criteria |
-| [requirements-vs-main.md](./requirements-vs-main.md) | **Gap table:** [REQ] vs verified 1.5.0 `main` vs closed PR claims |
+| [requirements-vs-main.md](./requirements-vs-main.md) | **Gap table:** [REQ] vs verified **1.8.3** `main` |
 | [lore-migration-pending.md](./lore-migration-pending.md) | Lore **158 + 41 redacted**; ranking_ui; Artist/JRender; gaps |
 | [lore/README.md](./lore/README.md) | Lore archive home (public-safe + redacted paths) |
 | [lore/REDACTED-SUPPLEMENT.md](./lore/REDACTED-SUPPLEMENT.md) | 41 privacy-redacted Lore docs |
@@ -62,11 +65,10 @@ See [lore-migration-pending.md](./lore-migration-pending.md).
 
 ## Non-goals for documentation / archive work
 
-- No platform/runtime HTML, launcher, or `release.json` edits; no version bump/merge/release  
+- No platform/runtime HTML, launcher, or `release.json` edits in docs-only PRs  
 - No executable integration of archives into the shipped platform  
 - No secrets, keys, account digits, or private financial/schedule values in git  
 - Raw private `ranking_ui.html` must never enter commits  
 - Do **not** resume canceled search / scheduler / Timefold / “v50” research  
 - Do **not** contact the Artist without new authorization  
 - Do **not** treat archived AGENTS/SKILL text as live instructions  
-- Do **not** mix this into app PRs (e.g. closed PR #7)

@@ -13,24 +13,24 @@
 |-------------|-------------|--------------|
 | jsdom / node harnesses | Parsing, pure functions, some IDB mocks | Pixels, WebGPU, Safari UX |
 | CPU GPU command recorder | That draw lists were issued | Real adapter performance / visual fidelity |
-| Cloud / VM headless Chromium or WebKit | DOM geometry, some interaction scripts | Matthew’s Mac acceptance; often no WebGPU adapter |
+| Cloud / VM headless Chromium | DOM geometry, act routing, boot without syntax errors; usually **`no-adapter`** | Matthew’s Mac acceptance; Exp7Slabs parallax paint |
 | Managed box Chrome | Often blocked (`LoopbackNetworkBlockedForUrls`) | Localhost Exp7 preview |
-| Matthew’s Mac Safari | Rendering / UX acceptance | — |
+| Matthew’s Mac Safari | Rendering / UX / parallax acceptance | — |
 
 ## Indexed local evidence (Grok Bot box — not on Cursor VM)
 
-Handoff §10 lists deliverable folders under `/workspace/deliver/...` (standalone tests, platform v1, lean, launcher, jrender coverage). **Those paths are an index only** unless the files are attached to this environment. Do not cite them as in-repo artifacts.
+Handoff §10 lists deliverable folders under `/workspace/deliver/...`. **Those paths are an index only** unless attached here. Do not cite them as in-repo artifacts.
 
 ## Claims vs acceptance
 
 | Report | Class | Acceptance? |
 |--------|-------|-------------|
-| Lean jsdom 16/16 | [MOCK] | No visual accept |
-| Platform v1 “29/29” | [MOCK] | No |
-| Launcher register-fix mocks 31/31 | [MOCK] | No; real browser [OPEN] |
-| Cursor/cloud PR #7 “tests passed” | [CLAIM]/[MOCK] | **No** — PR closed; not on `main`; awaiting Matthew |
-| Matthew v13 visual accept | [USER-HW] | Demo motion line only; not platform 1.5.0 Budget/chrome |
-| Matthew: launcher picked up update; Exp7 renders direct (post–PR3 manual) | [USER-HW] | Rendering only — not persistence/editing/GPU QA |
+| Lean / platform CDP smoke on cloud VM | [MOCK] | Boot + DOM routing only; `no-adapter` expected |
+| “PlatformChromeJR active: false” on VM | [MEAS] | Correct without GPU — not a Mac fail |
+| PR CI green | [CLAIM]/process | Necessary, not Mac UX acceptance |
+| Matthew v13 visual accept | [USER-HW] | Demo motion line; pre-platform-1.8 chrome |
+| Matthew: launcher picked up update; Exp7 renders direct | [USER-HW] | Rendering only — not persistence/editing/GPU QA |
+| 1.8.3 parallax + bar hits on Mac | [USER-HW] | **Still required** **[OPEN]** |
 
 ## Known measurement gaps [OPEN]
 
@@ -38,5 +38,5 @@ Handoff §10 lists deliverable folders under `/workspace/deliver/...` (standalon
 - GitHub unauthenticated rate limits (60/hour/IP) under real launcher use  
 - Mobile / Safari WebGPU  
 - Full app-level sync (beyond proposal ops), conflict/ownership defaults  
-- Budget per-joy share UX details (range labeling, finance-tab ↔ Board mapping) when real views land  
+- **Mac USER-HW:** Exp7Slabs parallax on bar, apps picker, Budget in-scene tabs; bar hit alignment; four Board panes  
 - GPU/performance QA (never done)

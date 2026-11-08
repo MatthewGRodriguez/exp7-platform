@@ -11,44 +11,61 @@
 | v16 | (handoff placeholder) | historical |
 | v17 | Local collaborative editing: RGA notes, LWW label, movable order, own-intent undo, binary log exchange — **local only**, not durable/authenticated | historical |
 | v18–v20 | Planner/scheduler-only experiments; v20 = v17 + planner scripts | **Do not resume** search/scheduler [REQ] |
-| **Lean (2026-11-07)** | Based on **v17**; keeps editing; removes experimental views, planner tab, scheduler/planner seed; core scripts 0–18 reported byte-identical to v17 | handoff sizes: lean 1 487 141 B vs v17 1 532 837 B; jsdom 16/16 **[MOCK]** |
+| **Lean (2026-11-07)** | Based on **v17**; keeps editing; removes experimental views, planner tab, scheduler/planner seed | historical |
 
-**Canceled:** search optimization, benchmarks, Timefold comparison, “v50” research line. [REQ 2026-11-07]
+**Canceled:** search optimization, benchmarks, Timefold comparison, “v50” research line. **[REQ 2026-11-07]**
 
 ## Platform releases on GitHub `main` [MEAS 2026-11-08]
 
-Verified by `git fetch origin main`, `git log`, `release.json` on tip, and public raw HTTP 200 for manifest.
+Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 
-| Version | How it landed | Commit (merge or tip) | Notes |
-|---------|---------------|------------------------|-------|
-| 1.2.0 | PR #1 merged | `12f3f4d…` | Initial lean publish |
-| (post-1.2 manual) | Matthew closed PR #3; **manual** commits of HTML + manifest | `7eb37a4`, `0f80e29` | Direct mount path attributed to these manual updates [USER-HW rendering] |
-| 1.3.0 | PR #4 merged | `7fcc965` / merge `e56d287` | Simplify UI; automatic Exp7 **proposal-op** sync |
-| 1.4.0 | PR #5 merged | `29693b7` / merge `7748add` | App-first; back + avatar chrome |
-| **1.5.0** | PR #6 merged | `0ce3053` / merge **`69a2cd9bb34a18926ee1e4b8db73b56406e6a6fb`** | **Current `main`**: Budget **stub** package + chrome tweaks |
-| 1.6.0 | PR #7 **closed, not merged** | branch tip exists; **not** `main` | [CLAIM] only until Matthew accepts |
+| Version | How it landed | Notes |
+|---------|---------------|--------|
+| 1.2.0 | PR #1 | Initial lean publish |
+| (post-1.2 manual) | Matthew closed PR #3; manual commits | Direct mount path |
+| 1.3.0 | PR #4 | Simplify UI; Exp7 proposal-op sync |
+| 1.4.0 | PR #5 | App-first; back + avatar chrome |
+| 1.5.0 | PR #6 | Budget **stub** package (historical substitute) |
+| 1.6.x | PRs #10–#11 | Budget direct HTML views era; reserved bar work |
+| 1.7.0–1.7.2 | PRs #12–#14 | Exp7Views unbundle / packed release; JRender shared inject |
+| 1.7.3–1.7.7 | PRs #15–#19 | Budget = demo Cal/Board/Plan parity; boot hang fix |
+| 1.7.8 | PR #21 | `Exp7Views.mountSurface` (N views, one shared JRender) |
+| 1.7.9 | PR #22 | Reserved top bar JRender paint; shell-hosted Exp7Views |
+| 1.8.0 | PR #23 | Budget three→four type boards on shared atlas |
+| 1.8.1 | PR #24 | Budget chrome cleanup; four Board type tabs |
+| 1.8.2 | PR #25 | Bar + apps via JRViews; Budget tabs in `hostDoc` |
+| **1.8.3** | **PR #26** | Hide DOM tabs (scoped CSS); Plan chrome after `planDoc`; bar canvas hits |
 
-### Current manifest (verbatim fields) [MEAS]
+### Current manifest (verbatim) [MEAS]
+
+Tip: `d8f6ccdc171b49385e0a738e7451714741f5dd99` (merge #26).
 
 ```json
-"version": "1.5.0",
+"version": "1.8.3",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "7420b9f6c459133f2f8f1cd3f5b223f1c1fc9f487b5be7ce6d71f5c9867c6d09",
+"sha256": "2033acab6ed923098b4ab37b52581a7490cb0da5b77ef05016593ff9015d6c98",
 "minLauncherMajor": 1
 ```
 
-Payload byte length on that commit: **2 061 979**. SHA matches manifest.
+Payload byte length on tip: **1 868 344**. SHA matches manifest.
 
-## PR disposition summary [MEAS]
+`contains.viewsModuleId`: `exp7-views@1`  
+`contains.chromeJr`: PlatformChromeJR bar + apps via JRViews (Exp7Slabs); Budget tabs in hostDoc; DOM fallback when no-adapter.
 
-| PR | Title theme | State |
-|----|-------------|-------|
-| #1 | Initial 1.2.0 | Merged |
-| #2 | Open-app render / iframe-era fix | Closed unmerged |
-| #3 | Direct mount 1.2.2 | Closed unmerged (manual follow-up on main) |
-| #4 | 1.3.0 sync UI | Merged |
-| #5 | 1.4.0 app-first chrome | Merged |
-| #6 | 1.5.0 Budget + chrome | Merged |
-| #7 | 1.6.0 real views + reserved bar | **Closed unmerged** |
+## PR disposition (chrome / views era) [MEAS]
 
-Open PRs at docs check: **none**.
+| PR | Theme | State |
+|----|-------|-------|
+| #1–#6 | 1.2–1.5 platform | Merged |
+| #7 | 1.6.0 real views candidate | **Closed unmerged** (later work landed via other PRs) |
+| #8–#9 | Docs / archives | Merged |
+| #10–#11 | Budget HTML views | Merged |
+| #12–#14 | Exp7Views pack / JRender boot | Merged (#12 closed; packed via #13) |
+| #15–#19 | Budget parity + boot | Merged |
+| #20 | Docs: one JRender everywhere | Merged |
+| #21–#22 | mountSurface + platform bar JR | Merged |
+| #23–#24 | Budget multi-board | Merged |
+| #25 | 1.8.2 parallax chrome JRViews | Merged |
+| #26 | 1.8.3 doubled-tabs / Plan / hit offset | Merged |
+
+Open PRs at this docs check: re-verify with `gh pr list`.
