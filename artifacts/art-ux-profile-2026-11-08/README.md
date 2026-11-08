@@ -1,25 +1,32 @@
 # Art UX + profile image review artifacts (2026-11-08)
 
-Review branch deliverables for merge base `3d76da1`. Platform tip **1.8.4**.
+Review branch `cursor/art-ux-profile-image-15ae` · platform **1.8.4** · base `3d76da1`.
 
-## Paths for coordinator copy
+## Coordinator copy — exact paths
 
-| Path | Contents |
-|------|----------|
-| `design/` | params.json, state-table.json/md/mmd |
-| `api/IMAGE-ABI.md` | JRDI load/patch/free/ownership |
-| `perspective/` | tests results + contact-sheet notes |
-| `lighting/` | analytical fits + pose-series (Blender BLOCKED) |
-| `blender/BLOCKED.md` | missing Blender CLI |
-| `moho/BLOCKED.md` | missing Moho CLI |
-| `web/` | jrender-images.js, chrome profile consumer, ux states |
-| `screenshots/` | MOCK bar avatar SVG states (not GPU proof) |
-| `gifs/` | MOCK parallax on/off global-palette no-dither |
-| `pack/metrics.json` | packed chars/lines/hash/delta |
-| `qa/` | EVIDENCE, missing-gates, view-matrix |
+| Path | What |
+|------|------|
+| `handoff/LATEST.txt` | Pointer to current archive + sha256 |
+| `handoff/ART-PIPELINE-HANDOFF-*.tar.gz` | **Self-contained Mac handoff** (no .git/secrets) |
+| `qa/GATE-MATRIX.md` | Rendered vs provisional vs blocked + exact Mac commands |
+| `qa/MAC_RUNBOOK.md` | Blender 4.2.1 METAL + Moho probe steps → ArtScratch |
+| `qa/EVIDENCE.md` | Classified evidence |
+| `qa/missing-gates.md` | Open hardware/tool gates |
+| `qa/view-matrix.md` | All shipped views coverage |
+| `contact-sheets/*-provisional.svg` | Layout sheets only — **not** Blender/Moho pixels |
+| `design/` `api/IMAGE-ABI.md` `lighting/fits.json` | Params/state/ABI; lighting **provisional** |
+| `web/` | JRDI + chrome + UX sources packed into lean |
+| `pack/metrics.json` | Lean pack chars/lines/hash/delta |
+| `gifs/*-MOCK.gif` `screenshots/*.svg` | **MOCK** — not production visual evidence |
+
+## Mac ArtScratch
+
+`/Users/user-rodri/ArtScratch/exp7-art/<stage>/`  
+Blender: `.../blender/ui-states/<run>/` · Moho: `.../moho/comparison/`
 
 ## Honest status
 
-Implemented: JRDI host image ABI, bar profile-photo consumer (exclusive initials), UX state table/washes, perspective math gates, analytical lighting, pack into lean HTML, unit tests.
-
-**Not** complete full art workflow: Blender + Moho + Mac WebGPU pixel/motion gates remain **[OPEN][BLOCKED]** / **[USER-HW]**.
+- JRDI + exclusive avatar + UX stamping + tests: **landed in lean**
+- Blender generator METAL/4.2.1: **probe-ready**, not executed here
+- Moho: **real seed .moho** + Lua scaffolds; CLI `-h` blocked; renders not executed; **no fabricated Moho output**
+- Full art workflow **not complete** until Mac Blender/Moho probes + USER-HW WebGPU

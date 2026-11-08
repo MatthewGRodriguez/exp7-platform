@@ -1,6 +1,6 @@
 /* JRender host Image / bitmap ABI (JRDI) - real WebGPU only, shared GPUContext.
  * Not a wasm DL op: shipped wasm rejects unknown ops; textures live on the host.
- * Documented in art/api/IMAGE-ABI.md. ASCII only.
+ * Documented in art/api/IMAGE-ABI.md. ASCII only. No second renderer.
  */
 (function (root) {
   'use strict';
@@ -10,10 +10,10 @@
   var MAX_EDGE = 256;
   var MAX_TEXELS = MAX_EDGE * MAX_EDGE;
   var MAX_ENTRIES = 32;
+  var MAX_BYTES = 8 * 1024 * 1024; /* 8 MiB texture budget across store */
   var MAGIC = 'JRDI';
   var VERSION = 1;
 
-  /* Public GitHub avatar hosts only - never PAT/query secrets in URL. */
   var ALLOW_HOSTS = {
     'avatars.githubusercontent.com': 1,
     'avatars0.githubusercontent.com': 1,
@@ -39,7 +39,6 @@
     if (/[?#]/.test(s) && /(?:^|[?#&])(?:token|access_token|pat|authorization|key)=/i.test(s)) {
       return { ok: false, reason: 'secret-query' };
     }
-    /* Prefer URL when present; fall back to regex for Node/vm without URL. */
     var host = null;
     if (typeof URL === 'function') {
       try { host = new URL(s).hostname.toLowerCase(); } catch (e) {
@@ -52,7 +51,6 @@
       if (host.indexOf('@') >= 0) return { ok: false, reason: 'bad-url' };
     }
     if (!ALLOW_HOSTS[host]) return { ok: false, reason: 'host-not-allowed' };
-    /* Strip query/hash for cache key stability; GitHub avatars work without them. */
     if (typeof URL === 'function') {
       try {
         var u = new URL(s);
@@ -66,6 +64,35 @@
     return { ok: true, url: s, host: host };
   }
 
+  /* Exclusive avatar paint contract: never dual photo+initials. */
+  function exclusiveAvatarPaint(mode) {
+    var m = mode || 'initials';
+    if (m === 'pending' || m === 'loading') {
+      return { mode: 'pending', showInitials: false, showPhoto: false, showSoftDisc: false, label: '' };
+    }
+    if (m === 'photo' || m === 'ready') {
+      return { mode: 'photo', showInitials: false, showPhoto: true, showSoftDisc: false, label: '' };
+    }
+    return { mode: 'initials', showInitials: true, showPhoto: false, showSoftDisc: true, label: null };
+  }
+
+  function circleContains(cx, cy, r, x, y) {
+    var dx = x - cx, dy = y - cy;
+    return (dx * dx + dy * dy) <= (r * r);
+  }
+
+  /* CSS-px circle hit for companion overlays (matches fragment discard r=0.5 of quad). */
+  function imageHit(node, x, y) {
+    if (!node || !node.handle || node.handle.state !== 'ready') return false;
+    var x0 = node.x + (node.dx || 0), y0 = node.y + (node.dy || 0);
+    var w = node.w, h = node.h;
+    if (x < x0 || y < y0 || x > x0 + w || y > y0 + h) return false;
+    if ((node.clip || 'circle') === 'circle') {
+      return circleContains(x0 + w / 2, y0 + h / 2, Math.min(w, h) / 2, x, y);
+    }
+    return true;
+  }
+
   function nextId(store) {
     store._seq = (store._seq + 1) >>> 0 || 1;
     return store._seq;
@@ -74,14 +101,13 @@
   function ImageHandle(store, id) {
     this.store = store;
     this.id = id;
-    this.state = 'empty'; /* empty|loading|ready|error|freed */
+    this.state = 'empty';
     this.url = null;
     this.w = 0;
     this.h = 0;
     this.refs = 0;
     this.tex = null;
     this.view = null;
-    this.bg = null;
     this.error = null;
     this.gen = 0;
   }
@@ -90,6 +116,7 @@
     this.gc = gc;
     this.map = new Map();
     this.byUrl = new Map();
+    this.inFlight = new Map(); /* url -> Promise<handle> */
     this._seq = 1;
     this.bytes = 0;
     this.peak = 0;
@@ -97,12 +124,30 @@
     this.errors = 0;
     this.frees = 0;
     this.recoveries = 0;
+    this.racesJoined = 0;
     this.sampler = null;
     this.pipe = null;
     this.mod = null;
     this.bgl = null;
     this.ub = null;
   }
+
+  ImageStore.prototype.stats = function () {
+    return {
+      entries: this.map.size,
+      bytes: this.bytes,
+      peak: this.peak,
+      loads: this.loads,
+      errors: this.errors,
+      frees: this.frees,
+      recoveries: this.recoveries,
+      racesJoined: this.racesJoined,
+      inFlight: this.inFlight.size,
+      maxEntries: MAX_ENTRIES,
+      maxBytes: MAX_BYTES,
+      maxEdge: MAX_EDGE
+    };
+  };
 
   ImageStore.prototype._ensurePipe = function (fmt) {
     var gc = this.gc, dev = gc.dev;
@@ -170,13 +215,17 @@
     return this.pipe;
   };
 
-  ImageStore.prototype._evictIfNeeded = function () {
-    if (this.map.size < MAX_ENTRIES) return;
-    var victim = null;
-    for (var h of this.map.values()) {
-      if (h.refs <= 0 && h.state !== 'loading') { victim = h; break; }
+  ImageStore.prototype._evictIfNeeded = function (needBytes) {
+    needBytes = needBytes || 0;
+    var guard = 0;
+    while ((this.map.size >= MAX_ENTRIES || this.bytes + needBytes > MAX_BYTES) && guard++ < MAX_ENTRIES + 4) {
+      var victim = null;
+      for (var h of this.map.values()) {
+        if (h.refs <= 0 && h.state !== 'loading') { victim = h; break; }
+      }
+      if (!victim) break;
+      this.free(victim, true);
     }
-    if (victim) this.free(victim, true);
   };
 
   ImageStore.prototype._uploadBitmap = function (handle, bmp) {
@@ -190,7 +239,7 @@
     var tw = Math.max(1, Math.round(w * scale));
     var th = Math.max(1, Math.round(h * scale));
     if (tw * th > MAX_TEXELS) throw fail('too-large', tw + 'x' + th);
-    /* Draw through canvas to get RGBA + optional downscale (CORS-safe when bitmap is clean). */
+    this._evictIfNeeded(tw * th * 4);
     var cv = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(tw, th) : document.createElement('canvas');
     cv.width = tw; cv.height = th;
     var ctx = cv.getContext('2d', { willReadFrequently: false });
@@ -202,17 +251,9 @@
       format: 'rgba8unorm',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
     });
-    if (typeof createImageBitmap === 'function' && cv.transferToImageBitmap) {
-      /* prefer copyExternalImageToTexture when available */
-    }
     try {
-      dev.queue.copyExternalImageToTexture(
-        { source: cv },
-        { texture: tex },
-        [tw, th]
-      );
+      dev.queue.copyExternalImageToTexture({ source: cv }, { texture: tex }, [tw, th]);
     } catch (e) {
-      /* Fallback: read pixels (may throw if tainted - treat as CORS error). */
       var imgData;
       try { imgData = ctx.getImageData(0, 0, tw, th); } catch (te) {
         tex.destroy();
@@ -228,18 +269,35 @@
     handle.view = tex.createView();
     handle.w = tw;
     handle.h = th;
-    handle.bg = null;
     this.bytes += tw * th * 4;
     if (this.bytes > this.peak) this.peak = this.bytes;
   };
 
+  ImageStore.prototype._fetchDecode = async function (url, opts) {
+    var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    var timer = null;
+    if (ctrl && opts.timeoutMs) timer = setTimeout(function () { try { ctrl.abort(); } catch (_) {} }, opts.timeoutMs | 0);
+    try {
+      var res = await fetch(url, {
+        mode: 'cors',
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+        signal: ctrl && ctrl.signal
+      });
+      if (!res.ok) throw fail('http-' + res.status, 'fetch failed');
+      var blob = await res.blob();
+      return await createImageBitmap(blob, { colorSpaceConversion: 'default', premultiplyAlpha: 'none' });
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
+
   ImageStore.prototype.load = async function (src, opts) {
     opts = opts || {};
-    this._evictIfNeeded();
-    var urlInfo = null;
+    this._evictIfNeeded(0);
     var key = null;
     if (typeof src === 'string' || src == null) {
-      urlInfo = sanitizeUrl(src);
+      var urlInfo = sanitizeUrl(src);
       if (!urlInfo.ok) {
         var h0 = new ImageHandle(this, nextId(this));
         h0.state = urlInfo.reason === 'absent' ? 'empty' : 'error';
@@ -250,12 +308,28 @@
         return h0;
       }
       key = urlInfo.url;
-      if (this.byUrl.has(key)) {
+      if (!opts.force && this.byUrl.has(key)) {
         var exist = this.byUrl.get(key);
-        exist.refs++;
-        return exist;
+        if (exist.state === 'ready' || exist.state === 'loading') {
+          exist.refs++;
+          return exist;
+        }
+        /* error/empty cached entries: drop and reload unless force:false keepError */
+        if (!opts.keepError) {
+          this.free(exist, true);
+        } else {
+          exist.refs++;
+          return exist;
+        }
+      }
+      if (!opts.force && this.inFlight.has(key)) {
+        this.racesJoined++;
+        var shared = await this.inFlight.get(key);
+        if (shared && shared.state !== 'freed') shared.refs++;
+        return shared;
       }
     }
+
     var handle = new ImageHandle(this, nextId(this));
     handle.refs = 1;
     handle.state = 'loading';
@@ -265,43 +339,36 @@
     this.map.set(handle.id, handle);
     if (key) this.byUrl.set(key, handle);
     this.loads++;
-    try {
-      var bmp;
-      if (src && typeof src === 'object' && (src.close || src.width)) {
-        bmp = src;
-      } else {
-        var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
-        var timer = null;
-        if (ctrl && opts.timeoutMs) timer = setTimeout(function () { try { ctrl.abort(); } catch (_) {} }, opts.timeoutMs | 0);
-        var res = await fetch(key, {
-          mode: 'cors',
-          credentials: 'omit',
-          referrerPolicy: 'no-referrer',
-          signal: ctrl && ctrl.signal
-        });
-        if (timer) clearTimeout(timer);
-        if (!res.ok) throw fail('http-' + res.status, 'fetch failed');
-        var blob = await res.blob();
-        if (!/^image\//i.test(blob.type || 'image/png') && blob.type) {
-          /* some CDNs omit type; still try decode */
+
+    var work = (async function (store) {
+      try {
+        var bmp;
+        if (src && typeof src === 'object' && (src.close || src.width)) {
+          bmp = src;
+        } else {
+          bmp = await store._fetchDecode(key, opts);
         }
-        bmp = await createImageBitmap(blob, { colorSpaceConversion: 'default', premultiplyAlpha: 'none' });
-      }
-      if (handle.gen !== gen || handle.state === 'freed') {
+        if (handle.gen !== gen || handle.state === 'freed') {
+          try { bmp.close && bmp.close(); } catch (_) {}
+          return handle;
+        }
+        store._uploadBitmap(handle, bmp);
         try { bmp.close && bmp.close(); } catch (_) {}
-        return handle;
+        handle.state = 'ready';
+        handle.error = null;
+      } catch (e) {
+        handle.state = 'error';
+        handle.error = (e && e.code) || (e && e.message) || String(e);
+        store.errors++;
+        if (key && store.byUrl.get(key) === handle) store.byUrl.delete(key);
+      } finally {
+        if (key) store.inFlight.delete(key);
       }
-      this._uploadBitmap(handle, bmp);
-      try { bmp.close && bmp.close(); } catch (_) {}
-      handle.state = 'ready';
-      handle.error = null;
-    } catch (e) {
-      handle.state = 'error';
-      handle.error = (e && e.code) || (e && e.message) || String(e);
-      this.errors++;
-      if (key && this.byUrl.get(key) === handle) this.byUrl.delete(key);
-    }
-    return handle;
+      return handle;
+    })(this);
+
+    if (key) this.inFlight.set(key, work);
+    return work;
   };
 
   ImageStore.prototype.patch = async function (handle, src, opts) {
@@ -311,6 +378,7 @@
     var gen = handle.gen;
     var oldUrl = handle.url;
     if (oldUrl && this.byUrl.get(oldUrl) === handle) this.byUrl.delete(oldUrl);
+    if (oldUrl) this.inFlight.delete(oldUrl);
     handle.state = 'loading';
     handle.error = null;
     handle.url = null;
@@ -330,17 +398,7 @@
         }
         handle.url = urlInfo.url;
         this.byUrl.set(handle.url, handle);
-        var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
-        var timer = null;
-        if (ctrl && opts.timeoutMs) timer = setTimeout(function () { try { ctrl.abort(); } catch (_) {} }, opts.timeoutMs | 0);
-        var res = await fetch(handle.url, {
-          mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer',
-          signal: ctrl && ctrl.signal
-        });
-        if (timer) clearTimeout(timer);
-        if (!res.ok) throw fail('http-' + res.status);
-        var blob = await res.blob();
-        bmp = await createImageBitmap(blob, { colorSpaceConversion: 'default', premultiplyAlpha: 'none' });
+        bmp = await this._fetchDecode(handle.url, opts);
       } else {
         bmp = src;
       }
@@ -372,6 +430,7 @@
     handle.state = 'freed';
     handle.gen++;
     if (handle.url && this.byUrl.get(handle.url) === handle) this.byUrl.delete(handle.url);
+    if (handle.url) this.inFlight.delete(handle.url);
     if (handle.tex) {
       try { handle.tex.destroy(); } catch (_) {}
       this.bytes -= handle.w * handle.h * 4;
@@ -384,26 +443,26 @@
   ImageStore.prototype.recover = async function () {
     this.recoveries++;
     this.pipe = null; this.mod = null; this.bgl = null; this.sampler = null; this.ub = null; this._fmt = null;
+    this.inFlight.clear();
     var pending = [];
     for (var h of this.map.values()) {
-      if (h.url && (h.state === 'ready' || h.state === 'error' || h.state === 'loading')) {
-        h.tex = null; h.view = null; h.bg = null; h.state = 'loading';
-        pending.push(this.patch(h, h.url, { timeoutMs: 15000 }));
+      if (h.url && h.state !== 'freed' && h.state !== 'empty') {
+        h.tex = null; h.view = null; h.state = 'loading';
+        pending.push(this.patch(h, h.url, { timeoutMs: 15000, force: true }));
       }
     }
     await Promise.all(pending);
   };
 
   ImageStore.prototype.destroy = function () {
+    this.inFlight.clear();
     for (var h of [...this.map.values()]) this.free(h, true);
     this.pipe = null; this.mod = null; this.ub = null; this.sampler = null;
   };
 
-  /* Per-renderer image layer: overlays tied to companion DL node ids for hit/parallax. */
   function ImageLayer(renderer) {
     this.r = renderer;
-    this.nodes = new Map(); /* nodeId -> { handle, x,y,w,h, alpha, clip, dx, dy, exclusiveTextId } */
-    this.vb = null;
+    this.nodes = new Map();
   }
 
   ImageLayer.prototype.set = function (nodeId, desc) {
@@ -411,13 +470,16 @@
       this.nodes.delete(nodeId | 0);
       return;
     }
+    var alpha = desc.alpha == null ? 1 : +desc.alpha;
+    if (!(alpha >= 0)) alpha = 0;
+    if (alpha > 1) alpha = 1;
     this.nodes.set(nodeId | 0, {
       handle: desc.handle,
       x: +desc.x || 0,
       y: +desc.y || 0,
       w: +desc.w || 0,
       h: +desc.h || 0,
-      alpha: desc.alpha == null ? 1 : +desc.alpha,
+      alpha: alpha,
       clip: desc.clip || 'circle',
       dx: +desc.dx || 0,
       dy: +desc.dy || 0
@@ -434,6 +496,15 @@
     if (n) { n.dx = +dx || 0; n.dy = +dy || 0; }
   };
 
+  ImageLayer.prototype.hit = function (x, y) {
+    var ids = [...this.nodes.keys()].reverse();
+    for (var i = 0; i < ids.length; i++) {
+      var n = this.nodes.get(ids[i]);
+      if (imageHit(n, x, y)) return ids[i];
+    }
+    return null;
+  };
+
   ImageLayer.prototype.draw = function (pass, dpr) {
     var r = this.r;
     var store = r._imageStore;
@@ -442,9 +513,7 @@
     try { store._ensurePipe(r.fmt || 'bgra8unorm'); } catch (e) { return 0; }
     var nDraw = 0;
     var d = dpr || r.dpr || 1;
-    for (var e of r.entries) {
-      nDraw += this._drawEntry(pass, store, e, d);
-    }
+    for (var e of r.entries) nDraw += this._drawEntry(pass, store, e, d);
     return nDraw;
   };
 
@@ -452,24 +521,15 @@
     var r = this.r, n = 0;
     if (!e || !e.scene) return 0;
     var verts = [];
-    for (var [id, node] of this.nodes) {
+    for (var node of this.nodes.values()) {
       var h = node.handle;
       if (!h || h.state !== 'ready' || !h.view) continue;
-      var x = (node.x + node.dx) * d;
-      var y = (node.y + node.dy) * d;
-      var w = node.w * d, hh = node.h * d;
-      var a = node.alpha;
-      /* CSS px relative to scene; shader maps via uniform */
+      /* Positions are CSS px of the scene; viewport is set in device px via dpr. */
       var x0 = node.x + node.dx, y0 = node.y + node.dy, x1 = x0 + node.w, y1 = y0 + node.h;
-      verts.push({ h: h, x0: x0, y0: y0, x1: x1, y1: y1, a: a });
+      verts.push({ h: h, x0: x0, y0: y0, x1: x1, y1: y1, a: node.alpha });
     }
     if (!verts.length) return 0;
-    var cssW = e.w, cssH = e.h;
-    var u = new Float32Array([
-      r.c.width / d, r.c.height / d, 0, 0,
-      e.x, e.y, 1, 1
-    ]);
-    /* vp = css canvas size; scene offset */
+    var u = new Float32Array(8);
     u[0] = r.c.width / (r.dpr || d);
     u[1] = r.c.height / (r.dpr || d);
     u[4] = e.x; u[5] = e.y; u[6] = 1; u[7] = 1;
@@ -515,7 +575,6 @@
     if (!renderer || renderer._imageStore) return renderer;
     renderer._imageStore = store;
     renderer.images = new ImageLayer(renderer);
-    /* Replace draw to composite images inside the same render pass (before end). */
     renderer.draw = function () {
       if (!this.msaa || this.hidden || this.lost) return 0;
       for (var e of this.entries) if (e.scene.h) this.sync(e.scene);
@@ -541,6 +600,13 @@
         if (this._imageStore) await this._imageStore.recover();
       };
     }
+    var prevDestroy = renderer.destroy && renderer.destroy.bind(renderer);
+    if (renderer.destroy) {
+      renderer.destroy = function () {
+        if (this.images) this.images.clear();
+        if (prevDestroy) prevDestroy();
+      };
+    }
     return renderer;
   }
 
@@ -564,7 +630,6 @@
     return gc._images;
   }
 
-  /* Hook Renderer.init - every renderer has r.gc (shared or owned). */
   var R = J.Renderer;
   if (R && R.init) {
     var origInit = R.init.bind(R);
@@ -580,7 +645,11 @@
     VERSION: VERSION,
     MAX_EDGE: MAX_EDGE,
     MAX_ENTRIES: MAX_ENTRIES,
+    MAX_BYTES: MAX_BYTES,
     sanitizeUrl: sanitizeUrl,
+    exclusiveAvatarPaint: exclusiveAvatarPaint,
+    imageHit: imageHit,
+    circleContains: circleContains,
     storeFor: storeFor,
     attachToRenderer: attachToRenderer,
     allowHosts: Object.keys(ALLOW_HOSTS)

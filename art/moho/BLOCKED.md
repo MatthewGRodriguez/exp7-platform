@@ -1,10 +1,12 @@
-# Moho stage — BLOCKED on this agent
+# Moho stage status
 
-**Tool:** Moho CLI  
-**Status:** Not available as an executable on this cloud VM. Archived Moho project assets exist under `docs/archives/ranking_ui/vendor/moho/` but are historical — not a live CLI.
+| Item | Status |
+|------|--------|
+| Moho 14.3 binary on Mac | Inventory-confirmed: `/Applications/Moho.app/Contents/MacOS/Moho` |
+| `-h` help | **BLOCKED** — no text within 20s |
+| Real `.moho` seed | **SHIPPED** `art/pipeline/moho/seed/JWorkbook_chrome.moho` (archived living-core project; zip+mohoproj JSON) |
+| Comparison scene | **PROBE-READY** via `CreateExp7ArtComparison.lua` (Moho creates the file; we do not fabricate mohoproj) |
+| FileRender / GIF | **NOT EXECUTED** here; probe scripts only |
+| Fabricated Moho PNG/GIF in repo | **NONE** — do not treat MOCK web gifs as Moho |
 
-**Required (not run):** SVG layers/frame keys from the same state table/fits; side-by-side flat vs new; comparison GIFs with global palette / no dither from Moho export.
-
-Web comparison GIFs under `artifacts/.../gifs/` are **synthetic mock motion sheets** for review layout only — **[MOCK]**, not Moho output.
-
-Evidence class: **[OPEN][BLOCKED]**
+See `art/pipeline/moho/README.md` and `art/pipeline/mac/MAC_RUNBOOK.md`.

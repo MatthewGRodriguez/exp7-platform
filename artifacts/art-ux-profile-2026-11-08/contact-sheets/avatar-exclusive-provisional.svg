@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="160">
+<title>PROVISIONAL exclusive avatar modes</title>
+<rect width="720" height="160" fill="#fff"/>
+<text x="12" y="20" font-size="12" fill="#a00">[PROVISIONAL/MOCK layout] Mac WebGPU paint is USER-HW</text>
+<rect x="40" y="40" width="200" height="100" fill="#f6f7f9" stroke="#dde2ec"/>
+<circle cx="140" cy="90" r="28" fill="none" stroke="#dde2ec" stroke-dasharray="4 3"/>
+<text x="140" y="130" text-anchor="middle" font-size="11">pending: neither</text>
+<rect x="270" y="40" width="200" height="100" fill="#f6f7f9" stroke="#dde2ec"/>
+<circle cx="370" cy="90" r="28" fill="#6b8caf"/>
+<text x="370" y="130" text-anchor="middle" font-size="11">photo: circle clip</text>
+<rect x="500" y="40" width="200" height="100" fill="#f6f7f9" stroke="#dde2ec"/>
+<circle cx="600" cy="90" r="28" fill="#eef1f6" stroke="#8a96aa"/>
+<text x="600" y="95" text-anchor="middle" font-size="14">MR</text>
+<text x="600" y="130" text-anchor="middle" font-size="11">initials: soft disc + text</text>
+</svg>

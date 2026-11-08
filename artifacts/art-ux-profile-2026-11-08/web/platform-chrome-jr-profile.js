@@ -1,6 +1,6 @@
 /* PlatformChromeJR profile-photo consumer (art pass).
  * Circular clipped JRDI image on reserved bar avatar; exclusive initials/soft-disc on absent/failure.
- * DOM account/key overlays unchanged. PAT never in image URLs.
+ * Pending: neither initials nor photo. DOM account/key overlays unchanged. PAT never in image URLs.
  */
 (function (root) {
   'use strict';
@@ -19,10 +19,23 @@
     drawing: false,
     appsDrawing: false,
     avatarNodeId: null,
-    loadGen: 0
+    loadGen: 0,
+    unmounted: false
   };
 
   function $(id) { return document.getElementById(id); }
+
+  function paint() {
+    var J = root.JRender;
+    var fn = J && J.Images && J.Images.exclusiveAvatarPaint;
+    return fn ? fn(state.avatarMode) : {
+      mode: state.avatarMode,
+      showInitials: state.avatarMode === 'initials',
+      showPhoto: state.avatarMode === 'photo',
+      showSoftDisc: state.avatarMode === 'initials',
+      label: state.avatarMode === 'initials' ? state.initials : ''
+    };
+  }
 
   function setBarMode(on) {
     state.on = !!on;
@@ -40,22 +53,19 @@
     return new DOMParser().parseFromString('<div id="app">' + html + '</div>', 'text/html').getElementById('app');
   }
 
-  function softDiscStyle() {
-    /* Soft disc behind photo or as exclusive fallback plate - matches DOM #avatarFallback language. */
-    return 'min-width:' + AVATAR + 'px;min-height:' + AVATAR + 'px;border-radius:999px;background:#eef1f6';
-  }
-
   function barHtml() {
-    var mode = state.avatarMode;
-    var label = mode === 'photo' ? '' : (state.initials || '?');
-    /* Exclusive: photo mode uses empty label (image layer paints); never dual initials+photo. */
+    var p = paint();
+    var label = p.showInitials ? (state.initials || '?') : '';
+    var bg = p.showSoftDisc ? 'background:#eef1f6;' : 'background:transparent;';
+    /* Exclusive: photo has no initials text; pending has neither; soft-disc only with initials. */
     return '' +
       '<div class="ja-comp" data-plat="bar" style="background:#ffffff;min-height:' + BAR_H + 'px">' +
       '<div class="ja-bar" style="padding:4px 8px;gap:8px">' +
       '<button type="button" data-jv-act="plat:back" class="ja-joy" data-jr-state="idle" style="min-width:36px;min-height:36px">&larr;</button>' +
-      '<button type="button" data-jv-act="plat:avatar" class="ja-joy" data-jr-state="' +
-      (mode === 'photo' ? 'photo' : (mode === 'pending' ? 'loading' : 'idle')) +
-      '" style="' + softDiscStyle() + '">' + label + '</button>' +
+      '<button type="button" data-jv-act="plat:avatar" class="ja-joy" data-jr-state="' + p.mode +
+      '" aria-busy="' + (p.mode === 'pending' ? 'true' : 'false') +
+      '" style="min-width:' + AVATAR + 'px;min-height:' + AVATAR + 'px;border-radius:999px;' + bg + '">' +
+      label + '</button>' +
       '<span class="ja-dim">Exp7</span>' +
       '</div></div>';
   }
@@ -91,7 +101,6 @@
     if (!view || !view.L || !view.L.nodes) return null;
     for (var i = 0; i < view.L.nodes.length; i++) {
       var n = view.L.nodes[i];
-      if (n && n.act === 'jv' && n.el && n.el.getAttribute && n.el.getAttribute('data-jv-act') === 'plat:avatar') return n;
       if (n && n.el && n.el.getAttribute && n.el.getAttribute('data-jv-act') === 'plat:avatar') return n;
     }
     return null;
@@ -121,8 +130,12 @@
 
   function placePhotoOverlay() {
     var view = state.barView;
-    if (!view || !view.r || !view.r.images) return false;
-    if (state.avatarMode !== 'photo' || !state.avatarHandle || state.avatarHandle.state !== 'ready') {
+    var p = paint();
+    if (!p.showPhoto || !view || !view.r || !view.r.images) {
+      clearPhotoOverlay();
+      return false;
+    }
+    if (!state.avatarHandle || state.avatarHandle.state !== 'ready') {
       clearPhotoOverlay();
       return false;
     }
@@ -132,17 +145,23 @@
     state.avatarNodeId = node.id;
     view.r.images.set(node.id, {
       handle: state.avatarHandle,
-      x: b.x,
-      y: b.y,
-      w: b.w,
-      h: b.h,
+      x: b.x, y: b.y, w: b.w, h: b.h,
       alpha: 1,
       clip: 'circle',
-      dx: 0,
-      dy: 0
+      dx: 0, dy: 0
     });
     try { view.r.request && view.r.request(); view.r.draw && view.r.draw(); } catch (_) {}
     return true;
+  }
+
+  function freeHandle() {
+    if (!state.avatarHandle) return;
+    try {
+      var J = root.JRender;
+      var gc = root.JRViews && root.JRViews.gc && root.JRViews.gc();
+      if (J && J.Images && gc) J.Images.storeFor(gc).free(state.avatarHandle, true);
+    } catch (_) {}
+    state.avatarHandle = null;
   }
 
   async function ensureAvatarHandle(url) {
@@ -153,11 +172,8 @@
     var gc = root.JRViews && root.JRViews.gc && root.JRViews.gc();
     if (!gc) return null;
     var store = J.Images.storeFor(gc);
-    if (state.avatarHandle) {
-      store.free(state.avatarHandle, true);
-      state.avatarHandle = null;
-    }
-    var h = await store.load(check.url, { timeoutMs: 12000 });
+    freeHandle();
+    var h = await store.load(check.url, { timeoutMs: 12000, force: true });
     if (h.state !== 'ready') {
       store.free(h, true);
       return null;
@@ -166,12 +182,32 @@
     return h;
   }
 
+  function hookParallax() {
+    try {
+      var ctl = state.barView && state.barView._slabs;
+      if (!ctl || ctl._avatarPhotoHook) return;
+      ctl._avatarPhotoHook = true;
+      var prevTick = ctl.tick.bind(ctl);
+      ctl.tick = function (t) {
+        var dirty = prevTick(t);
+        if (state.avatarMode === 'photo' && state.barView && state.barView.r && state.barView.r.images && state.avatarNodeId != null) {
+          var C = root.EXP7_SLAB_CONFIG, k = (C && C.front && C.front.outer) || 0;
+          var xy = this.active() ? this.xy : [0, 0];
+          /* Parallax: shift * z/(D-z) approximated by Exp7Slabs front factor on companion node. */
+          state.barView.r.images.shift(state.avatarNodeId, xy[0] * k, xy[1] * k);
+        }
+        return dirty;
+      };
+    } catch (_) {}
+  }
+
   async function drawBar() {
-    if (state.drawing) return;
+    if (state.unmounted || state.drawing) return;
     state.drawing = true;
     try {
       if (!root.JRViews || !root.JRender) throw new Error('JRViews/JRender missing');
       await root.JRViews.boot();
+      if (state.unmounted) return;
       var host = $('jrChromeHost');
       var cv = $('jrChromeCanvas');
       if (!host || !cv) throw new Error('jrChromeHost/canvas missing');
@@ -180,25 +216,22 @@
         state.barView = new root.JRViews.View();
         wireViewActs(state.barView);
       }
-      /* Resolve exclusive mode before paint. */
-      if (state.avatarUrl && state.avatarMode !== 'photo') {
-        state.avatarMode = 'pending';
-      }
+      if (state.avatarUrl && state.avatarMode !== 'photo') state.avatarMode = 'pending';
       if (!state.avatarUrl) {
         state.avatarMode = 'initials';
         clearPhotoOverlay();
       }
       var doc = parseApp(barHtml());
       await state.barView.show(cv, doc, W);
+      if (state.unmounted) return;
       setBarMode(true);
       if (state.avatarUrl) {
         var gen = ++state.loadGen;
         try {
           var h = await ensureAvatarHandle(state.avatarUrl);
-          if (gen !== state.loadGen) return;
+          if (state.unmounted || gen !== state.loadGen) return;
           if (h) {
             state.avatarMode = 'photo';
-            /* Re-show without initials text so exclusive photo paints alone. */
             doc = parseApp(barHtml());
             await state.barView.show(cv, doc, W);
             placePhotoOverlay();
@@ -209,30 +242,17 @@
             await state.barView.show(cv, doc, W);
           }
         } catch (e) {
+          if (gen !== state.loadGen || state.unmounted) return;
           state.avatarMode = 'initials';
           clearPhotoOverlay();
+          try {
+            doc = parseApp(barHtml());
+            await state.barView.show(cv, doc, W);
+          } catch (_) {}
         }
       }
       try { if (root.Exp7Slabs && root.Exp7Slabs.notify) root.Exp7Slabs.notify(); } catch (e) {}
-      /* Keep photo locked to avatar node under slabs parallax (front shift). */
-      try {
-        var ctl = state.barView && state.barView._slabs;
-        if (ctl && state.avatarNodeId != null) {
-          var prevTick = ctl.tick.bind(ctl);
-          if (!ctl._avatarPhotoHook) {
-            ctl._avatarPhotoHook = true;
-            ctl.tick = function (t) {
-              var dirty = prevTick(t);
-              if (state.avatarMode === 'photo' && state.barView && state.barView.r && state.barView.r.images && state.avatarNodeId != null) {
-                var C = root.EXP7_SLAB_CONFIG, k = (C && C.front && C.front.outer) || 0;
-                var xy = this.active() ? this.xy : [0, 0];
-                state.barView.r.images.shift(state.avatarNodeId, xy[0] * k, xy[1] * k);
-              }
-              return dirty;
-            };
-          }
-        }
-      } catch (_) {}
+      hookParallax();
     } catch (e) {
       setBarMode(false);
       root.__platformChromeJrError = String((e && e.message) || e);
@@ -243,7 +263,7 @@
   }
 
   async function drawApps() {
-    if (state.appsDrawing) return;
+    if (state.unmounted || state.appsDrawing) return;
     state.appsDrawing = true;
     try {
       if (!root.JRViews || !root.JRender) throw new Error('JRViews/JRender missing');
@@ -285,29 +305,53 @@
     } else if (url && typeof url === 'string' && url.indexOf('https://') === 0) {
       next = url;
     }
+    var same = next === state.avatarUrl;
     state.avatarUrl = next;
     state.avatarMode = next ? 'pending' : 'initials';
     state.loadGen++;
     if (!next) {
-      if (state.avatarHandle && J && J.Images) {
-        try {
-          var gc = root.JRViews && root.JRViews.gc && root.JRViews.gc();
-          if (gc) J.Images.storeFor(gc).free(state.avatarHandle, true);
-        } catch (_) {}
-      }
-      state.avatarHandle = null;
+      freeHandle();
+      clearPhotoOverlay();
+    } else if (!same) {
+      /* Update: drop previous photo immediately so exclusive pending holds. */
       clearPhotoOverlay();
     }
-    if (state.on) drawBar();
+    if (state.on && !state.unmounted) drawBar();
+  }
+
+  function unmount() {
+    state.unmounted = true;
+    state.loadGen++;
+    clearPhotoOverlay();
+    freeHandle();
+    setBarMode(false);
+    setAppsMode(false);
+    state.barView = null;
+    state.appsView = null;
+    state.avatarMode = 'initials';
+  }
+
+  async function onContextLost() {
+    clearPhotoOverlay();
+    state.avatarMode = state.avatarUrl ? 'pending' : 'initials';
+    try {
+      var gc = root.JRViews && root.JRViews.gc && root.JRViews.gc();
+      if (gc && gc._images) await gc._images.recover();
+    } catch (_) {}
+    if (!state.unmounted && state.on) return drawBar();
   }
 
   function start() {
+    state.unmounted = false;
     var run = function () {
-      drawBar();
-      if (root.UI && root.UI.appsOpen) drawApps();
+      if (!state.unmounted) {
+        drawBar();
+        if (root.UI && root.UI.appsOpen) drawApps();
+      }
     };
     addEventListener('resize', run);
     if (root.visualViewport) visualViewport.addEventListener('resize', run);
+    addEventListener('jrender-devicelost', function () { onContextLost(); });
     return drawBar();
   }
 
@@ -316,9 +360,12 @@
     redraw: drawBar,
     redrawApps: drawApps,
     setAvatarInfo: setAvatarInfo,
+    unmount: unmount,
+    onContextLost: onContextLost,
     active: function () { return !!state.on; },
     appsActive: function () { return !!state.appsOn; },
     avatarMode: function () { return state.avatarMode; },
+    avatarPaint: function () { return paint(); },
     error: function () { return root.__platformChromeJrError || null; }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

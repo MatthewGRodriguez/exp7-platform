@@ -62,14 +62,31 @@ Clip: circular discard + soft edge in WGSL. Alpha respects DPR via CSS-px → de
 
 `gc.recover()` / `renderer.recover()` re-fetch URL handles and rebuild the image pipeline. No silent software fallback.
 
+## Exclusive avatar paint
+
+```
+JRender.Images.exclusiveAvatarPaint(mode)
+-> { mode, showInitials, showPhoto, showSoftDisc, label }
+```
+
+| mode | initials | photo | soft-disc |
+|------|----------|-------|-----------|
+| pending/loading | no | no | no |
+| photo/ready | no | yes | no |
+| initials (also error/absent/freed fallback) | yes | no | yes |
+
+Never dual initials+photo. Soft-disc is exclusive with photo (plate only when initials).
+
 ## Platform consumer
 
 `PlatformChromeJR.setAvatarInfo(url, login)`:
 
 1. Sanitize URL via JRDI.
-2. Pending: neither initials nor photo (DOM parity).
+2. Pending: neither initials nor photo (DOM parity) via `exclusiveAvatarPaint`.
 3. Ready: re-layout bar **without** initials text; place circular overlay on `plat:avatar` node.
 4. Fail/absent: initials on soft disc only; overlay cleared.
+5. `unmount()` frees textures; `onContextLost` / `jrender-devicelost` recovers store then redraws.
+6. Parallax: Exp7Slabs front factor shifts overlay (`images.shift`); hit uses circular `images.hit`.
 
 ## JRViews
 

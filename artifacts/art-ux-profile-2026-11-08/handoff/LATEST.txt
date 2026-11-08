@@ -1,0 +1,4 @@
+archive=ART-PIPELINE-HANDOFF-20261108T163738Z.tar.gz
+sha256=c932d526c89dc458dba886c30700fce09fab5889e0b6ae8684a7bf51cafc3c28
+path=artifacts/art-ux-profile-2026-11-08/handoff/ART-PIPELINE-HANDOFF-20261108T163738Z.tar.gz
+scratch=/Users/user-rodri/ArtScratch/exp7-art
