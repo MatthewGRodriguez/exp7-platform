@@ -62,11 +62,13 @@ Module id: **`exp7-views@1`**. Presentation: `runtime-html-string → JRViews �
 
 ## 4. Profile image render support (gap)
 
-### Today [MEAS]
+### Today [MEAS] (updated 1.8.4-art review)
 
 - DOM `#btnAvatar` can show a GitHub profile `<img>` **or** initials fallback (exclusive `.is-on`).  
-- When JR bar paints, avatar is **initials text** in the JRViews scene — **no bitmap/image DL op** is used.  
-- Archived JRender API (`docs/archives/artist-jrender/jrender-exp7/API.md`) documents vector paths, rects, text, richText, patches, shared `GPUContext` — **no public image/sprite/bitmap node API** in that archive. Shipped `jrender.classic.js` uses GPU textures for the framebuffer/readback, not as a documented app-facing image primitive.
+- **JRDI/1 host image ABI** ([docs/api/IMAGE-ABI.md](./api/IMAGE-ABI.md), packed `jrender-images` in lean): textured circular overlays on shared `GPUContext` / same render pass. Not a wasm DL op (shipped wasm rejects unknown ops).  
+- `PlatformChromeJR` consumes JRDI for the reserved-bar avatar: exclusive photo **xor** initials/soft-disc; public GitHub avatar HTTPS hosts only.  
+- Archived JRender API still has no wasm DL image op; JRDI is the documented host extension pending any future wasm bump from Ash’s tree.  
+- Mac WebGPU / LIVE-GPU paint remain **[USER-HW][OPEN]** on cloud.
 
 ### Ask of Ash
 

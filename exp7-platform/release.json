@@ -1,17 +1,17 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.3",
+  "version": "1.8.4",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "2033acab6ed923098b4ab37b52581a7490cb0da5b77ef05016593ff9015d6c98",
+  "sha256": "0d50e1da5fbaa3f9a8b8e3096a9820a9426ac857da7c45dd889111ec509beb0d",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "exp7-lean demo + Budget Exp7Views consumers; JRViews platform bar/apps (canvas hits); Budget Cal/Board/Plan (+ type) tabs in-scene after planDoc; DOM tabs hidden via #budgetRoot.jr-chrome (scoped CSS safe); 4 Board type boards; Budget local-IDB only",
+    "app": "exp7-lean demo + Budget Exp7Views consumers; JRViews platform bar/apps (canvas hits); Budget Cal/Board/Plan (+ type) tabs in-scene after planDoc; DOM tabs hidden via #budgetRoot.jr-chrome (scoped CSS safe); 4 Board type boards; Budget local-IDB only; JRDI profile images + UX state table; exclusive avatar photo/initials",
     "appSha256": "ec696151f233c4762c6b831f4f9cbec9857f6ac24a179fcfb0aa44ffc8c9da63",
     "budgetSha256": "673372b101ea5342552ec16a2e5d3820e322411031c52d808b68c35c3d494c67",
     "budgetMode": "exp7-views",
     "viewsModuleId": "exp7-views@1",
     "viewsSourcesAggregateSha256": "96b954d9e411a69f7a3b47f7e3d87d3e021e72dee06a28776326afd52ab9790d",
-    "chromeJr": "PlatformChromeJR: bar + apps via JRViews (Exp7Slabs parallax); Budget tabs in hostDoc; DOM fallback when no-adapter",
+    "chromeJr": "PlatformChromeJR: JRDI circular avatar photo (exclusive initials fallback); bar/apps JRViews; Budget tabs in hostDoc",
     "standalone": "dist/exp7-views-standalone.html",
     "standaloneSha256": "bc8e1553a54b089e42461be0ee8391998b62cd5cfc7877f75d3305b1b4979e26"
   }
