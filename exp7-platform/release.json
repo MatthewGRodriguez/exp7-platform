@@ -1,11 +1,11 @@
 {
  "format": "exp7-platform-release/1",
- "version": "1.3.0",
+ "version": "1.4.0",
  "file": "exp7-platform/exp7-platform-lean.html",
- "sha256": "6e01b6e133941a68b7778dd738681c34e2fd28a77a5a4820e8c6a3e559b43486",
+ "sha256": "df6e1586687f03db2a2bf89150ee94e1eca5445d2157e9248f6d2eeec7a278c4",
  "minLauncherMajor": 1,
  "contains": {
-  "app": "exp7-lean (v17 editing; Add user/Share; automatic app-op sync via exp7-app-v1; direct in-page mount)",
+  "app": "exp7-lean (v17 editing; app-first chrome; Add user/Share; proposal-op sync via exp7-app-v1; direct in-page mount)",
   "appSha256": "8b96d6b58b9ab6718af78076b75a5841fb1a80de2de9fca8f8eb73fb90d8a2b8"
  }
 }
