@@ -219,7 +219,7 @@ def make_avatar(name, loc, diameter, image_path: Path, z=0.08):
     ob = bpy.context.active_object
     ob.name = name
     ob.scale = (diameter, diameter, 1.0)
-    bpy.ops.object.transform_apply(scale=True)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     _disable_shadows(ob)
 
     mat = bpy.data.materials.new(name + "_mat")
@@ -369,20 +369,20 @@ def compose_board(make_panel, palette, geom, element_states, font_id, prefix="Vi
         ("Studio rent", "$1,450", "Housing"),
     ]
     for ci, (cname, states) in enumerate(cols):
-        cx = (ci - 1) * 1.35
+        cx = (ci - 1) * 1.55
         col_p, *_ = make_panel(
             f"{prefix}_col{ci}", element_states["idle"], palette, geom, st_name="idle",
-            size=(1.20, 0.32), origin=(cx, 1.05), content_lines=0,
+            size=(1.25, 0.32), origin=(cx, 1.05), content_lines=0,
         )
         objs.append(col_p)
         objs.append(label_on_panel(col_p, f"{prefix}_colLab{ci}", cname, (-0.48, 0.0), BODY_SIZE, INK, font_id))
         for ri, st_name in enumerate(states):
             st = dict(element_states.get(st_name, element_states["idle"]))
-            y = 0.55 - ri * (0.58 + gap)
+            y = 0.55 - ri * (0.62 + gap)
             title, amt, tag = cards[ri]
             panel, _, ring, _ = make_panel(
                 f"{prefix}_card{ci}{ri}", st, palette, geom, st_name=st_name,
-                size=(1.20, 0.50), origin=(cx, y), content_lines=0,
+                size=(1.25, 0.52), origin=(cx, y), content_lines=0,
             )
             objs.append(panel)
             if ring:
@@ -481,7 +481,7 @@ def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="V
     bar.name = f"{prefix}_bar"
     # ~3.6m wide — fits frontal FOV without overflow; still fills canvas after push-in
     bar.scale = (1.80, bar_h / 2, 0.03)
-    bpy.ops.object.transform_apply(scale=True)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     mat = bpy.data.materials.new(f"{prefix}_bar_mat")
     mat.use_nodes = True
     bsdf = mat.node_tree.nodes.get("Principled BSDF")

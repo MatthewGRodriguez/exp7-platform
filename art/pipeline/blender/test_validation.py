@@ -62,6 +62,8 @@ class ViewsContent(unittest.TestCase):
         self.assertGreaterEqual(VC.BODY_SIZE, 0.12)
         self.assertGreaterEqual(VC.DAY_SIZE, 0.12)
         self.assertIn("Matrix.Identity(4)", Path(__file__).with_name("views_content.py").read_text())
+        gen_src = Path(__file__).with_name("generate_ui_scene.py").read_text()
+        self.assertIn("location=False, rotation=False, scale=True", gen_src)
 
     def test_assets(self):
         root = Path(__file__).parent / "assets"

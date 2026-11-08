@@ -631,7 +631,8 @@ def make_box(name, sx, sy, sz, loc, bevel_w, mat):
     obj = bpy.context.active_object
     obj.name = name
     obj.scale = (sx / 2, sy / 2, sz / 2)
-    bpy.ops.object.transform_apply(scale=True)
+    # Blender 4.2: transform_apply(scale=True) alone can zero location — pin loc/rot False
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     if bevel_w > 0:
         apply_bevel(obj, bevel_w)
     if mat:

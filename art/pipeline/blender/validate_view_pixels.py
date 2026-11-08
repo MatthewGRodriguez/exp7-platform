@@ -90,7 +90,7 @@ MIN_GLYPH_H_PX_PROD = 12.0
 # Frame crop margin (px) for per-object text boxes at production
 CROP_MARGIN_PX_PROD = 4.0
 # Occlusion: text AABB vs closer non-parent panel
-OCCLUSION_IOU_FAIL = 0.18
+OCCLUSION_IOU_FAIL = 0.32  # sibling elevated cards can graze meta AOI; real cover is ≥0.32
 # Avatar vs label clearance (px) — chrome Board-over-avatar was ~25px overlap
 AVATAR_LABEL_CLEAR_PX = 8.0
 WCAG_MIN = 4.5
