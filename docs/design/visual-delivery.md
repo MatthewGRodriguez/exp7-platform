@@ -1,5 +1,7 @@
 # Visual delivery (1.8.8)
 
+The live screen after 1.8.8 was reported unchanged. The idle material in that build is a 2px inset line, so a display list can contain it and still look like the old cards. 1.8.9 does not restyle anything. Its Debug snapshot says whether those bands and gold rings are in the live display list (`style.note`) and which shell version actually loaded.
+
 The styling that was agreed in `docs/artist-coordination-brief.md` and `docs/design/state-table.json` is shipped only when it is in `exp7-platform/exp7-platform-lean.html` and shows up in the JRender display list. A Blender or Moho file is not a shipped surface.
 
 Environment for the checks below: cloud Node, reading the lean file and running the `jrviews-ux-states` layout hook on stub nodes. Mac Safari / Shortcuts WebGPU is **not** verified.
