@@ -35,7 +35,8 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | 1.8.1 | PR #24 | Budget chrome cleanup; four Board type tabs |
 | 1.8.2 | PR #25 | Bar + apps via JRViews; Budget tabs in `hostDoc` |
 | **1.8.3** | **PR #26** | Hide DOM tabs (scoped CSS); Plan chrome after `planDoc`; bar canvas hits |
-| **1.8.4** | PR #29 (this branch) | JRDI profile images + UX state table/washes; Mac LIVE-GPU still open |
+| **1.8.4** | PR #29 | JRDI profile images + UX state table/washes |
+| **1.8.5** | this branch | JRDI: keep image VBs until after `queue.submit` (fixes Invalid CommandEncoder) |
 
 ### Current manifest (verbatim) [MEAS]
 
@@ -43,9 +44,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.4",
+"version": "1.8.5",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "0d50e1da5fbaa3f9a8b8e3096a9820a9426ac857da7c45dd889111ec509beb0d",
+"sha256": "e2fa529aa67f85d58b68eb794963ba53074331f783cbf9bf74c5482e07e3765b",
 "minLauncherMajor": 1
 ```
 
