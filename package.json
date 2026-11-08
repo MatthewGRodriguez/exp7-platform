@@ -1,0 +1,28 @@
+{
+  "name": "exp7-platform",
+  "version": "1.0.0",
+  "description": "Software-only public repository for Exp7 Platform release artifacts.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test:mount": "node tests/mount-render-ready.mjs",
+    "test:boot-modes": "node tests/probe-boot-modes.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MatthewGRodriguez/exp7-platform.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MatthewGRodriguez/exp7-platform/issues"
+  },
+  "homepage": "https://github.com/MatthewGRodriguez/exp7-platform#readme",
+  "dependencies": {
+    "puppeteer-core": "^24.43.1"
+  },
+  "private": true
+}
