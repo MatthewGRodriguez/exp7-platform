@@ -37,7 +37,7 @@ except ImportError:
     Vector = None
 
 DEFAULT_SCRATCH = "/Users/user-rodri/ArtScratch/exp7-art"
-GENERATOR_REV = "front-readable-v8"
+GENERATOR_REV = "front-readable-v9"
 
 # Ensure sibling import works inside Blender --python
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -419,11 +419,39 @@ def _project_pts(scene, cam, pts):
     return min(xs), max(xs), min(ys), max(ys), min(zs)
 
 
-def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24):
-    """Content-aware framing from MESH AABB: deterministic distance, then capped push-in.
+def _collect_content_pts(objects):
+    """Full content extent: MESH + FONT + avatar, including parented children.
 
-    Avoids iterative pull failure modes (board/chrome stuck at overflow~0.01 while
-    still flagged FAIL). FONT bound_boxes are excluded — they inflate NDC.
+    v8 excluded FONT and missed parented labels → plan left-column crop / chrome underscale.
+    """
+    assert bpy is not None
+    seen = set()
+    pts = []
+
+    def visit(ob):
+        if ob is None or id(ob) in seen:
+            return
+        seen.add(id(ob))
+        useful = ob.type in ("MESH", "FONT", "CURVE") or ("avatar" in ob.name.lower())
+        if useful:
+            try:
+                for c in ob.bound_box:
+                    pts.append(ob.matrix_world @ Vector(c))
+            except Exception:
+                pts.append(ob.location.copy())
+        for ch in getattr(ob, "children", []) or []:
+            visit(ch)
+
+    for ob in objects or []:
+        visit(ob)
+    return pts
+
+
+def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_name: str | None = None):
+    """Content-aware framing from full MESH+FONT extent; crop-hard + min-fill push-in.
+
+    Includes parented label bounds so production text anchors stay in-frame.
+    Chrome uses a flatter view_dir so the nav bar is not foreshortened to ~10% fill.
     """
     assert bpy is not None
     if not objects:
@@ -432,15 +460,7 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24):
     scene = bpy.context.scene
     old_res = (scene.render.resolution_x, scene.render.resolution_y)
     scene.render.resolution_x, scene.render.resolution_y = int(res[0]), int(res[1])
-    pts = []
-    mesh_objs = [ob for ob in objects if ob is not None and (ob.type == "MESH" or "avatar" in ob.name.lower())]
-    use_objs = mesh_objs if mesh_objs else [ob for ob in objects if ob is not None]
-    for ob in use_objs:
-        try:
-            for c in ob.bound_box:
-                pts.append(ob.matrix_world @ Vector(c))
-        except Exception:
-            pts.append(ob.location.copy())
+    pts = _collect_content_pts(objects)
     if not pts:
         scene.render.resolution_x, scene.render.resolution_y = old_res
         return {"ok": False, "errors": ["no bounds"]}
@@ -449,19 +469,29 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24):
     xs = [p.x for p in pts]
     ys = [p.y for p in pts]
     zs = [p.z for p in pts]
-    # Horizontal extent in content plane (XY) dominates UI framing
-    extent = max(max(xs) - min(xs), max(ys) - min(ys), max(zs) - min(zs), 0.5) * 0.5
+    span_x = max(xs) - min(xs)
+    span_y = max(ys) - min(ys)
+    span_z = max(zs) - min(zs)
+    extent = max(span_x, span_y, span_z, 0.5) * 0.5
     sensor = float(getattr(cam.data, "sensor_width", 36.0) or 36.0)
     lens = float(cam.data.lens)
-    # Fit extent*(1+2*margin) into vertical/horizontal FOV with aspect
     aspect = float(res[0]) / max(1.0, float(res[1]))
     fov_x = 2.0 * math.atan((sensor * 0.5) / max(1e-6, lens))
     fov_y = 2.0 * math.atan((sensor * 0.5 / aspect) / max(1e-6, lens))
-    fit = extent * (1.0 + 2.0 * margin) * 1.15  # pad for perspective foreshortening
-    dist = max(fit / max(1e-6, math.tan(min(fov_x, fov_y) * 0.5)), 4.5)
+    fit = extent * (1.0 + 2.0 * margin) * 1.12
+    dist = max(fit / max(1e-6, math.tan(min(fov_x, fov_y) * 0.5)), 3.8)
 
-    # Keep the elevated study angle (not top-down): direction from default view pose
-    view_dir = Vector((0.0, -0.75, 0.55)).normalized()
+    # Flat nav (chrome): more frontal so the bar has vertical presence + readable glyphs
+    flat = (view_name == "chrome") or (span_x > 2.5 * max(span_y, 0.01) and span_z < 0.8)
+    if flat:
+        view_dir = Vector((0.0, -0.96, 0.28)).normalized()
+        min_fill = 0.62  # larger axis must fill ≥62% of NDC
+        min_cam_dist = 3.2
+    else:
+        view_dir = Vector((0.0, -0.78, 0.50)).normalized()
+        min_fill = 0.55
+        min_cam_dist = 3.6
+
     cam.location = target + view_dir * dist
     cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
 
@@ -473,8 +503,7 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24):
         )
 
     minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
-    # Extra pull if still outside (foreshortening / avatar)
-    for _ in range(24):
+    for _ in range(max_iters):
         if _fit(minx, maxx, miny, maxy, minz):
             break
         overflow = max(
@@ -484,11 +513,10 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24):
             maxy - (1.0 - margin),
             0.02,
         )
-        cam.location = cam.location + view_dir * max(0.45, overflow * 8.0)
+        cam.location = cam.location + view_dir * max(0.35, overflow * 7.0)
         cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
         minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
     else:
-        # Soften: accept small overflow (chrome avatar foreshortening) after hard pull
         overflow = max(
             margin - minx,
             maxx - (1.0 - margin),
@@ -496,38 +524,31 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24):
             maxy - (1.0 - margin),
             0.0,
         )
-        if overflow > 0.0 and overflow <= 0.12 and minz > 0:
-            cam.location = cam.location + view_dir * max(1.2, overflow * 15.0)
-            cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
-            minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
-            overflow = max(
-                margin - minx,
-                maxx - (1.0 - margin),
-                margin - miny,
-                maxy - (1.0 - margin),
-                0.0,
-            )
-        if overflow > 0.08 or minz <= 0:
+        # Hard fail on crop — soft-accept previously left plan left-column cropped
+        if overflow > 0.04 or minz <= 0:
             scene.render.resolution_x, scene.render.resolution_y = old_res
             return {
                 "ok": False,
-                "errors": [f"ndc=[{minx:.3f},{miny:.3f},{maxx:.3f},{maxy:.3f}]"],
+                "errors": [f"crop ndc=[{minx:.3f},{miny:.3f},{maxx:.3f},{maxy:.3f}] overflow={overflow:.3f}"],
                 "ndc_bounds": [minx, miny, maxx, maxy],
                 "cam_dist": (cam.location - target).length,
+                "method": "extent_fullcontent_v9",
             }
-        log(f"FRAMING accept overflow={overflow:.3f} ndc=[{minx:.3f},{miny:.3f},{maxx:.3f},{maxy:.3f}]")
 
-    # Modest dolly-in for glyph size
+    # Dolly-in until larger NDC span meets min_fill (chrome was ~10% visual mass)
     pushed = 0
-    min_cam_dist = 4.0
-    for _ in range(10):
+    for _ in range(18):
         minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
+        span_nx = maxx - minx
+        span_ny = maxy - miny
+        fill = max(span_nx, span_ny)
         slack = min(minx - margin, 1.0 - margin - maxx, miny - margin, 1.0 - margin - maxy)
         dist_now = (cam.location - target).length
-        if slack < 0.04 or dist_now <= min_cam_dist:
+        if fill >= min_fill or slack < 0.025 or dist_now <= min_cam_dist:
             break
         loc = cam.location.copy()
-        trial = loc - view_dir * min(0.3, slack * 1.5)
+        step = min(0.45, max(0.12, (min_fill - fill) * 2.5), slack * 2.0)
+        trial = loc - view_dir * step
         if (trial - target).length < min_cam_dist:
             break
         cam.location = trial
@@ -538,17 +559,32 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24):
             cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
             break
         pushed += 1
-        minx, maxx, miny, maxy = minx2, maxx2, miny2, maxy2
+        minx, maxx, miny, maxy, minz = minx2, maxx2, miny2, maxy2, minz2
 
+    minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
+    span_nx = maxx - minx
+    span_ny = maxy - miny
+    fill = max(span_nx, span_ny)
+    crop_ok = _fit(minx, maxx, miny, maxy, minz)
     scene.render.resolution_x, scene.render.resolution_y = old_res
+    ok = crop_ok and fill >= (min_fill - 0.08)
+    errors = []
+    if not crop_ok:
+        errors.append(f"crop ndc=[{minx:.3f},{miny:.3f},{maxx:.3f},{maxy:.3f}]")
+    if fill < (min_fill - 0.08):
+        errors.append(f"underscale fill={fill:.3f} < min_fill={min_fill:.2f}")
     return {
-        "ok": True,
+        "ok": ok,
+        "errors": errors,
         "ndc_bounds": [minx, miny, maxx, maxy],
         "margin": margin,
         "cam_loc": list(cam.location),
         "cam_dist": (cam.location - target).length,
         "push_in_steps": pushed,
-        "method": "extent_distance_v8",
+        "fill": fill,
+        "min_fill": min_fill,
+        "flat_view": flat,
+        "method": "extent_fullcontent_v9",
     }
 
 
@@ -685,6 +721,13 @@ def make_panel(name: str, st: dict, palette: dict, geom: dict, tilt_deg=None, st
     obj = make_box(name, sx * scale, sy * scale, thick, (origin[0], origin[1], zc), rad, mat)
     if abs(tilt) > 1e-6:
         obj.rotation_euler[0] = math.radians(tilt)
+    # Binding contract for child labels (views_content parents text here)
+    obj["exp7_lift_m"] = float(lift_m)
+    obj["exp7_thick"] = float(thick)
+    obj["exp7_face_local_z"] = float(thick / 2 + 0.018)
+    obj["exp7_size_x"] = float(sx * scale)
+    obj["exp7_size_y"] = float(sy * scale)
+    obj["exp7_st_name"] = str(st_name)
 
     border_key = st.get("border", "border")
     border_col = palette["_rgba"].get(border_key) or palette["_rgba"]["border"]
@@ -944,35 +987,63 @@ def project_object_px(cam, ob, res_w, res_h):
 
 
 def write_projected_rois(cam, objs, out_json: Path, res_w: int, res_h: int) -> dict:
-    """Sidecar for validate_view_pixels — semantic ROI from projected text geometry."""
+    """Sidecar for validate_view_pixels — text + panel projections for occlusion/crop gates."""
     objects = {}
-    for ob in objs:
+    # Include parented children even if only parents were listed
+    all_obs = []
+    seen = set()
+
+    def _add(ob):
+        if ob is None or id(ob) in seen:
+            return
+        seen.add(id(ob))
+        all_obs.append(ob)
+        for ch in getattr(ob, "children", []) or []:
+            _add(ch)
+
+    for ob in objs or []:
+        _add(ob)
+
+    panel_tokens = ("_card", "_day", "_row", "_app", "_tab", "_col", "_header", "_bar", "_avatar")
+    for ob in all_obs:
         if ob is None:
             continue
-        if ob.type == "FONT" or "avatar" in ob.name.lower():
-            p640 = project_object_px(cam, ob, 640, 360)
-            p1280 = project_object_px(cam, ob, 1280, 720)
-            pref = project_object_px(cam, ob, res_w, res_h)
-            entry = {
-                "px_tl": pref["px_tl"],
-                "px_tl_640": p640["px_tl"],
-                "px_tl_1280": p1280["px_tl"],
-                "h_px_640": p640["h_px"],
-                "h_px_1280": p1280["h_px"],
-                "in_frame": pref["in_frame"],
-            }
-            if ob.type == "FONT":
-                entry["body"] = ob.data.body
-                entry["blender_size"] = float(ob.data.size)
-                entry["kind"] = "text"
-            else:
-                entry["kind"] = "avatar"
-            objects[ob.name] = entry
+        is_text = ob.type == "FONT"
+        is_avatar = "avatar" in ob.name.lower()
+        is_panel = ob.type == "MESH" and any(t in ob.name for t in panel_tokens)
+        if not (is_text or is_avatar or is_panel):
+            continue
+        p640 = project_object_px(cam, ob, 640, 360)
+        p1280 = project_object_px(cam, ob, 1280, 720)
+        pref = project_object_px(cam, ob, res_w, res_h)
+        entry = {
+            "px_tl": pref["px_tl"],
+            "px_tl_640": p640["px_tl"],
+            "px_tl_1280": p1280["px_tl"],
+            "h_px_640": p640["h_px"],
+            "h_px_1280": p1280["h_px"],
+            "w_px_1280": p1280["w_px"],
+            "in_frame": pref["in_frame"],
+            "z_near": pref["z_near"],
+            "world_z": float(ob.matrix_world.translation.z),
+            "parent": ob.parent.name if ob.parent else None,
+        }
+        if is_text:
+            entry["body"] = ob.data.body
+            entry["blender_size"] = float(ob.data.size)
+            entry["kind"] = "text"
+            entry["bound_parent"] = ob.get("exp7_bound_parent")
+        elif is_avatar:
+            entry["kind"] = "avatar"
+        else:
+            entry["kind"] = "panel"
+            entry["st_name"] = ob.get("exp7_st_name")
+        objects[ob.name] = entry
     doc = {
         "resolution": [res_w, res_h],
         "resolution_ref": [res_w, res_h],
         "objects": objects,
-        "mechanism": "projected_text_geometry_v8",
+        "mechanism": "projected_text_geometry_v9_panels",
     }
     out_json.write_text(json.dumps(doc, indent=2))
     return doc
@@ -1433,7 +1504,9 @@ def main():
                 view_cam.rotation_euler = (
                     Vector((0.0, 0.1, 0.15)) - view_cam.location
                 ).to_track_quat("-Z", "Y").to_euler()
-                frame = frame_camera_to_objects(view_cam, objs, (rx, ry), margin=0.05)
+                frame = frame_camera_to_objects(
+                    view_cam, objs, (rx, ry), margin=0.05, view_name=view_name
+                )
                 inv = VC.content_inventory("View")
                 vval = VC.validate_view_content(inv, view_name)
                 vval["framing"] = frame

@@ -5,6 +5,9 @@ Display-intent sRGB constants are converted to scene-linear on assignment
 (Blender Emission Color is scene-linear; stuffing hex/255 made ink render ~L80).
 Avatar = opaque *illustrated fixture* on flat +Z plane (Emission) — labeled FIX/S,
 not a gradient disc and not a photographic claim.
+
+v9 binding: labels parent to panel meshes in local face space so lift/scale/tilt
+keep text registered on the card (production scene-graph), not uncoupled world XY.
 """
 from __future__ import annotations
 
@@ -36,6 +39,15 @@ INK = (0.078, 0.094, 0.133)  # #141822
 INK_SECONDARY = (0.125, 0.149, 0.188)  # #202630
 INK_DISABLED = (0.216, 0.243, 0.282)  # #374048
 INK_ACCENT = (0.35, 0.25, 0.05)
+# Light ink for washed/saturated faces (selected/dragging/invalid/…) — worst-BG gate
+INK_ON_FACE = (0.97, 0.98, 1.0)
+INK_ON_FACE_SECONDARY = (0.90, 0.92, 0.96)
+INK_ON_FACE_ACCENT = (1.0, 0.92, 0.55)
+
+# States whose wash makes dark ink fail worst-BG contrast on the face
+FACE_LIGHT_INK_STATES = frozenset(
+    {"selected", "dragging", "invalid", "pressed", "drop-pending", "focus"}
+)
 
 
 def srgb_to_linear(c: float) -> float:
@@ -114,7 +126,24 @@ def _disable_shadows(ob):
         pass
 
 
-def make_text(name, body, loc, size, color, font_id, z_off=0.035):
+def ink_for_state(st_name: str, role: str = "primary"):
+    """Pick ink that survives worst-BG measurement on the panel face."""
+    if st_name in FACE_LIGHT_INK_STATES:
+        if role == "accent":
+            return INK_ON_FACE_ACCENT
+        if role == "secondary":
+            return INK_ON_FACE_SECONDARY
+        return INK_ON_FACE
+    if st_name == "disabled":
+        return INK_DISABLED if role != "accent" else INK_ACCENT
+    if role == "accent":
+        return INK_ACCENT
+    if role == "secondary":
+        return INK_SECONDARY
+    return INK
+
+
+def make_text(name, body, loc, size, color, font_id, z_off=0.035, align_x="LEFT", align_y="CENTER"):
     """Flat unlit Emission — strength 1.0, zero extrude. Color is display-intent → linear."""
     import bpy  # type: ignore
 
@@ -123,8 +152,8 @@ def make_text(name, body, loc, size, color, font_id, z_off=0.035):
     ob.name = name
     ob.data.body = body
     ob.data.size = size
-    ob.data.align_x = "LEFT"
-    ob.data.align_y = "CENTER"
+    ob.data.align_x = align_x
+    ob.data.align_y = align_y
     ob.data.extrude = 0.0
     ob.data.bevel_depth = 0.0
     if font_id:
@@ -147,6 +176,35 @@ def make_text(name, body, loc, size, color, font_id, z_off=0.035):
     ob["exp7_ink_scene_linear"] = [r, g, b]
     _disable_shadows(ob)
     return ob
+
+
+def parent_to_panel(child, panel, local_xyz):
+    """Bind child into panel local space (identity parent inverse → location is local).
+
+    Production contract: panel lift/scale/tilt move labels with the face — never leave
+    labels at uncoupled world XY under/ beside a lifted card.
+    """
+    face_z = float(panel.get("exp7_face_local_z", local_xyz[2] if len(local_xyz) > 2 else 0.03))
+    lx, ly = float(local_xyz[0]), float(local_xyz[1])
+    lz = float(local_xyz[2]) if len(local_xyz) > 2 else face_z
+    # Prefer stored face height when caller passes a sentinel / underspecified z
+    if len(local_xyz) < 3 or abs(lz) < 1e-6:
+        lz = face_z
+    child.parent = panel
+    try:
+        child.matrix_parent_inverse.identity()
+    except Exception:
+        pass
+    child.location = (lx, ly, lz)
+    child["exp7_bound_parent"] = panel.name
+    return child
+
+
+def label_on_panel(panel, name, body, local_xy, size, color, font_id, align_x="LEFT", align_y="CENTER"):
+    """Create FONT and parent it onto the panel face (local XY, face-local Z)."""
+    face_z = float(panel.get("exp7_face_local_z", 0.03))
+    ob = make_text(name, body, (0.0, 0.0, 0.0), size, color, font_id, z_off=0.0, align_x=align_x, align_y=align_y)
+    return parent_to_panel(ob, panel, (local_xy[0], local_xy[1], face_z))
 
 
 def make_avatar(name, loc, diameter, image_path: Path, z=0.08):
@@ -235,8 +293,8 @@ def compose_calendar(make_panel, palette, geom, element_states, font_id, prefix=
         size=(3.6, 0.42), origin=(0.0, 1.55), content_lines=0,
     )
     objs.append(p)
-    objs.append(make_text(f"{prefix}_title", "November 2026", (-1.55, 1.58, 0.06), TITLE_SIZE, INK, font_id))
-    objs.append(make_text(f"{prefix}_sub", "Calendar · design-study", (-1.55, 1.38, 0.06), SUB_SIZE, INK_SECONDARY, font_id))
+    objs.append(label_on_panel(p, f"{prefix}_title", "November 2026", (-1.55, 0.06), TITLE_SIZE, INK, font_id))
+    objs.append(label_on_panel(p, f"{prefix}_sub", "Calendar · design-study", (-1.55, -0.10), SUB_SIZE, INK_SECONDARY, font_id))
 
     weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     cell_w, cell_h = 0.44, 0.40
@@ -257,19 +315,37 @@ def compose_calendar(make_panel, palette, geom, element_states, font_id, prefix=
             st = dict(element_states.get(st_name, element_states["idle"]))
             x = (col - 3) * (cell_w + gap * 0.55)
             y = 0.75 - row * (cell_h + gap * 0.45)
-            p, _, ring, _ = make_panel(
+            panel, _, ring, _ = make_panel(
                 f"{prefix}_day{row}{col}", st, palette, geom, st_name=st_name,
                 size=(cell_w, cell_h), origin=(x, y), content_lines=0,
             )
-            objs.append(p)
+            objs.append(panel)
             if ring:
                 objs.append(ring)
-            label_c = INK_DISABLED if st_name == "disabled" else INK
-            objs.append(make_text(f"{prefix}_num{row}{col}", str(day), (x - 0.1, y + 0.02, 0.05), DAY_SIZE, label_c, font_id))
+            objs.append(
+                label_on_panel(
+                    panel, f"{prefix}_num{row}{col}", str(day),
+                    (-0.08, 0.06), DAY_SIZE, ink_for_state(st_name), font_id,
+                )
+            )
             if st_name == "selected":
-                objs.append(make_text(f"{prefix}_evt{row}{col}", "Review", (x - 0.16, y - 0.12, 0.05), META_SIZE, INK_ACCENT, font_id))
+                objs.append(
+                    label_on_panel(
+                        panel, f"{prefix}_evt{row}{col}", "Review",
+                        (-0.14, -0.10), META_SIZE, ink_for_state(st_name, "accent"), font_id,
+                    )
+                )
             day += 1
-    objs.append(make_text(f"{prefix}_banner", "DESIGN-STUDY · unlit text · not live WebGPU", (-1.7, -1.15, 0.04), META_SIZE, INK_SECONDARY, font_id))
+    objs.append(
+        make_text(
+            f"{prefix}_banner",
+            "DESIGN-STUDY · unlit text · not live WebGPU",
+            (-1.7, -1.15, 0.04),
+            META_SIZE,
+            INK_SECONDARY,
+            font_id,
+        )
+    )
     return objs
 
 
@@ -289,36 +365,60 @@ def compose_board(make_panel, palette, geom, element_states, font_id, prefix="Vi
         ("Studio rent", "$1,450", "Housing"),
     ]
     for ci, (cname, states) in enumerate(cols):
-        cx = (ci - 1) * 1.3
-        p, *_ = make_panel(
+        cx = (ci - 1) * 1.35
+        col_p, *_ = make_panel(
             f"{prefix}_col{ci}", element_states["idle"], palette, geom, st_name="idle",
-            size=(1.15, 0.32), origin=(cx, 1.05), content_lines=0,
+            size=(1.20, 0.32), origin=(cx, 1.05), content_lines=0,
         )
-        objs.append(p)
-        objs.append(make_text(f"{prefix}_colLab{ci}", cname, (cx - 0.42, 1.05, 0.06), BODY_SIZE, INK, font_id))
+        objs.append(col_p)
+        objs.append(label_on_panel(col_p, f"{prefix}_colLab{ci}", cname, (-0.48, 0.0), BODY_SIZE, INK, font_id))
         for ri, st_name in enumerate(states):
             st = dict(element_states.get(st_name, element_states["idle"]))
-            y = 0.55 - ri * (0.55 + gap)
+            y = 0.55 - ri * (0.58 + gap)
             title, amt, tag = cards[ri]
-            p, _, ring, _ = make_panel(
+            panel, _, ring, _ = make_panel(
                 f"{prefix}_card{ci}{ri}", st, palette, geom, st_name=st_name,
-                size=(1.15, 0.48), origin=(cx, y), content_lines=0,
+                size=(1.20, 0.50), origin=(cx, y), content_lines=0,
             )
-            objs.append(p)
+            objs.append(panel)
             if ring:
                 objs.append(ring)
-            tc = INK_DISABLED if st_name == "disabled" else INK
-            objs.append(make_text(f"{prefix}_ct{ci}{ri}", title, (cx - 0.45, y + 0.1, 0.06), BODY_SIZE, tc, font_id))
-            objs.append(make_text(f"{prefix}_ca{ci}{ri}", amt, (cx - 0.45, y - 0.02, 0.06), BODY_SIZE, INK_ACCENT, font_id))
-            objs.append(make_text(f"{prefix}_cg{ci}{ri}", f"{tag} · {st_name}", (cx - 0.45, y - 0.14, 0.06), META_SIZE, INK_SECONDARY, font_id))
-    objs.append(make_text(f"{prefix}_banner", "DESIGN-STUDY · drop-pending=accent · invalid=caution", (-1.75, -1.25, 0.04), META_SIZE, INK_SECONDARY, font_id))
+            # Labels live ON the face (local), so lift/scale/dragging cannot leave text under the tile
+            objs.append(
+                label_on_panel(
+                    panel, f"{prefix}_ct{ci}{ri}", title,
+                    (-0.50, 0.12), BODY_SIZE, ink_for_state(st_name), font_id,
+                )
+            )
+            objs.append(
+                label_on_panel(
+                    panel, f"{prefix}_ca{ci}{ri}", amt,
+                    (-0.50, 0.0), BODY_SIZE, ink_for_state(st_name, "accent"), font_id,
+                )
+            )
+            objs.append(
+                label_on_panel(
+                    panel, f"{prefix}_cg{ci}{ri}", f"{tag} · {st_name}",
+                    (-0.50, -0.14), META_SIZE, ink_for_state(st_name, "secondary"), font_id,
+                )
+            )
+    objs.append(
+        make_text(
+            f"{prefix}_banner",
+            "DESIGN-STUDY · drop-pending=accent · invalid=caution",
+            (-1.75, -1.30, 0.04),
+            META_SIZE,
+            INK_SECONDARY,
+            font_id,
+        )
+    )
     return objs
 
 
 def compose_plan(make_panel, palette, geom, element_states, font_id, prefix="ViewPlan"):
     objs = []
-    objs.append(make_text(f"{prefix}_title", "Plan · Dependencies", (-1.75, 1.5, 0.06), TITLE_SIZE, INK, font_id))
-    objs.append(make_text(f"{prefix}_sub", "what-if isolation · design-study", (-1.75, 1.3, 0.06), SUB_SIZE, INK_SECONDARY, font_id))
+    objs.append(make_text(f"{prefix}_title", "Plan · Dependencies", (-1.55, 1.50, 0.06), TITLE_SIZE, INK, font_id))
+    objs.append(make_text(f"{prefix}_sub", "what-if isolation · design-study", (-1.55, 1.30, 0.06), SUB_SIZE, INK_SECONDARY, font_id))
     rows = [
         ("selected", "Kickoff brief", "Owner: Alex · Due Fri"),
         ("focus", "Vendor shortlist", "3 options · needs review"),
@@ -328,34 +428,55 @@ def compose_plan(make_panel, palette, geom, element_states, font_id, prefix="Vie
     ]
     for i, (st_name, title, sub) in enumerate(rows):
         st = dict(element_states.get(st_name, element_states["idle"]))
-        y = 0.9 - i * 0.45
-        p, _, ring, _ = make_panel(
+        y = 0.90 - i * 0.45
+        panel, _, ring, _ = make_panel(
             f"{prefix}_row{i}", st, palette, geom, st_name=st_name,
             size=(3.4, 0.36), origin=(0.0, y), content_lines=0,
         )
-        objs.append(p)
+        objs.append(panel)
         if ring:
             objs.append(ring)
-        tc = INK_DISABLED if st_name == "disabled" else INK
-        objs.append(make_text(f"{prefix}_rt{i}", f"{i+1}. {title}", (-1.5, y + 0.05, 0.06), BODY_SIZE, tc, font_id))
-        objs.append(make_text(f"{prefix}_rs{i}", sub, (-1.5, y - 0.1, 0.06), META_SIZE, INK_SECONDARY, font_id))
-    objs.append(make_text(f"{prefix}_banner", "DESIGN-STUDY · not live WebGPU", (-1.5, -1.15, 0.04), BODY_SIZE, INK_SECONDARY, font_id))
+        # Keep labels inside panel half-extents (±1.7) with padding — avoids left-column crop
+        objs.append(
+            label_on_panel(
+                panel, f"{prefix}_rt{i}", f"{i+1}. {title}",
+                (-1.50, 0.06), BODY_SIZE, ink_for_state(st_name), font_id,
+            )
+        )
+        objs.append(
+            label_on_panel(
+                panel, f"{prefix}_rs{i}", sub,
+                (-1.50, -0.08), META_SIZE, ink_for_state(st_name, "secondary"), font_id,
+            )
+        )
+    objs.append(
+        make_text(
+            f"{prefix}_banner",
+            "DESIGN-STUDY · not live WebGPU",
+            (-1.50, -1.20, 0.04),
+            BODY_SIZE,
+            INK_SECONDARY,
+            font_id,
+        )
+    )
     return objs
 
 
 def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="ViewChrome"):
+    """Horizontal nav — larger physical size so 1280 framing yields ≥12px glyphs + clear avatar."""
     import bpy  # type: ignore
 
     scale = float(geom.get("scenePxScale", 0.01))
-    bar_h = float(geom.get("barH", 44)) * scale
-    avatar = float(geom.get("avatar", 36)) * scale * 1.15
+    bar_h = max(0.55, float(geom.get("barH", 44)) * scale * 1.8)
+    avatar = max(0.55, float(geom.get("avatar", 36)) * scale * 2.2)
     gap = float(geom.get("gap", 8)) * scale
     objs = []
 
-    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 0.2, 0.025))
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 0.0, 0.04))
     bar = bpy.context.active_object
     bar.name = f"{prefix}_bar"
-    bar.scale = (1.55, bar_h * 1.3 / 2, 0.016)
+    # ~4.6m wide × tall bar so frontal framing fills the canvas
+    bar.scale = (2.30, bar_h / 2, 0.03)
     bpy.ops.object.transform_apply(scale=True)
     mat = bpy.data.materials.new(f"{prefix}_bar_mat")
     mat.use_nodes = True
@@ -364,38 +485,73 @@ def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="V
         c = palette["_rgba"]["surface"]
         bsdf.inputs["Base Color"].default_value = (c[0], c[1], c[2], 1)
     bar.data.materials.append(mat)
+    bar["exp7_face_local_z"] = 0.05
+    bar["exp7_size_x"] = 4.60
+    bar["exp7_size_y"] = float(bar_h)
     objs.append(bar)
-    objs.append(make_text(f"{prefix}_brand", "Exp7", (-1.45, 0.22, 0.06), TITLE_SIZE * 0.9, INK, font_id))
+    objs.append(
+        label_on_panel(bar, f"{prefix}_brand", "Exp7", (-2.05, 0.0), TITLE_SIZE * 1.05, INK, font_id)
+    )
 
-    for i, (label, st_name) in enumerate([("Exp7", "selected"), ("Budget", "idle"), ("Atlas", "hover")]):
+    # Apps: left-center cluster — clear of brand and of avatar
+    for i, (label, st_name) in enumerate([("Budget", "selected"), ("Atlas", "idle"), ("Roster", "hover")]):
         st = dict(element_states.get(st_name, element_states["idle"]))
-        x = -0.55 + i * (0.50 + gap)
-        p, _, ring, _ = make_panel(
+        x = -0.85 + i * (0.72 + gap)
+        panel, _, ring, _ = make_panel(
             f"{prefix}_app{i}", st, palette, geom, st_name=st_name,
-            size=(0.46, bar_h * 0.85), origin=(x, 0.2), content_lines=0,
+            size=(0.64, bar_h * 0.72), origin=(x, 0.0), content_lines=0,
         )
-        objs.append(p)
+        objs.append(panel)
         if ring:
             objs.append(ring)
-        objs.append(make_text(f"{prefix}_appLab{i}", label, (x - 0.16, 0.2, 0.06), BODY_SIZE * 1.15, INK, font_id))
+        objs.append(
+            label_on_panel(
+                panel, f"{prefix}_appLab{i}", label,
+                (-0.22, 0.0), BODY_SIZE * 1.25, ink_for_state(st_name), font_id,
+            )
+        )
 
+    # Tabs further right but with ≥0.55m clearance before avatar
     for i, (label, st_name) in enumerate([("Cal", "selected"), ("Board", "idle"), ("Plan", "idle")]):
         st = dict(element_states.get(st_name, element_states["idle"]))
-        x = 0.65 + i * (0.38 + gap * 0.35)
-        p, _, ring, _ = make_panel(
+        x = 0.95 + i * (0.48 + gap * 0.4)
+        panel, _, ring, _ = make_panel(
             f"{prefix}_tab{i}", st, palette, geom, st_name=st_name,
-            size=(0.34, bar_h * 0.7), origin=(x, 0.2), content_lines=0,
+            size=(0.42, bar_h * 0.62), origin=(x, 0.0), content_lines=0,
         )
-        objs.append(p)
+        objs.append(panel)
         if ring:
             objs.append(ring)
-        objs.append(make_text(f"{prefix}_tabLab{i}", label, (x - 0.10, 0.2, 0.06), BODY_SIZE, INK, font_id))
+        objs.append(
+            label_on_panel(
+                panel, f"{prefix}_tabLab{i}", label,
+                (-0.12, 0.0), BODY_SIZE * 1.1, ink_for_state(st_name), font_id,
+            )
+        )
 
     path = avatar_asset_path()
-    av = make_avatar(f"{prefix}_avatar", (1.15, 0.2), avatar, path, z=0.09)
+    # Avatar on far right — no label overlaid on disc; "you" sits below with gap
+    av = make_avatar(f"{prefix}_avatar", (2.05, 0.0), avatar, path, z=0.12)
     objs.append(av)
-    objs.append(make_text(f"{prefix}_login", "you", (1.00, -0.15, 0.05), BODY_SIZE * 0.9, INK_SECONDARY, font_id))
-    # Shorter footer lines — long banners project out of frame / undersample (plan/chrome v8)
-    objs.append(make_text(f"{prefix}_banner", "DESIGN-STUDY chrome · fixture", (-1.45, -0.55, 0.04), BODY_SIZE, INK_SECONDARY, font_id))
-    objs.append(make_text(f"{prefix}_note", "Best≠Selected · PAT stays DOM", (-1.45, -0.72, 0.04), BODY_SIZE * 0.9, INK_SECONDARY, font_id))
+    objs.append(make_text(f"{prefix}_login", "you", (1.92, -0.48, 0.06), BODY_SIZE, INK_SECONDARY, font_id))
+    objs.append(
+        make_text(
+            f"{prefix}_banner",
+            "DESIGN-STUDY chrome · fixture",
+            (-2.05, -0.85, 0.04),
+            BODY_SIZE,
+            INK_SECONDARY,
+            font_id,
+        )
+    )
+    objs.append(
+        make_text(
+            f"{prefix}_note",
+            "Best≠Selected · PAT stays DOM",
+            (-2.05, -1.05, 0.04),
+            BODY_SIZE * 0.9,
+            INK_SECONDARY,
+            font_id,
+        )
+    )
     return objs

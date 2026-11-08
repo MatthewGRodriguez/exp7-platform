@@ -101,7 +101,7 @@ class DryRun(unittest.TestCase):
         )
         self.assertEqual(r.returncode, 0, r.stderr)
         meta = json.loads(r.stdout)
-        self.assertEqual(meta["generator_rev"], "front-readable-v8")
+        self.assertEqual(meta["generator_rev"], "front-readable-v9")
 
 
 class UnlitText(unittest.TestCase):
@@ -137,7 +137,10 @@ class UnlitText(unittest.TestCase):
         vsrc = Path(__file__).with_name("validate_view_pixels.py").read_text()
         self.assertIn("projected_sidecar", vsrc)
         self.assertIn("textmask_vs_hiddenBG", vsrc)
-        self.assertIn("projected-roi-textmask-v8", vsrc)
+        self.assertIn("projected-roi-textmask-v9-adversarial", vsrc)
+        self.assertIn("indep_worst_bg", vsrc)
+        self.assertIn("gate_object_layout", vsrc)
+        self.assertIn("parent_to_panel", Path(__file__).with_name("views_content.py").read_text())
         self.assertNotIn("min_dark=400", vsrc)
         # Hardcoded y14–57 title ROI must not be the primary path
         self.assertNotIn("(0.04, 0.04, 0.55, 0.16)", vsrc)

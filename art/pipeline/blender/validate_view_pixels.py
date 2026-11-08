@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
 """Projected-geometry ROI pixel gates for METAL/CPU DESIGN-STUDY view PNGs.
 
-v8 mechanism (replaces hardcoded fractional VIEW_ROIS that missed title at y~86):
+v9 mechanism (keeps v8 projected ROI + text-hidden BG; adds adversarial gates):
   - Prefer companion `view_<name>_rois.json` written at render from projected FONT AABBs
   - Prefer companion `view_<name>_bg.png` (same camera, FONT objects hide_render) for BG
   - FG = beauty pixels inside projected text mask that differ from BG (surface under glyphs)
-  - Fallback: darkest 8% vs brightest 25% *inside projected ROI only* (never whole-frame band)
+  - Worst-BG text-hidden contrast (independent checker parity — NOT darkest8%/brightest25%)
+  - Per-object crop / projected glyph-size / occlusion (closer panel covering text AABB)
+  - Fallback percentile path retained but MUST NOT alone pass production when BG exists
 
 Avatar: require non-black chroma + fixture-like structure — gradient-only disc FAIL if
 chroma_hits high but spatial variance is pure left→right ramp with no label/features.
 
-Ortho PNGs are NOT METAL predictors.
+Ortho PNGs are NOT METAL predictors. Independent checker must not be weakened.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import struct
 import zlib
 from pathlib import Path
@@ -84,6 +87,13 @@ VIEW_ROIS_LEGACY = {
 # Probe 640 undersamples glyphs with projected height < this — gate as SKIP not false pass
 MIN_GLYPH_H_PX_PROBE = 8.0
 MIN_GLYPH_H_PX_PROD = 12.0
+# Frame crop margin (px) for per-object text boxes at production
+CROP_MARGIN_PX_PROD = 4.0
+# Occlusion: text AABB vs closer non-parent panel
+OCCLUSION_IOU_FAIL = 0.18
+# Avatar vs label clearance (px) — chrome Board-over-avatar was ~25px overlap
+AVATAR_LABEL_CLEAR_PX = 8.0
+WCAG_MIN = 4.5
 
 
 def read_png_rgba(path: Path):
@@ -321,6 +331,236 @@ def roi_contrast_masked(beauty, bg, w, h, box, min_delta=18) -> dict:
     }
 
 
+def _y_rel(r, g, b):
+    """Relative luminance from 0–255 sRGB (matches independent checker Y())."""
+    return 0.2126 * rel_lum(r) + 0.7152 * rel_lum(g) + 0.0722 * rel_lum(b)
+
+
+def _percentile(vals, p):
+    if not vals:
+        return 0.0
+    s = sorted(vals)
+    if len(s) == 1:
+        return s[0]
+    k = (len(s) - 1) * (p / 100.0)
+    f = math.floor(k)
+    c = math.ceil(k)
+    if f == c:
+        return s[int(k)]
+    return s[f] * (c - k) + s[c] * (k - f)
+
+
+def roi_contrast_worst_bg(beauty, bg, w, h, box, min_delta_y=0.02) -> dict:
+    """Independent-checker parity: FG=10th%ile ink Y vs worst BG (min or max of ROI).
+
+    Darkest-8% / brightest-25% alone false-passed Mac v8 coloured tiles — this gate
+    must stay adversarial and must not be weakened.
+    """
+    xa, ya, xb, yb = absolute_box(box, w, h)
+    if xb <= xa or yb <= ya or bg is None:
+        return {
+            "ok": False,
+            "error": "worst_bg requires valid ROI + text-hidden BG",
+            "C_worst_bg": None,
+            "pxbox": [xa, ya, xb, yb],
+            "method": "indep_worst_bg",
+        }
+    xa, ya = max(0, xa), max(0, ya)
+    xb, yb = min(w, xb), min(h, yb)
+    if xb - xa < 2 or yb - ya < 2:
+        return {"ok": False, "error": "tiny roi", "C_worst_bg": None, "pxbox": [xa, ya, xb, yb], "method": "indep_worst_bg"}
+
+    ink_y = []
+    bg_y = []
+    for y in range(ya, yb):
+        for x in range(xa, xb):
+            i = (y * w + x) * 4
+            if beauty[i + 3] < 200:
+                continue
+            ay = _y_rel(beauty[i], beauty[i + 1], beauty[i + 2])
+            by = _y_rel(bg[i], bg[i + 1], bg[i + 2])
+            bg_y.append(by)
+            if abs(ay - by) > min_delta_y:
+                ink_y.append(ay)
+    if len(ink_y) < 4:
+        return {
+            "ok": False,
+            "error": "ink mask too sparse (occlusion or miss)",
+            "C_worst_bg": None,
+            "ink_px": len(ink_y),
+            "pxbox": [xa, ya, xb, yb],
+            "method": "indep_worst_bg",
+        }
+    fg = _percentile(ink_y, 10)
+    bg_mean = sum(bg_y) / len(bg_y)
+    bgw = min(bg_y) if fg < bg_mean else max(bg_y)
+    bg_med = _percentile(bg_y, 50)
+    c_worst = contrast_ratio(fg, bgw)
+    c_med = contrast_ratio(fg, bg_med)
+    return {
+        "ok": c_worst >= WCAG_MIN,
+        "C_worst_bg": c_worst,
+        "C_median_bg": c_med,
+        "fg_y10": fg,
+        "bg_worst": bgw,
+        "bg_median": bg_med,
+        "ink_px": len(ink_y),
+        "pxbox": [xa, ya, xb, yb],
+        "method": "indep_worst_bg",
+    }
+
+
+def _box_iou(a, b) -> float:
+    ax0, ay0, ax1, ay1 = a
+    bx0, by0, bx1, by1 = b
+    ix0, iy0 = max(ax0, bx0), max(ay0, by0)
+    ix1, iy1 = min(ax1, bx1), min(ay1, by1)
+    iw, ih = max(0.0, ix1 - ix0), max(0.0, iy1 - iy0)
+    inter = iw * ih
+    if inter <= 0:
+        return 0.0
+    area_a = max(0.0, ax1 - ax0) * max(0.0, ay1 - ay0)
+    area_b = max(0.0, bx1 - bx0) * max(0.0, by1 - by0)
+    union = area_a + area_b - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _box_overlap_px(a, b) -> float:
+    """Min side length of intersection (px) — chrome label-over-avatar used ~25px overlap."""
+    ax0, ay0, ax1, ay1 = a
+    bx0, by0, bx1, by1 = b
+    ix0, iy0 = max(ax0, bx0), max(ay0, by0)
+    ix1, iy1 = min(ax1, bx1), min(ay1, by1)
+    iw, ih = max(0.0, ix1 - ix0), max(0.0, iy1 - iy0)
+    if iw <= 0 or ih <= 0:
+        return 0.0
+    return min(iw, ih)
+
+
+def gate_object_layout(sidecar: dict, w: int, h: int) -> dict:
+    """Per-object crop / glyph-size / occlusion / avatar-clearance from ROI sidecar."""
+    objects = sidecar.get("objects") or {}
+    errors = []
+    reports = {}
+    key = "px_tl_640" if w <= 640 else "px_tl_1280"
+    h_key = "h_px_640" if w <= 640 else "h_px_1280"
+    min_h = MIN_GLYPH_H_PX_PROBE if w <= 640 else MIN_GLYPH_H_PX_PROD
+    margin = 2.0 if w <= 640 else CROP_MARGIN_PX_PROD
+
+    texts = {k: v for k, v in objects.items() if v.get("kind") == "text" or "body" in v}
+    panels = {k: v for k, v in objects.items() if v.get("kind") == "panel"}
+    avatars = {k: v for k, v in objects.items() if v.get("kind") == "avatar" or "avatar" in k.lower()}
+
+    for name, od in texts.items():
+        box = od.get(key) or od.get("px_tl")
+        if not box:
+            continue
+        x0, y0, x1, y1 = [float(v) for v in box]
+        h_px = float(od.get(h_key) or (y1 - y0))
+        rep = {"body": (od.get("body") or "")[:32], "h_px": h_px, "pxbox": [x0, y0, x1, y1]}
+        # Crop gate — plan left column previously clipped
+        if x0 < margin or y0 < margin or x1 > (w - margin) or y1 > (h - margin):
+            msg = f"crop {name} px=[{x0:.1f},{y0:.1f},{x1:.1f},{y1:.1f}] margin={margin}"
+            errors.append(msg)
+            rep["crop_ok"] = False
+        else:
+            rep["crop_ok"] = True
+        # Glyph size at production
+        if w > 640 and h_px < min_h:
+            # Watermark banners may be secondary; still fail production for content labels
+            body = (od.get("body") or "")
+            if not body.startswith("DESIGN-STUDY"):
+                msg = f"glyph_small {name} h_px={h_px:.1f}<{min_h}"
+                errors.append(msg)
+                rep["glyph_ok"] = False
+            else:
+                rep["glyph_ok"] = True
+        else:
+            rep["glyph_ok"] = True
+
+        # Occlusion: closer non-parent panel covering text
+        parent = od.get("bound_parent") or od.get("parent")
+        t_z = float(od.get("z_near") if od.get("z_near") is not None else 1e9)
+        worst_iou = 0.0
+        occluder = None
+        for pname, pd in panels.items():
+            if pname == parent or pname == name:
+                continue
+            pbox = pd.get(key) or pd.get("px_tl")
+            if not pbox:
+                continue
+            p_z = float(pd.get("z_near") if pd.get("z_near") is not None else 1e9)
+            # Smaller camera-space z = closer to camera
+            if p_z >= t_z - 1e-4:
+                continue
+            iou = _box_iou([x0, y0, x1, y1], [float(v) for v in pbox])
+            if iou > worst_iou:
+                worst_iou = iou
+                occluder = pname
+        rep["occlusion_iou"] = worst_iou
+        rep["occluder"] = occluder
+        if worst_iou >= OCCLUSION_IOU_FAIL:
+            errors.append(f"occlusion {name} vs closer {occluder} iou={worst_iou:.2f}")
+            rep["occlusion_ok"] = False
+        else:
+            rep["occlusion_ok"] = True
+        reports[name] = rep
+
+    # Avatar must stay clear of labels (chrome Board overlapped illustrated avatar)
+    for aname, ad in avatars.items():
+        abox = ad.get(key) or ad.get("px_tl")
+        if not abox:
+            continue
+        ab = [float(v) for v in abox]
+        for name, od in texts.items():
+            tbox = od.get(key) or od.get("px_tl")
+            if not tbox:
+                continue
+            ov = _box_overlap_px(ab, [float(v) for v in tbox])
+            if ov > AVATAR_LABEL_CLEAR_PX:
+                errors.append(f"avatar_overlap {name} overlaps {aname} by {ov:.1f}px")
+                reports.setdefault(name, {})["avatar_clear_ok"] = False
+
+    return {"ok": not errors, "errors": errors, "objects": reports}
+
+
+def gate_per_object_worst_bg(sidecar: dict, beauty, bg, w: int, h: int) -> dict:
+    """Run indep worst-BG on every text object; production fails any C_worst_bg < 4.5."""
+    objects = sidecar.get("objects") or {}
+    key = "px_tl_640" if w <= 640 else "px_tl_1280"
+    errors = []
+    reports = {}
+    measured = []
+    for name, od in objects.items():
+        if "body" not in od and od.get("kind") != "text":
+            continue
+        box = od.get(key) or od.get("px_tl")
+        if not box:
+            continue
+        body = od.get("body") or ""
+        # Skip watermark banners at probe; still measure at production
+        r = roi_contrast_worst_bg(beauty, bg, w, h, box)
+        reports[name] = {**r, "body": body[:24], "h_px": od.get("h_px_640" if w <= 640 else "h_px_1280")}
+        if r.get("C_worst_bg") is None:
+            if w > 640 and not body.startswith("DESIGN-STUDY"):
+                errors.append(f"worst_bg unmeasured {name} ({r.get('error')})")
+            continue
+        measured.append(r["C_worst_bg"])
+        if w > 640 and r["C_worst_bg"] < WCAG_MIN:
+            errors.append(
+                f"worst_bg {name} C={r['C_worst_bg']:.2f}<{WCAG_MIN} "
+                f"fgY={r.get('fg_y10', 0):.3f} bgW={r.get('bg_worst', 0):.3f}"
+            )
+    return {
+        "ok": not errors,
+        "errors": errors,
+        "objects": reports,
+        "min_C_worst_bg": min(measured) if measured else None,
+        "n_measured": len(measured),
+        "n_fail": sum(1 for c in measured if c < WCAG_MIN) if w > 640 else 0,
+    }
+
+
 def avatar_roi_proof(px, w, h, box) -> dict:
     xa, ya, xb, yb = absolute_box(box, w, h)
     if xb <= xa or yb <= ya:
@@ -504,6 +744,19 @@ def validate_png(
                     f"near_black={avatar.get('near_black_frac')} meanL={avatar.get('mean_luma')}"
                 )
 
+    layout = None
+    worst = None
+    if sidecar:
+        layout = gate_object_layout(sidecar, w, h)
+        if not layout.get("ok"):
+            errors.extend(layout.get("errors") or [])
+        if bg_px is not None:
+            worst = gate_per_object_worst_bg(sidecar, beauty, bg_px, w, h)
+            if not worst.get("ok"):
+                errors.extend(worst.get("errors") or [])
+        elif w > 640:
+            errors.append(f"{view}: missing text-hidden BG — cannot run indep worst-BG gate")
+
     gated = [
         n
         for n, rr in roi_reports.items()
@@ -519,13 +772,22 @@ def validate_png(
         "errors": errors,
         "skips": skips,
         "rois": roi_reports,
+        "layout": layout,
+        "worst_bg": {
+            "min_C_worst_bg": (worst or {}).get("min_C_worst_bg"),
+            "n_measured": (worst or {}).get("n_measured"),
+            "n_fail": (worst or {}).get("n_fail"),
+            "ok": (worst or {}).get("ok"),
+        }
+        if worst
+        else None,
         "size": [w, h],
         "view": view,
         "roi_source": source,
         "bg_pass": bool(bg_px),
         "min_glyph_h_px": min_h,
-        "note": "Projected text ROI + optional text-hidden BG — not whole-band percentile",
-        "not": ["DESIGN-STUDY-ORTHO predictor", "hardcoded title y14-57", "gradient-as-photo"],
+        "note": "Projected ROI + indep worst-BG + crop/occlusion/glyph gates (v9)",
+        "not": ["DESIGN-STUDY-ORTHO predictor", "hardcoded title y14-57", "gradient-as-photo", "darkest8% alone"],
     }
 
 
@@ -552,7 +814,7 @@ def main():
         )
         report[view] = r
         ok = ok and r["ok"]
-    out = {"ok": ok, "views": report, "validator": "projected-roi-textmask-v8"}
+    out = {"ok": ok, "views": report, "validator": "projected-roi-textmask-v9-adversarial"}
     text = json.dumps(out, indent=2)
     if args.out:
         Path(args.out).write_text(text)
