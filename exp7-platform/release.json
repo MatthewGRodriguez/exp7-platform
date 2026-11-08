@@ -1,18 +1,18 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "a00532520e89f6bd4de4ede672e627c1f0d249076e44e14314aaba3b0dd24a2e",
+  "sha256": "4f8481c7c881ab41c97f28967d7b98a22350a319cb2b42bc223130b23fdbf2b9",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "exp7-lean demo + Budget as Exp7Views consumers; shell hosts shared exp7-views@1 / JRender once; reserved top bar painted with JRender; Budget: Calendar start, Board sub-tabs expense/income/debt/asset (4 JRender boards), Plan; no load/reset/status chrome; combined Cal/Plan membership; exclusive avatar; Budget local-IDB only",
+    "app": "exp7-lean demo + Budget as Exp7Views consumers; shell hosts shared exp7-views@1 / JRender once; platform back/avatar + apps picker via JRViews→JRender→Exp7Slabs; Budget Cal/Board/Plan (+ type) tabs in-scene for parallax; 4 Board type boards; Calendar start; combined Cal/Plan; exclusive avatar; Budget local-IDB only",
     "appSha256": "ec696151f233c4762c6b831f4f9cbec9857f6ac24a179fcfb0aa44ffc8c9da63",
-    "budgetSha256": "8a4f25d33f6403cbc6fec53c29d5ae58202c3d238d7746a7ef13699dc99a2474",
+    "budgetSha256": "f00dc6345274998ac42d0b1167ee913d28d4a43fa98436fd3fac162edd2b0db0",
     "budgetMode": "exp7-views",
     "viewsModuleId": "exp7-views@1",
-    "viewsSourcesAggregateSha256": "cc24c44c3ce65dffa31d6dcd21663dcb29f445e854f85054ae85927b69612e97",
-    "chromeJr": "platform reserved bar via PlatformChromeJR (JRender paint; DOM a11y hits)",
+    "viewsSourcesAggregateSha256": "bf6a293e82f9703e6237b2fffb9b7318c36ffdb6ea001bf2ffe6ab0508c5aa31",
+    "chromeJr": "PlatformChromeJR: bar + apps via JRViews (Exp7Slabs parallax); Budget tabs in hostDoc; DOM fallback when no-adapter",
     "standalone": "dist/exp7-views-standalone.html",
-    "standaloneSha256": "00359ce4fcf8deb5582f1574b2cba7fa2fbc2231963447f8dcf40cb73cf03162"
+    "standaloneSha256": "e99f78e922a65bb4f177d5b56ca45a72296038e556ee2d8f07d90d09015b3a04"
   }
 }
