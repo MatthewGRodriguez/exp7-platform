@@ -1,0 +1,243 @@
+{
+  "version": "1.7.0",
+  "builtAt": "2026-11-08T09:42:48.034Z",
+  "viewsModuleId": "exp7-views@1",
+  "viewsSourcesAggregateSha256": "424431a0c8507ac4e8f48bd285741f865277eebc108defb07fdc94af5c03c3d1",
+  "files": [
+    {
+      "path": "src/budget/budget-app.html",
+      "bytes": 2353,
+      "sha256": "8c5e7a6d0478782faadd824b7d2f60818c4ab6d47ff70c54f489afbc10f0ee15"
+    },
+    {
+      "path": "src/budget/budget-app.js",
+      "bytes": 15820,
+      "sha256": "4eaee510ae7e1beeb583b27092fe87ef35866781b6998e5d38aea064314d1376"
+    },
+    {
+      "path": "src/demo/atlas_codec.bundle.js",
+      "bytes": 522481,
+      "sha256": "7aa5db2a71ce687d33ee92de659b6a1f48c3f13cdfb0639ce65e2fbdbdb4fb2f"
+    },
+    {
+      "path": "src/demo/circuit_lang.js",
+      "bytes": 10984,
+      "sha256": "4d041eb9c7b2cad2713d2f9c66a80dfc53f7a052f165e667f07d4bbda46f0f9f"
+    },
+    {
+      "path": "src/demo/demo-app-open.js",
+      "bytes": 1620,
+      "sha256": "d5d420700164b43c338414c867844b036e69d3234abfbfacccb2445ecabe2daf"
+    },
+    {
+      "path": "src/demo/demo-app-post.js",
+      "bytes": 31127,
+      "sha256": "9cf451d3784b2b009a1aba2ce33e048badce7890053866c3c6d442e192799085"
+    },
+    {
+      "path": "src/demo/demo-app-pre.js",
+      "bytes": 61904,
+      "sha256": "770b41495ac2588c5d3a2e177a2fa627421cea08a49ebbf0968a67d66f29f670"
+    },
+    {
+      "path": "src/demo/demo-body.html",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "src/demo/demo-consume-views.js",
+      "bytes": 655,
+      "sha256": "503432af36518f6b462ad441cac4f7f4b21b574bd779cd6bb64a700adf4ac022"
+    },
+    {
+      "path": "src/demo/demo-head.html",
+      "bytes": 640,
+      "sha256": "501bdc2d2cda1e2e6fb2dec27181b06d65becf736fb0935bff1a5520f9ba5249"
+    },
+    {
+      "path": "src/demo/demo.css",
+      "bytes": 4189,
+      "sha256": "c82e04df3ec0a294305fc978b273b99bc25ef9d5de6455cd7d34e9a8a686eed0"
+    },
+    {
+      "path": "src/demo/editing-ui.js",
+      "bytes": 5447,
+      "sha256": "32e9a4cdec2f31e229833d7103ff0f2dd6b7b88e100369206e85b43f7ef4d9c1"
+    },
+    {
+      "path": "src/demo/exp7-demo.skeleton.html",
+      "bytes": 17718,
+      "sha256": "1c9c88fdb448b2aed5a0383d9b9494f274efb42f37b213ba77016b9ecf22760e"
+    },
+    {
+      "path": "src/demo/exp7-helpers.js",
+      "bytes": 8871,
+      "sha256": "945133c1170a6cbbb1e75d4a13ff0b8c8bd7719c4243a9992b9d120642045611"
+    },
+    {
+      "path": "src/demo/exp7-sync-core.js",
+      "bytes": 11213,
+      "sha256": "c21a2d12af90186c555866378faf7d6b15e96315d6633af85323a494a28c94e1"
+    },
+    {
+      "path": "src/demo/frame-boot.js",
+      "bytes": 757,
+      "sha256": "83bb091f3710558319c8d6845bc86e0a6ed9d02bb223b7b088449cb8d0bb2716"
+    },
+    {
+      "path": "src/demo/lean-jrender-helpers.js",
+      "bytes": 5268,
+      "sha256": "3996300b5becb5637f8e9482a17bb13051b29938ca8492471eb22087f6488c78"
+    },
+    {
+      "path": "src/demo/proposals.js",
+      "bytes": 15992,
+      "sha256": "fe53413ccda40657659889e5c09ae2d6c8fbb24c7d861b29c7270ac42534b626"
+    },
+    {
+      "path": "src/demo/session-audit.js",
+      "bytes": 3193,
+      "sha256": "f7744492de5c3b84cf4378817bc778991f0c72e7611caf21f3c45288c63cf17c"
+    },
+    {
+      "path": "src/exp7-views/assets/jr-font-bold.b91.txt",
+      "bytes": 27076,
+      "sha256": "c65ced081c4e9474ca75bc2b95095609c1148c1b07a8d31cc6751e19f2082eb4"
+    },
+    {
+      "path": "src/exp7-views/assets/jr-font.b91.txt",
+      "bytes": 27100,
+      "sha256": "0e138703fc97251a3cc763ce9408cb0ae601ca7de0e150b199df397e48d5f8df"
+    },
+    {
+      "path": "src/exp7-views/assets/jr-wasm.b91.txt",
+      "bytes": 254861,
+      "sha256": "543cc7cda120ee0d69ed191a283fe218b81f944c5c7c8f5f4d8a05e33b55a0b8"
+    },
+    {
+      "path": "src/exp7-views/assets/script-12.attrs.json",
+      "bytes": 65,
+      "sha256": "46e1befcd59f49615d76d0277d97a466b476a80fd4a80afd74a6a326b364389a"
+    },
+    {
+      "path": "src/exp7-views/assets/script-13.attrs.json",
+      "bytes": 65,
+      "sha256": "c59e4e916b89a90a1844498a1273ae0d770ee63863b3b0519ae81066a9f69b31"
+    },
+    {
+      "path": "src/exp7-views/assets/script-14.attrs.json",
+      "bytes": 70,
+      "sha256": "ef2b30ffad9d7fd6a79c763d4ffcefc7f9cb94321b0a37c066dfa38431ff1f9d"
+    },
+    {
+      "path": "src/exp7-views/exp7-views.js",
+      "bytes": 9147,
+      "sha256": "d2b0239a9fc7672f403ffd3d0db60414141211f898f02ee9bb11bf0d369c8413"
+    },
+    {
+      "path": "src/exp7-views/theme-criticality.js",
+      "bytes": 1187,
+      "sha256": "f3fbe42ed20041a6e341bc46ad4aa0697266706d3b43f6333f53d5112e1944d9"
+    },
+    {
+      "path": "src/exp7-views/vendor/atlas.js",
+      "bytes": 22133,
+      "sha256": "ea9e21fb9c261cd07885bc616c44d1b440a87531e6872e01eba28dfa059d8a28"
+    },
+    {
+      "path": "src/exp7-views/vendor/eval.js",
+      "bytes": 41356,
+      "sha256": "6ebb648e7c4bf42222e9aa45f9e80243dad4aec9f63cb4fcc36d8bef7ecbfe09"
+    },
+    {
+      "path": "src/exp7-views/vendor/gpu-motion.js",
+      "bytes": 3266,
+      "sha256": "f23019aaf0a03949dfb47e3a60b15dc8c4f22b9ecb90541b2083bbf5004b518e"
+    },
+    {
+      "path": "src/exp7-views/vendor/jbp.js",
+      "bytes": 8926,
+      "sha256": "d307257648faab98d73cf47f5a3e206114e27566cbf496e12380c610c3c76760"
+    },
+    {
+      "path": "src/exp7-views/vendor/jfactor_exp6.js",
+      "bytes": 166075,
+      "sha256": "739ea66791bf795dd938cf33c5f664cb46b24311ce48f1b402b9d2ce02ecd605"
+    },
+    {
+      "path": "src/exp7-views/vendor/jr-asset-sizes.js",
+      "bytes": 87,
+      "sha256": "979eb99a6f96784898dd521a53f3710dd13c78cf8a0a94228d6d899019dfcff5"
+    },
+    {
+      "path": "src/exp7-views/vendor/jrender.classic.js",
+      "bytes": 70638,
+      "sha256": "b67c588b7f4c7a74f0d19add913a45f9f31d0ac81ca14952fe110232f2595237"
+    },
+    {
+      "path": "src/exp7-views/vendor/jrviews.js",
+      "bytes": 34654,
+      "sha256": "50681ac7d767ff404b00b81bbeeb0874db8b27f0de1c2447c33d4f40e7082a46"
+    },
+    {
+      "path": "src/exp7-views/vendor/motion-config.js",
+      "bytes": 14191,
+      "sha256": "45cd5990af6c40d209ab97226789c5811458ebcf412e20a25b1f76dddb6b36aa"
+    },
+    {
+      "path": "src/exp7-views/vendor/runtime-factory.js",
+      "bytes": 55137,
+      "sha256": "5322024c392728d5eddbee6f4e52d59a36805d50f79062cca967911e20c666fb"
+    },
+    {
+      "path": "src/exp7-views/vendor/slab-config.js",
+      "bytes": 14787,
+      "sha256": "bc537c020be92cf1cd201723645c59a280d86412073b397402f41464c63f87d3"
+    },
+    {
+      "path": "src/exp7-views/views-host-impl.js",
+      "bytes": 73966,
+      "sha256": "f0182c2c139c4eae13b6ddcb5f06c1f5e354baa58e5e658aa14516d557ccbd66"
+    },
+    {
+      "path": "src/extract-manifest.json",
+      "bytes": 5641,
+      "sha256": "743fea3bee4f397435dc06d839eb1175aa6903fab31c6bd7b13a764d80d10d34"
+    },
+    {
+      "path": "src/shell/platform-chrome.html",
+      "bytes": 7412,
+      "sha256": "7454b5803970c27eb465bbdee725b8ce274b92d936c317e5cb729450b82379a0"
+    },
+    {
+      "path": "src/shell/platform-shell.js",
+      "bytes": 41177,
+      "sha256": "d3c150e9463b360aa7e2e97ab2c823f2ded0ce10db7d55f815d426ba18148931"
+    },
+    {
+      "path": "src/standalone/exp7-views-standalone.html",
+      "bytes": 3808,
+      "sha256": "5c1bace3edc1a0166caec896c2923b11bdf9e27b93166c11a9c6d30901fecb47"
+    }
+  ],
+  "artifacts": {
+    "lean": {
+      "path": "exp7-platform/exp7-platform-lean.html",
+      "sha256": "d5e39411164565cfba34feacf564927bab433f14019c651ddee05e8b9cfd6c2e",
+      "bytes": 3200382
+    },
+    "apppkg": {
+      "sha256": "bf4c50940d44011cad225fe836e0c502b4bd3a700e3981fc6fba71ae3b12f405",
+      "bytes": 1520559
+    },
+    "budgetpkg": {
+      "sha256": "e052e4a2dbc6a992402e1b0b6d7ab55d6fdb59e90cd9d6e4cb6319c6e863cc67",
+      "bytes": 843176
+    },
+    "standalone": {
+      "path": "dist/exp7-views-standalone.html",
+      "sha256": "6c960850f1b2a5b1576f1d0a1c2f4c97e6afbedbdb5965a94b7f8e9813d86351",
+      "bytes": 828849
+    }
+  }
+}

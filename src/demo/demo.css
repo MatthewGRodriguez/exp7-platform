@@ -1,0 +1,35 @@
+
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f4f6fa;color:#1c2333}
+header{background:#1f2a44;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:16px}
+header h1{font-size:17px;margin:0;font-weight:600}header .sub{opacity:.75;font-size:12px}
+nav{display:flex;flex-wrap:wrap;gap:4px;padding:0 16px;background:#fff;border-bottom:1px solid #dde2ec;position:sticky;top:0;z-index:2}
+nav button{border:0;background:none;padding:11px 14px;font:inherit;cursor:pointer;color:#55607a;border-bottom:3px solid transparent}
+nav button.on{color:#1f2a44;border-color:#3d6cf0;font-weight:600}
+main{padding:16px 20px;max-width:1260px;margin:0 auto}section{display:none}section.on{display:block}
+.grid{display:grid;gap:14px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1.2fr 1fr}.g3v{grid-template-columns:minmax(0,1.9fr) minmax(0,1fr)}
+.card{background:#fff;border:1px solid #dde2ec;border-radius:10px;padding:12px 14px}
+.card h3{margin:0 0 8px;font-size:14px;color:#33405e}
+button.b{border:1px solid #c9d1e3;background:#fff;border-radius:7px;padding:5px 10px;font:inherit;font-size:13px;cursor:pointer;margin:2px}
+button.b:hover{background:#eef2fb}button.p{background:#3d6cf0;color:#fff;border-color:#3d6cf0}button.p:hover{background:#2f59d4}
+button.r{border-color:#e3b2b2;color:#a02828}
+input,select,textarea{font:inherit;font-size:13px;border:1px solid #c9d1e3;border-radius:6px;padding:4px 6px}
+textarea{font-family:ui-monospace,Menlo,Consolas,monospace;width:100%}
+.mono,pre{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+pre{background:#f6f8fc;border:1px solid #e3e8f2;border-radius:6px;padding:8px;margin:6px 0;max-height:260px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+table{border-collapse:collapse;width:100%;font-size:12.5px}td,th{border-bottom:1px solid #edf0f6;padding:3px 6px;text-align:left;vertical-align:top}th{color:#66708a;font-weight:600}
+.alt{border:2px solid #dde2ec;border-radius:9px;padding:8px 10px;margin:6px 0;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.alt:hover{border-color:#9db4f5}.alt.best{border-color:#2f9e5b;background:#f0faf3}.alt.un{opacity:.5;text-decoration:line-through}
+.tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11.5px;background:#eef2fb;color:#3a4a74;margin-left:4px}
+.tag.g{background:#e3f6ea;color:#1d7a43}.tag.red{background:#fde8e8;color:#a02828}.tag.y{background:#fff4d6;color:#8a6200}
+.ok{color:#1d7a43}.bad{color:#a02828}.muted{color:#7a849c;font-size:12px}
+.res{padding:8px 10px;border-radius:7px;margin-top:8px}.res.ok{background:#e3f6ea}.res.bad{background:#fde8e8}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0}
+.writer h3{display:flex;justify-content:space-between}.hash{font-family:ui-monospace,monospace;font-size:12px}
+.big{font-size:22px;font-weight:600}.toggle{padding:5px 12px;border-radius:14px;border:0;color:#fff;cursor:pointer;font:inherit}
+.on-line{background:#2f9e5b}.off-line{background:#a02828}
+.ptree details{margin-left:14px}.ptree summary{cursor:pointer;font-family:ui-monospace,monospace;font-size:12px}
+.prow td{font-size:12px}.prow .pp{cursor:pointer;color:#2346b8}.prow .pp:hover{text-decoration:underline}
+.hl{background:#e3f6ea!important}.hlf{background:#fde8e8!important}.hlb{background:#fff4d6!important}.anc>summary{background:#eef7f0}.ancf>summary{background:#fdeeee}
+.ptree table{table-layout:fixed}.ptree td:nth-child(1){width:36%}.ptree td:nth-child(2){width:22%}.ptree td:nth-child(3){width:7%}.ptree td:nth-child(4){width:6%}.ptree td:nth-child(5){width:11%}.ptree td{overflow:hidden;text-overflow:ellipsis}
+.cp{border:0;background:none;cursor:pointer;font-size:12px;color:#66708a;padding:0 3px}.ins{max-height:260px;overflow:auto}
+.jrv{border:1px solid #dde2ec;border-radius:8px;background:transparent;overflow:hidden;min-height:60px}.jrv canvas{display:block;width:100%;background:transparent}.jrv{color-scheme:light}.jrerr{color:#8c3600}input,select,textarea{color-scheme:light}input::placeholder,textarea::placeholder{color:#49556a;opacity:1}.jrerr{padding:10px;white-space:pre-wrap}

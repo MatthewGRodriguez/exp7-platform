@@ -1,0 +1,110 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Exp7 Platform</title>
+<style>
+:root{--bar-h:44px;--ink:#1a1d23;--muted:#5b6573;--line:#dde2ec;--bg:#fff}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif}
+button{font:inherit;padding:.4rem .75rem;margin:.15rem 0;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width:28rem}
+.ok{color:#0a6b0a}.bad{color:#a00}.na{color:var(--muted)}.row{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin:.4rem 0}
+#members{padding-left:1.1rem}#members li{margin:.2rem 0}
+/* Reserved top platform bar — not a floating overlay over app content */
+#topChrome{position:fixed;top:0;left:0;right:0;z-index:40;display:flex;align-items:center;gap:8px;height:var(--bar-h);padding:0 8px;background:#fff;border-bottom:1px solid var(--line);box-sizing:border-box}
+#btnBack{background:#fff;border:1px solid var(--line);border-radius:8px;min-width:36px;min-height:36px;width:36px;height:36px;padding:0;margin:0;display:inline-flex;align-items:center;justify-content:center;font-size:1.25rem;line-height:1;flex-shrink:0}
+/* Avatar: ONLY the profile image (or one fallback disc) is the control — no button chrome, no dual children */
+#topChrome #btnAvatar{
+  -webkit-appearance:none;appearance:none;
+  border:0!important;background:transparent!important;padding:0!important;margin:0!important;
+  width:36px;height:36px;min-width:36px;min-height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;
+  display:block;position:relative;cursor:pointer;line-height:0;font-size:0;box-shadow:none;color:transparent;
+}
+#topChrome #btnAvatar:focus-visible{outline:2px solid #246;outline-offset:2px}
+/* Image and fallback are mutually exclusive via .is-on only — never side-by-side halves */
+#topChrome #btnAvatar > img,
+#topChrome #btnAvatar > #avatarFallback{
+  position:absolute;inset:0;width:100%!important;height:100%!important;max-width:none;max-height:none;
+  margin:0!important;padding:0!important;border:0!important;border-radius:50%;
+  display:none!important; /* default off; .is-on turns exactly one on */
+  box-sizing:border-box;pointer-events:none;
+}
+#topChrome #btnAvatar > img{
+  object-fit:cover;object-position:center;background:transparent;
+}
+#topChrome #btnAvatar > img.is-on{display:block!important}
+#topChrome #btnAvatar > #avatarFallback{
+  align-items:center;justify-content:center;
+  font-weight:600;font-size:.85rem;line-height:1;letter-spacing:0;
+  color:var(--muted)!important;background:#eef1f6;
+}
+#topChrome #btnAvatar > #avatarFallback.is-on{display:flex!important}
+#appsOverlay{position:fixed;top:var(--bar-h);left:0;right:0;bottom:0;z-index:30;background:#f6f7f9;padding:12px 16px 24px;overflow:auto}
+#appButtons{display:flex;flex-wrap:wrap;gap:10px}
+#appButtons button.appPick{min-width:9rem;min-height:4.5rem;padding:1rem;border:1px solid var(--line);border-radius:10px;background:#fff;text-align:left;font-size:1rem}
+#appButtons button.appPick[aria-current="true"]{outline:2px solid #246}
+#accountMenu{position:fixed;top:calc(var(--bar-h) + 4px);left:8px;z-index:50;width:min(26rem,calc(100vw - 16px));max-height:calc(100vh - var(--bar-h) - 16px);overflow:auto;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;box-shadow:0 8px 28px rgba(20,30,50,.12)}
+#accountMenu[hidden],#appsOverlay[hidden]{display:none!important}
+#accountScrim{position:fixed;top:var(--bar-h);left:0;right:0;bottom:0;z-index:45;background:transparent}
+/* App content begins strictly below reserved bar */
+#appShell{position:fixed;top:var(--bar-h);left:0;right:0;bottom:0;padding:0;overflow:auto;transform:translateZ(0);isolation:isolate}
+.appSlot{position:relative;min-height:100%;height:100%;overflow:auto}
+.appSlot[hidden]{display:none!important}
+#out{display:none}
+/* Budget has its own #appSlot-budget with direct HTML views (not Exp7 demo base) */
+</style></head>
+<body>
+<header id="topChrome" aria-label="Platform">
+<button type="button" id="btnBack" aria-label="Show apps" title="Apps">←</button>
+<button type="button" id="btnAvatar" aria-label="Account" aria-haspopup="dialog" aria-expanded="false" aria-controls="accountMenu" title="Account">
+<img id="avatarImg" alt="" hidden width="36" height="36" decoding="async" referrerpolicy="no-referrer">
+<span id="avatarFallback" aria-hidden="true" hidden></span>
+</button>
+</header>
+<div id="accountScrim" hidden></div>
+<div id="appsOverlay" hidden role="dialog" aria-label="Apps">
+<div id="appButtons"></div>
+</div>
+<div id="accountMenu" hidden role="dialog" aria-label="Account" aria-modal="true">
+<section id="keyArea" aria-label="Enter GitHub key">
+<label for="tok"><b>GitHub key</b></label>
+<input type="password" id="tok" autocomplete="off" spellcheck="false" placeholder="Paste key, checks start automatically">
+<p class="row"><a id="reg" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">Register (create a key)</a></p>
+<p id="kstat" aria-live="polite"></p>
+</section>
+<div id="after" hidden>
+<p class="ok" id="who"></p>
+<p id="tstat" aria-live="polite"></p>
+<p id="syncstat" class="na" aria-live="polite">Sync idle.</p>
+<label class="na">Data repo <input type="text" id="tgt" value="exp7-app-data" autocomplete="off" spellcheck="false" title="Your public personal data repo name"></label>
+<div class="row">
+<input type="text" id="userIn" placeholder="GitHub username or paste invite JSON" autocomplete="off" spellcheck="false">
+<button type="button" id="btnAdd">Add user</button>
+<button type="button" id="btnShare">Share</button>
+</div>
+<ul id="members" class="na"></ul>
+<label class="na" for="shareOut">Share / invite (no secrets)</label>
+<textarea id="shareOut" readonly rows="3"></textarea>
+<p id="shareStat" class="na" aria-live="polite"></p>
+<button type="button" id="clr">Sign out</button>
+</div>
+<p id="offinfo" class="na"></p>
+<div id="profiles" aria-label="Saved accounts (no keys)"></div>
+<p id="pkginfo" class="na"></p>
+<details><summary>Software package updates</summary>
+<p class="na">Optional local .html package trial for Exp7 only. Never writes personal data repos. Budget persists separately in this browser.</p>
+<p><label>Package (.html): <input type="file" id="pkgfile" accept=".html,text/html"></label><br>
+<label>Release manifest (optional .json): <input type="file" id="pkgman" accept=".json,application/json"></label><br>
+<label>Expected SHA-256 (optional): <input type="text" id="pkgsha" autocomplete="off" spellcheck="false"></label></p>
+<p class="row"><button type="button" id="imp">Stage</button> <button type="button" id="act">Activate trial</button> <button type="button" id="keep">Keep</button> <button type="button" id="rev">Revert</button></p>
+<p id="staged" class="na"></p>
+</details>
+<span id="appmount" class="na" aria-live="polite" hidden></span>
+<span id="appmountBar" class="na" aria-live="polite" hidden></span>
+<span id="syncstatBar" class="na" aria-live="polite" hidden></span>
+</div>
+<div id="appShell">
+<div id="appSlot-exp7" class="appSlot" hidden data-app="exp7"></div>
+<div id="appSlot-budget" class="appSlot" hidden data-app="budget"></div>
+</div>
+<div id="out" class="na" hidden></div>

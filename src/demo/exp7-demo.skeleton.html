@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><link rel="icon" href="data:,"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Exp7 lean candidate (v17 editing, experimental views removed) — original core-wasm</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f4f6fa;color:#1c2333}
+header{background:#1f2a44;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:16px}
+header h1{font-size:17px;margin:0;font-weight:600}header .sub{opacity:.75;font-size:12px}
+nav{display:flex;flex-wrap:wrap;gap:4px;padding:0 16px;background:#fff;border-bottom:1px solid #dde2ec;position:sticky;top:0;z-index:2}
+nav button{border:0;background:none;padding:11px 14px;font:inherit;cursor:pointer;color:#55607a;border-bottom:3px solid transparent}
+nav button.on{color:#1f2a44;border-color:#3d6cf0;font-weight:600}
+main{padding:16px 20px;max-width:1260px;margin:0 auto}section{display:none}section.on{display:block}
+.grid{display:grid;gap:14px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1.2fr 1fr}.g3v{grid-template-columns:minmax(0,1.9fr) minmax(0,1fr)}
+.card{background:#fff;border:1px solid #dde2ec;border-radius:10px;padding:12px 14px}
+.card h3{margin:0 0 8px;font-size:14px;color:#33405e}
+button.b{border:1px solid #c9d1e3;background:#fff;border-radius:7px;padding:5px 10px;font:inherit;font-size:13px;cursor:pointer;margin:2px}
+button.b:hover{background:#eef2fb}button.p{background:#3d6cf0;color:#fff;border-color:#3d6cf0}button.p:hover{background:#2f59d4}
+button.r{border-color:#e3b2b2;color:#a02828}
+input,select,textarea{font:inherit;font-size:13px;border:1px solid #c9d1e3;border-radius:6px;padding:4px 6px}
+textarea{font-family:ui-monospace,Menlo,Consolas,monospace;width:100%}
+.mono,pre{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+pre{background:#f6f8fc;border:1px solid #e3e8f2;border-radius:6px;padding:8px;margin:6px 0;max-height:260px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+table{border-collapse:collapse;width:100%;font-size:12.5px}td,th{border-bottom:1px solid #edf0f6;padding:3px 6px;text-align:left;vertical-align:top}th{color:#66708a;font-weight:600}
+.alt{border:2px solid #dde2ec;border-radius:9px;padding:8px 10px;margin:6px 0;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.alt:hover{border-color:#9db4f5}.alt.best{border-color:#2f9e5b;background:#f0faf3}.alt.un{opacity:.5;text-decoration:line-through}
+.tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11.5px;background:#eef2fb;color:#3a4a74;margin-left:4px}
+.tag.g{background:#e3f6ea;color:#1d7a43}.tag.red{background:#fde8e8;color:#a02828}.tag.y{background:#fff4d6;color:#8a6200}
+.ok{color:#1d7a43}.bad{color:#a02828}.muted{color:#7a849c;font-size:12px}
+.res{padding:8px 10px;border-radius:7px;margin-top:8px}.res.ok{background:#e3f6ea}.res.bad{background:#fde8e8}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0}
+.writer h3{display:flex;justify-content:space-between}.hash{font-family:ui-monospace,monospace;font-size:12px}
+.big{font-size:22px;font-weight:600}.toggle{padding:5px 12px;border-radius:14px;border:0;color:#fff;cursor:pointer;font:inherit}
+.on-line{background:#2f9e5b}.off-line{background:#a02828}
+.ptree details{margin-left:14px}.ptree summary{cursor:pointer;font-family:ui-monospace,monospace;font-size:12px}
+.prow td{font-size:12px}.prow .pp{cursor:pointer;color:#2346b8}.prow .pp:hover{text-decoration:underline}
+.hl{background:#e3f6ea!important}.hlf{background:#fde8e8!important}.hlb{background:#fff4d6!important}.anc>summary{background:#eef7f0}.ancf>summary{background:#fdeeee}
+.ptree table{table-layout:fixed}.ptree td:nth-child(1){width:36%}.ptree td:nth-child(2){width:22%}.ptree td:nth-child(3){width:7%}.ptree td:nth-child(4){width:6%}.ptree td:nth-child(5){width:11%}.ptree td{overflow:hidden;text-overflow:ellipsis}
+.cp{border:0;background:none;cursor:pointer;font-size:12px;color:#66708a;padding:0 3px}.ins{max-height:260px;overflow:auto}
+.jrv{border:1px solid #dde2ec;border-radius:8px;background:transparent;overflow:hidden;min-height:60px}.jrv canvas{display:block;width:100%;background:transparent}.jrv{color-scheme:light}.jrerr{color:#8c3600}input,select,textarea{color-scheme:light}input::placeholder,textarea::placeholder{color:#49556a;opacity:1}.jrerr{padding:10px;white-space:pre-wrap}
+</style>
+<style id="budget-mode-css">
+#budgetTypeBar{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+#budgetTypeBar button{font:inherit;padding:.3rem .65rem;border:1px solid #dde2ec;border-radius:8px;background:#fff;cursor:pointer}
+#budgetTypeBar button.on{background:#1f4b7a;color:#fff;border-color:#1f4b7a}
+#budgetRankPanel{margin:10px 0;padding:8px 0;border-top:1px solid #dde2ec}
+</style>
+
+</head><body>
+<script>/* INCLUDE:src/demo/frame-boot.js */</script>
+<header><h1>Exp7 demo</h1><span class="sub">single file · offline · synthetic data only · real Exp7 engine code inlined</span><span id="codecStat" class="tag" style="margin-left:auto"></span><button id="copyDiag" class="b" style="margin-left:8px" title="show selectable diagnostics (clipboard optional in sandbox)">Copy diagnostics</button></header>
+<div id="bootStatus" class="jrerr" role="status" style="margin:8px 16px;border:1px solid #e3b2b2;background:#fff6f0;border-radius:8px;padding:10px">Exp7 is starting… If this stays visible, scripts did not finish booting in this frame.</div>
+<div id="diagPanel" hidden style="margin:8px 16px"><div class="muted" style="margin-bottom:4px">Diagnostics (selectable plaintext — clipboard may be blocked in an opaque sandbox frame):</div><textarea id="diagOut" readonly rows="12" style="width:100%;font:12px ui-monospace,Menlo,Consolas,monospace"></textarea></div>
+<nav id="tabs"></nav>
+<main>
+<section id="t-atlas"><p class="muted" id="rich-example-note">Rich synthetic example: 10 choice groups, 50 named alternatives, and branching prerequisite chains. Explore Paths, Plan and the Two writers editing tab. Initial picks are example state, not proposal history. One jreq link per item; needs gates can join selected branches.</p><div class="grid g3">
+ <div class="card"><h3>Getting there: alternatives group <span class="muted">(click to pick; JAtlasModel.pickAlt: userPick &gt; pref &gt; Exp7 Best()/SimulatedBest() over jbp-compiled scores)</span></h3><div id="alts"></div>
+  <div class="row"><button class="b" id="clearPick">Clear my pick</button><span class="muted">Right-hand buttons per option: ★ set pref · ⊘ toggle unavailable</span></div>
+  <div id="bestBox" class="res ok"></div></div>
+ <div class="card"><h3>Joys (live values)</h3><div id="joys"></div>
+  <h3 style="margin-top:12px">Dates and requirement (jreq)</h3><div id="dates"></div></div>
+</div>
+<div class="grid g2" style="margin-top:14px"><div class="card"><h3>Last proposal</h3><div id="atlasLast" class="muted">Nothing sent yet. Click an option or move a joy.</div></div>
+<div class="card"><h3>Owners / path revisions</h3><div id="owners"></div></div></div><div class="card" style="margin-top:14px"><h3>Path inspector <span class="muted">(real flattened atlas paths; click a path to pre-fill the Proposal console)</span></h3><div class="row"><input id="insAtlasF" size="30" placeholder="prefix or search, e.g. items/getthere/"></div><div id="insAtlas" class="ins"></div></div></section>
+
+<section id="t-console"><div class="grid g3">
+ <div class="card"><h3>Build a batch</h3>
+  <div class="row"><select id="cOp"><option>set</option><option>delta</option><option>add</option><option>remove</option><option>ref</option></select>
+   <input id="cPath" size="32" value="joys/fun/value"> <input id="cVal" size="16" value="1" title="JSON value (bare text = string)"><button class="b" id="cAdd">+ add op</button></div>
+  <div class="row">Fill with <input id="cN" type="number" value="1000" min="0" max="6000" style="width:80px"> ops of <span class="mono">delta joys/clock/value 1</span> <button class="b" id="cFill">fill</button><button class="b" id="cClear">clear batch</button></div>
+  <div class="muted" id="cCount"></div><pre id="cBatch"></pre>
+  <div class="row"><button class="b p" id="cSubmit">Submit proposal (all-or-nothing)</button><span class="muted">proc = ui:console, baseRev = current rev</span></div>
+  <div id="cRes"></div></div>
+ <div class="card"><h3>Examples</h3><div id="cEx"></div><h3 style="margin-top:10px">Proposal checker selftest (real code)</h3><div id="selftest" class="muted"></div></div>
+</div><div class="card" style="margin-top:14px"><h3>Path inspector <span class="muted">(real flattened atlas paths; click a path to pre-fill the Proposal console)</span></h3><div class="row"><input id="insConsoleF" size="30" placeholder="prefix or search, e.g. items/getthere/"></div><div id="insConsole" class="ins"></div></div></section>
+
+<section id="t-sync"><div class="card"><h3>Low-stakes concurrent edits: localized two-writer binary demo</h3><p class="muted">RGA notes, deterministic LWW labels, dense-position movable list. Structural fields still require original proposals. No remote-client interoperability/authentication claim. Notes project to actual atlas paths only after merging.</p><div class="row"><select id="co-writer"><option>alice</option><option>bob</option></select><select id="co-task"></select><input id="co-text" placeholder="note text to append"><button class="b" id="co-append">Append note</button><input id="co-index" type="number" value="0" min="0"><input id="co-count" type="number" value="1" min="0"><button class="b" id="co-delete">Delete visible range</button><input id="co-label" placeholder="nonstructural label"><button class="b" id="co-label-set">Set label</button><select id="co-before"></select><button class="b" id="co-move">Move selected before target</button><button class="b" id="co-undo">Undo own last intent</button><label><input id="co-offline" type="checkbox">Hold edits offline</label><button class="b p" id="co-merge">Exchange binary logs / quiet merge</button></div><p id="co-status" class="mono"></p><div class="jrv" id="xp-collab"></div></div>
+<div class="row" style="margin-bottom:10px"><button id="net" class="toggle on-line">network: online</button>
+ <button class="b p" id="syncBtn">Sync now</button><label><input type="checkbox" id="autoSync"> auto-sync after each edit (when online)</label>
+ <button class="b" id="scenario">Scenario: concurrent offline edits</button><button class="b" id="resetSync">reset</button><span id="conv" style="margin-left:auto"></span></div>
+ <div class="grid g2" id="writers"></div>
+ <div class="card" style="margin-top:14px"><h3>Merge order (timestamp, writer id, seq) — last write wins</h3><div id="order" class="mono"></div></div><div class="card" style="margin-top:14px"><h3>Per-replica path diffs and merge winners</h3><div id="syncDiff"></div></div><div class="card" style="margin-top:14px"><h3>Path inspector <span class="muted">(real flattened atlas paths; click a path to pre-fill the Proposal console)</span></h3><div class="row"><input id="insSyncF" size="30" placeholder="prefix or search, e.g. items/getthere/"></div><div id="insSync" class="ins"></div></div></section>
+
+<section id="t-storage"><div class="grid g2">
+ <div class="card"><h3>Session change log</h3><div id="logSum"></div><div style="max-height:420px;overflow:auto"><table id="logT"></table></div></div>
+ <div class="card"><h3>5000-op batch</h3><p class="muted">Same segment as atlas-sync-test tools/core_test.js: 5000 × <span class="mono">set items/i(k%50)/values/vk = k</span>, writer alice, seq 8, ts 124; the JSON size (1-space indent, as legacy .json segments were written) is shown as a comparison only; only atlas/1 is written.</p>
+ <button class="b p" id="gen5k">Generate and encode</button><div id="g5k"></div></div></div><div class="card" style="margin-top:14px"><h3>Session log per path</h3><div id="pathStats"></div></div></section>
+
+<section id="t-circuit"><div class="grid g2">
+ <div class="card"><h3>Source (circuit language v0)</h3><textarea id="src" rows="13" spellcheck="false"></textarea>
+  <div id="parseRes"></div>
+  <h3 style="margin-top:10px">Fire an event → ops → proposal</h3>
+  <div class="row"><select id="evSel"></select><input id="evArgs" size="44" class="mono"><button class="b p" id="fire">Run rule</button></div>
+  <div class="row"><button class="b" id="fireAll">Run demo sequence (pick, rate, tick, unavailable)</button></div><div id="fireRes"></div></div>
+ <div class="card"><h3>Canonical print (print(parse(src)))</h3><pre id="printed"></pre><div id="rt"></div>
+  <h3>Scores</h3><div id="scoreInfo" class="muted"></div></div></div></section>
+
+<section id="t-paths"><div class="card"><h3>Paths: the real flattened Exp7 atlas, full depth</h3>
+<div class="row"><button class="b" id="pvTree">tree</button><button class="b" id="pvFlat">flat list</button><input id="pPre" size="26" placeholder="path prefix, e.g. items/getthere/"><input id="pQ" size="20" placeholder="search (path or value)"><button class="b" id="pOpen">expand all</button><button class="b" id="pClose">collapse all</button><span id="pCount" class="muted"></span></div>
+<div id="pLast"></div><div id="pBody" style="max-height:620px;overflow:auto"></div></div></section>
+<section id="t-cal"><div class="grid g3v"><div class="card"><h3>Calendar — real <span class="mono">calHtml</span> (calendarTemplate component, Board/Plan switch) <span class="muted">day states from the template blueprints</span></h3><div class="jrv" id="vf-cal"></div><div id="vi-cal" class="muted mono"></div></div>
+<div><div class="card"><h3>Proposals (real checker, proc ui:views)</h3><div id="vb-cal"></div><div id="vr-cal"></div></div><div class="card" style="margin-top:10px"><div id="vd-cal"></div></div><div class="card" style="margin-top:10px"><h3>Deep paths this view reads <span class="muted">(touched paths first)</span></h3><div id="vl-cal"></div><div id="vp-cal" class="ins" style="max-height:330px"></div></div></div></div></section>
+<section id="t-brd"><div class="grid g3v"><div class="card"><h3>Board — real <span class="mono">boardHtml</span> <span class="muted">unscheduled / scheduled, sort + filter from the atlas</span></h3><div class="jrv" id="vf-brd"></div><div id="vi-brd" class="muted mono"></div></div>
+<div><div class="card"><h3>Proposals (real checker, proc ui:views)</h3><div id="vb-brd"></div><div id="vr-brd"></div></div><div class="card" style="margin-top:10px"><div id="vd-brd"></div></div><div class="card" style="margin-top:10px"><h3>Deep paths this view reads <span class="muted">(touched paths first)</span></h3><div id="vl-brd"></div><div id="vp-brd" class="ins" style="max-height:330px"></div></div></div></div></section>
+<section id="t-plan"><div class="grid g3v"><div class="card"><h3>Plan — real <span class="mono">depsHtml</span> (Dependencies &amp; sequence) + Selected item, Joy, alternatives what-if</h3><div class="jrv" id="vf-plan"></div><div id="vi-plan" class="muted mono"></div></div>
+<div><div class="card"><h3>Proposals (real checker, proc ui:views)</h3><div id="vb-plan"></div><div id="vr-plan"></div></div><div class="card" style="margin-top:10px"><div id="vd-plan"></div></div><div class="card" style="margin-top:10px"><h3>Deep paths this view reads <span class="muted">(touched paths first)</span></h3><div id="vl-plan"></div><div id="vp-plan" class="ins" style="max-height:330px"></div></div></div></div></section>
+<section id="t-about"><div class="card" style="max-width:900px"><h3>About this demo</h3><div id="about"></div></div></section>
+
+
+</main>
+<script>/* INCLUDE:src/exp7-views/vendor/jfactor_exp6.js */</script>
+<script>/* INCLUDE:src/exp7-views/vendor/jbp.js */</script>
+<script>/* INCLUDE:src/exp7-views/vendor/atlas.js */</script>
+<script>/* INCLUDE:src/exp7-views/vendor/eval.js */</script>
+<script>/* INCLUDE:src/demo/circuit_lang.js */</script>
+<script>/* INCLUDE:src/demo/proposals.js */</script>
+<script>/* INCLUDE:src/demo/exp7-sync-core.js */</script>
+<script>/* INCLUDE:src/demo/atlas_codec.bundle.js */</script>
+<script>/* INCLUDE:src/exp7-views/vendor/runtime-factory.js */</script>
+<script>/* INCLUDE:src/exp7-views/vendor/jrender.classic.js */</script>
+
+<script>/* INCLUDE:src/exp7-views/vendor/motion-config.js */</script>
+<!-- JRender wasm: jrender-exp7/wasm/jrender_full_small.wasm (208675 B, sha1 9a21bfd3a14fc5d84db1169c8ee04a3bd9c0b7d0); fonts: dejavu.jrf + dejavu_bold.jrf; basE91 -->
+<script type="text/plain" id="jr-wasm" data-enc="b91">/* INCLUDE:src/exp7-views/assets/jr-wasm.b91.txt */</script>
+<script type="text/plain" id="jr-font" data-enc="b91">/* INCLUDE:src/exp7-views/assets/jr-font.b91.txt */</script>
+<script type="text/plain" id="jr-font-bold" data-enc="b91">/* INCLUDE:src/exp7-views/assets/jr-font-bold.b91.txt */</script>
+<script>/* INCLUDE:src/exp7-views/vendor/jr-asset-sizes.js */</script>
+<script>/* INCLUDE:src/exp7-views/vendor/jrviews.js */</script>
+<script>/* INCLUDE:src/exp7-views/vendor/gpu-motion.js */</script>
+<script>/* INCLUDE:src/exp7-views/vendor/slab-config.js */</script>
+<script>/* INCLUDE:src/demo/session-audit.js */</script>
+
+<script>/* INCLUDE:src/demo/exp7-helpers.js */</script>
+<script>/* INCLUDE:src/exp7-views/theme-criticality.js */</script>
+<script>/* INCLUDE:src/exp7-views/exp7-views.js */</script>
+<script>/* INCLUDE:src/exp7-views/views-host-impl.js */</script>
+<script>/* INCLUDE:src/demo/demo-app-pre.js */</script>
+<script>/* INCLUDE:src/demo/demo-consume-views.js */</script>
+<script>/* INCLUDE:src/demo/demo-app-post.js */</script>
+<script>/* INCLUDE:src/demo/lean-jrender-helpers.js */</script>
+<script>/* INCLUDE:src/demo/editing-ui.js */</script>
+</body></html>

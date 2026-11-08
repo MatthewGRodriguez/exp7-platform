@@ -66,3 +66,7 @@ Do not document platform sync as “full app sync.”
 - Network: `api.github.com` only, `credentials:'omit'`, refuse redirects; release reads unauthenticated + commit-pinned.  
 - Refuse a key that can write the **software** repo.  
 - Trust limit: SHA proves integrity of fetched bytes, not publisher benevolence → branch protection + 2FA recommended.
+
+## Exp7Views unbundle (1.7.0)
+
+Reusable Calendar/Board/Plan live under `src/exp7-views/` (`exp7-views@1`). Demo and Budget are consumers. Presentation: runtime HTML string → JRViews → JRender (not legacy factory→innerHTML). See `docs/exp7-views/README.md`.

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Budget</title>
+<style>
+:root{--bg:#ffffff;--fg:#1c2333;--ac:#75510f;--line:#dde2ea;--muted:#49556a}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font:14px/1.4 "IBM Plex Sans",system-ui,sans-serif;background:var(--bg);color:var(--fg)}
+#bootStatus{padding:10px 12px;background:#fff6dc;color:#6b4300}
+.top{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.top button{background:#fff;border:1px solid var(--line);padding:6px 10px;cursor:pointer;color:var(--fg)}
+.top button.on{border-color:var(--ac);background:#f7f1e6}
+.hint{color:var(--muted);font-size:12px}
+#boardChrome{padding:6px 10px;border-bottom:1px solid var(--line)}
+#budgetTypeBar button{margin-right:4px}
+.jrv{min-height:420px;width:100%;position:relative;background:var(--bg)}
+.jrv canvas{display:block;width:100%}
+.jrerr{padding:12px;color:#8c3600;background:#fff0e7;white-space:pre-wrap}
+section{padding:8px 10px}
+#budgetRankPanel{padding:8px 10px;border-top:1px solid var(--line)}
+#budgetViewStatus{padding:4px 10px;font:12px/1.3 ui-monospace,monospace;color:var(--muted)}
+</style>
+</head>
+<body>
+<div id="bootStatus">Budget starting…</div>
+<div class="top" id="budgetTabs">
+  <button data-t="cal" class="on">Calendar</button>
+  <button data-t="brd">Board</button>
+  <button data-t="plan">Plan</button>
+  <button id="budgetLoadExamples">Load examples</button>
+  <button id="budgetResetBlank">Reset blank</button>
+  <span class="hint">Exp7Views · expenses / income / debt / assets · local IDB</span>
+</div>
+<div id="boardChrome" hidden>
+  <div id="budgetTypeBar">
+    <button data-budget-type="expense" class="on">expense</button>
+    <button data-budget-type="income">income</button>
+    <button data-budget-type="debt">debt</button>
+    <button data-budget-type="asset">asset</button>
+  </div>
+</div>
+<div id="budgetViewStatus"></div>
+<section id="t-cal"><div class="jrv" id="vf-cal"></div></section>
+<section id="t-brd" hidden><div class="jrv" id="vf-brd"></div><div id="budgetRankPanel"></div></section>
+<section id="t-plan" hidden><div class="jrv" id="vf-plan"></div></section>
+<!-- VIEWS_SCRIPTS -->
+<script>/* INCLUDE:src/budget/budget-app.js */</script>
+</body>
+</html>

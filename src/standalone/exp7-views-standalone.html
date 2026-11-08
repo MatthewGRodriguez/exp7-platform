@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Exp7Views standalone consumer</title>
+<style>
+:root{--bg:#ffffff;--fg:#1c2333;--muted:#49556a;--line:#dde2ea;--ac:#75510f}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font:14px/1.45 "IBM Plex Sans",system-ui,sans-serif;background:linear-gradient(#f4f6fa,#ffffff);color:var(--fg)}
+header{padding:16px 18px 8px}
+header h1{margin:0;font:600 22px/1.2 "IBM Plex Serif",Georgia,serif;color:var(--ac)}
+header p{margin:6px 0 0;color:var(--muted);max-width:52rem}
+.meta{padding:0 18px 10px;font:12px/1.4 ui-monospace,monospace;color:var(--muted)}
+.grid{display:grid;gap:12px;padding:0 18px 18px}
+@media(min-width:960px){.grid{grid-template-columns:1fr 1fr 1fr}}
+.panel h2{margin:0 0 6px;font-size:14px}
+.jrv{min-height:360px;border:1px solid var(--line);background:#fff;position:relative}
+.jrerr{padding:10px;background:#fff0e7;color:#8c3600;white-space:pre-wrap}
+.status{padding:8px 18px 18px;font:12px/1.4 ui-monospace,monospace;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Exp7Views</h1>
+  <p>Minimal independent caller — no Exp7 demo chrome, no demo seed atlas. Same module identity demo and Budget consume.</p>
+</header>
+<div class="meta" id="modMeta">loading…</div>
+<div class="grid">
+  <div class="panel"><h2>Calendar</h2><div class="jrv" id="vf-cal"></div></div>
+  <div class="panel"><h2>Board</h2><div class="jrv" id="vf-brd"></div></div>
+  <div class="panel"><h2>Plan</h2><div class="jrv" id="vf-plan"></div></div>
+</div>
+<div class="status" id="status">booting…</div>
+<!-- VIEWS_SCRIPTS -->
+<script>
+(function(){
+  function $(id){return document.getElementById(id)}
+  function setStatus(t){$('status').textContent=t}
+  async function main(){
+    if(!window.Exp7Views||window.Exp7Views.MODULE_ID!=='exp7-views@1'){
+      setStatus('FAIL: Exp7Views module missing'); return;
+    }
+    var EV=window.Exp7Views;
+    $('modMeta').textContent='MODULE_ID='+EV.MODULE_ID+' · presentation='+EV.presentation+' · legacyDom='+EV.legacyDomPath;
+    var atlas=EV.blankMoneyAtlas('Standalone');
+    // one example item so calendar/board/plan are non-empty visually when GPU works
+    var R=EV.rootsFor(atlas);
+    var id='sa_item';
+    atlas.items[id]={id:id,name:'Standalone example',values:{type:'expense',amount:10,date:(function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})()},factors:{},state:{},alts:null,jreq:null,blueprint:null};
+    ['calId','boardId','planId'].forEach(function(k){
+      var c=atlas.components[R[k]]; if(!c) return; var ref='item:'+id; if((c.items||[]).indexOf(ref)<0) c.items=(c.items||[]).concat([ref]);
+    });
+    var handles=[];
+    function mount(kind, hostId, root){
+      handles.push(EV.mount({
+        host:$(hostId), atlas:atlas, root:root, kind:kind,
+        onPropose:function(ops){ setStatus('propose '+ops.length+' op(s) (standalone local no-op apply)'); return {ok:true}; },
+        onError:function(err){ setStatus('GPU/JRender unavailable: '+err+' — no DOM mock substitute'); },
+        onUpdate:function(V){ if(V&&V.n&&!V.err) setStatus('mounted '+handles.length+' · last '+kind+' nodes='+(V.nodes||0)); }
+      }));
+    }
+    mount('calendar','vf-cal',R.calendar);
+    mount('board','vf-brd',R.board);
+    mount('plan','vf-plan',R.plan);
+    window.__standalone={moduleId:EV.MODULE_ID, handles:handles, atlas:atlas, dispose:function(){ handles.forEach(function(h){EV.dispose(h)}); }};
+    setStatus('standalone ready · module '+EV.MODULE_ID+' · handles '+handles.length);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',main); else main();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+[
+  {
+    "path": "src/demo/frame-boot.js",
+    "sha256": "83bb091f3710558319c8d6845bc86e0a6ed9d02bb223b7b088449cb8d0bb2716",
+    "bytes": 757,
+    "note": "frame boot"
+  },
+  {
+    "path": "src/exp7-views/vendor/jfactor_exp6.js",
+    "sha256": "739ea66791bf795dd938cf33c5f664cb46b24311ce48f1b402b9d2ce02ecd605",
+    "bytes": 166075,
+    "note": "JFactor"
+  },
+  {
+    "path": "src/exp7-views/vendor/jbp.js",
+    "sha256": "d307257648faab98d73cf47f5a3e206114e27566cbf496e12380c610c3c76760",
+    "bytes": 8926,
+    "note": "JBlueprint"
+  },
+  {
+    "path": "src/exp7-views/vendor/atlas.js",
+    "sha256": "ea9e21fb9c261cd07885bc616c44d1b440a87531e6872e01eba28dfa059d8a28",
+    "bytes": 22133,
+    "note": "atlas model"
+  },
+  {
+    "path": "src/exp7-views/vendor/eval.js",
+    "sha256": "6ebb648e7c4bf42222e9aa45f9e80243dad4aec9f63cb4fcc36d8bef7ecbfe09",
+    "bytes": 41356,
+    "note": "atlas eval"
+  },
+  {
+    "path": "src/demo/circuit_lang.js",
+    "sha256": "4d041eb9c7b2cad2713d2f9c66a80dfc53f7a052f165e667f07d4bbda46f0f9f",
+    "bytes": 10984,
+    "note": "circuit lang (demo)"
+  },
+  {
+    "path": "src/demo/proposals.js",
+    "sha256": "fe53413ccda40657659889e5c09ae2d6c8fbb24c7d861b29c7270ac42534b626",
+    "bytes": 15992,
+    "note": "proposal checker (demo)"
+  },
+  {
+    "path": "src/demo/exp7-sync-core.js",
+    "sha256": "c21a2d12af90186c555866378faf7d6b15e96315d6633af85323a494a28c94e1",
+    "bytes": 11213,
+    "note": "sync core (demo)"
+  },
+  {
+    "path": "src/demo/atlas_codec.bundle.js",
+    "sha256": "7aa5db2a71ce687d33ee92de659b6a1f48c3f13cdfb0639ce65e2fbdbdb4fb2f",
+    "bytes": 522481,
+    "note": "codec (demo)"
+  },
+  {
+    "path": "src/exp7-views/vendor/runtime-factory.js",
+    "sha256": "5322024c392728d5eddbee6f4e52d59a36805d50f79062cca967911e20c666fb",
+    "bytes": 55137,
+    "note": "JA_RUNTIME_FACTORY"
+  },
+  {
+    "path": "src/exp7-views/vendor/jrender.classic.js",
+    "sha256": "b67c588b7f4c7a74f0d19add913a45f9f31d0ac81ca14952fe110232f2595237",
+    "bytes": 70638,
+    "note": "JRender classic"
+  },
+  {
+    "path": "src/exp7-views/vendor/motion-config.js",
+    "sha256": "45cd5990af6c40d209ab97226789c5811458ebcf412e20a25b1f76dddb6b36aa",
+    "bytes": 14191,
+    "note": "motion config"
+  },
+  {
+    "path": "src/exp7-views/assets/jr-wasm.b91.txt",
+    "sha256": "543cc7cda120ee0d69ed191a283fe218b81f944c5c7c8f5f4d8a05e33b55a0b8",
+    "bytes": 254861,
+    "note": "wasm b91"
+  },
+  {
+    "path": "src/exp7-views/assets/jr-font.b91.txt",
+    "sha256": "0e138703fc97251a3cc763ce9408cb0ae601ca7de0e150b199df397e48d5f8df",
+    "bytes": 27100,
+    "note": "font b91"
+  },
+  {
+    "path": "src/exp7-views/assets/jr-font-bold.b91.txt",
+    "sha256": "c65ced081c4e9474ca75bc2b95095609c1148c1b07a8d31cc6751e19f2082eb4",
+    "bytes": 27076,
+    "note": "font bold b91"
+  },
+  {
+    "path": "src/exp7-views/vendor/jr-asset-sizes.js",
+    "sha256": "979eb99a6f96784898dd521a53f3710dd13c78cf8a0a94228d6d899019dfcff5",
+    "bytes": 87,
+    "note": "asset size consts"
+  },
+  {
+    "path": "src/exp7-views/vendor/jrviews.js",
+    "sha256": "50681ac7d767ff404b00b81bbeeb0874db8b27f0de1c2447c33d4f40e7082a46",
+    "bytes": 34654,
+    "note": "JRViews layout"
+  },
+  {
+    "path": "src/exp7-views/vendor/gpu-motion.js",
+    "sha256": "f23019aaf0a03949dfb47e3a60b15dc8c4f22b9ecb90541b2083bbf5004b518e",
+    "bytes": 3266,
+    "note": "GPU motion lifecycle"
+  },
+  {
+    "path": "src/exp7-views/vendor/slab-config.js",
+    "sha256": "bc537c020be92cf1cd201723645c59a280d86412073b397402f41464c63f87d3",
+    "bytes": 14787,
+    "note": "slab config"
+  },
+  {
+    "path": "src/demo/session-audit.js",
+    "sha256": "f7744492de5c3b84cf4378817bc778991f0c72e7611caf21f3c45288c63cf17c",
+    "bytes": 3193,
+    "note": "session audit"
+  },
+  {
+    "path": "src/demo/exp7-helpers.js",
+    "sha256": "945133c1170a6cbbb1e75d4a13ff0b8c8bd7719c4243a9992b9d120642045611",
+    "bytes": 8871,
+    "note": "demo helpers"
+  },
+  {
+    "path": "src/demo/lean-jrender-helpers.js",
+    "sha256": "3996300b5becb5637f8e9482a17bb13051b29938ca8492471eb22087f6488c78",
+    "bytes": 5268,
+    "note": "lean jrender helpers"
+  },
+  {
+    "path": "src/demo/editing-ui.js",
+    "sha256": "32e9a4cdec2f31e229833d7103ff0f2dd6b7b88e100369206e85b43f7ef4d9c1",
+    "bytes": 5447,
+    "note": "editing UI"
+  },
+  {
+    "path": "src/exp7-views/theme-criticality.js",
+    "sha256": "20b20320afcec0d330b7bf3daf2722db661baa1e6b9848201f0bfb65c4f8f4f8",
+    "bytes": 1533,
+    "note": "EXP7_LIGHT_THEME + RISK_COL"
+  },
+  {
+    "path": "src/exp7-views/views-host-impl.js",
+    "sha256": "00fc05880e2786531e3542e1797c3669c8d08d8edf0fbf1bc00f0d2b77c8c0c6",
+    "bytes": 70484,
+    "note": "JVS/startRuntime/setView/calDoc/boardDoc/planDoc"
+  },
+  {
+    "path": "src/demo/demo-app-pre.js",
+    "sha256": "770b41495ac2588c5d3a2e177a2fa627421cea08a49ebbf0968a67d66f29f670",
+    "bytes": 61904,
+    "note": "demo codec+chrome before views host"
+  },
+  {
+    "path": "src/demo/demo-app-post.js",
+    "sha256": "9cf451d3784b2b009a1aba2ce33e048badce7890053866c3c6d442e192799085",
+    "bytes": 31127,
+    "note": "demo budget helpers+renderViews+boot"
+  },
+  {
+    "path": "src/demo/demo.css",
+    "sha256": "c82e04df3ec0a294305fc978b273b99bc25ef9d5de6455cd7d34e9a8a686eed0",
+    "bytes": 4189,
+    "note": "demo CSS"
+  },
+  {
+    "path": "src/demo/demo-body.html",
+    "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "bytes": 1,
+    "note": "demo body markup"
+  },
+  {
+    "path": "src/demo/demo-head.html",
+    "sha256": "501bdc2d2cda1e2e6fb2dec27181b06d65becf736fb0935bff1a5520f9ba5249",
+    "bytes": 640,
+    "note": "demo head"
+  }
+]
