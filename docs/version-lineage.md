@@ -51,7 +51,8 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.17** | PR #42 | A board row's first drag move snaps a gold edge. A day stays unmarked. |
 | **1.8.18** | PR #43 | The top of a card fades. Press turns the edge navy, then the edge returns. |
 | **1.8.19** | PR #44 | A dark card brightens through the middle. A white card does not. |
-| **1.8.20** | this branch | The cast shadow stays on the ground when the face rises. |
+| **1.8.20** | PR #45 | The cast shadow stays on the ground when the face rises. |
+| **1.8.21** | this branch | Shadow ids jump reserved bands, so the first draw does not stall. |
 
 ### Current manifest (verbatim) [MEAS]
 
@@ -59,9 +60,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.20",
+"version": "1.8.21",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "f5d400967c4e9e6c5346f8e98a2e77bd0b0b3997464530c45c0effd48693384c",
+"sha256": "8a767838f1af3f5ceb1f5b96faaa5711348957ad4b54381eec4055457dca1136",
 "minLauncherMajor": 1
 ```
 

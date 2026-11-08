@@ -1,11 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.20",
+  "version": "1.8.21",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "f5d400967c4e9e6c5346f8e98a2e77bd0b0b3997464530c45c0effd48693384c",
+  "sha256": "8a767838f1af3f5ceb1f5b96faaa5711348957ad4b54381eec4055457dca1136",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "1.8.20: The cast shadow stays on the ground when the face rises.",
+    "app": "1.8.21: Shadow ids jump reserved bands so the first draw does not stall.",
     "appSha256": "4e19bdeeb76818a6a96b9cb6655d48c950d429b17d3680184231e5a67755508b",
     "budgetSha256": "673372b101ea5342552ec16a2e5d3820e322411031c52d808b68c35c3d494c67",
     "budgetMode": "exp7-views",

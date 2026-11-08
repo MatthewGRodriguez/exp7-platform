@@ -90,6 +90,12 @@ The cast shadow is its own node, painted behind the face. A live lift moves the 
 
 Cloud Node, on `View.show`: a day shadow started at the cell bottom, a selected button kept a 2 px gap, and a hover pose targeted lift 1.5 on the button while the shadow row did not move. Mac paint is not verified.
 
+## First draw (1.8.21)
+
+1.8.20 picked each shadow id by stepping one integer at a time. A reserved id band is 256 million wide, and several bands sit back to back, so a calendar of shadow nodes could sit for the better part of a minute before the first draw. 1.8.21 jumps the whole band, the same way the layout allocates other node ids. The shadow still stays on the ground.
+
+Cloud Node: an id at the start of each reserved band now resolves in a handful of jumps. The one-step loop was still inside the band after 2 million steps. A 42-day grid plus 12 board rows laid out in 44 ms and still produced the ground nodes. Mac paint is not verified.
+
 ## Still not implemented
 
 - A GPU gaussian filter. 1.8.14’s shadow is the sampled kernel in display-list rows. The shipped wasm has no blur op.
