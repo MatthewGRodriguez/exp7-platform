@@ -38,7 +38,8 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.4** | PR #29 | JRDI profile images + UX state table/washes |
 | **1.8.5** | PR #30 | JRDI: keep image VBs until after `queue.submit` (fixes Invalid CommandEncoder) |
 | **1.8.6** | PR #31 | App-slot reuse reveals WebGPU views |
-| **1.8.7** | this branch | WebGPU keepalive: no display:none/visibility:hidden on GPU hosts; force resize on reveal |
+| **1.8.7** | PR #32 | WebGPU keepalive (no display:none) |
+| **1.8.8** | this branch | Opaque Back cover; visible-only reveal; state-table rings and inset light in the draw list |
 
 ### Current manifest (verbatim) [MEAS]
 
@@ -46,9 +47,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.7",
+"version": "1.8.8",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "0f43be537eb8f79121290e45e86e10991ca33cb0cef80892237b1666b9633e2e",
+"sha256": "18470899a4d0974c3556124f8b44b2fd65b864874655c9d4cfdd4e0dd72825ab",
 "minLauncherMajor": 1
 ```
 

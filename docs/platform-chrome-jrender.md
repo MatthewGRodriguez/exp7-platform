@@ -175,3 +175,20 @@ Safari / Shortcuts: `display:none` or `#appShell { visibility:hidden }` zeroes l
 - Inactive `.appSlot` uses `.is-dormant` (opacity 0, still laid out) — not `display:none`
 - Apps overlay covers shell; does not `visibility:hidden` the shell
 - `revealAppViews` calls `renderer.resize` then `draw`, then re-queues JRViews
+
+
+## Back overlay and return (1.8.8)
+
+`#appsOverlay.jr-on` stays an opaque `#f6f7f9` plate (promoted layer). While Back is open, `#appShell.is-apps-covered` sets slot opacity to 0 so a WebGPU canvas cannot composite through the picker. Closing Back or reusing a mounted app calls `revealAppViews` only for hosts with a real on-screen box — hidden Budget panes are not resized — and `View.show` uses `{rebuild:true}` so the visible scene is reloaded onto the swapchain.
+
+## State-table material in the draw list (1.8.8)
+
+`jrviews-ux-states` runs inside `JRViews.layout` for Cal, Board, Plan, and chrome controls that share that layout (`.ja-day`, `.ja-brow`, `.ja-prow`, `.ja-joy`, buttons). It is still one JRender display list, not a CSS or PNG stand-in.
+
+- `ja-sel` maps to Selected. Class `best` does not.
+- Selected / focus / invalid / drop-pending / pressed rings use the state-table colors (gold `[117,81,15]`, focus navy `[36,88,166]`, caution `[170,0,0]`).
+- One light from above (archive params elevation 50°): a 2px inset highlight and a 2px inset contact shade. Shade alpha is `36 + lift*14`, with lift from `docs/design/state-table.json`. Both bands stay inside the fill.
+- Calendar days do not scale above 1, so a drag pose cannot cover the next cell.
+- `JRender.POSES` uses the same scale, lift, and opacity numbers. `ViewStates` still snaps idle calendar transforms back to identity after a selection update, so the resting look is the display-list material above.
+
+What this pass does not emit: Blender caustics, a gaussian shadow outside the cell, Moho frame playback, or a perspective camera on the live canvas. Those remain study artifacts. See `docs/design/visual-delivery.md`.

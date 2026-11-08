@@ -1,11 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.7",
+  "version": "1.8.8",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "0f43be537eb8f79121290e45e86e10991ca33cb0cef80892237b1666b9633e2e",
+  "sha256": "18470899a4d0974c3556124f8b44b2fd65b864874655c9d4cfdd4e0dd72825ab",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "exp7-lean + Budget Exp7Views; JRDI avatar + UX washes; WebGPU slot keepalive: dormant slots opacity/z-index (not display:none); apps overlay does not visibility:hidden appShell; reveal forces renderer.resize+draw",
+    "app": "exp7-lean + Budget; JRDI; state-table rings and inset one-light shade on Cal/Board/Plan/chrome; opaque Back cover; return redraws only on-screen canvases",
     "appSha256": "ec696151f233c4762c6b831f4f9cbec9857f6ac24a179fcfb0aa44ffc8c9da63",
     "budgetSha256": "673372b101ea5342552ec16a2e5d3820e322411031c52d808b68c35c3d494c67",
     "budgetMode": "exp7-views",
