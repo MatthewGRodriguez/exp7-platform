@@ -70,6 +70,7 @@
     "accent": "#75510f",
     "border": "#8a96aa",
     "selection": "#2458a6",
+    "selectionWash": "#e8eef8",
     "anchor": "#6841a6",
     "invalid": "#a00",
     "disabled": "#9aa3b2",
@@ -77,6 +78,12 @@
     "critical": "#fff0e7",
     "moderate": "#fff6dc",
     "low": "#e8f5ef"
+  },
+  "cameraFraming": {
+    "intent": "elevated-front-readable",
+    "rejectHeightFracBelow": 0.12,
+    "rejectAreaFracBelow": 0.04,
+    "note": "Must see panel FACE + ground shadow; grazing/edge-on is a FAIL (Mac METAL 2026-11-08)"
   },
   "images": {
     "abi": "JRDI/1",

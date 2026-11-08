@@ -1,98 +1,83 @@
-# Mac art probe runbook (inventory-confirmed)
+# Mac art probe runbook (inventory-confirmed) — rev front-readable-v2
 
-**Do not clone repos onto the Mac for this pass.** Use the `ART-PIPELINE-HANDOFF` archive only.  
-**Do not change Blender/Moho app settings panels** — scripts select Cycles METAL in-session only.
+**Do not clone repos onto the Mac.** Use the `ART-PIPELINE-HANDOFF-*.tar.gz` from `/opt/cursor/artifacts`.  
+**Do not change Blender/Moho settings panels.**
 
-## Confirmed inventory
+Prior fail (run-20261108T1045): edge-on slivers, states indistinguishable, no tilt/persp — generator fixed in this handoff. Moho bare `Moho script.lua` exited **139**; stage remains BLOCKED pending documented CLI form.
 
-| Tool | Path | Notes |
-|------|------|-------|
-| Blender 4.2.1 LTS | `/Applications/Blender.app/Contents/MacOS/Blender` | headless works; Cycles METAL Apple M3 GPU 10 cores |
-| Moho 14.3 | `/Applications/Moho.app/Contents/MacOS/Moho` | `-h` yielded **no text within 20s** — CLI help **unverified**. Historical working form: `Moho script.lua` (no flags). |
-| Safe outputs | `/Users/user-rodri/ArtScratch/exp7-art/<stage>/` | one heavy job at a time |
+## Inventory
 
-## Unpack handoff
+| Tool | Path |
+|------|------|
+| Blender 4.2.1 LTS | `/Applications/Blender.app/Contents/MacOS/Blender` |
+| Moho 14.3 | `/Applications/Moho.app/Contents/MacOS/Moho` |
+| Scratch | `/Users/user-rodri/ArtScratch/exp7-art/<stage>/` |
+
+## Unpack
 
 ```bash
-mkdir -p /Users/user-rodri/ArtScratch/exp7-art
-cd /Users/user-rodri/ArtScratch/exp7-art
+export ART_SCRATCH=/Users/user-rodri/ArtScratch/exp7-art
+mkdir -p "$ART_SCRATCH"
+cd "$ART_SCRATCH"
 tar -xzf /path/to/ART-PIPELINE-HANDOFF-*.tar.gz
 cd ART-PIPELINE-HANDOFF-*
-export ART_SCRATCH=/Users/user-rodri/ArtScratch/exp7-art
 export EXP7_ART_SCRATCH="$ART_SCRATCH"
 ```
 
-## Blender — first batch (states + lift series)
+## Blender (PROBE — required)
 
-One heavy job; lock file `blender/.heavy.lock` blocks overlaps.
+Validates framing (rejects slivers) before Cycles METAL renders. One heavy lock.
 
 ```bash
-mkdir -p "$ART_SCRATCH/blender"
 /Applications/Blender.app/Contents/MacOS/Blender --background --python \
   art/pipeline/blender/generate_ui_scene.py -- \
   --params art/design/params.json \
   --states art/design/state-table.json \
   --scratch "$ART_SCRATCH" \
-  --stage ui-states \
+  --stage ui-states-v2 \
   --device METAL \
   --samples 64 \
   --resolution 1280x720
 ```
 
-Dry-run (no GPU) from any machine with Blender python unavailable:
+Expect: `state_*.png`, `lift_*.png`, `tilt_*.png`, `persp_*pt.png`, `validation.json`, `run.json`.  
+Reject if `validation.json` framing fails or disabled/invalid/pressed ≈ idle.
+
+Dry-run (no GPU):
 
 ```bash
 python3 art/pipeline/blender/generate_ui_scene.py --dry-run \
   --params art/design/params.json --states art/design/state-table.json
 ```
 
-Expected outputs: `$ART_SCRATCH/blender/ui-states/<run_id>/state_*.png`, `lift_*.png`, `run.json`.
+## Moho (BLOCKED on this Mac until CLI form succeeds)
 
-After renders: measure shadow offset/blur → write `lighting/fits.measured.json` (analytical fits are **provisional only**).
-
-## Moho — first batch probe (no fabricated CLI proof)
-
-### A) Seed project (real historical `.moho`, not generated)
+Failed form (do not retry as success path):
 
 ```bash
-mkdir -p "$ART_SCRATCH/moho/seed" "$ART_SCRATCH/moho/comparison"
-cp art/pipeline/moho/seed/JWorkbook_chrome.moho "$ART_SCRATCH/moho/seed/"
-# GUI open only if needed: launch Moho empty, then File→Open (never: open -a Moho file.moho)
-```
-
-### B) Scaffold comparison scene via MohoScript (historical CLI form)
-
-```bash
-/Applications/Moho.app/Contents/MacOS/Moho \
-  art/pipeline/moho/scripts/CreateExp7ArtComparison.lua
-# expect stderr: EXP7_COMPARISON_SAVED .../moho/comparison/Exp7_art_comparison.moho
-```
-
-### C) Provisional state keys
-
-```bash
-export EXP7_MOHO_PROJECT="$ART_SCRATCH/moho/comparison/Exp7_art_comparison.moho"
-/Applications/Moho.app/Contents/MacOS/Moho \
-  art/pipeline/moho/scripts/AnimateExp7States.lua
-```
-
-### D) Render probe (success only if `RENDER_OK` appears)
-
-```bash
-export EXP7_MOHO_RENDER_OUT="$ART_SCRATCH/moho/comparison/Exp7_art_comparison_preview.png"
-/Applications/Moho.app/Contents/MacOS/Moho \
-  art/pipeline/moho/scripts/RenderExp7Preview.lua
-```
-
-### E) Smoke
-
-```bash
+# OBSERVED: exit 139 SIGSEGV, empty logs
 /Applications/Moho.app/Contents/MacOS/Moho art/pipeline/moho/scripts/SmokeQuit.lua
-# expect: SMOKE_OK
 ```
 
-**Blocked / unverified:** any `-h`/`--help`/`--console` claims; Moho GIF export commands not inventoried here; do not invent side-by-side GIF from Moho until FileRender probe succeeds.
+Documented candidates to try next (Lost Marble forum / Moho 14.2 startup scripts + `-r` FAQ). Use **absolute** paths. Success = exit 0 + logs / PNG — not assumed:
 
-## Crash law (from Moho archive)
+```bash
+SEED="$(pwd)/art/pipeline/moho/seed/JWorkbook_chrome.moho"
+OUT="$ART_SCRATCH/moho/cli-probe"
+mkdir -p "$OUT"
 
-Never: `open -a Moho ANY_DOCUMENT` (SIGSEGV). Use Pro binary + MohoScript, or empty GUI then File→Open.
+# A) Startup script with document + script (14.2+)
+/Applications/Moho.app/Contents/MacOS/Moho \
+  "$SEED" \
+  "$(pwd)/art/pipeline/moho/scripts/SmokeQuit.lua"
+
+# B) CLI render one frame of seed
+/Applications/Moho.app/Contents/MacOS/Moho \
+  -r "$SEED" -f png -outfolder "$OUT" -start 1 -end 1 -v
+```
+
+If both still SIGSEGV: leave Moho **BLOCKED**; do not open GUI as a substitute claim. Details: `art/pipeline/moho/BLOCKED.md`.
+
+## After Blender
+
+Measure shadow offset/blur on frontal lift series → `lighting/fits.measured.json`. Keep `fits.json` provisional until then.
