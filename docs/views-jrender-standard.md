@@ -97,9 +97,9 @@ Apps (Exp7 demo, Budget, standalone, future):
 
 ---
 
-## Open work (implementation later)
+## Open work
 
-1. Formalize a small **mount API** for “N views + optional scene layers” on one shared renderer (today: multiple `Exp7Views.mount` / `setView` hosts). **[OPEN]**  
+1. ~~Formalize a small **mount API** for “N views + optional scene layers” on one shared renderer~~ → **`Exp7Views.mountSurface` + `rendererInfo`** (1.7.8+). Apps mount Cal/Board/Plan (or a custom `views[]`) on one atlas; JRViews already shares one Core/`GPUContext`. Custom scene layers still attach via `rendererInfo().gc` / future host hooks — not a second renderer. **[MEAS in source / pack]**  
 2. Migrate platform chrome into JRender scene content without breaking launcher handoff / key memory rules. **[OPEN]**  
 3. Mac **[USER-HW]** acceptance for multi-view + shell-in-JRender (box `no-adapter` ≠ GPU proof). **[OPEN]**  
 4. Keep two-file release discipline for software payloads; docs-only PRs remain an authorized exception. **[REQ]**
