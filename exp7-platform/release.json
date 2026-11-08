@@ -1,18 +1,18 @@
 {
  "format": "exp7-platform-release/1",
- "version": "1.7.3",
+ "version": "1.7.4",
  "file": "exp7-platform/exp7-platform-lean.html",
- "sha256": "7bdd43287533f9a194ce2453ef5f69021a52d094c465a9028d3b478fbcfc22ee",
+ "sha256": "bd1462d8696a998a8bec2b4c4b8ea9c783d738b3c9c7880b976e8117ea1058e0",
  "minLauncherMajor": 1,
  "contains": {
   "app": "exp7-lean demo + Budget as Exp7Views consumers (shared exp7-views@1: runtime HTML\u2192JRViews\u2192JRender); reserved top bar; exclusive avatar; Budget local-IDB only",
-  "appSha256": "58d130585aae3f723d9aea3d0d24c9aecb1f7857abbb5fc5cd3931248e5cc39e",
-  "budgetSha256": "41535e2b2c0c07ed60e479508b2bb6db85fd3806b40d9a8912d6604d8ef46f07",
+  "appSha256": "09f5ef484b60e1c9d93a9b505051fb9ef7621fc413519b5c991a30418d763a3c",
+  "budgetSha256": "5e6988d1812796e57c4d155624866ded8ac16a010c0cff8ec52c51c54b8bddf3",
   "budgetMode": "exp7-views",
   "viewsModuleId": "exp7-views@1",
-  "viewsSourcesAggregateSha256": "2440ea89ec2550d72e49a4679cc3dd381b7260932eff03f1f3ce688eaf96b91d",
+  "viewsSourcesAggregateSha256": "dafc4b4cd0e44f439e28f503847e4a39ec1c90def540cfbe6df675332b1ab317",
   "standalone": "dist/exp7-views-standalone.html",
-  "standaloneSha256": "2f65c62b7369eb68a967e8e8a63a81f66f004c7be2eaaca93a0738780258259d",
-  "fix": "Budget same calendarTemplate+Exp7Slabs as demo; section.on parallax; exp7views.JVS for gpu-motion"
+  "standaloneSha256": "31c53722e894c22583767959ec2e94d6d7038b5642d306486384fce6158a6ca1",
+  "fix": "Budget Plan tab = comp:reqs deps (same as demo), not calendar *_plan"
  }
 }
