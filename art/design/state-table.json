@@ -6,13 +6,13 @@
     "idle": { "lift": 0, "tilt": 0, "scale": 1, "opacity": 1, "ring": "none", "bg": "surface", "border": "border" },
     "hover": { "lift": 1.5, "tilt": 0, "scale": 1, "opacity": 1, "ring": "none", "bg": "subtle", "border": "border" },
     "focus": { "lift": 1.5, "tilt": 0, "scale": 1, "opacity": 1, "ring": "focus", "bg": "surface", "border": "selection" },
-    "pressed": { "lift": 0, "tilt": 0, "scale": 0.985, "opacity": 1, "ring": "none", "bg": "subtle", "border": "border" },
+    "pressed": { "lift": 0, "tilt": 0, "scale": 0.97, "opacity": 1, "ring": "focus", "bg": "subtle", "border": "selection", "note": "scale+selection border/ring — matches JRViews RING.pressed; not wash-only" },
     "selected": { "lift": 2, "tilt": 0, "scale": 1, "opacity": 1, "ring": "gold", "bg": "selectionWash", "border": "selection" },
     "dragging": { "lift": 4, "tilt": 0, "scale": 1.02, "opacity": 0.96, "ring": "none", "bg": "surface", "border": "selection" },
-    "drop-pending": { "lift": 3, "tilt": 0, "scale": 1.01, "opacity": 0.9, "ring": "caution", "bg": "subtle", "border": "accent" },
+    "drop-pending": { "lift": 3, "tilt": 0, "scale": 1.01, "opacity": 0.9, "ring": "gold", "bg": "subtle", "border": "accent", "note": "accent/gold ring — must NOT share invalid/caution red" },
     "invalid": { "lift": 0, "tilt": 0, "scale": 1, "opacity": 1, "ring": "caution", "bg": "surface", "border": "invalid" },
     "settling": { "lift": 1, "tilt": 0, "scale": 1, "opacity": 1, "ring": "none", "bg": "surface", "border": "border" },
-    "disabled": { "lift": 0, "tilt": 0, "scale": 1, "opacity": 0.5, "ring": "none", "bg": "subtle", "border": "disabled" }
+    "disabled": { "lift": 0, "tilt": 0, "scale": 1, "opacity": 0.42, "ring": "none", "bg": "softDisc", "border": "disabled", "note": "opacity+softDisc+disabled border — ROI alpha, not global mean" }
   },
   "appStates": {
     "loading": { "ambient": "paused", "pointer": "off", "loader": true },

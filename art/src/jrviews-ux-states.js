@@ -15,13 +15,13 @@
     idle: null,
     hover: [36, 88, 166, 14],
     focus: [36, 88, 166, 18],
-    pressed: [36, 88, 166, 26],
+    pressed: [36, 88, 166, 40],
     selected: [36, 88, 166, 32],
     dragging: [36, 88, 166, 20],
-    'drop-pending': [117, 81, 15, 24],
-    invalid: [170, 0, 0, 20],
+    'drop-pending': [117, 81, 15, 28],
+    invalid: [170, 0, 0, 22],
     settling: [36, 88, 166, 12],
-    disabled: [154, 163, 178, 48],
+    disabled: [154, 163, 178, 72],
     loading: [244, 246, 250, 255],
     empty: [244, 246, 250, 255],
     error: [170, 0, 0, 16],
@@ -42,13 +42,13 @@
     idle: { scale: 1, opacity: 1 },
     hover: { scale: 1, opacity: 1 },
     focus: { scale: 1, opacity: 1 },
-    pressed: { scale: 0.985, opacity: 1 },
+    pressed: { scale: 0.97, opacity: 1 },
     selected: { scale: 1, opacity: 1 },
     dragging: { scale: 1.02, opacity: 0.96 },
     'drop-pending': { scale: 1.01, opacity: 0.9 },
     invalid: { scale: 1, opacity: 1 },
     settling: { scale: 1, opacity: 1 },
-    disabled: { scale: 1, opacity: 0.5 }
+    disabled: { scale: 1, opacity: 0.42 }
   };
 
   var INTERACTIVE = 'button,.ja-joy,.ja-chip,.ja-alt,.ja-sw,.ja-tog,.ja-day,[data-jv-act],[data-day],.ja-brow,.ja-prow';

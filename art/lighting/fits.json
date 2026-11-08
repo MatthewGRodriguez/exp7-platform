@@ -2,8 +2,17 @@
   "id": "exp7-lighting-fits/1",
   "status": "provisional-analytical-only",
   "notMeasured": true,
-  "blender": "PROBE-READY via art/pipeline/blender/generate_ui_scene.py on Mac Blender 4.2.1 METAL — not executed on cloud",
-  "method": "Ground-plane prediction from params.light ONLY. Not traced from renders. Do not treat as measured fit.",
+  "measuredImageSpaceRejected": true,
+  "blender": "PROBE-READY via generate_ui_scene.py on Mac Blender 4.2.1 METAL",
+  "method": "Ground-plane prediction from params.light ONLY. Mac v3 image-px slopes are NOT adopted.",
+  "mac_v3_image_space_note": {
+    "exposed_offset_r50_slope": 8.75,
+    "penumbra_10_90_slope": 4.0,
+    "panel_bottom_edge_motion_slope": -12.87,
+    "measured_penumbra_over_offset": 0.46,
+    "model_penumbra_over_offset": 1.436,
+    "verdict": "REJECT as ground-plane model — image-space includes silhouette motion; use calibrate_shadow_ground.py + camera_instrumentation.json unprojection before revising predictions"
+  },
   "light": {
     "elevationDeg": 72,
     "size": 420,
@@ -11,9 +20,9 @@
   },
   "predictions": {
     "shadowOffsetPerLiftPx": 0.3249,
-    "noteOffset": "h * cot(elevation) = h * cot(72 deg) approx h * 0.3249",
+    "noteOffset": "h * cot(elevation) = h * cot(72 deg) approx h * 0.3249 — GROUND design-px, not image-px",
     "penumbraPerLiftPx": 0.4667,
-    "notePenumbra": "h * lightSize / distance = h * 420/900 approx h * 0.4667",
+    "notePenumbra": "h * lightSize / distance = h * 420/900 approx h * 0.4667 — GROUND design-px",
     "highlightShiftPerTiltDeg": 0,
     "rimPerTiltDeg": 0,
     "shadePerTiltDeg": 0,
@@ -33,8 +42,8 @@
   },
   "caustics": {
     "enabled": false,
-    "reason": "Optional stage deferred until base Blender series exists on Mac"
+    "reason": "Optional stage deferred until ground-space shadow fit exists"
   },
-  "measuredFitsPath": "lighting/fits.measured.json (create on Mac after PNG trace)",
-  "evidenceClass": "[PROVISIONAL] analytical; measured [OPEN][USER-HW]"
+  "measuredFitsPath": "lighting/fits.measured.json (create on Mac after GROUND unprojection — not raw image slopes)",
+  "evidenceClass": "[PROVISIONAL] analytical; measured ground-space [OPEN][USER-HW]"
 }

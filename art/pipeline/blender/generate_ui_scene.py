@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """Exp7 UI art Blender generator — Blender 4.2.1 LTS + Cycles METAL.
 
-Rev front-readable-v3 (after Mac v2 quality FAIL):
-  - Focus/selected/invalid/drop-pending rings follow rounded-panel contour from
-    shared geometry.radii (not oversized torii).
-  - State face colors use the same palette washes as art/src/jrviews-ux-states.js
-    (selection/accent/invalid/disabled alphas) — not lift-only / wash-token-only.
-  - Paired shadow-catcher + surface-only lift renders so offset/blur can be fit
-    separately (beauty stay provisional for measure).
-  - Calendar / Board / Plan / chrome compositions from shared params (not a lone
-    generic panel).
-  - Framing + state-table gates retained; ROI note for hover/pressed/disabled.
+Rev front-readable-v4 (after Mac v3 quality FAIL on views/Moho/measure):
+  - Contour rings retained; drop-pending uses gold/accent (not invalid red).
+  - Pressed/disabled use stronger design-table scale/opacity + selection ring.
+  - Views are full-frame DESIGN-STUDY compositions with real typography + avatar
+    assets (labeled ≠ live WebGPU). Content validation rejects empty bars.
+  - Shadow: image-px ≠ ground-plane; instrumentation for unprojection (fits stay
+    provisional — do not adopt invalid image-space slopes as model).
+  - --only views|states|lift|shadow|tilt|persp for focused Mac re-runs.
 
 Mac:
   /Applications/Blender.app/Contents/MacOS/Blender --background --python this.py -- \\
@@ -39,7 +37,14 @@ except ImportError:
     Vector = None
 
 DEFAULT_SCRATCH = "/Users/user-rodri/ArtScratch/exp7-art"
-GENERATOR_REV = "front-readable-v3"
+GENERATOR_REV = "front-readable-v4"
+
+# Ensure sibling import works inside Blender --python
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    import views_content as VC
+except ImportError:
+    VC = None
 
 MIN_PROJECTED_AREA_FRAC = 0.04
 MIN_PROJECTED_HEIGHT_FRAC = 0.12
@@ -52,13 +57,13 @@ WASH_RGBA = {
     "idle": None,
     "hover": (36, 88, 166, 14),
     "focus": (36, 88, 166, 18),
-    "pressed": (36, 88, 166, 26),
+    "pressed": (36, 88, 166, 40),  # selection wash — stronger than hover; still palette
     "selected": (36, 88, 166, 32),
     "dragging": (36, 88, 166, 20),
-    "drop-pending": (117, 81, 15, 24),
-    "invalid": (170, 0, 0, 20),
+    "drop-pending": (117, 81, 15, 28),  # accent — not invalid red
+    "invalid": (170, 0, 0, 22),
     "settling": (36, 88, 166, 12),
-    "disabled": (154, 163, 178, 48),
+    "disabled": (154, 163, 178, 72),
 }
 
 
@@ -78,7 +83,7 @@ def parse_args(argv=None):
     p.add_argument("--params", required=True)
     p.add_argument("--states", required=True)
     p.add_argument("--scratch", default=os.environ.get("ART_SCRATCH", DEFAULT_SCRATCH))
-    p.add_argument("--stage", default="ui-states-v3")
+    p.add_argument("--stage", default="ui-states-v4")
     p.add_argument("--run-id", default=None)
     p.add_argument("--samples", type=int, default=64)
     p.add_argument("--resolution", default="1280x720")
@@ -90,7 +95,17 @@ def parse_args(argv=None):
     p.add_argument("--skip-validate", action="store_true")
     p.add_argument("--skip-views", action="store_true")
     p.add_argument("--skip-shadow-passes", action="store_true")
+    p.add_argument(
+        "--only",
+        default="",
+        help="Comma list: views,states,lift,shadow,tilt,persp — skip other expensive series",
+    )
     return p.parse_args(argv)
+
+
+def only_set(args) -> set:
+    raw = [x.strip() for x in (args.only or "").split(",") if x.strip()]
+    return set(raw) if raw else {"views", "states", "lift", "shadow", "tilt", "persp"}
 
 
 def hex_rgba(h: str, a: float = 1.0):
@@ -375,7 +390,7 @@ def face_color_for_state(st_name: str, st: dict, palette: dict):
     return over_wash(tuple(base), wash)
 
 
-def make_contour_ring(name, sx, sy, z, scale, radius_m, ring_w, color, tilt):
+def make_contour_ring(name, sx, sy, z, scale, radius_m, ring_w, color, tilt, emit=0.12):
     """Rounded-rect focus ring hugging panel outline (boolean outer − inner)."""
     assert bpy is not None
     ox = (sx + 2 * ring_w) * scale
@@ -413,7 +428,7 @@ def make_contour_ring(name, sx, sy, z, scale, radius_m, ring_w, color, tilt):
         log(f"WARN ring boolean: {e}")
     bpy.data.objects.remove(inner, do_unlink=True)
     outer.name = name
-    outer.data.materials.append(principled_mat(name + "_mat", color, emit=0.12, rough=0.28))
+    outer.data.materials.append(principled_mat(name + "_mat", color, emit=emit, rough=0.28))
     if abs(tilt) > 1e-6:
         outer.rotation_euler[0] = math.radians(tilt)
     return outer
@@ -437,6 +452,10 @@ def make_panel(name: str, st: dict, palette: dict, geom: dict, tilt_deg=None, st
     tilt = float(st.get("tilt", 0) if tilt_deg is None else tilt_deg)
     rad = panel_radius_m(geom, sx * scale, sy * scale)
     ring_w = px_m(2.5, geom)  # design focus ring ~2–3px
+    if st_name == "focus" or st.get("ring") == "focus":
+        ring_w = px_m(3.5, geom)  # Mac v3: focus ring was faint
+    if st_name == "drop-pending":
+        ring_w = px_m(3.0, geom)
 
     face = face_color_for_state(st_name, st, palette)
     mat = principled_mat(name + "_mat", face, opacity=opacity)
@@ -464,6 +483,7 @@ def make_panel(name: str, st: dict, palette: dict, geom: dict, tilt_deg=None, st
     ring_col = palette["_ring"].get(ring_key)
     ring_obj = None
     if ring_col:
+        emit = 0.28 if st_name in ("focus", "selected", "drop-pending") else 0.12
         ring_obj = make_contour_ring(
             name + "_ring",
             sx,
@@ -474,6 +494,7 @@ def make_panel(name: str, st: dict, palette: dict, geom: dict, tilt_deg=None, st
             ring_w,
             ring_col,
             tilt,
+            emit=emit,
         )
         ring_obj.location = (origin[0], origin[1], ring_obj.location.z)
 
@@ -611,6 +632,12 @@ def validate_state_table(states: dict) -> dict:
             errors.append(
                 f"state '{name}' has no non-lift material/scale/opacity/ring/border/tilt vs idle"
             )
+    dp = states.get("drop-pending") or {}
+    inv = states.get("invalid") or {}
+    if dp.get("ring") == "caution":
+        errors.append("drop-pending ring must not be caution/invalid-red (use gold/accent)")
+    if dp.get("ring") and inv.get("ring") and dp.get("ring") == inv.get("ring"):
+        errors.append(f"drop-pending and invalid share ring '{dp.get('ring')}' — semantic collision")
     return {"ok": not errors, "errors": errors, "note": "Mac measure must use ROI not global mean |dL|"}
 
 
@@ -823,10 +850,10 @@ def main():
         "generator_rev": GENERATOR_REV,
         "blender_target": "4.2.1 LTS",
         "fix_note": (
-            "v3: rounded-panel contour rings; JRViews washes; shadow-catcher+surface pairs; "
-            "Calendar/Board/Plan/chrome compositions; ROI measure guidance"
+            "v4: content views+avatar DESIGN-STUDY; semantic rings; shadow ground calibration; "
+            "Moho shapes; --only focused passes"
         ),
-        "mac_v2_fail_ref": "run-v2-20261108T1050 oversized torus rings; global-mean |dL| misread",
+        "mac_v3_fail_ref": "run-v3 views=generic bars; shadow image-px≠ground; Moho empty layers",
         "executable_expected": "/Applications/Blender.app/Contents/MacOS/Blender",
         "cycles_device_requested": args.device,
         "scratch": str(scratch),
@@ -837,20 +864,32 @@ def main():
         "params_id": params.get("id"),
         "state_table_validation": st_val_full,
         "wash_source": "art/src/jrviews-ux-states.js WASH/RING (palette-derived)",
+        "view_label": "DESIGN-STUDY — not live Safari WebGPU app output",
+        "only": sorted(only_set(args)),
         "measure_guidance": {
-            "do_not_use": "global mean |dL| across full frame",
-            "use": "ROI = panel projected bbox; geometric scale/opacity/ring presence; shadow-only pass for offset/blur",
+            "do_not_use": "global mean |dL|; raw image-px offset as ground-plane model",
+            "use": "ROI panel bbox; geometric scale/opacity/ring; shadow catcher + unprojection (calibrate_shadow_ground.py)",
             "subtle_by_design": ["hover", "settling"],
-            "meaningful_cues": ["pressed.scale", "disabled.opacity+wash", "focus/selected/invalid contour rings"],
-            "analytical_fits": "provisional until shadow_*.png + surface_*.png measured",
+            "meaningful_cues": [
+                "pressed.scale+selection ring",
+                "disabled.opacity+softDisc",
+                "focus thicker selection ring",
+                "drop-pending gold/accent ≠ invalid caution",
+            ],
+            "analytical_fits": "PROVISIONAL — Mac v3 image slopes not adopted as ground truth",
         },
         "evidence": "rendered-on-mac-when-complete; dry-run is not GPU proof",
     }
 
+    want = only_set(args)
+    if args.skip_views:
+        want.discard("views")
+    if args.skip_shadow_passes:
+        want.discard("shadow")
+
     if args.dry_run or bpy is None:
         meta["dry_run"] = True
         meta["bpy_available"] = bpy is not None
-        # Ring hug estimate: contour ring outer = panel + 2*ring_w
         sx, sy = 1.7, 1.05
         rw = px_m(2.5, geom)
         meta["ring_estimate"] = {
@@ -860,8 +899,20 @@ def main():
             "reject_if_overshoot_gt": 0.35,
         }
         meta["views_planned"] = ["calendar", "board", "plan", "chrome"]
+        meta["views_content_module"] = bool(VC)
+        meta["avatar_assets"] = {
+            "design_study": str(Path(__file__).parent / "assets" / "avatar-design-study.png"),
+            "photo_study": str(Path(__file__).parent / "assets" / "avatar-photo-study.png"),
+        }
         meta["shadow_passes_planned"] = ["shadow_lift_##px.png", "surface_lift_##px.png"]
+        meta["content_gates"] = {"min_text_objects": 8, "chrome_requires_avatar": True}
+        # Semantic checks in dry-run
+        dp_ring = states_doc["elementStates"].get("drop-pending", {}).get("ring")
+        inv_ring = states_doc["elementStates"].get("invalid", {}).get("ring")
+        meta["semantic_rings"] = {"drop-pending": dp_ring, "invalid": inv_ring, "ok": dp_ring != inv_ring}
         print(json.dumps(meta, indent=2))
+        if not meta["semantic_rings"]["ok"]:
+            raise SystemExit("SEMANTIC_FAIL drop-pending ring collides with invalid")
         if bpy is None and not args.dry_run:
             raise SystemExit("bpy missing — run inside Blender")
         return 0
@@ -894,109 +945,144 @@ def main():
             raise SystemExit("RING_VALIDATION_FAIL: " + "; ".join(ring_val["errors"]))
         clear_named("UIPanel_")
 
+        # Write camera instrumentation for ground-space shadow fit (always cheap)
+        try:
+            from calibrate_shadow_ground import write_camera_instrumentation
+
+            write_camera_instrumentation(cam, out_dir / "camera_instrumentation.json", params, (rx, ry))
+            meta["camera_instrumentation"] = str(out_dir / "camera_instrumentation.json")
+        except Exception as e:
+            log(f"WARN camera instrumentation: {e}")
+
         renders = []
-        # State beauty series
-        for name, st in element_states.items():
-            clear_named("UIPanel_")
-            make_panel(f"UIPanel_{name}", st, palette, geom, st_name=name, content_lines=2)
-            out_png = out_dir / f"state_{name}.png"
-            log(f"RENDER state={name} wash={WASH_RGBA.get(name)} ring={st.get('ring')} scale={st.get('scale')} opacity={st.get('opacity')}")
-            render_still(out_png, (rx, ry))
-            obj = bpy.data.objects.get(f"UIPanel_{name}")
-            metrics = projected_metrics(cam, obj, (rx, ry)) if obj else {}
-            renders.append({"state": name, "path": str(out_png), "visual": visual_keys(st), "projected": metrics, "pass": "beauty"})
+        view_content_reports = {}
 
-        # Lift beauty + paired shadow/surface measurement passes
-        for lift_px in (0, 1, 2, 4, 8):
-            clear_named("UIPanel_")
-            st = dict(element_states["idle"])
-            st["lift"] = float(lift_px)
-            make_panel("UIPanel_lift", st, palette, geom, st_name="idle", content_lines=0)
-            out_png = out_dir / f"lift_{lift_px:02d}px.png"
-            render_still(out_png, (rx, ry))
-            renders.append({"series": "lift", "lift_px": lift_px, "path": str(out_png), "pass": "beauty"})
+        if "states" in want:
+            for name, st in element_states.items():
+                clear_named("UIPanel_")
+                make_panel(f"UIPanel_{name}", st, palette, geom, st_name=name, content_lines=2)
+                out_png = out_dir / f"state_{name}.png"
+                log(f"RENDER state={name} wash={WASH_RGBA.get(name)} ring={st.get('ring')} scale={st.get('scale')} opacity={st.get('opacity')}")
+                render_still(out_png, (rx, ry))
+                obj = bpy.data.objects.get(f"UIPanel_{name}")
+                metrics = projected_metrics(cam, obj, (rx, ry)) if obj else {}
+                renders.append({"state": name, "path": str(out_png), "visual": visual_keys(st), "projected": metrics, "pass": "beauty"})
 
-            if not args.skip_shadow_passes:
-                # Shadow-only: catcher ground, transparent film
-                ensure_ground(catcher=True)
-                out_sh = out_dir / f"shadow_lift_{lift_px:02d}px.png"
-                render_still(out_sh, (rx, ry), transparent=True)
-                renders.append({"series": "lift-shadow", "lift_px": lift_px, "path": str(out_sh), "pass": "shadow_catcher"})
-                # Surface-only: hide ground, opaque film
-                g = bpy.data.objects.get("Ground")
-                if g:
-                    g.hide_render = True
-                out_sf = out_dir / f"surface_lift_{lift_px:02d}px.png"
-                render_still(out_sf, (rx, ry), transparent=False)
-                renders.append({"series": "lift-surface", "lift_px": lift_px, "path": str(out_sf), "pass": "surface_only"})
-                if g:
-                    g.hide_render = False
-                    try:
-                        g.is_shadow_catcher = False
-                    except Exception:
-                        pass
-                ensure_ground(catcher=False)
+        if "lift" in want or "shadow" in want:
+            for lift_px in (0, 1, 2, 4, 8):
+                clear_named("UIPanel_")
+                st = dict(element_states["idle"])
+                st["lift"] = float(lift_px)
+                make_panel("UIPanel_lift", st, palette, geom, st_name="idle", content_lines=0)
+                if "lift" in want:
+                    out_png = out_dir / f"lift_{lift_px:02d}px.png"
+                    render_still(out_png, (rx, ry))
+                    renders.append({"series": "lift", "lift_px": lift_px, "path": str(out_png), "pass": "beauty"})
+                if "shadow" in want:
+                    ensure_ground(catcher=True)
+                    out_sh = out_dir / f"shadow_lift_{lift_px:02d}px.png"
+                    render_still(out_sh, (rx, ry), transparent=True)
+                    renders.append({"series": "lift-shadow", "lift_px": lift_px, "path": str(out_sh), "pass": "shadow_catcher"})
+                    g = bpy.data.objects.get("Ground")
+                    if g:
+                        g.hide_render = True
+                    out_sf = out_dir / f"surface_lift_{lift_px:02d}px.png"
+                    render_still(out_sf, (rx, ry), transparent=False)
+                    renders.append({"series": "lift-surface", "lift_px": lift_px, "path": str(out_sf), "pass": "surface_only"})
+                    if g:
+                        g.hide_render = False
+                        try:
+                            g.is_shadow_catcher = False
+                        except Exception:
+                            pass
+                    ensure_ground(catcher=False)
 
-        # Tilt series
-        for tilt in (0, 2, 5, 10):
-            clear_named("UIPanel_")
-            st = dict(element_states["idle"])
-            make_panel("UIPanel_tilt", st, palette, geom, tilt_deg=float(tilt), st_name="idle")
-            out_png = out_dir / f"tilt_{tilt:02d}deg.png"
-            render_still(out_png, (rx, ry))
-            renders.append({"series": "tilt", "tilt_deg": tilt, "path": str(out_png)})
+        if "tilt" in want:
+            for tilt in (0, 2, 5, 10):
+                clear_named("UIPanel_")
+                st = dict(element_states["idle"])
+                make_panel("UIPanel_tilt", st, palette, geom, tilt_deg=float(tilt), st_name="idle")
+                out_png = out_dir / f"tilt_{tilt:02d}deg.png"
+                render_still(out_png, (rx, ry))
+                renders.append({"series": "tilt", "tilt_deg": tilt, "path": str(out_png)})
 
-        # Perspective study
-        study_st = dict(element_states.get("selected", element_states["idle"]))
-        for mode in (1, 2, 3):
-            clear_named("UIPanel_")
-            make_panel("UIPanel_persp", study_st, palette, geom, st_name="selected", content_lines=2)
-            sc = make_camera_study(f"StudyCam_{mode}pt", mode, focal)
-            bpy.context.scene.camera = sc
-            out_png = out_dir / f"persp_{mode}pt.png"
-            render_still(out_png, (rx, ry))
-            renders.append({"series": "perspective", "mode": mode, "path": str(out_png)})
-        bpy.context.scene.camera = cam
+        if "persp" in want:
+            study_st = dict(element_states.get("selected", element_states["idle"]))
+            for mode in (1, 2, 3):
+                clear_named("UIPanel_")
+                make_panel("UIPanel_persp", study_st, palette, geom, st_name="selected", content_lines=2)
+                sc = make_camera_study(f"StudyCam_{mode}pt", mode, focal)
+                bpy.context.scene.camera = sc
+                out_png = out_dir / f"persp_{mode}pt.png"
+                render_still(out_png, (rx, ry))
+                renders.append({"series": "perspective", "mode": mode, "path": str(out_png)})
+            bpy.context.scene.camera = cam
 
-        # Full view compositions
-        if not args.skip_views:
+        if "views" in want:
+            if VC is None:
+                raise SystemExit("views_content module missing — cannot render non-empty views")
+            font_id = VC._load_font_id(VC.find_font())
+            # Wider framing so compositions are full-frame, not cropped fragments
             view_cam = make_camera_front(
                 focal,
                 params["camera"].get("near", 10),
                 params["camera"].get("far", 4000),
-                loc=Vector((0.2, -3.2, 2.9)),
-                target=Vector((0.0, 0.2, 0.15)),
+                loc=Vector((0.0, -4.2, 3.4)),
+                target=Vector((0.0, 0.15, 0.2)),
             )
             bpy.context.scene.camera = view_cam
-            for view_name, composer in (
-                ("calendar", compose_calendar),
-                ("board", compose_board),
-                ("plan", compose_plan),
-                ("chrome", compose_chrome),
-            ):
+            composers = {
+                "calendar": VC.compose_calendar,
+                "board": VC.compose_board,
+                "plan": VC.compose_plan,
+                "chrome": VC.compose_chrome,
+            }
+            for view_name, composer in composers.items():
                 clear_named("View")
                 clear_named("UIPanel_")
                 ensure_ground(catcher=False)
-                composer(palette, geom, states_doc["elementStates"])
+                composer(make_panel, palette, geom, states_doc["elementStates"], font_id)
+                inv = VC.content_inventory("View")
+                vval = VC.validate_view_content(inv, view_name)
+                view_content_reports[view_name] = vval
+                if not vval["ok"] and not args.skip_validate:
+                    raise SystemExit("VIEW_CONTENT_FAIL " + view_name + ": " + "; ".join(vval["errors"]))
                 out_png = out_dir / f"view_{view_name}.png"
-                log(f"RENDER view={view_name}")
+                log(f"RENDER view={view_name} texts={inv['texts']} avatars={inv['avatars']} DESIGN-STUDY")
                 render_still(out_png, (rx, ry))
-                renders.append({"series": "view", "view": view_name, "path": str(out_png)})
+                renders.append({
+                    "series": "view",
+                    "view": view_name,
+                    "path": str(out_png),
+                    "label": "DESIGN-STUDY",
+                    "content": inv,
+                })
             bpy.context.scene.camera = cam
 
         meta["renders"] = renders
+        meta["view_content_validation"] = view_content_reports
         meta["status"] = "ok"
+        (out_dir / "validation.json").write_text(
+            json.dumps(
+                {
+                    "state_table": st_val_full,
+                    "framing": framing,
+                    "ring": ring_val,
+                    "views": view_content_reports,
+                },
+                indent=2,
+            )
+        )
         (out_dir / "run.json").write_text(json.dumps(meta, indent=2))
         (out_dir / "TRACE_NEXT.md").write_text(
-            "# Measure (v3)\n\n"
-            "1. Use `shadow_lift_*.png` (catcher) for offset + penumbra — not beauty composites.\n"
-            "2. Use `surface_lift_*.png` for panel silhouette without ground shadow.\n"
-            "3. State deltas: ROI = panel projected bbox from validation/run projected metrics; "
-            "do **not** use full-frame mean |dL| (Mac v2 false FAIL for hover/pressed).\n"
-            "4. Expect hover/settling subtle by design (JRViews wash α 12–14); "
-            "pressed=scale+wash, disabled=opacity+wash, focus/selected/invalid=contour rings.\n"
-            "5. Write `lighting/fits.measured.json`. Analytical fits.json stays provisional until then.\n"
-            "6. Views: `view_calendar|board|plan|chrome.png` must show content strips + state variety.\n"
+            "# Measure / Moho (v4)\n\n"
+            "1. Shadow: use `camera_instrumentation.json` + `calibrate_shadow_ground.py` — "
+            "do **not** treat image-px exposed offset (Mac v3 ~8.75) as ground-plane model.\n"
+            "2. Panel edge motion (~12.9 px/lift) contaminates image-space offset; unproject first.\n"
+            "3. State ROI: pressed=scale+ring, disabled=opacity — not global mean.\n"
+            "4. Views are DESIGN-STUDY with typography/avatar; not live WebGPU acceptance.\n"
+            "5. Moho: CreateExp7ArtComparison draws shapes; render with proven `-r` only (FileRender SEGV).\n"
+            "6. fits.json remains provisional until ground-space fit matches elev/size model or model is revised with evidence.\n"
         )
         log("DONE " + str(out_dir))
         print(

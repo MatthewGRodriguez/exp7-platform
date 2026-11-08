@@ -2,13 +2,10 @@
 
 | Item | Status |
 |------|--------|
-| Moho 14.3 binary | `/Applications/Moho.app/Contents/MacOS/Moho` |
-| Form A: `Moho <abs seed.moho> <abs script.lua>` | **VERIFIED** rc0 `SMOKE_OK` (2026-11-08) |
-| Form B: `Moho -r … -f png …` | **VERIFIED** rc0 `seed_00001.png` |
-| Bare `Moho script.lua` | **FAIL** exit 139 — wrong argv, **not** licensing |
-| `-h` help | **BLOCKED** — no text ≤20s |
-| Comparison / animate / FileRender | **PROBE-READY** via form A — not yet claimed complete |
-| Fabricated Moho PNG/GIF in repo | **NONE** |
+| Form A doc+script | **VERIFIED** SMOKE_OK |
+| Form B `-r` | **VERIFIED** writes PNG |
+| Bare script / FileRender Lua | **FAIL** exit 139 |
+| Empty-layer comparison (v3) | **FAIL** — transparent frames; not a completed stage |
+| Create with shapes + Animate + `-r` | **PROBE-READY** (v4 scripts) |
 
-Canonical runbook: `art/pipeline/mac/MAC_RUNBOOK.md` (Moho section first after Blender).
-Details: `art/pipeline/moho/BLOCKED.md`, `README.md`.
+See `art/pipeline/moho/BLOCKED.md` and MAC_RUNBOOK.

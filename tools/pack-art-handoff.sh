@@ -37,21 +37,21 @@ cat > "$STAGE/README.md" <<EOF
 
 Self-contained Exp7 art pipeline handoff. **No .git. No PATs/keys.**
 
-Generator: **front-readable-v3** (contour rings, JRViews washes, shadow+surface pairs, Cal/Board/Plan/chrome views).
-Fail evidence: \`qa/mac-fail-20261108T1045/\` (slivers), \`qa/mac-fail-v2-20261108/\` (torus rings / global-mean).
-Moho form A/B **VERIFIED** on Mac 14.3 — document path first.
+Generator: **front-readable-v4** — content views (typography+avatar DESIGN-STUDY), semantic state rings,
+shadow ground calibration (image-px slopes rejected), Moho shapes + \`-r\` only.
+Fail evidence: v1 slivers, v2 torii, v3 generic bars / empty Moho layers / image-space shadow mismatch.
 
-Mac scratch root: \`/Users/user-rodri/ArtScratch/exp7-art/<stage>\`
+Mac scratch: \`/Users/user-rodri/ArtScratch/exp7-art\` — prefer \`--only views|states|shadow\`.
 
 ## Start here
-1. Read \`art/pipeline/mac/MAC_RUNBOOK.md\` (Moho verified commands first after unpack)
-2. Read \`qa/GATE-MATRIX.md\`
-3. Blender: \`generate_ui_scene.py\` stage \`ui-states-v3\` + \`measure_roi.py\` (not global mean)
-4. Moho: \`Moho <abs seed> <abs script.lua>\` / \`-r\` — then comparison/animate/render
-5. Analytical \`art/lighting/fits.json\` stays **provisional** until shadow-catcher fit
+1. \`art/pipeline/mac/MAC_RUNBOOK.md\`
+2. \`qa/GATE-MATRIX.md\` + \`qa/ALL-VIEWS-QA.md\`
+3. Blender \`ui-states-v4\` with content validation (no empty views)
+4. Moho Create must log shapes>0; render with \`-r\` (not FileRender)
+5. \`fits.json\` provisional — do not adopt Mac v3 image-px slopes
 
-Do not clone software repos onto the Mac for this probe; use this archive only.
-CI green does **not** mean visual QA pass. Still not a full art QA pass.
+Still not a full visual QA pass. Do not merge/promote.
+CI green ≠ visual QA.
 EOF
 
 # Manifest

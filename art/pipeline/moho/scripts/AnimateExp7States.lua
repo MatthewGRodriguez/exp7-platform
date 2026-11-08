@@ -26,7 +26,7 @@ local STATE_SCALE = {
   idle = 1.0,
   hover = 1.0,
   focus = 1.0,
-  pressed = 0.985,
+  pressed = 0.97,
   selected = 1.0,
   dragging = 1.02,
   ["drop-pending"] = 1.01,
@@ -62,31 +62,52 @@ function MohoScript(moho)
   pcall(function() doc:SetEndFrame(120) end)
   pcall(function() doc:SetFps(24) end)
 
-  -- One state pose every 12 frames for contact scrub
   local order = {
     "idle", "hover", "focus", "pressed", "selected",
     "dragging", "drop-pending", "invalid", "settling", "disabled"
   }
+  local empty = 0
   for i = 1, #order do
     local name = order[i]
     local layer = findLayer(doc, "state_" .. name)
     if layer == nil then
       w("MISS state_" .. name)
+      empty = empty + 1
     else
-      local f = (i - 1) * 12
-      local lift = STATE_LIFT[name] or 0
-      local sc = STATE_SCALE[name] or 1
-      local vx = LM.Vector3:new_local()
-      local sx = LM.Vector3:new_local()
-      vx:Set(0, lift, 0)
-      sx:Set(sc, sc, 1)
-      layer.fTranslation:SetValue(f, vx)
-      layer.fScale:SetValue(f, sx)
-      w("keyed " .. name .. " f=" .. f .. " lift=" .. lift)
+      moho.layer = layer
+      pcall(function() moho:SetSelLayer(layer) end)
+      local nShapes = 0
+      pcall(function()
+        local mesh = moho:Mesh()
+        if mesh ~= nil then nShapes = mesh:CountShapes() end
+      end)
+      w("shapes state_" .. name .. "=" .. tostring(nShapes))
+      if nShapes < 1 then
+        w("ERR empty_layer state_" .. name .. " — animate of empty layers is FAIL")
+        empty = empty + 1
+      else
+        local f = (i - 1) * 12
+        local lift = STATE_LIFT[name] or 0
+        local sc = STATE_SCALE[name] or 1
+        local vx = LM.Vector3:new_local()
+        local sx = LM.Vector3:new_local()
+        vx:Set(0, lift, 0)
+        sx:Set(sc, sc, 1)
+        layer.fTranslation:SetValue(f, vx)
+        layer.fScale:SetValue(f, sx)
+        w("keyed " .. name .. " f=" .. f .. " lift=" .. lift)
+      end
     end
+  end
+
+  if empty > 0 then
+    w("EXP7_ANIMATE_FAIL empty_layers=" .. tostring(empty) .. " — re-run CreateExp7ArtComparison.lua with shapes")
+    moho:Quit()
+    return
   end
 
   moho:FileSave()
   w("EXP7_ANIMATE_SAVED " .. tostring(path))
+  w("RENDER_NEXT: Moho -r \"" .. tostring(path) .. "\" -f png -outfolder \"$EXP7_ART_SCRATCH/moho/render\" -start 1 -end 120 -v")
   moho:Quit()
 end

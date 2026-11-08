@@ -1,22 +1,17 @@
-# Missing / pending gate matrix
+# Gate matrix (v4)
 
-Legend: **rendered** · **provisional** · **blocked** · **fail** · **verified**
+| Gate | Class | Status |
+|------|-------|--------|
+| Blender ui-states-v4 views (text+avatar DESIGN-STUDY) | rendered | **PROBE-READY** `--only views` — content validation required |
+| Blender states semantic fix | rendered | **PROBE-READY** `--only states` |
+| Blender v3 Mac run | fail quality | views=generic bars; drop-pending≈invalid; pressed/disabled weak; image-px shadow ≠ ground |
+| Shadow ground unprojection | provisional | `calibrate_shadow_ground.py` + `camera_instrumentation.json` — fits stay provisional |
+| Moho form A/B | verified | doc-first + `-r` |
+| Moho Create with shapes | rendered | **PROBE-READY** — must log shapes>0; empty FAIL |
+| Moho Animate | rendered | refuses empty layers |
+| Moho FileRender Lua | fail | exit 139 — **do not use** |
+| Moho `-r` multi-frame | rendered | only after shapes exist |
+| Live Safari WebGPU before/after | USER-HW | **OPEN** — cloud has no accepted GPU proof |
+| Analytical fits.json | provisional | image-space slopes **rejected** as model |
 
-| Gate | Class | Command / note | Status |
-|------|-------|----------------|--------|
-| Blender ui-states-v3 (contour rings, washes, views, shadow pairs) | rendered | `Blender --background --python art/pipeline/blender/generate_ui_scene.py -- … --stage ui-states-v3 --device METAL` | **PROBE-READY** |
-| Blender v2 Mac run-v2-20261108T1050 | fail | framing OK; rings=huge ellipses; global-mean misread hover/pressed | **FAIL quality** — evidence `qa/mac-fail-v2-20261108/` |
-| Blender v1 edge-on slivers | fail | `qa/mac-fail-20261108T1045/` | **FAIL** (fixed in v2 framing) |
-| Framing/ring/state unit gates | provisional | `python3 art/pipeline/blender/test_validation.py` | runnable |
-| ROI + shadow measure | rendered | `measure_roi.py --dir <run>` on `shadow_lift_*` + state ROI | **OPEN** after v3 render |
-| Measured lighting fits | rendered | fit offset/blur from shadow catcher vs elev/size | **OPEN** — `fits.json` provisional |
-| Moho form A doc+script | verified | `Moho <abs seed> <abs SmokeQuit.lua>` → SMOKE_OK | **VERIFIED** |
-| Moho form B `-r` | verified | writes `seed_00001.png` | **VERIFIED** |
-| Moho bare script | fail | exit 139 | wrong argv |
-| Moho comparison / animate / FileRender | rendered | form A with Create/Animate/Render scripts | **PROBE-READY** |
-| Moho GIF side-by-side | blocked | until FileRender probe succeeds | **OPEN** |
-| View comps Cal/Board/Plan/chrome | rendered | `view_*.png` from v3 generator | **PROBE-READY** |
-| JRDI / UX state JS | provisional | lifecycle tests + `jrviews-ux-states.js` washes | runnable **[MOCK]** |
-| Exp7Slabs / contrast / idle rAF | rendered | Safari WebGPU USER-HW | **OPEN** |
-
-Cloud: no GPU. CI green ≠ visual QA pass.
+CI green ≠ visual QA. Still not full pass. Do not merge/promote.

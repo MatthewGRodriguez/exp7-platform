@@ -1,0 +1,157 @@
+{
+ "0": {
+  "below": {
+   "peak": 0.775,
+   "r90": 0,
+   "r50": 3,
+   "r10": 5,
+   "width10_90": 5,
+   "energy": 2.59
+  },
+  "above": {
+   "peak": 0.124,
+   "r90": 0,
+   "r50": 1,
+   "r10": 1,
+   "width10_90": 1,
+   "energy": 0.14
+  },
+  "shadow_alpha_sum": 4492.3,
+  "shadow_centroid": [
+   642.89,
+   545.2
+  ],
+  "panel_centroid": [
+   638.55,
+   463.54
+  ],
+  "panel_rows": [
+   298,
+   623
+  ]
+ },
+ "1": {
+  "below": {
+   "peak": 0.822,
+   "r90": 2,
+   "r50": 12,
+   "r10": 16,
+   "width10_90": 14,
+   "energy": 9.36
+  },
+  "above": {
+   "peak": 0.253,
+   "r90": 0,
+   "r50": 1,
+   "r10": 1,
+   "width10_90": 1,
+   "energy": 0.29
+  },
+  "shadow_alpha_sum": 9444.2,
+  "shadow_centroid": [
+   639.81,
+   575.79
+  ],
+  "panel_centroid": [
+   638.55,
+   451.1
+  ],
+  "panel_rows": [
+   286,
+   610
+  ]
+ },
+ "2": {
+  "below": {
+   "peak": 0.764,
+   "r90": 14,
+   "r50": 20,
+   "r10": 26,
+   "width10_90": 12,
+   "energy": 15.02
+  },
+  "above": {
+   "peak": 0.086,
+   "r90": 0,
+   "r50": 1,
+   "r10": 1,
+   "width10_90": 1,
+   "energy": 0.1
+  },
+  "shadow_alpha_sum": 14170.0,
+  "shadow_centroid": [
+   639.09,
+   579.94
+  ],
+  "panel_centroid": [
+   638.53,
+   438.55
+  ],
+  "panel_rows": [
+   273,
+   598
+  ]
+ },
+ "4": {
+  "below": {
+   "peak": 0.782,
+   "r90": 5,
+   "r50": 38,
+   "r10": 46,
+   "width10_90": 41,
+   "energy": 27.07
+  },
+  "above": {
+   "peak": 0.146,
+   "r90": 0,
+   "r50": 1,
+   "r10": 1,
+   "width10_90": 1,
+   "energy": 0.15
+  },
+  "shadow_alpha_sum": 23197.4,
+  "shadow_centroid": [
+   638.41,
+   572.61
+  ],
+  "panel_centroid": [
+   638.53,
+   413.22
+  ],
+  "panel_rows": [
+   248,
+   572
+  ]
+ },
+ "8": {
+  "below": {
+   "peak": 0.699,
+   "r90": 52,
+   "r50": 73,
+   "r10": 87,
+   "width10_90": 35,
+   "energy": 47.01
+  },
+  "above": {
+   "peak": 0.354,
+   "r90": 0,
+   "r50": 1,
+   "r10": 2,
+   "width10_90": 2,
+   "energy": 0.4
+  },
+  "shadow_alpha_sum": 39993.3,
+  "shadow_centroid": [
+   638.92,
+   545.75
+  ],
+  "panel_centroid": [
+   638.5,
+   361.34
+  ],
+  "panel_rows": [
+   197,
+   520
+  ]
+ }
+}

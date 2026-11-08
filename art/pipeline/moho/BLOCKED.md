@@ -1,25 +1,23 @@
-# Moho stage — VERIFIED CLI (Mac 14.3, 2026-11-08) + remaining probes
+# Moho stage — verified CLI + shape requirement
 
-## Verified on Matthew Mac (Moho 14.3)
+## Verified (Mac 14.3)
 
-| Form | Command | Result |
-|------|---------|--------|
-| **A — document + script (canonical)** | `/Applications/Moho.app/Contents/MacOS/Moho <abs seed.moho> <abs SmokeQuit.lua>` | **rc=0**, stderr `SMOKE_OK` |
-| **B — CLI render** | `/Applications/Moho.app/Contents/MacOS/Moho -r <abs seed> -f png -outfolder <dir> -start 1 -end 1 -v` | **rc=0**, writes `seed_00001.png` |
-| Bare `Moho script.lua` | (no document) | **exit 139** SIGSEGV — **wrong argv**, not licensing/first-launch |
+| Form | Result |
+|------|--------|
+| `Moho <abs doc.moho> <abs script.lua>` | rc0 (SmokeQuit SMOKE_OK) |
+| `Moho -r <doc> -f png -outfolder …` | rc0 writes PNG |
+| Bare `Moho script.lua` | exit **139** — wrong argv |
+| `FileRender` via RenderExp7Preview.lua | exit **139** — **do not use** |
 
-Bundled Optional Scripts / Command Line Scripts document form A. Put **document path first**.
+## v3 FAIL (must not re-claim)
 
-## Still open (not yet run on Mac as of this handoff)
+Create/Animate exited 0 but layers had **no shapes** → 120 identical transparent frames. That is **not** a completed comparison stage.
 
-- `CreateExp7ArtComparison.lua` → comparison `.moho`
-- `AnimateExp7States.lua` (provisional keys)
-- `RenderExp7Preview.lua` / FileRender side-by-side GIF
+## Required now
 
-These are **PROBE-READY** with form A (seed or comparison doc + script). Do not use bare Lua.
+1. `CreateExp7ArtComparison.lua` draws filled rects per `state_*` (CountShapes>0) or abort.
+2. `AnimateExp7States.lua` refuses empty layers.
+3. Render with **`-r` only**.
+4. Reject transparent-identical frame sets.
 
-## Explicit non-claims
-
-- Moho `-h` still unproven as help text.
-- No fabricated Moho PNG/GIF in-repo beyond what Mac CLI wrote under ArtScratch.
-- Seed `seed/JWorkbook_chrome.moho` sha must remain unchanged unless Moho rewrites it.
+Seed `seed/JWorkbook_chrome.moho` unchanged unless Moho rewrites it.
