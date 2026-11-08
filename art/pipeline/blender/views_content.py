@@ -505,10 +505,9 @@ def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="V
     out = nodes.new("ShaderNodeOutputMaterial")
     em = nodes.new("ShaderNodeEmission")
     c = palette["_rgba"]["surface"]
-    em.inputs["Color"].default_value = (
-        srgb_to_linear(c[0]), srgb_to_linear(c[1]), srgb_to_linear(c[2]), 1.0
-    )
-    em.inputs["Strength"].default_value = 1.0
+    # Display-referred bright surface (matches ui_face_mat light path)
+    em.inputs["Color"].default_value = (float(c[0]), float(c[1]), float(c[2]), 1.0)
+    em.inputs["Strength"].default_value = 1.8
     links.new(em.outputs["Emission"], out.inputs["Surface"])
     bar.data.materials.append(mat)
     bar["exp7_face_local_z"] = 0.055

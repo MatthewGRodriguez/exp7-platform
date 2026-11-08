@@ -361,7 +361,12 @@ def principled_mat(name: str, base, opacity: float = 1.0, rough: float = 0.38, e
 
 
 def ui_face_mat(name: str, base, opacity: float = 1.0):
-    """Unlit Emission face — text-hidden BG must match design ink contrast (no shade false-fail)."""
+    """Unlit Emission face — text-hidden BG must match design ink contrast (no shade false-fail).
+
+    Light surfaces keep display-referred RGB at strength>1 so Standard+Cycles still
+    reads near-white under glyphs (linearizing #f4f4f4 alone under-read as mid-grey).
+    Dark solids stay scene-linear at strength 1 for white-on-color ink.
+    """
     assert bpy is not None
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
@@ -375,11 +380,16 @@ def ui_face_mat(name: str, base, opacity: float = 1.0):
     nodes.clear()
     out = nodes.new("ShaderNodeOutputMaterial")
     em = nodes.new("ShaderNodeEmission")
-    r, g, b = _srgb_to_linear(base[0]), _srgb_to_linear(base[1]), _srgb_to_linear(base[2])
+    lum = 0.2126 * float(base[0]) + 0.7152 * float(base[1]) + 0.0722 * float(base[2])
+    if lum >= 0.45:
+        r, g, b = float(base[0]), float(base[1]), float(base[2])
+        strength = 1.8
+    else:
+        r, g, b = _srgb_to_linear(base[0]), _srgb_to_linear(base[1]), _srgb_to_linear(base[2])
+        strength = 1.0
     em.inputs["Color"].default_value = (r, g, b, 1.0)
-    em.inputs["Strength"].default_value = 1.0
+    em.inputs["Strength"].default_value = strength
     if opacity < 0.999:
-        # Mix with transparent for disabled/drag fades
         tr = nodes.new("ShaderNodeBsdfTransparent")
         mix = nodes.new("ShaderNodeMixShader")
         mix.inputs["Fac"].default_value = float(opacity)
