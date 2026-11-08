@@ -217,6 +217,10 @@ Exp7Slabs only moves a node that is a slab, or that sits inside one. The 44px ba
 
 `jrviews-ux-states` samples the published shadow fit into one-pixel rows and stops at the next fill. Dark fills get the static glass brightening. The pose uses the 85 mm scale only when the shift is at least half a pixel. `style.note` counts penumbra rows. Exp7 `show` toggles sections inside `#appSlot-exp7` and does not write `window.budget`.
 
+## Face lip and click ease (1.8.15)
+
+The inset shade is the same sampled falloff as the cast shadow, kept inside the cell. Pointer hover and press ease for the state-table duration and then stop. Reduced motion clears the transform.
+
 ## Debug handoff (1.8.9)
 
 1.8.9 does not change painting. The bar has a **Debug** button (Shift+D) that stays clickable above the chrome canvas. It copies a JSON snapshot: shell version, overlay and slot opacity, which element is on top of the content, canvas sizes, GPU and view errors, and whether the live display list contains the 1.8.8 inset bands and gold rings. `style.note` states that in one sentence. No keys or account text.
