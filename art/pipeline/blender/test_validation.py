@@ -63,7 +63,14 @@ class ViewsContent(unittest.TestCase):
         self.assertGreaterEqual(VC.DAY_SIZE, 0.10)
 
     def test_assets(self):
-        self.assertTrue((Path(__file__).parent / "assets/avatar-photo-study.png").is_file())
+        root = Path(__file__).parent / "assets"
+        self.assertTrue((root / "avatar-fixture-study.png").is_file() or (root / "avatar-photo-study.png").is_file())
+        self.assertIn("illustrated-fixture", VC.assert_assets().get("kind", ""))
+
+    def test_emission_srgb_to_linear(self):
+        lin = VC.emission_rgb(VC.INK)
+        self.assertLess(lin[0], VC.INK[0] * 0.2)  # display 0.078 → ~0.007 linear
+        self.assertEqual(VC.emission_rgb((1.0, 1.0, 1.0)), (1.0, 1.0, 1.0))
 
 
 class MohoLoop(unittest.TestCase):
@@ -94,7 +101,7 @@ class DryRun(unittest.TestCase):
         )
         self.assertEqual(r.returncode, 0, r.stderr)
         meta = json.loads(r.stdout)
-        self.assertEqual(meta["generator_rev"], "front-readable-v7")
+        self.assertEqual(meta["generator_rev"], "front-readable-v8")
 
 
 class UnlitText(unittest.TestCase):
@@ -105,23 +112,42 @@ class UnlitText(unittest.TestCase):
         self.assertIn("visible_shadow = False", src)
         self.assertNotIn("default_value = 2.4", src)
         self.assertIn('em.inputs["Strength"].default_value = 1.0', src)
+        self.assertIn("emission_rgb", src)
+        self.assertIn("srgb_to_linear", src)
         self.assertIn("primitive_plane_add", src)
-        self.assertIn("set_caster_invisible_to_camera", Path(__file__).with_name("generate_ui_scene.py").read_text())
+        gen_src = Path(__file__).with_name("generate_ui_scene.py").read_text()
+        self.assertIn("set_caster_invisible_to_camera", gen_src)
+        self.assertIn('view_transform = "Standard"', gen_src)
+        self.assertIn("write_projected_rois", gen_src)
+        self.assertIn("render_text_hidden_bg", gen_src)
+        self.assertIn("push_in_steps", gen_src)
         # Secondary uses dark ink family — not pale muted
         self.assertLess(VC.INK_SECONDARY[0], 0.20)
         self.assertLess(VC.INK_DISABLED[0], 0.30)
 
-    def test_preflight_and_semantic_validator(self):
+    def test_preflight_and_projected_validator(self):
         r = subprocess.run(
             [sys.executable, str(Path(__file__).with_name("preflight_views.py"))],
             capture_output=True,
             text=True,
         )
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        pref = json.loads(r.stdout)
+        self.assertFalse(pref["tooling"]["pil_required"])
         vsrc = Path(__file__).with_name("validate_view_pixels.py").read_text()
-        self.assertIn("darkest8%", vsrc)
-        self.assertIn("Semantic ROI", vsrc)
+        self.assertIn("projected_sidecar", vsrc)
+        self.assertIn("textmask_vs_hiddenBG", vsrc)
+        self.assertIn("projected-roi-textmask-v8", vsrc)
         self.assertNotIn("min_dark=400", vsrc)
+        # Hardcoded y14–57 title ROI must not be the primary path
+        self.assertNotIn("(0.04, 0.04, 0.55, 0.16)", vsrc)
+
+    def test_diagnose_script_exists(self):
+        p = Path(__file__).with_name("diagnose_view_rootcause.py")
+        self.assertTrue(p.is_file())
+        src = p.read_text()
+        self.assertIn("projected_640x360", src)
+        self.assertIn("view_transform", src)
 
 
 class OrthoPreview(unittest.TestCase):

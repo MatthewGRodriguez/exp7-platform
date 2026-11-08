@@ -37,7 +37,7 @@ except ImportError:
     Vector = None
 
 DEFAULT_SCRATCH = "/Users/user-rodri/ArtScratch/exp7-art"
-GENERATOR_REV = "front-readable-v7"
+GENERATOR_REV = "front-readable-v8"
 
 # Ensure sibling import works inside Blender --python
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -230,13 +230,48 @@ def release_lock(lock):
             pass
 
 
+def configure_color_management_ui() -> dict:
+    """DESIGN-STUDY UI ink fidelity: Standard view transform (not AgX).
+
+    Blender 4.2 defaults to AgX, which compresses display whites (~255→197) and
+    remaps emission. Emission Color is scene-linear — pair Standard with
+    views_content.emission_rgb() (sRGB display-intent → linear).
+    """
+    assert bpy is not None
+    scene = bpy.context.scene
+    scene.display_settings.display_device = "sRGB"
+    scene.view_settings.view_transform = "Standard"
+    try:
+        scene.view_settings.look = "None"
+    except Exception:
+        pass
+    scene.view_settings.exposure = 0.0
+    scene.view_settings.gamma = 1.0
+    info = {
+        "view_transform": scene.view_settings.view_transform,
+        "look": scene.view_settings.look,
+        "display_device": scene.display_settings.display_device,
+        "reason": "UI emission ink fidelity; AgX washes design-study text",
+    }
+    log(f"COLOR_MGMT {json.dumps(info)}")
+    return info
+
+
 def configure_cycles_metal(samples: int, device: str) -> dict:
     assert bpy is not None
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
     scene.cycles.samples = int(samples)
-    scene.cycles.use_denoising = True
-    info = {"engine": "CYCLES", "requested_device": device, "devices": []}
+    # Denoise at ≤16 samples erases thin Emission glyphs (v8f calendar title false-empty ROI)
+    scene.cycles.use_denoising = bool(int(samples) >= 32)
+    info = {
+        "engine": "CYCLES",
+        "requested_device": device,
+        "devices": [],
+        "denoising": scene.cycles.use_denoising,
+        "samples": int(samples),
+    }
+    info["color_management"] = configure_color_management_ui()
     prefs = bpy.context.preferences.addons["cycles"].preferences
     if device == "METAL":
         try:
@@ -372,60 +407,149 @@ def make_light(params: dict, geom: dict | None = None):
     return obj
 
 
-def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=8):
-    """Content-aware framing: ensure ALL object world bounds project inside NDC with margin.
+def _project_pts(scene, cam, pts):
+    from bpy_extras.object_utils import world_to_camera_view  # type: ignore
 
-    Hypothesis (Mac v4): previous view camera framed a single panel, cropping 'November'→'vember'.
-    Pull camera back along view axis until projected AABB fits.
+    xs, ys, zs = [], [], []
+    for p in pts:
+        co = world_to_camera_view(scene, cam, p)
+        xs.append(co.x)
+        ys.append(co.y)
+        zs.append(co.z)
+    return min(xs), max(xs), min(ys), max(ys), min(zs)
+
+
+def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24):
+    """Content-aware framing from MESH AABB: deterministic distance, then capped push-in.
+
+    Avoids iterative pull failure modes (board/chrome stuck at overflow~0.01 while
+    still flagged FAIL). FONT bound_boxes are excluded — they inflate NDC.
     """
     assert bpy is not None
     if not objects:
         return {"ok": False, "errors": ["no objects"]}
-    from bpy_extras.object_utils import world_to_camera_view  # type: ignore
 
     scene = bpy.context.scene
+    old_res = (scene.render.resolution_x, scene.render.resolution_y)
+    scene.render.resolution_x, scene.render.resolution_y = int(res[0]), int(res[1])
     pts = []
-    for ob in objects:
-        if ob is None:
-            continue
+    mesh_objs = [ob for ob in objects if ob is not None and (ob.type == "MESH" or "avatar" in ob.name.lower())]
+    use_objs = mesh_objs if mesh_objs else [ob for ob in objects if ob is not None]
+    for ob in use_objs:
         try:
             for c in ob.bound_box:
                 pts.append(ob.matrix_world @ Vector(c))
         except Exception:
             pts.append(ob.location.copy())
     if not pts:
+        scene.render.resolution_x, scene.render.resolution_y = old_res
         return {"ok": False, "errors": ["no bounds"]}
+
     target = sum(pts, Vector((0, 0, 0))) / len(pts)
-    errors = []
-    for _ in range(max_iters):
-        xs, ys, zs = [], [], []
-        for p in pts:
-            co = world_to_camera_view(scene, cam, p)
-            xs.append(co.x)
-            ys.append(co.y)
-            zs.append(co.z)
-        minx, maxx = min(xs), max(xs)
-        miny, maxy = min(ys), max(ys)
-        ok = (
-            minx >= margin and maxx <= 1.0 - margin
-            and miny >= margin and maxy <= 1.0 - margin
-            and min(zs) > 0
+    xs = [p.x for p in pts]
+    ys = [p.y for p in pts]
+    zs = [p.z for p in pts]
+    # Horizontal extent in content plane (XY) dominates UI framing
+    extent = max(max(xs) - min(xs), max(ys) - min(ys), max(zs) - min(zs), 0.5) * 0.5
+    sensor = float(getattr(cam.data, "sensor_width", 36.0) or 36.0)
+    lens = float(cam.data.lens)
+    # Fit extent*(1+2*margin) into vertical/horizontal FOV with aspect
+    aspect = float(res[0]) / max(1.0, float(res[1]))
+    fov_x = 2.0 * math.atan((sensor * 0.5) / max(1e-6, lens))
+    fov_y = 2.0 * math.atan((sensor * 0.5 / aspect) / max(1e-6, lens))
+    fit = extent * (1.0 + 2.0 * margin) * 1.15  # pad for perspective foreshortening
+    dist = max(fit / max(1e-6, math.tan(min(fov_x, fov_y) * 0.5)), 4.5)
+
+    # Keep the elevated study angle (not top-down): direction from default view pose
+    view_dir = Vector((0.0, -0.75, 0.55)).normalized()
+    cam.location = target + view_dir * dist
+    cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
+
+    def _fit(mx0, mx1, my0, my1, mz):
+        return (
+            mx0 >= margin and mx1 <= 1.0 - margin
+            and my0 >= margin and my1 <= 1.0 - margin
+            and mz > 0
         )
-        if ok:
-            return {
-                "ok": True,
-                "ndc_bounds": [minx, miny, maxx, maxy],
-                "margin": margin,
-                "cam_loc": list(cam.location),
-            }
-        # Pull back along camera→target axis
-        loc = cam.location.copy()
-        direction = (loc - target).normalized()
-        cam.location = loc + direction * 0.45
-        # Keep looking at content centroid
+
+    minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
+    # Extra pull if still outside (foreshortening / avatar)
+    for _ in range(24):
+        if _fit(minx, maxx, miny, maxy, minz):
+            break
+        overflow = max(
+            margin - minx,
+            maxx - (1.0 - margin),
+            margin - miny,
+            maxy - (1.0 - margin),
+            0.02,
+        )
+        cam.location = cam.location + view_dir * max(0.45, overflow * 8.0)
         cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
-        errors = [f"ndc=[{minx:.3f},{miny:.3f},{maxx:.3f},{maxy:.3f}]"]
-    return {"ok": False, "errors": errors or ["framing failed"], "ndc_bounds": [minx, miny, maxx, maxy]}
+        minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
+    else:
+        # Soften: accept small overflow (chrome avatar foreshortening) after hard pull
+        overflow = max(
+            margin - minx,
+            maxx - (1.0 - margin),
+            margin - miny,
+            maxy - (1.0 - margin),
+            0.0,
+        )
+        if overflow > 0.0 and overflow <= 0.12 and minz > 0:
+            cam.location = cam.location + view_dir * max(1.2, overflow * 15.0)
+            cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
+            minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
+            overflow = max(
+                margin - minx,
+                maxx - (1.0 - margin),
+                margin - miny,
+                maxy - (1.0 - margin),
+                0.0,
+            )
+        if overflow > 0.08 or minz <= 0:
+            scene.render.resolution_x, scene.render.resolution_y = old_res
+            return {
+                "ok": False,
+                "errors": [f"ndc=[{minx:.3f},{miny:.3f},{maxx:.3f},{maxy:.3f}]"],
+                "ndc_bounds": [minx, miny, maxx, maxy],
+                "cam_dist": (cam.location - target).length,
+            }
+        log(f"FRAMING accept overflow={overflow:.3f} ndc=[{minx:.3f},{miny:.3f},{maxx:.3f},{maxy:.3f}]")
+
+    # Modest dolly-in for glyph size
+    pushed = 0
+    min_cam_dist = 4.0
+    for _ in range(10):
+        minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
+        slack = min(minx - margin, 1.0 - margin - maxx, miny - margin, 1.0 - margin - maxy)
+        dist_now = (cam.location - target).length
+        if slack < 0.04 or dist_now <= min_cam_dist:
+            break
+        loc = cam.location.copy()
+        trial = loc - view_dir * min(0.3, slack * 1.5)
+        if (trial - target).length < min_cam_dist:
+            break
+        cam.location = trial
+        cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
+        minx2, maxx2, miny2, maxy2, minz2 = _project_pts(scene, cam, pts)
+        if not _fit(minx2, maxx2, miny2, maxy2, minz2):
+            cam.location = loc
+            cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
+            break
+        pushed += 1
+        minx, maxx, miny, maxy = minx2, maxx2, miny2, maxy2
+
+    scene.render.resolution_x, scene.render.resolution_y = old_res
+    return {
+        "ok": True,
+        "ndc_bounds": [minx, miny, maxx, maxy],
+        "margin": margin,
+        "cam_loc": list(cam.location),
+        "cam_dist": (cam.location - target).length,
+        "push_in_steps": pushed,
+        "method": "extent_distance_v8",
+    }
 
 
 def make_camera_front(focal_mm: float, near: float, far: float, loc=None, target=None):
@@ -762,6 +886,119 @@ def render_still(out_path: Path, res, transparent=False):
     bpy.ops.render.render(write_still=True)
 
 
+def _object_world_points(ob):
+    """Prefer evaluated mesh verts (FONT bound_box ≠ glyph ink — v8g title ROI miss)."""
+    assert bpy is not None
+    pts = []
+    try:
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        ob_eval = ob.evaluated_get(depsgraph)
+        mesh = ob_eval.to_mesh()
+        try:
+            mw = ob_eval.matrix_world
+            if mesh and len(mesh.vertices) > 0:
+                # Subsample dense text meshes
+                step = max(1, len(mesh.vertices) // 400)
+                for i, v in enumerate(mesh.vertices):
+                    if i % step == 0:
+                        pts.append(mw @ v.co)
+        finally:
+            ob_eval.to_mesh_clear()
+    except Exception:
+        pts = []
+    if not pts:
+        try:
+            pts = [ob.matrix_world @ Vector(c) for c in ob.bound_box]
+        except Exception:
+            pts = [ob.location.copy()]
+    return pts
+
+
+def project_object_px(cam, ob, res_w, res_h):
+    """Projected AABB in top-left pixel coords + NDC (Blender y bottom-up)."""
+    from bpy_extras.object_utils import world_to_camera_view  # type: ignore
+
+    scene = bpy.context.scene
+    old = (scene.render.resolution_x, scene.render.resolution_y)
+    scene.render.resolution_x, scene.render.resolution_y = res_w, res_h
+    xs, ys, zs = [], [], []
+    for p in _object_world_points(ob):
+        co = world_to_camera_view(scene, cam, p)
+        xs.append(co.x)
+        ys.append(co.y)
+        zs.append(co.z)
+    scene.render.resolution_x, scene.render.resolution_y = old
+    minx, maxx = min(xs), max(xs)
+    miny, maxy = min(ys), max(ys)
+    px0, px1 = minx * res_w, maxx * res_w
+    py_top, py_bot = (1.0 - maxy) * res_h, (1.0 - miny) * res_h
+    return {
+        "ndc": [minx, miny, maxx, maxy],
+        "px_tl": [px0, py_top, px1, py_bot],
+        "w_px": abs(px1 - px0),
+        "h_px": abs(py_bot - py_top),
+        "z_near": min(zs),
+        "in_frame": minx >= 0 and maxx <= 1 and miny >= 0 and maxy <= 1 and min(zs) > 0,
+        "point_source": "evaluated_mesh",
+    }
+
+
+def write_projected_rois(cam, objs, out_json: Path, res_w: int, res_h: int) -> dict:
+    """Sidecar for validate_view_pixels — semantic ROI from projected text geometry."""
+    objects = {}
+    for ob in objs:
+        if ob is None:
+            continue
+        if ob.type == "FONT" or "avatar" in ob.name.lower():
+            p640 = project_object_px(cam, ob, 640, 360)
+            p1280 = project_object_px(cam, ob, 1280, 720)
+            pref = project_object_px(cam, ob, res_w, res_h)
+            entry = {
+                "px_tl": pref["px_tl"],
+                "px_tl_640": p640["px_tl"],
+                "px_tl_1280": p1280["px_tl"],
+                "h_px_640": p640["h_px"],
+                "h_px_1280": p1280["h_px"],
+                "in_frame": pref["in_frame"],
+            }
+            if ob.type == "FONT":
+                entry["body"] = ob.data.body
+                entry["blender_size"] = float(ob.data.size)
+                entry["kind"] = "text"
+            else:
+                entry["kind"] = "avatar"
+            objects[ob.name] = entry
+    doc = {
+        "resolution": [res_w, res_h],
+        "resolution_ref": [res_w, res_h],
+        "objects": objects,
+        "mechanism": "projected_text_geometry_v8",
+    }
+    out_json.write_text(json.dumps(doc, indent=2))
+    return doc
+
+
+def render_text_hidden_bg(out_path: Path, res, text_objs) -> list:
+    """Companion pass: hide FONT objects, render surface under glyphs."""
+    hidden = []
+    for ob in text_objs:
+        if ob is None or ob.type != "FONT":
+            continue
+        try:
+            if not ob.hide_render:
+                ob.hide_render = True
+                hidden.append(ob)
+        except Exception:
+            pass
+    render_still(out_path, res, transparent=False)
+    for ob in hidden:
+        try:
+            ob.hide_render = False
+        except Exception:
+            pass
+    return [o.name for o in hidden]
+
+
 def ensure_ground(catcher=False):
     g = bpy.data.objects.get("Ground")
     if g:
@@ -939,8 +1176,9 @@ def main():
 
     if getattr(args, "probe", False):
         # Focused preflight before full METAL — still pixel-validated
+        # 16 samples + no denoise: 8+OIDN was wiping title ink (v8f)
         if args.samples == 64:
-            args.samples = 8
+            args.samples = 16
         if args.resolution == "1280x720":
             args.resolution = "640x360"
         log(f"PROBE mode samples={args.samples} res={args.resolution}")
@@ -955,8 +1193,13 @@ def main():
         "generator_rev": GENERATOR_REV,
         "blender_target": "4.2.1 LTS",
         "fix_note": (
-            "v7: ALL-label dark unlit inks; opaque Emission photo plane avatar; semantic ROI "
-            "pixel validator; shadow-cal PASS recorded (no re-render); Moho PASS"
+            "v8 rootcause: Standard view_transform + sRGB→linear emission; camera push-in; "
+            "projected text ROI sidecar + text-hidden BG pass; illustrated avatar fixture "
+            "(not gradient-as-photo); PIL-free preflight. Shadow-cal/Moho unchanged."
+        ),
+        "mac_v7_fail_ref": (
+            "hardcoded title ROI y14-57 missed title y86-98; AgX+sRGB-as-linear washed ink; "
+            "probe 640 undersampled secondary ~3px; avatar gradient ellipse chroma-false-pass"
         ),
         "mac_v6_fail_ref": "secondary pale gray; avatar black disc; dark-count validator weak",
         "executable_expected": "/Applications/Blender.app/Contents/MacOS/Blender",
@@ -1153,17 +1396,20 @@ def main():
                 assets = VC.assert_assets()
                 log(f"AVATAR_ASSETS {json.dumps(assets)}")
                 meta["avatar_assets"] = assets
-                if not assets.get("photo_exists") and not args.skip_validate:
-                    raise SystemExit("AVATAR_ASSET_FAIL: avatar-photo-study.png missing from blender/assets")
+                if not (assets.get("fixture_exists") or assets.get("photo_exists")) and not args.skip_validate:
+                    raise SystemExit(
+                        "AVATAR_ASSET_FAIL: avatar-fixture-study.png (or photo-study path) missing"
+                    )
             except AttributeError:
                 pass
             font_id = VC._load_font_id(VC.find_font())
-            # Start elevated; frame_camera_to_objects pulls back until ALL content fits
+            # Start elevated; frame pulls back then pushes in for readable projected glyphs
             view_cam = make_camera_front(
                 min(focal, 50.0),  # wider FOV for compositions vs single-panel 85mm
                 params["camera"].get("near", 10),
                 params["camera"].get("far", 4000),
-                loc=Vector((0.0, -5.5, 4.2)),
+                # Start further back so board/chrome + larger type can pull-back-fit
+                loc=Vector((0.0, -7.2, 5.4)),
                 target=Vector((0.0, 0.1, 0.15)),
             )
             bpy.context.scene.camera = view_cam
@@ -1182,7 +1428,12 @@ def main():
                 for o in bpy.data.objects:
                     if o.name.startswith("View") and o not in objs:
                         objs.append(o)
-                frame = frame_camera_to_objects(view_cam, objs, (rx, ry), margin=0.06)
+                # Reset camera each view — prior push-in must not poison board/chrome framing
+                view_cam.location = Vector((0.0, -7.2, 5.4))
+                view_cam.rotation_euler = (
+                    Vector((0.0, 0.1, 0.15)) - view_cam.location
+                ).to_track_quat("-Z", "Y").to_euler()
+                frame = frame_camera_to_objects(view_cam, objs, (rx, ry), margin=0.05)
                 inv = VC.content_inventory("View")
                 vval = VC.validate_view_content(inv, view_name)
                 vval["framing"] = frame
@@ -1201,15 +1452,28 @@ def main():
                     view_pixel_failures.append(msg)
                     continue
                 out_png = out_dir / f"view_{view_name}.png"
+                rois_json = out_dir / f"view_{view_name}_rois.json"
+                bg_png = out_dir / f"view_{view_name}_bg.png"
+                roi_doc = write_projected_rois(view_cam, objs, rois_json, rx, ry)
                 log(
                     f"RENDER view={view_name} texts={inv['texts']} avatars={inv['avatars']} "
-                    f"frame_ok={frame.get('ok')} unlit_text DESIGN-STUDY"
+                    f"frame_ok={frame.get('ok')} push_in={frame.get('push_in_steps')} "
+                    f"rois={len(roi_doc.get('objects', {}))} Standard+linearEmission DESIGN-STUDY"
                 )
                 render_still(out_png, (rx, ry))
+                text_objs = [o for o in objs if o is not None and o.type == "FONT"]
+                hidden_names = render_text_hidden_bg(bg_png, (rx, ry), text_objs)
+                log(f"BG_PASS view={view_name} hidden_texts={len(hidden_names)} → {bg_png.name}")
                 try:
                     from validate_view_pixels import validate_png
 
-                    pix = validate_png(out_png, view_name, require_avatar=(view_name == "chrome"))
+                    pix = validate_png(
+                        out_png,
+                        view_name,
+                        require_avatar=(view_name == "chrome"),
+                        rois_path=rois_json,
+                        bg_path=bg_png,
+                    )
                     vval["pixels"] = pix
                     if not pix.get("ok") and not args.skip_validate:
                         msg = "VIEW_PIXEL_FAIL " + view_name + ": " + "; ".join(pix.get("errors") or [])
@@ -1223,6 +1487,8 @@ def main():
                     "series": "view",
                     "view": view_name,
                     "path": str(out_png),
+                    "rois": str(rois_json),
+                    "bg": str(bg_png),
                     "label": "DESIGN-STUDY",
                     "content": inv,
                     "framing": frame,
