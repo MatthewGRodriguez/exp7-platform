@@ -8,6 +8,10 @@ The header canvas was the layout height of a padded document, 90px, inside the 4
 
 Cloud Node, calling `JRViews.layout` with a stub text measure (not WebGPU, not Mac Safari): bar height 44, avatar circle inside that box; both app cards two lines, hit at least 220×70, including a 360px-wide wrap. Mac is not verified. This does not add the gaussian shadow, translated lift, or the rest of the physical pipeline listed below.
 
+## Header and Apps parallax (1.8.12)
+
+1.8.11 kept the card sizes and dropped the slab classes those surfaces used to carry, so the header and the Apps cards no longer moved with the pointer. 1.8.12 marks the 44px bar as the outer slab and each Apps card as an inner slab. Outer factor is `+0.9676` and inner is `-0.7697`, so the header and the cards move against each other. Card hit boxes stay at least 220×70. Cloud Node classified the layout nodes; it did not paint the motion. A Mac pass with the pointer moving is the check.
+
 ## Earlier delivery (1.8.8–1.8.10)
 
 The 1.8.9 Mac paste showed `hook: true` and `ux: false` on every view. `View.show` called the local `layout` function, not `JRViews.layout`, so the state-table pass never ran. 1.8.10 calls the exported layout. Idle days had no border in that paste; the pass now adds the state-table border plus the inset light.

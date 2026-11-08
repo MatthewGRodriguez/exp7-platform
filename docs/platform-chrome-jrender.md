@@ -203,6 +203,12 @@ The Apps list you see is the JR canvas (`#appsOverlay.jr-on` hides the DOM cards
 
 The header canvas was 90px tall inside a 44px bar, so the icon was cropped, and every reveal reloaded the photo. The bar scene is 44px with no document margin. A redraw keeps a ready photo instead of clearing it and fetching it again. `chromeJr` in the debug paste records the card boxes, the bar height, and whether the redraw kept the photo.
 
+## Header and Apps parallax (1.8.12)
+
+Exp7Slabs only moves a node that is a slab, or that sits inside one. The 44px bar is the outer slab (`data-plat="bar"`), so Back, the avatar, and the word Exp7 move together. The avatar photo uses that same outer factor. Each Apps card (`data-jv-act` starting `plat:app:`) is its own inner slab, so the cards move against the header. The Apps plate is the outer slab on that canvas. Closing Back pauses the Apps canvas so it does not keep a frame loop while hidden.
+
+`chromeJr.barSlabs.kinds` includes `outer`. With Back open, `chromeJr.appsSlabs.kinds` includes `inner`.
+
 ## Debug handoff (1.8.9)
 
 1.8.9 does not change painting. The bar has a **Debug** button (Shift+D) that stays clickable above the chrome canvas. It copies a JSON snapshot: shell version, overlay and slot opacity, which element is on top of the content, canvas sizes, GPU and view errors, and whether the live display list contains the 1.8.8 inset bands and gold rings. `style.note` states that in one sentence. No keys or account text.
