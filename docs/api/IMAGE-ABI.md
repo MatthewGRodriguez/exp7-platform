@@ -2,7 +2,7 @@
 
 **Status:** Host ABI for real WebGPU JRender. **Not** a wasm DL op — shipped `jrender_full_small.wasm` rejects unknown DL ops; bitmaps live on the shared `GPUContext` and composite in the same render pass.
 
-Evidence: implementation `art/src/jrender-images.js` packed into lean as `data-exp7-shared="jrender-images"`.
+Evidence: implementation packed into `exp7-platform/exp7-platform-lean.html` as `data-exp7-shared="jrender-images"`.
 
 ## Why host-side
 

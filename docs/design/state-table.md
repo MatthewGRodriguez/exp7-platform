@@ -1,6 +1,6 @@
-# Exp7 view state table (1.8.4-art)
+# Exp7 view state table (1.8.4)
 
-Single source: `state-table.json` + `params.json`. Click-path visuals ≤120 ms; never gate the action.
+Single source: [`state-table.json`](./state-table.json) (this directory). Click-path visuals ≤120 ms; never gate the action.
 
 ## Element states
 

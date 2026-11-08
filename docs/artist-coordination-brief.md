@@ -65,10 +65,10 @@ Module id: **`exp7-views@1`**. Presentation: `runtime-html-string → JRViews �
 ### Today [MEAS] (updated 1.8.4-art review)
 
 - DOM `#btnAvatar` can show a GitHub profile `<img>` **or** initials fallback (exclusive `.is-on`).  
-- **JRDI/1 host image ABI** (`art/api/IMAGE-ABI.md`, packed `jrender-images`): textured circular overlays on shared `GPUContext` / same render pass. Not a wasm DL op (shipped wasm rejects unknown ops).  
+- **JRDI/1 host image ABI** ([docs/api/IMAGE-ABI.md](./api/IMAGE-ABI.md), packed `jrender-images` in lean): textured circular overlays on shared `GPUContext` / same render pass. Not a wasm DL op (shipped wasm rejects unknown ops).  
 - `PlatformChromeJR` consumes JRDI for the reserved-bar avatar: exclusive photo **xor** initials/soft-disc; public GitHub avatar HTTPS hosts only.  
 - Archived JRender API still has no wasm DL image op; JRDI is the documented host extension pending any future wasm bump from Ash’s tree.  
-- Mac WebGPU paint / Blender / Moho stages remain **[USER-HW][OPEN]** / **[BLOCKED]** on cloud — see `artifacts/art-ux-profile-2026-11-08/qa/`.
+- Mac WebGPU / LIVE-GPU paint remain **[USER-HW][OPEN]** on cloud.
 
 ### Ask of Ash
 

@@ -2,7 +2,7 @@
 
 **Status:** Implementation reference for the shipped lean tip **1.8.4** **[MEAS]** (art-pass JRDI + UX states).  
 **Direction doc:** [views-jrender-standard.md](./views-jrender-standard.md).  
-**Evidence:** `art/src/platform-chrome-jr-profile.js` packed into `exp7-platform-lean.html`; Mac parallax/LIVE-GPU still **[USER-HW][OPEN]**.
+**Evidence:** JRDI + PlatformChromeJR profile path packed into `exp7-platform/exp7-platform-lean.html`; Mac parallax/LIVE-GPU still **[USER-HW][OPEN]**. See [api/IMAGE-ABI.md](./api/IMAGE-ABI.md) and [design/state-table.md](./design/state-table.md).
 
 ---
 
@@ -42,11 +42,11 @@ Exp7Slabs wraps `JRViews.View.prototype.show` and registers a slabs controller p
 
 ## PlatformChromeJR
 
-**Packed from** `art/src/platform-chrome-jr-profile.js` via `tools/pack-art-lean.mjs` into the lean shell.
+**Shipped in** `exp7-platform/exp7-platform-lean.html` (`data-exp7-shared` script blocks: `jrender-images`, `jrviews-ux-states`, PlatformChromeJR profile path).
 
 - `start()` / `redraw()` — paint bar  
 - `redrawApps()` — paint apps overlay  
-- `setAvatarInfo(url, login)` — JRDI circular profile photo when ready; exclusive initials/soft-disc on absent/failure (1.8.4-art)  
+- `setAvatarInfo(url, login)` — JRDI circular profile photo when ready; exclusive initials/soft-disc on absent/failure (1.8.4)  
 
 - `active()` / `appsActive()` / `error()` — diagnostics (`chrome_jr` records at startup)
 

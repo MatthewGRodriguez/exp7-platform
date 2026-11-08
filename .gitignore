@@ -3,8 +3,3 @@
 **/ranking_ui.RAW.PRIVATE.html
 ranking_ui_6d97.html
 *.RAW.PRIVATE.*
-
-# Art handoff archives live in tool artifacts (/opt/cursor/artifacts), not the PR
-artifacts/**/handoff/ART-PIPELINE-HANDOFF-*
-artifacts/**/web/
-__pycache__/
