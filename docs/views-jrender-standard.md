@@ -1,7 +1,7 @@
 # Views & JRender standard (direction)
 
 **Status:** Accepted product direction **[REQ 2026-11-08]** — documentation of the path forward.  
-**Not yet claimed complete on `main`:** account/key overlays stay DOM (PAT never in canvas). **1.8.2** moves platform back/avatar, apps picker, and Budget Cal/Board/Plan (+ type) tabs onto the JRViews→JRender→Exp7Slabs path so they parallax with the views **[MEAS partial]**.
+**Not yet claimed complete on `main`:** account/key overlays stay DOM (PAT never in canvas). **1.8.3** moves platform back/avatar, apps picker, and Budget Cal/Board/Plan (+ type) tabs onto JRViews→JRender→Exp7Slabs; DOM Budget tabs are suppressed when JR paints; Plan keeps in-scene tab chrome; bar hits use the JR canvas (no DOM offset) **[MEAS partial]**.
 
 Evidence classes: [EVIDENCE.md](./EVIDENCE.md).
 
