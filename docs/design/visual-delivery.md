@@ -66,6 +66,12 @@ A drag start eases a free control to the dragging pose (scale 1.02, lift capped 
 
 Cloud Node fired the live handler: a button drag targeted scale 1.02 and lift 2, a day drag targeted scale 1 and lift 0, Space targeted scale 0.97, and drag end used 120 ms. Mac paint is not verified.
 
+## Drop-pending gold (1.8.17)
+
+The first drag move on a board row snaps to drop-pending. The edge is gold `[117, 81, 15]` and the fill takes the gold wash. That gold is separate from the invalid caution red `[170, 0, 0]`. The snap is 0 ms, so later drag moves do not start another ease. A day, a plan row, and a free control do not take this state. The row stays at scale 1 and does not rise. Drag end eases back over 120 ms and restores the edge. The wash is skipped when it would put text under 4.5:1. The focus ring is still the one drawn at layout.
+
+Cloud Node fired the live handler: the board-row edge unpacked to `[117, 81, 15, 255]`, the wash was the warm composite `[240, 236, 229]`, a second move did not restamp, and a day, a plan row, and a button stayed unmarked. Mac paint is not verified.
+
 ## Still not implemented
 
 - A GPU gaussian filter. 1.8.14’s shadow is the sampled kernel in display-list rows. The shipped wasm has no blur op.

@@ -1,11 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.16",
+  "version": "1.8.17",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "aad90229bef099e12e40d84b0e5a054b47a6ece6fc676b70ea9eefd613baeb5d",
+  "sha256": "11a93e3fc0a5c30c9e7c9e47fb633d5ebfe7e2a7f435cd7c50e6c58d9cffe4e3",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "1.8.16: Drag eases a free control up. A day stays the same size. Enter and Space shrink like a press. The frame loop stops.",
+    "app": "1.8.17: A board row's first drag move snaps a gold edge. A day stays unmarked. Drag end restores the edge.",
     "appSha256": "4e19bdeeb76818a6a96b9cb6655d48c950d429b17d3680184231e5a67755508b",
     "budgetSha256": "673372b101ea5342552ec16a2e5d3820e322411031c52d808b68c35c3d494c67",
     "budgetMode": "exp7-views",

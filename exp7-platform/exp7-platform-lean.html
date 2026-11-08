@@ -97,7 +97,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.16. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. Drag a button and it rises. Drag a day and it stays the same size. Enter or Space shrinks a control the same way a press does. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.17. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. Drag a board row and its edge turns gold. Drag a day and it stays the same size, with no gold edge. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -10677,6 +10677,15 @@ window.x7 = window.x7 || function (t) {
           }
         }
       }
+      n.uxBorderAt = -1;
+      var borderItems = n.items || [];
+      for (var bi = 0; bi < borderItems.length; bi++) {
+        if (borderItems[bi][0] === 'border') {
+          n.uxBorderAt = bi;
+          n.baseBorder = borderItems[bi][borderItems[bi].length - 1];
+          break;
+        }
+      }
     }
     L.uxStates = true;
     L.uxLight = 'penumbra-0.79-0.93-elev50';
@@ -10685,7 +10694,7 @@ window.x7 = window.x7 || function (t) {
     L.uxRefraction = 'blocked-no-dl-op';
     L.uxMoho = 'blocked-no-svg-op';
     L.uxCaustics = 'not-emitted';
-    L.uxMotion = 'click-ease-drag';
+    L.uxMotion = 'drop-pending-gold';
     L.uxStamped = stamp.stamped;
     L.uxTouched = touched;
     L.uxGeoTouched = geoTouched;
@@ -10696,6 +10705,22 @@ window.x7 = window.x7 || function (t) {
 
   function reducedMotion() {
     try { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; }
+  }
+  /* Board rows are the only surface that lists drop-pending. The ring is gold, never the invalid red. */
+  function dropHost(el) {
+    return !!(el && el.classList && el.classList.contains('ja-brow'));
+  }
+  function dropFill(n) {
+    if (n.base == null) return null;
+    var washed = over(WASH['drop-pending'], unpack(n.base));
+    var items = n.items || [];
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (it[0] !== 'text' && it[0] !== 'tbox' && it[0] !== 'label' && it[0] !== 'glyph') continue;
+      if (typeof it[4] !== 'number') continue;
+      if (contrastRatio(unpack(it[4]), washed) < 4.5) return null;
+    }
+    return packRgba(washed);
   }
   function poseKind(el) {
     if (!el || !el.classList) return 'skip';
@@ -10757,10 +10782,15 @@ window.x7 = window.x7 || function (t) {
     view._uxRaf = root.requestAnimationFrame(step);
   };
   /* Color snaps. The transform eases for the state-table duration and the frame loop stops when it arrives. The click handler has already run. */
-  V.View.prototype._uxPose = function (n, scale, lift, fill, ms) {
+  V.View.prototype._uxPose = function (n, scale, lift, fill, ms, ring) {
     if (!this.s || !n || !root.JRender || !root.JRender.Patch) return;
-    if (fill != null) {
-      try { var pc = new root.JRender.Patch(); pc.colorItem(n.id, 0, fill); this.s.patch(pc); } catch (e) {}
+    if (fill != null || (ring != null && n.uxBorderAt >= 0)) {
+      try {
+        var pc = new root.JRender.Patch();
+        if (fill != null) pc.colorItem(n.id, 0, fill);
+        if (ring != null && n.uxBorderAt >= 0) pc.colorItem(n.id, n.uxBorderAt, ring);
+        this.s.patch(pc);
+      } catch (e) {}
     }
     var toS = scale || 1, toL = lift || 0;
     if (reducedMotion() || pageHidden()) {
@@ -10786,7 +10816,7 @@ window.x7 = window.x7 || function (t) {
     if (!s || s._uxPoseWired) return;
     s._uxPoseWired = true;
     var prev = s.onevent;
-    var EV = (root.JRender && root.JRender.EV) || { ENTER: 1, LEAVE: 2, DOWN: 3, UP: 4, KEYDOWN: 8, KEYUP: 9, CANCEL: 11, DRAGSTART: 12, DRAGEND: 14 };
+    var EV = (root.JRender && root.JRender.EV) || { ENTER: 1, LEAVE: 2, DOWN: 3, UP: 4, KEYDOWN: 8, KEYUP: 9, CANCEL: 11, DRAGSTART: 12, DRAG: 13, DRAGEND: 14 };
     s.onevent = function (e) {
       if (prev) prev(e);
       var n = e.id != null && view.byId && view.byId.get(e.id);
@@ -10801,12 +10831,24 @@ window.x7 = window.x7 || function (t) {
       /* Days and rows do not grow or rise while dragging. A 1.02 scale would cover the next cell. */
       var dragScale = (kind === 'day' || kind === 'stack') ? 1 : GEO.dragging.scale;
       var dragLift = kind === 'free' ? Math.min(LIFT.dragging, cap) : 0;
+      var restoreRing = n._uxDrop ? n.baseBorder : null;
       if (e.kind === EV.ENTER && kind === 'free' && rest <= 0) view._uxPose(n, 1, hoverLift, null, CLICK_MS.hover);
-      else if (e.kind === EV.LEAVE || e.kind === EV.CANCEL) view._uxPose(n, 1, 0, n.base, e.kind === EV.CANCEL ? CLICK_MS.cancel : CLICK_MS.leave);
+      else if (e.kind === EV.LEAVE || e.kind === EV.CANCEL) {
+        n._uxDrop = false;
+        view._uxPose(n, 1, 0, n.base, e.kind === EV.CANCEL ? CLICK_MS.cancel : CLICK_MS.leave, restoreRing);
+      }
       else if (e.kind === EV.DOWN || (e.kind === EV.KEYDOWN && keyPress)) view._uxPose(n, GEO.pressed.scale, 0, pressedFill, CLICK_MS.press);
       else if (e.kind === EV.UP || (e.kind === EV.KEYUP && keyPress)) view._uxPose(n, 1, hoverLift, n.hov != null ? n.hov : n.base, CLICK_MS.up);
       else if (e.kind === EV.DRAGSTART) view._uxPose(n, dragScale, dragLift, null, CLICK_MS.drag);
-      else if (e.kind === EV.DRAGEND) view._uxPose(n, 1, hoverLift, n.hov != null ? n.hov : n.base, CLICK_MS.drop);
+      /* The first move snaps to drop-pending. Later moves do not start another ease. */
+      else if (e.kind === EV.DRAG && dropHost(n.el) && !n._uxDrop) {
+        n._uxDrop = true;
+        view._uxPose(n, 1, 0, dropFill(n), 0, packRgba(RING['drop-pending']));
+      }
+      else if (e.kind === EV.DRAGEND) {
+        n._uxDrop = false;
+        view._uxPose(n, 1, hoverLift, n.hov != null ? n.hov : n.base, CLICK_MS.drop, restoreRing);
+      }
     };
   };
 
@@ -13091,7 +13133,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.16",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.17",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
