@@ -44,7 +44,8 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.10** | PR #35 | Wire the style pass into View.show. Stop Exp7 tabs from hiding Budget sections. |
 | **1.8.11** | PR #36 | Apps picker cards are two lines at a real size. Header icon stays put across an app switch. |
 | **1.8.12** | PR #37 | Header is the outer parallax slab. Each Apps card is an inner slab. |
-| **1.8.13** | this branch | Free controls lift. Days and rows keep a contact shadow in the gap. |
+| **1.8.13** | PR #38 | Free controls lift. Days and rows keep a contact shadow in the gap. |
+| **1.8.14** | this branch | Sampled penumbra. Dark glass read. Exp7 show stays in its slot. |
 
 ### Current manifest (verbatim) [MEAS]
 
@@ -52,9 +53,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.13",
+"version": "1.8.14",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "5a0c9a51b75ce9fea2218355e3c82b28df1f47286fd75fc75a56da998f46e898",
+"sha256": "62836c299594da164ca76c035b15bb84bc35b10a2ea1909bc0b217d0cccb7e7e",
 "minLauncherMajor": 1
 ```
 

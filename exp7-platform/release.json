@@ -1,12 +1,12 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.13",
+  "version": "1.8.14",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "5a0c9a51b75ce9fea2218355e3c82b28df1f47286fd75fc75a56da998f46e898",
+  "sha256": "62836c299594da164ca76c035b15bb84bc35b10a2ea1909bc0b217d0cccb7e7e",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "1.8.13: Free controls lift by the state-table amount, capped at 2px. Days and rows get a contact shadow in the gap.",
-    "appSha256": "f513cca4bed61c267681b04bf27ab65f9b2c914f18632b097c9a6fc677c126e2",
+    "app": "1.8.14: Sampled contact penumbra from the published fit. Dark fills get the static glass read. Exp7 show stays inside its slot and no longer writes window.budget.",
+    "appSha256": "4e19bdeeb76818a6a96b9cb6655d48c950d429b17d3680184231e5a67755508b",
     "budgetSha256": "673372b101ea5342552ec16a2e5d3820e322411031c52d808b68c35c3d494c67",
     "budgetMode": "exp7-views",
     "viewsModuleId": "exp7-views@1",

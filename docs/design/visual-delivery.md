@@ -44,16 +44,26 @@ The state table’s lift was only a darker inset band. A full y-shift covers the
 
 Cloud Node, on the layout hook: a selected day did not move and its shadow stayed inside the gap; a selected button sat 2px higher than the idle button beside it, with the shadow in the vacated band. Mac paint of the pointer is not verified. This is not a gaussian blur.
 
+## Measured penumbra, glass read, and the gates that stay blocked (1.8.14)
+
+Shell 1.8.14 replaces the single contact rectangle with rows sampled from the published fit: offset 0.79 px and blur 0.93 px per px of lift, core alpha 0.55, elevation 50. A row under the perception floor (3%) is dropped. A row that would enter the next fill is dropped and marked clipped. Calendar days and stacked rows still do not translate. Free controls still rise by at most 2px, and the hit moves with them. Disabled text is no longer multiplied by 0.38. Its ink stays, and the contrast check is at least 4.5 in every state.
+
+A dark fill gets the published static glass brightening (top alpha about 0.04, bottom about 0.06). A near-white fill does not: that brightening is under 3%. Specular specks are not drawn. `uxCaustics` is `not-emitted`. This build did not re-render Blender, so it is not a new caustic proof.
+
+The 85 mm scale (0.06% per px of lift, distance 2099 px) is applied only when the change is at least half a pixel. At the lifts that fit in the gaps, that change is smaller, so the pose stays unscaled. Header and Apps parallax are unchanged.
+
+Cloud Node called `View.show` and checked the decorated list: day y, fading penumbra, clip, button lift and hit, avatar disc, dark-glass read, contrast, reduced motion, a missing `matchMedia`, hidden pause, and Exp7 `show` leaving Budget sections alone. That check is not a file in this repo. It did not paint pixels on a GPU.
+
 ## Still not implemented
 
-- Gaussian blur. 1.8.13’s contact shadow is a solid rect in the gap, not a blurred bitmap. It does not cover the next day.
-- Translated lift on calendar days and stacked rows. The gap is too small. Free controls do lift, capped at 2px. Dragging’s 4px lift is capped the same way.
-- Blender caustics, refractive glass, belt waves, and the v11 study renders. Those files are not the product look and are not packed into the lean HTML.
-- Moho SVG frame playback inside the wasm renderer.
-- A perspective camera (85 mm study) on the live canvas. Exp7Slabs parallax is the motion that already ships; this pass does not add a camera.
-- Face images on Cal / Board / Plan cells. JRDI remains the chrome-bar avatar. `data-jr-img` on view cells is still unwired.
+- A GPU gaussian filter. 1.8.14’s shadow is the sampled kernel in display-list rows. The shipped wasm has no blur op.
+- Translated lift on calendar days and stacked rows. The next fill is too close. Free controls still rise, capped at 2px.
+- A refraction shader, and any caustic speck. The static glass read is the published brightening on a dark fill only. Specks stay out. There is no new on/off render in this build.
+- Moho SVG frame playback inside the wasm renderer. The wasm has no SVG or timeline op. An idle frame loop is not added. Click poses still snap, inside the 120 ms budget.
+- The 85 mm perspective scale on the lifts that fit. It is under half a pixel there, so it is not drawn. Parallax remains the existing slab motion.
+- Face images on Cal / Board / Plan cells. JRDI remains the chrome-bar avatar.
 - Atlas and Roster as separate lean apps.
-- A Mac Safari / Shortcuts capture of this build.
+- A Mac Safari / Shortcuts capture of this build. The Back overlay still has no new runtime capture.
 
 ## Do not read these as the product
 
