@@ -97,7 +97,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.12. chromeJr.barSlabs.kinds should include outer, and chromeJr.appsSlabs.kinds should include inner while Back is open. Move the pointer: the header and the Apps cards should shift against each other. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.13. style.note should mention lifted controls and contact shadows. A selected tab or Apps card sits a little higher. A selected day keeps its place and has a short shadow in the gap under it. Hover a button: it rises. Press it: it shrinks. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -10329,8 +10329,9 @@ window.x7 = window.x7 || function (t) {
     pressed: [36, 88, 166, 200]
   };
 
-  /* Lifts from docs/design/state-table.json. Drawn as inset shade strength.
-     A translated lift overlaps the next calendar cell, so it is not a y-offset. */
+  /* Lifts from docs/design/state-table.json (px). Calendar days and stacked rows do not
+     translate: the gap is 4px and 2px, and a shift covers the neighbor. Free controls
+     (buttons, Apps cards, tabs) translate by at most 2px. Days get a shadow in the gap. */
   var LIFT = {
     idle: 0, hover: 1.5, focus: 1.5, pressed: 0, selected: 2,
     dragging: 4, 'drop-pending': 3, invalid: 0, settling: 1, disabled: 0
@@ -10441,6 +10442,33 @@ window.x7 = window.x7 || function (t) {
     return packRgba(c);
   }
 
+  function liftPx(el, st) {
+    var lift = LIFT[st] || 0;
+    if (!lift || !el || !el.classList) return 0;
+    if (el.classList.contains('ja-day') || el.classList.contains('ja-brow') || el.classList.contains('ja-prow') || el.classList.contains('ja-section')) return 0;
+    return Math.min(lift, 2);
+  }
+  function contactH(el, st) {
+    var lift = LIFT[st] || 0;
+    if (!lift || !el || !el.classList) return 0;
+    if (el.classList.contains('ja-day')) return Math.min(3, Math.max(1, Math.round(lift)));
+    if (el.classList.contains('ja-brow') || el.classList.contains('ja-prow') || el.classList.contains('ja-section')) return 1;
+    var px = liftPx(el, st);
+    return px > 0 ? Math.max(1, Math.round(px)) : 0;
+  }
+  function shiftItems(n, dy) {
+    if (!dy) return;
+    var items = n.items || [];
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      var k = it[0];
+      if (k === 'rect' || k === 'rrect' || k === 'border' || k === 'hit' || k === 'text' || k === 'tbox' || k === 'label' || k === 'glyph' || k === 'rich') {
+        if (typeof it[2] === 'number') it[2] += dy;
+      }
+    }
+    if (n.hit && typeof n.hit[1] === 'number') n.hit[1] += dy;
+  }
+
   var origLayout = V.layout;
   V.layout = function (rootEl, width, opt) {
     opt = opt || {};
@@ -10449,6 +10477,8 @@ window.x7 = window.x7 || function (t) {
     if (!L || !L.nodes) return L;
     var touched = 0;
     var geoTouched = 0;
+    var lifted = 0;
+    var contacts = 0;
     for (var i = 0; i < L.nodes.length; i++) {
       var n = L.nodes[i];
       if (!n.el) continue;
@@ -10535,6 +10565,22 @@ window.x7 = window.x7 || function (t) {
           if (n.hov != null && WASH.hover && st !== 'photo' && st !== 'pending' && st !== 'initials') {
             n.hov = packRgba(over(WASH.hover, unpack(fill[fill.length - 1])));
           }
+          /* Contact shadow sits in the gap under the control. Free controls also move up by the lift. */
+          var rise = liftPx(n.el, st);
+          var ch = contactH(n.el, st);
+          var origBottom = fy + fh;
+          if (rise) {
+            shiftItems(n, -rise);
+            n.uxLiftPx = rise;
+            lifted++;
+          }
+          if (ch > 0) {
+            var shadeA2 = Math.min(160, Math.round(70 + (LIFT[st] || 0) * 18));
+            n.items.push(['rect', fx + 4, origBottom, Math.max(1, fw - 8), ch, packRgba([20, 30, 50, shadeA2])]);
+            n.uxContact = ch;
+            contacts++;
+            touched++;
+          }
         }
       }
     }
@@ -10543,7 +10589,58 @@ window.x7 = window.x7 || function (t) {
     L.uxStamped = stamp.stamped;
     L.uxTouched = touched;
     L.uxGeoTouched = geoTouched;
+    L.uxLifted = lifted;
+    L.uxContacts = contacts;
     return L;
+  };
+
+  function reducedMotion() {
+    try { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; }
+  }
+  function poseKind(el) {
+    if (!el || !el.classList) return 'skip';
+    if (el.classList.contains('ja-day')) return 'day';
+    if (el.classList.contains('ja-brow') || el.classList.contains('ja-prow') || el.classList.contains('ja-section')) return 'stack';
+    var ds = el.getAttribute('data-jr-state');
+    if (ds === 'photo' || ds === 'pending' || ds === 'initials') return 'skip';
+    if (/border-radius:\s*999/.test(el.getAttribute('style') || '')) return 'skip';
+    return 'free';
+  }
+  function poseMatrix(n, scale, lift) {
+    var h = n.hit;
+    var cx = 0, cy = 0;
+    if (h && typeof h[0] === 'number') { cx = h[0] + h[2] / 2; cy = h[1] + h[3] / 2; }
+    var s = scale || 1;
+    return [s, 0, 0, s, cx * (1 - s), cy * (1 - s) - (lift || 0)];
+  }
+  V.View.prototype._uxPose = function (n, scale, lift, fill) {
+    if (reducedMotion() || !this.s || !n || !root.JRender || !root.JRender.Patch) return;
+    var p = new root.JRender.Patch();
+    p.xform(n.id, poseMatrix(n, scale, lift));
+    if (fill != null) p.colorItem(n.id, 0, fill);
+    try { this.s.patch(p); if (this.r) this.r.draw(); } catch (e) {}
+  };
+  var origWire = V.View.prototype.wire;
+  V.View.prototype.wire = function () {
+    origWire.call(this);
+    var view = this, s = this.s;
+    if (!s || s._uxPoseWired) return;
+    s._uxPoseWired = true;
+    var prev = s.onevent;
+    var EV = (root.JRender && root.JRender.EV) || { ENTER: 1, LEAVE: 2, DOWN: 3, UP: 4, CANCEL: 11 };
+    s.onevent = function (e) {
+      if (prev) prev(e);
+      var n = e.id != null && view.byId && view.byId.get(e.id);
+      if (!n || !n.el) return;
+      var kind = poseKind(n.el);
+      if (kind === 'skip') return;
+      var cap = 2;
+      var rest = LIFT[stateOf(n.el)] || 0;
+      if (e.kind === EV.ENTER && kind === 'free' && rest <= 0) view._uxPose(n, 1, Math.min(LIFT.hover, cap), null);
+      else if (e.kind === EV.LEAVE || e.kind === EV.CANCEL) view._uxPose(n, 1, 0, n.base);
+      else if (e.kind === EV.DOWN) view._uxPose(n, GEO.pressed.scale, 0, n.base == null ? null : packRgba(over(WASH.pressed, unpack(n.base))));
+      else if (e.kind === EV.UP) view._uxPose(n, 1, (kind === 'free' && rest <= 0) ? Math.min(LIFT.hover, cap) : 0, n.hov != null ? n.hov : n.base);
+    };
   };
 
   function unpack(c) {
@@ -12692,11 +12789,14 @@ function styleProbe(){
  const views=[];
  Object.keys(JVS).forEach(function(id){
   const V=JVS[id]; const L=V.view&&V.view.L; let days=0,sel=0,gold=0,bands=0,sample=null;
-  if(L&&L.nodes) L.nodes.forEach(function(n){
-   if(!n.el||!n.el.classList) return;
-   const day=n.el.classList.contains("ja-day"), row=n.el.classList.contains("ja-brow")||n.el.classList.contains("ja-prow")||n.el.classList.contains("ja-joy");
-   if(!day&&!row) return;
-   if(day) days++;
+   let lifts=0, contacts=0;
+   if(L&&L.nodes) L.nodes.forEach(function(n){
+    if(n.uxLiftPx) lifts++;
+    if(n.uxContact) contacts++;
+    if(!n.el||!n.el.classList) return;
+    const day=n.el.classList.contains("ja-day"), row=n.el.classList.contains("ja-brow")||n.el.classList.contains("ja-prow")||n.el.classList.contains("ja-joy");
+    if(!day&&!row) return;
+    if(day) days++;
    if(n.el.classList.contains("ja-sel")||n.el.getAttribute("data-jr-state")==="selected") sel++;
    (n.items||[]).forEach(function(it){
     if(it[0]==="rect"&&(it[4]===2||it[4]===3)){ const col=dbgUnpack(it[it.length-1]); if(col&&((col[0]===255&&col[1]===255&&col[2]===255&&col[3]>=70)||(col[0]===20&&col[1]===30&&col[2]===50))) bands++; }
@@ -12704,7 +12804,7 @@ function styleProbe(){
    });
    if(!sample) sample={cls:String(n.el.className).slice(0,80), state:n.el.getAttribute("data-jr-state"), items:(n.items||[]).slice(0,6).map(function(it){ return {k:it[0], wh:(typeof it[3]==="number"&&typeof it[4]==="number")?[Math.round(it[3]),Math.round(it[4])]:null, rgba:dbgUnpack(it[it.length-1])}; })};
   });
-  views.push({id:id, err:V.err?String(V.err).slice(0,180):"", draws:V.n||0, ux:!!(L&&L.uxStates), light:(L&&L.uxLight)||null, touched:(L&&L.uxTouched)||0, days:days, selected:sel, goldBorders:gold, thinBands:bands, sample:sample});
+   views.push({id:id, err:V.err?String(V.err).slice(0,180):"", draws:V.n||0, ux:!!(L&&L.uxStates), light:(L&&L.uxLight)||null, touched:(L&&L.uxTouched)||0, lifted:(L&&L.uxLifted)||lifts, contacts:(L&&L.uxContacts)||contacts, days:days, selected:sel, goldBorders:gold, thinBands:bands, sample:sample});
  });
  let note="ux hook is not installed";
  if(hook&&!views.length) note="ux hook is installed; no view has been drawn yet";
@@ -12717,7 +12817,10 @@ function styleProbe(){
   else if(!banded) note="hook installed but the live display list has no inset light bands";
   else note="inset light bands are in the display list ("+banded+"). Idle cards also get the state-table border when they had none.";
   if(s>0&&g===0) note+=" A control is selected and no gold ring is in the display list.";
-  if(s>0&&g>0) note+=" Selected gold rings in the display list: "+g+".";
+   if(s>0&&g>0) note+=" Selected gold rings in the display list: "+g+".";
+   const liftedN=drawn.reduce(function(a,v){return a+(v.lifted||0)},0);
+   const contactN=drawn.reduce(function(a,v){return a+(v.contacts||0)},0);
+   if(liftedN||contactN) note+=" Lifted controls: "+liftedN+". Contact shadows in the gap: "+contactN+".";
  }
  return {hook:hook, lightTheme:!!window.EXP7_LIGHT_THEME, note:note, views:views};
 }
@@ -12784,7 +12887,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.12",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.13",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
