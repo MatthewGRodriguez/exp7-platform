@@ -197,6 +197,12 @@ What this pass does not emit: Blender caustics, a gaussian shadow outside the ce
 
 `View.show` calls `window.JRViews.layout`, which is the state-table wrapper. Exp7 `show()` only toggles sections inside `#appSlot-exp7`. `revealAppViews('budget')` restores the Budget tab from `__budgetUi` before it measures canvases.
 
+## Apps picker and header icon (1.8.11)
+
+The Apps list you see is the JR canvas (`#appsOverlay.jr-on` hides the DOM cards). `parseFloat("4.5rem")` is 4.5, so those buttons were one text line, and each one sat inside a full-width `ja-section` frame. The canvas now lays out two-line cards (`min-width:220px; min-height:72px`). `cssPx` treats `rem` as 16px.
+
+The header canvas was 90px tall inside a 44px bar, so the icon was cropped, and every reveal reloaded the photo. The bar scene is 44px with no document margin. A redraw keeps a ready photo instead of clearing it and fetching it again. `chromeJr` in the debug paste records the card boxes, the bar height, and whether the redraw kept the photo.
+
 ## Debug handoff (1.8.9)
 
 1.8.9 does not change painting. The bar has a **Debug** button (Shift+D) that stays clickable above the chrome canvas. It copies a JSON snapshot: shell version, overlay and slot opacity, which element is on top of the content, canvas sizes, GPU and view errors, and whether the live display list contains the 1.8.8 inset bands and gold rings. `style.note` states that in one sentence. No keys or account text.
