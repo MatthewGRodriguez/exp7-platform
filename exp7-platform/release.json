@@ -1,11 +1,12 @@
 {
  "format": "exp7-platform-release/1",
- "version": "1.4.0",
+ "version": "1.5.0",
  "file": "exp7-platform/exp7-platform-lean.html",
- "sha256": "df6e1586687f03db2a2bf89150ee94e1eca5445d2157e9248f6d2eeec7a278c4",
+ "sha256": "7420b9f6c459133f2f8f1cd3f5b223f1c1fc9f487b5be7ce6d71f5c9867c6d09",
  "minLauncherMajor": 1,
  "contains": {
-  "app": "exp7-lean (v17 editing; app-first chrome; Add user/Share; proposal-op sync via exp7-app-v1; direct in-page mount)",
-  "appSha256": "8b96d6b58b9ab6718af78076b75a5841fb1a80de2de9fca8f8eb73fb90d8a2b8"
+  "app": "exp7-lean v17 + Budget (calendar/board/plan; local IDB; harmonic rank shares)",
+  "appSha256": "8b96d6b58b9ab6718af78076b75a5841fb1a80de2de9fca8f8eb73fb90d8a2b8",
+  "budgetSha256": "811660a9066150ae4c318d77b70a0897d47408026d74ce503784c676992ac6bc"
  }
 }
