@@ -1,6 +1,6 @@
-# Platform chrome on JRender (1.8.4)
+# Platform chrome on JRender (1.8.6)
 
-**Status:** Implementation reference for the shipped lean tip **1.8.4** **[MEAS]** (art-pass JRDI + UX states).  
+**Status:** Implementation reference for the shipped lean tip **1.8.6** **[MEAS]** (JRDI + UX states; app-slot reveal).  
 **Direction doc:** [views-jrender-standard.md](./views-jrender-standard.md).  
 **Evidence:** JRDI + PlatformChromeJR profile path packed into `exp7-platform/exp7-platform-lean.html`; Mac parallax/LIVE-GPU still **[USER-HW][OPEN]**. See [api/IMAGE-ABI.md](./api/IMAGE-ABI.md) and [design/state-table.md](./design/state-table.md).
 
@@ -161,3 +161,8 @@ See [version-lineage.md](./version-lineage.md).
 | `src/budget/budget-app.{html,js}` | Budget consumer + DOM fallback tabs |
 | `src/exp7-views/vendor/slab-config.js` | Exp7Slabs |
 | `build/build.mjs` | Assembles two-file release |
+
+
+## App switch / WebGPU reveal (1.8.6)
+
+Mounted apps stay alive under `.appSlot[hidden]` / `#appShell` `visibility:hidden` while the apps picker is open. WebGPU canvases with transparent clear lose pixels when not composited. **Reuse** of an already-mounted app (`openApp` when `UI.slots[id].mounted`) and closing the apps overlay must call `revealAppViews(appId)` so JRViews re-queue (`why:'reveal'`) / redraw. Exp7Slabs `visible()` ignores hidden `.appSlot` and a visibility-hidden `#appShell` so parallax does not keep drawing buried canvases.

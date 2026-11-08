@@ -1,11 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.5",
+  "version": "1.8.6",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "e2fa529aa67f85d58b68eb794963ba53074331f783cbf9bf74c5482e07e3765b",
+  "sha256": "9fcb7193f72f04d3dc1c53c05c58e1d22de6a05d981d8542017db076a07a9b0a",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "exp7-lean demo + Budget Exp7Views consumers; JRViews platform bar/apps (canvas hits); Budget Cal/Board/Plan (+ type) tabs in-scene after planDoc; DOM tabs hidden via #budgetRoot.jr-chrome (scoped CSS safe); 4 Board type boards; Budget local-IDB only; JRDI profile images + UX state table; exclusive avatar photo/initials; JRDI vertex buffers live until after queue.submit (fixes Invalid CommandEncoder)",
+    "app": "exp7-lean demo + Budget Exp7Views consumers; JRViews platform bar/apps (canvas hits); Budget Cal/Board/Plan (+ type) tabs in-scene after planDoc; DOM tabs hidden via #budgetRoot.jr-chrome; 4 Board type boards; Budget local-IDB only; JRDI profile images + UX state table; exclusive avatar photo/initials; app-slot reuse reveals/redraws WebGPU views (fixes blank after Exp7\u2194Budget switch)",
     "appSha256": "ec696151f233c4762c6b831f4f9cbec9857f6ac24a179fcfb0aa44ffc8c9da63",
     "budgetSha256": "673372b101ea5342552ec16a2e5d3820e322411031c52d808b68c35c3d494c67",
     "budgetMode": "exp7-views",
