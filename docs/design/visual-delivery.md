@@ -52,7 +52,7 @@ A dark fill gets the published static glass brightening (top alpha about 0.04, b
 
 The 85 mm scale (0.06% per px of lift, distance 2099 px) is applied only when the change is at least half a pixel. At the lifts that fit in the gaps, that change is smaller, so the pose stays unscaled. Header and Apps parallax are unchanged.
 
-`exp7-platform/regression/display-list.mjs` calls `View.show` with `displayListOnly` and checks the decorated list: day y, fading penumbra, clip, button lift and hit, avatar disc, dark-glass read, contrast, reduced motion, a missing `matchMedia`, hidden pause, and Exp7 `show` leaving Budget sections alone. Cloud Node passed that file. It did not paint pixels on a GPU.
+Cloud Node called `View.show` and checked the decorated list: day y, fading penumbra, clip, button lift and hit, avatar disc, dark-glass read, contrast, reduced motion, a missing `matchMedia`, hidden pause, and Exp7 `show` leaving Budget sections alone. That check is not a file in this repo. It did not paint pixels on a GPU.
 
 ## Still not implemented
 

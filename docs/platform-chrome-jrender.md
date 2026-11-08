@@ -215,7 +215,7 @@ Exp7Slabs only moves a node that is a slab, or that sits inside one. The 44px ba
 
 ## Measured penumbra (1.8.14)
 
-`jrviews-ux-states` samples the published shadow fit into one-pixel rows and stops at the next fill. Dark fills get the static glass brightening. The pose uses the 85 mm scale only when the shift is at least half a pixel. `style.note` counts penumbra rows. Exp7 `show` toggles sections inside `#appSlot-exp7` and does not write `window.budget`. The regression file is `exp7-platform/regression/display-list.mjs`.
+`jrviews-ux-states` samples the published shadow fit into one-pixel rows and stops at the next fill. Dark fills get the static glass brightening. The pose uses the 85 mm scale only when the shift is at least half a pixel. `style.note` counts penumbra rows. Exp7 `show` toggles sections inside `#appSlot-exp7` and does not write `window.budget`.
 
 ## Debug handoff (1.8.9)
 
