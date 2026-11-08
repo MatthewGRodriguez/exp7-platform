@@ -1,18 +1,18 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.7.9",
+  "version": "1.8.1",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "eded6377e444e0d5fb9f2371b1b087ec60cd8c96e48fbad316820aa3b05109f6",
+  "sha256": "a00532520e89f6bd4de4ede672e627c1f0d249076e44e14314aaba3b0dd24a2e",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "exp7-lean demo + Budget as Exp7Views consumers; shell hosts shared exp7-views@1 / JRender once; reserved top bar painted with JRender (DOM hit targets + account overlays remain); exclusive avatar; Budget local-IDB only",
+    "app": "exp7-lean demo + Budget as Exp7Views consumers; shell hosts shared exp7-views@1 / JRender once; reserved top bar painted with JRender; Budget: Calendar start, Board sub-tabs expense/income/debt/asset (4 JRender boards), Plan; no load/reset/status chrome; combined Cal/Plan membership; exclusive avatar; Budget local-IDB only",
     "appSha256": "ec696151f233c4762c6b831f4f9cbec9857f6ac24a179fcfb0aa44ffc8c9da63",
-    "budgetSha256": "6d79aff1a2c2f891003b2a748316634502790755381367c8a485be64073adb75",
+    "budgetSha256": "8a4f25d33f6403cbc6fec53c29d5ae58202c3d238d7746a7ef13699dc99a2474",
     "budgetMode": "exp7-views",
     "viewsModuleId": "exp7-views@1",
-    "viewsSourcesAggregateSha256": "bd7232deb159f44438e5095a34fa400543976ee4d60ca65c3907b84b95935b96",
+    "viewsSourcesAggregateSha256": "cc24c44c3ce65dffa31d6dcd21663dcb29f445e854f85054ae85927b69612e97",
     "chromeJr": "platform reserved bar via PlatformChromeJR (JRender paint; DOM a11y hits)",
     "standalone": "dist/exp7-views-standalone.html",
-    "standaloneSha256": "0d8979256d2617f04126d0764453671148175e707ca71c365f7e84c81302849a"
+    "standaloneSha256": "00359ce4fcf8deb5582f1574b2cba7fa2fbc2231963447f8dcf40cb73cf03162"
   }
 }
