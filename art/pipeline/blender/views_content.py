@@ -28,11 +28,11 @@ MIN_TEXT_OBJECTS = 8
 MIN_AVATAR_OBJECTS = 1
 
 # World sizes chosen so production 1280 framing (after push-in) keeps secondary ≥~12px.
-TITLE_SIZE = 0.42
-SUB_SIZE = 0.24
-BODY_SIZE = 0.22
-META_SIZE = 0.18
-DAY_SIZE = 0.22
+TITLE_SIZE = 0.48
+SUB_SIZE = 0.26
+BODY_SIZE = 0.26
+META_SIZE = 0.20
+DAY_SIZE = 0.24
 
 # Display-intent sRGB 0–1 (documentation + analytical preflight). NOT scene-linear.
 INK = (0.078, 0.094, 0.133)  # #141822
@@ -40,9 +40,9 @@ INK_SECONDARY = (0.125, 0.149, 0.188)  # #202630
 INK_DISABLED = (0.216, 0.243, 0.282)  # #374048
 INK_ACCENT = (0.35, 0.25, 0.05)
 # Light ink for washed/saturated faces (selected/dragging/invalid/…) — worst-BG gate
-INK_ON_FACE = (0.97, 0.98, 1.0)
-INK_ON_FACE_SECONDARY = (0.90, 0.92, 0.96)
-INK_ON_FACE_ACCENT = (1.0, 0.92, 0.55)
+INK_ON_FACE = (1.0, 1.0, 1.0)
+INK_ON_FACE_SECONDARY = (0.92, 0.94, 0.98)
+INK_ON_FACE_ACCENT = (1.0, 1.0, 1.0)
 
 # States whose wash makes dark ink fail worst-BG contrast on the face
 FACE_LIGHT_INK_STATES = frozenset(
@@ -555,7 +555,7 @@ def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="V
 
     path = avatar_asset_path()
     # Far-right avatar with gap past Plan tab (~1.55) — no label-over-disc
-    av = make_avatar(f"{prefix}_avatar", (1.85, 0.0), avatar * 0.9, path, z=0.12)
+    av = make_avatar(f"{prefix}_avatar", (2.05, 0.0), avatar * 0.85, path, z=0.12)
     objs.append(av)
     # Compact footer strip under bar (mesh) so framing includes labels
     foot, *_ = make_panel(

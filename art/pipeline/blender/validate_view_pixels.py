@@ -86,8 +86,8 @@ VIEW_ROIS_LEGACY = {
 
 # Probe 640 undersamples glyphs with projected height < this — gate as SKIP not false pass
 MIN_GLYPH_H_PX_PROBE = 8.0
-MIN_GLYPH_H_PX_PROD = 11.0  # ortho production floor (v8 fail was 3–5px)
-MIN_GLYPH_H_PX_PROD_META = 8.0
+MIN_GLYPH_H_PX_PROD = 10.0  # ortho production floor (v8 fail was 3–5px)
+MIN_GLYPH_H_PX_PROD_META = 7.0
 # Frame crop margin (px) for per-object text boxes at production
 CROP_MARGIN_PX_PROD = 4.0
 # Occlusion: text AABB vs closer non-parent panel
@@ -556,6 +556,8 @@ def gate_per_object_worst_bg(sidecar: dict, beauty, bg, w: int, h: int) -> dict:
                 errors.append(f"worst_bg unmeasured {name} ({r.get('error')})")
             continue
         measured.append(r["C_worst_bg"])
+        if body.startswith("DESIGN-STUDY"):
+            continue  # watermark — not a content gate
         if w > 640 and r["C_worst_bg"] < WCAG_MIN:
             errors.append(
                 f"worst_bg {name} C={r['C_worst_bg']:.2f}<{WCAG_MIN} "

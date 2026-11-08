@@ -662,12 +662,12 @@ def make_box(name, sx, sy, sz, loc, bevel_w, mat):
 # Darker solid faces for states that use light on-face ink (wash-only blues were ~L0.9
 # and failed independent worst-BG against INK_ON_FACE).
 FACE_SOLID_FOR_LIGHT_INK = {
-    "selected": (0.12, 0.28, 0.55),
-    "dragging": (0.14, 0.32, 0.60),
-    "pressed": (0.10, 0.24, 0.48),
-    "focus": (0.16, 0.34, 0.58),
-    "drop-pending": (0.42, 0.30, 0.08),
-    "invalid": (0.58, 0.06, 0.06),
+    "selected": (0.06, 0.16, 0.38),
+    "dragging": (0.07, 0.18, 0.42),
+    "pressed": (0.05, 0.14, 0.34),
+    "focus": (0.08, 0.20, 0.44),
+    "drop-pending": (0.28, 0.18, 0.04),
+    "invalid": (0.48, 0.04, 0.04),
 }
 
 
@@ -757,8 +757,8 @@ def make_panel(name: str, st: dict, palette: dict, geom: dict, tilt_deg=None, st
     # Binding contract for child labels (views_content parents text here)
     obj["exp7_lift_m"] = float(lift_m)
     obj["exp7_thick"] = float(thick)
-    # Flush to face so elevated/ortho rays sample the panel under glyphs (not ground)
-    obj["exp7_face_local_z"] = float(thick / 2 + 0.02)
+    # Above face top (+bevel); below would sink into volume / under rim
+    obj["exp7_face_local_z"] = float(thick / 2 + 0.05)
     obj["exp7_size_x"] = float(sx * scale)
     obj["exp7_size_y"] = float(sy * scale)
     obj["exp7_st_name"] = str(st_name)
@@ -766,14 +766,15 @@ def make_panel(name: str, st: dict, palette: dict, geom: dict, tilt_deg=None, st
     border_key = st.get("border", "border")
     border_col = palette["_rgba"].get(border_key) or palette["_rgba"]["border"]
     # Edge stroke as slightly larger thin plate under face rim (rounded)
+    # Rim sits under the face so labels on face_z never render beneath the border plate
     rim = make_box(
         name + "_border",
         (sx + ring_w * 0.6) * scale,
         (sy + ring_w * 0.6) * scale,
         0.006,
-        (origin[0], origin[1], lift_m + thick + 0.002),
+        (origin[0], origin[1], max(0.001, lift_m - 0.002)),
         rad + ring_w * 0.2,
-        principled_mat(name + "_border_mat", border_col, emit=0.04, rough=0.35),
+        ui_face_mat(name + "_border_mat", border_col, opacity=1.0),
     )
     if abs(tilt) > 1e-6:
         rim.rotation_euler[0] = math.radians(tilt)
