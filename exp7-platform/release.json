@@ -1,11 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.11",
+  "version": "1.8.12",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "43f411056136e70b19dbf39394dbe9756f5c063f18dfe7b0a052094eb52dc0c8",
+  "sha256": "4dab4c903149192808a2187e290aeeb5df196ac3d12c6e8294da8b0cc05c6bb0",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "1.8.11: Apps picker cards are two lines at a real size. Header icon is kept across an app switch. Debug handoff includes chromeJr.",
+    "app": "1.8.12: Header is the outer parallax slab. Each Apps card is an inner slab. Card sizes and the kept photo stay.",
     "appSha256": "f513cca4bed61c267681b04bf27ab65f9b2c914f18632b097c9a6fc677c126e2",
     "budgetSha256": "673372b101ea5342552ec16a2e5d3820e322411031c52d808b68c35c3d494c67",
     "budgetMode": "exp7-views",

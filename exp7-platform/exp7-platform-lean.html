@@ -97,7 +97,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.11. chromeJr.appsButtons should be two text lines and at least about 220×70. chromeJr.barLayoutH should be 44, and avatar.y+avatar.h should sit inside it. bar-draw says kept:true when a switch did not reload the icon. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.12. chromeJr.barSlabs.kinds should include outer, and chromeJr.appsSlabs.kinds should include inner while Back is open. Move the pointer: the header and the Apps cards should shift against each other. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -10231,13 +10231,14 @@ function contour(b){const[x,y,w,h,r0]=b,r=Math.max(0,Math.min(r0,w/2,h/2)),o=[];
 function sides(q,b,dx,dy,cols){const P=contour(b);for(let i=0;i<P.length;i++){const a=P[i],z=P[(i+1)%P.length],nx=z[1]-a[1],ny=a[0]-z[0];if(nx*dx+ny*dy<=1e-10)continue;const k=Math.abs(nx)>Math.abs(ny)?(nx>0?1:3):(ny>0?2:0);q.path([['M',a[0],a[1]],['L',z[0],z[1]],['L',z[0]+dx,z[1]+dy],['L',a[0]+dx,a[1]+dy],['Z']],J.hex(cols[k]));}}
 class Slabs{constructor(view){this.view=view;this.nodes=new Map();this.slabs=[];this.base=new Map();this.ids=new Set();this.xy=[0,0];this.pointerY=0;this.v=0;this.raf=0;this.offset=0;this.paused=true;this.pauseAt=clock();this.drag=false;this.form=false;this.last=clock();this.prevScroll=0;all.add(this);}
  /* Demo uses section.on + CSS display:none; Budget uses [hidden]. Both must activate slabs/parallax when the tab is shown. */
- visible(){const el=this.view.c;if(document.hidden||!el)return false;const slot=el.closest&&el.closest('.appSlot');if(slot){if(slot.classList.contains('is-dormant'))return false;if(slot.closest&&slot.closest('#appShell')&&slot.closest('#appShell').classList.contains('is-apps-covered'))return false;if(slot.hidden&&!slot.classList.contains('is-active'))return false;try{const cs=getComputedStyle(slot);if(cs.display==='none'||cs.visibility==='hidden'||parseFloat(cs.opacity)===0)return false;}catch(_){}}const shell=el.closest&&el.closest('#appShell');if(shell){try{const sc=getComputedStyle(shell);if(sc.visibility==='hidden'||sc.pointerEvents==='none'){/* apps overlay parks shell; do not ambient-draw under picker */ if(document.getElementById('appsOverlay')&&!document.getElementById('appsOverlay').hidden)return false;}}catch(_){}}const s=el.closest&&el.closest('section');if(!s)return true;if(s.hidden)return false;try{if(getComputedStyle(s).display==='none'||getComputedStyle(s).visibility==='hidden')return false;}catch(_){if(!s.classList.contains('on')&&s.style&&s.style.display==='none')return false;}return true;}
+ visible(){const el=this.view.c;if(document.hidden||!el)return false;const appsOv=el.closest&&el.closest('#appsOverlay');if(appsOv&&appsOv.hidden)return false;const slot=el.closest&&el.closest('.appSlot');if(slot){if(slot.classList.contains('is-dormant'))return false;if(slot.closest&&slot.closest('#appShell')&&slot.closest('#appShell').classList.contains('is-apps-covered'))return false;if(slot.hidden&&!slot.classList.contains('is-active'))return false;try{const cs=getComputedStyle(slot);if(cs.display==='none'||cs.visibility==='hidden'||parseFloat(cs.opacity)===0)return false;}catch(_){}}const shell=el.closest&&el.closest('#appShell');if(shell){try{const sc=getComputedStyle(shell);if(sc.visibility==='hidden'||sc.pointerEvents==='none'){/* apps overlay parks shell; do not ambient-draw under picker */ if(document.getElementById('appsOverlay')&&!document.getElementById('appsOverlay').hidden)return false;}}catch(_){}}const s=el.closest&&el.closest('section');if(!s)return true;if(s.hidden)return false;try{if(getComputedStyle(s).display==='none'||getComputedStyle(s).visibility==='hidden')return false;}catch(_){if(!s.classList.contains('on')&&s.style&&s.style.display==='none')return false;}return true;}
  active(){return this.visible()&&!reduced()&&!this.form&&!this.detached;}
  sync(t=clock()){const off=!this.active()||this.drag;if(off!==this.paused){if(off)this.pauseAt=t;else this.offset+=Math.max(0,t-this.pauseAt);this.paused=off;}if(off&&this.raf){cancelAnimationFrame(this.raf);this.raf=0;}return!off;}
  ask(){if(this.verifying||!this.sync()||this.raf||!this.slabs.length)return;this.raf=requestAnimationFrame(t=>{this.raf=0;if(!this.sync(t))return;this.tick(t);this.view.r.draw();if(this.v||C.ambient.enabled&&!this.drag)this.ask();});}
  detach(){this.detached=true;this.sync();if(this.raf)cancelAnimationFrame(this.raf);this.raf=0;if(!this.scene)return;const p=new J.Patch();for(const id of this.ids)p.remove(id);for(const[id]of this.nodes)p.xform(id,this.base.get(id)||I());if(this.ids.size||this.nodes.size)this.raw(p);this.scene.patch=this.original;if(this.scene.onevent===this.event)this.scene.onevent=this.beforeEvent;this.nodes.clear();this.slabs=[];this.base.clear();this.ids.clear();this.paintedEnabled=false;}
  bind(){this.detached=false;this.lastFront=null;const view=this.view,s=view.s;if(!s||!view.L)return;this.scene=s;this.original=s.patch;this.raw=p=>this.original.call(s,p);this.form=!!view.L.nodes.find(n=>n.tf);const used=new Set(view.L.nodes.map(n=>n.id)),byEl=new Map();
- for(const n of view.L.nodes){if(!n.el)continue;const first=n.items.find(i=>i[0]==='rrect'||i[0]==='rect');if(!first)continue;let kind=n.el.matches('.ja-comp')?'outer':n.el.matches('.ja-deps,.ja-section,.ja-brow,.ja-prow,.ja-detail,.ja-rails')?'inner':null;if(!kind||byEl.has(n.el))continue;const b=[first[1],first[2],first[3],first[4],first[0]==='rrect'?first[5]:0];let h=2166136261;for(const ch of 'px2-side:'+n.key)h=Math.imul(h^ch.charCodeAt(0),16777619)>>>0;let id=(0x60000000|(h&0x0fffffff))>>>0;while(used.has(id))id=(id+1)>>>0;used.add(id);this.ids.add(id);const z={id,owner:n.id,el:n.el,kind,b};byEl.set(n.el,z);this.slabs.push(z);}
+ for(const n of view.L.nodes){if(!n.el)continue;const first=n.items.find(i=>i[0]==='rrect'||i[0]==='rect');if(!first)continue;/* Chrome: the 44px bar is the outer slab (header moves together, avatar photo uses the same factor). Each Apps card is its own inner slab so it moves against the header. */
+let kind=n.el.matches('.ja-comp,[data-plat="bar"],[data-plat="apps"]')?'outer':n.el.matches('.ja-deps,.ja-section,.ja-brow,.ja-prow,.ja-detail,.ja-rails,.ja-joy[data-jv-act^="plat:app:"]')?'inner':null;if(!kind||byEl.has(n.el))continue;const b=[first[1],first[2],first[3],first[4],first[0]==='rrect'?first[5]:0];let h=2166136261;for(const ch of 'px2-side:'+n.key)h=Math.imul(h^ch.charCodeAt(0),16777619)>>>0;let id=(0x60000000|(h&0x0fffffff))>>>0;while(used.has(id))id=(id+1)>>>0;used.add(id);this.ids.add(id);const z={id,owner:n.id,el:n.el,kind,b};byEl.set(n.el,z);this.slabs.push(z);}
  /* Existing logical month/plan containers have no separate fill node. Map their real drawn bounds to the original inner-glass part, sides only; no background fill or replacement geometry. */
  const containers=new Set();for(const n of view.L.nodes){const el=n.el&&n.el.closest('.ja-cal,.ja-plan');if(el)containers.add(el);}for(const el of containers){if(byEl.has(el))continue;const ns=view.L.nodes.filter(n=>n.el&&(el===n.el||el.contains(n.el)));let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;for(const n of ns)for(const a of n.items){let x,y,w,h;if(['rect','rrect','border'].includes(a[0]))[x,y,w,h]=a.slice(1,5);else if(a[0]==='text'||a[0]==='tbox'){x=a[1];y=a[2]-a[3];w=view.s.core.measure(V.font(),a[3],a[5]);if(a[0]==='tbox'){w=Math.min(a[6],w);h=view.s.core.wrap(V.font(),a[3],a[5],a[6],{lineHeight:a[7]}).height;}else h=a[3]*1.3;}else continue;x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x+w);y1=Math.max(y1,y+h);}if(!ns.length||!(x1>x0&&y1>y0))continue;let h=2166136261;for(const ch of 'px2-glass:'+ns[0].key)h=Math.imul(h^ch.charCodeAt(0),16777619)>>>0;let id=(0x60000000|(h&0x0fffffff))>>>0;while(used.has(id))id=(id+1)>>>0;used.add(id);this.ids.add(id);const z={id,owner:ns[0].id,el,kind:'inner',b:[x0,y0,x1-x0,y1-y0,10],logical:true};byEl.set(el,z);this.slabs.push(z);}
  for(const n of view.L.nodes){let el=n.el;while(el&&!byEl.has(el))el=el.parentElement;if(el)this.nodes.set(n.id,byEl.get(el));}
@@ -12032,7 +12033,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     var label = p.showInitials ? (state.initials || '?') : '';
     var bg = p.showSoftDisc ? 'background:#eef1f6;' : 'background:transparent;';
     /* Exclusive: photo has no initials text; pending has neither; soft-disc only with initials. */
-    /* One 44px row. A ja-comp plus the document margin made this canvas 90px and cropped the icon under the bar. */
+    /* One 44px row. data-plat=bar is the outer parallax slab. The old document margin, not this row, was what made the canvas 90px. */
     return '' +
       '<div class="ja-bar" data-plat="bar" style="background:#ffffff;min-height:' + BAR_H + 'px">' +
       '<button type="button" data-jv-act="plat:back" class="ja-joy" data-jr-state="idle" style="min-width:36px;min-height:36px">&larr;</button>' +
@@ -12395,8 +12396,18 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       avatar: b ? { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) } : null,
       appsCanvas: acv ? [acv.clientWidth, acv.clientHeight] : null,
       appsLayoutH: L ? L.H : null,
-      appsButtons: buttons
+      appsButtons: buttons,
+      barSlabs: slabBrief(state.barView),
+      appsSlabs: slabBrief(state.appsView)
     };
+  }
+
+  function slabBrief(view) {
+    var ctl = view && view._slabs;
+    if (!ctl || !ctl.slabs) return null;
+    var kinds = [];
+    for (var i = 0; i < ctl.slabs.length; i++) kinds.push(ctl.slabs[i].kind);
+    return { n: ctl.slabs.length, kinds: kinds, nodes: ctl.nodes ? ctl.nodes.size : 0, active: !!(ctl.active && ctl.active()) };
   }
 
   root.PlatformChromeJR = {
@@ -12663,6 +12674,7 @@ function hideAppsOverlay(opts){opts=opts||{};UI.appsOpen=false;try{window.__plat
  const o=$("appsOverlay");if(o){o.hidden=true;o.classList.remove("jr-on")}
  const sh=$("appShell"); if(sh){sh.classList.remove("is-apps-covered"); sh.style.pointerEvents=""; sh.style.visibility=""; sh.removeAttribute("aria-hidden")}
  dbgChrome(opts.skipReveal?"overlay-hide-skip":"overlay-hide");
+ try{if(window.Exp7Slabs&&Exp7Slabs.notify)Exp7Slabs.notify()}catch(e){}
  if(!opts.skipReveal && UI.mountedAppId){try{revealAppViews(UI.mountedAppId)}catch(e){dbgPush("reveal-throw",String(e&&e.message||e))}}}
 
 function openAccountMenu(){UI.accountOpen=true;const m=$("accountMenu"),s=$("accountScrim");if(m)m.hidden=false;if(s)s.hidden=false;$("btnAvatar").setAttribute("aria-expanded","true");
@@ -12772,7 +12784,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.11",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.12",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
