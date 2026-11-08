@@ -97,7 +97,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.18. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The top of a card fades. Press a control and its edge turns navy, then the edge returns. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.19. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. A dark card brightens through the middle. A white card does not. No sparkle. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -10450,7 +10450,7 @@ window.x7 = window.x7 || function (t) {
   var LIGHT = {
     elevationDeg: 50, azimuthDeg: 90, offsetPerPx: 0.79, blurPerPx: 0.93, coreAlpha: 0.55, restPx: 1.15,
     focalMm: 85, distancePx: 2099.1, scalePerPx: 0.0006, halfPx: 0.5,
-    ca1Top: 10, ca1Bot: 16
+    ca1Top: 10, ca1Body: 12, ca1Bot: 16
   };
   var CLICK_MS = { hover: 90, leave: 100, focus: 90, press: 60, up: 80, select: 100, drag: 80, drop: 120, cancel: 120, invalid: 120 };
 
@@ -10669,9 +10669,10 @@ window.x7 = window.x7 || function (t) {
           /* Glass rims are part of the fill, so they rise with it. The penumbra stays at the original bottom. */
           var glass = glassRead(n, fill);
           n.uxGlass = glass.kind;
+          n.uxGlassBody = glass.body || 0;
           if (glass.rims.length) {
-            n.items.push(glass.rims[0], glass.rims[1]);
-            touched += 2;
+            n.items.push.apply(n.items, glass.rims);
+            touched += glass.rims.length;
           }
           var rise = liftPx(n.el, st);
           var phys = physicalLift(n.el, st);
@@ -10717,7 +10718,7 @@ window.x7 = window.x7 || function (t) {
     L.uxRefraction = 'blocked-no-dl-op';
     L.uxMoho = 'blocked-no-svg-op';
     L.uxCaustics = 'not-emitted';
-    L.uxMotion = 'soft-top-press-ring';
+    L.uxMotion = 'glass-body';
     L.uxStamped = stamp.stamped;
     L.uxTouched = touched;
     L.uxGeoTouched = geoTouched;
@@ -10905,30 +10906,32 @@ window.x7 = window.x7 || function (t) {
       255
     ];
   }
-  /* Published CA1 is a static brightening on dark glass. On a near-white fill it is under 3% and is not drawn.
-     Specks are not included. This is not a refraction shader and not a new caustic proof. */
+  /* Published CA1 is a static brightening on dark glass: a faint top, a slightly stronger body, and a bottom line.
+     On a near-white fill the body is under 3% and is not drawn. Specks are not included.
+     This is not a refraction shader and not a new caustic proof. */
   function glassRead(n, fill) {
     var col = unpack(fill[fill.length - 1]);
-    if (lum(col) >= 0.25) return { kind: 'below-perception', rims: [] };
+    if (lum(col) >= 0.25) return { kind: 'below-perception', rims: [], body: 0 };
     var fx = fill[1], fy = fill[2], fw = fill[3], fh = fill[4];
     var top = over([255, 255, 255, LIGHT.ca1Top], col);
+    var body = over([255, 255, 255, LIGHT.ca1Body], col);
     var bot = over([255, 255, 255, LIGHT.ca1Bot], col);
+    var bodyTop = fy + 3, bodyBot = fy + fh - 2, bodyH = bodyBot - bodyTop;
     var items = n.items || [];
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
       if (it[0] !== 'text' && it[0] !== 'tbox' && it[0] !== 'label' && it[0] !== 'glyph') continue;
       if (typeof it[4] !== 'number' || typeof it[2] !== 'number') continue;
       var ink = unpack(it[4]);
-      var bg = it[2] < fy + 3 ? top : (it[2] > fy + fh - 3 ? bot : col);
-      if (contrastRatio(ink, bg) < 4.5) return { kind: 'skipped-contrast', rims: [] };
+      var bg = it[2] < fy + 3 ? top : (it[2] > fy + fh - 3 ? bot : (bodyH >= 8 ? body : col));
+      if (contrastRatio(ink, bg) < 4.5) return { kind: 'skipped-contrast', rims: [], body: 0 };
     }
-    return {
-      kind: 'ca1-static',
-      rims: [
-        ['rect', fx + 2, fy + 1, Math.max(1, fw - 4), 2, packRgba([255, 255, 255, LIGHT.ca1Top])],
-        ['rect', fx + 2, fy + fh - 2, Math.max(1, fw - 4), 1, packRgba([255, 255, 255, LIGHT.ca1Bot])]
-      ]
-    };
+    var rims = [
+      ['rect', fx + 2, fy + 1, Math.max(1, fw - 4), 2, packRgba([255, 255, 255, LIGHT.ca1Top])]
+    ];
+    if (bodyH >= 8) rims.push(['rect', fx + 2, bodyTop, Math.max(1, fw - 4), bodyH, packRgba([255, 255, 255, LIGHT.ca1Body])]);
+    rims.push(['rect', fx + 2, fy + fh - 2, Math.max(1, fw - 4), 1, packRgba([255, 255, 255, LIGHT.ca1Bot])]);
+    return { kind: 'ca1-static', rims: rims, body: bodyH >= 8 ? LIGHT.ca1Body : 0 };
   }
   function photoDecision(state) {
     var photoReady = !!(state && state.avatarUrl && state.avatarMode === 'photo' && state.avatarHandle && state.avatarHandle.state === 'ready');
@@ -13171,7 +13174,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.18",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.19",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
