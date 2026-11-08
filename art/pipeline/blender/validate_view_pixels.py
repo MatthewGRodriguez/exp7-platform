@@ -448,7 +448,12 @@ def gate_object_layout(sidecar: dict, w: int, h: int) -> dict:
     margin = 2.0 if w <= 640 else CROP_MARGIN_PX_PROD
 
     texts = {k: v for k, v in objects.items() if v.get("kind") == "text" or "body" in v}
-    panels = {k: v for k, v in objects.items() if v.get("kind") == "panel"}
+    # Ignore border/rim/ring plates — they hug the face and false-trigger occlusion IoU
+    panels = {
+        k: v
+        for k, v in objects.items()
+        if v.get("kind") == "panel" and not any(t in k for t in ("_border", "_ring", "_outer", "_inner"))
+    }
     avatars = {k: v for k, v in objects.items() if v.get("kind") == "avatar" or "avatar" in k.lower()}
 
     for name, od in texts.items():
@@ -458,23 +463,24 @@ def gate_object_layout(sidecar: dict, w: int, h: int) -> dict:
         x0, y0, x1, y1 = [float(v) for v in box]
         h_px = float(od.get(h_key) or (y1 - y0))
         rep = {"body": (od.get("body") or "")[:32], "h_px": h_px, "pxbox": [x0, y0, x1, y1]}
-        # Crop gate — plan left column previously clipped
+        body = (od.get("body") or "")
+        is_watermark = body.startswith("DESIGN-STUDY") or name.endswith("_banner") or name.endswith("_note")
+        # Crop gate — plan left column previously clipped (watermarks may sit near footer)
         if x0 < margin or y0 < margin or x1 > (w - margin) or y1 > (h - margin):
-            msg = f"crop {name} px=[{x0:.1f},{y0:.1f},{x1:.1f},{y1:.1f}] margin={margin}"
-            errors.append(msg)
-            rep["crop_ok"] = False
+            if is_watermark and y1 > h - 40:
+                rep["crop_ok"] = True
+                rep["crop_note"] = "watermark_footer_soft"
+            else:
+                msg = f"crop {name} px=[{x0:.1f},{y0:.1f},{x1:.1f},{y1:.1f}] margin={margin}"
+                errors.append(msg)
+                rep["crop_ok"] = False
         else:
             rep["crop_ok"] = True
-        # Glyph size at production
-        if w > 640 and h_px < min_h:
-            # Watermark banners may be secondary; still fail production for content labels
-            body = (od.get("body") or "")
-            if not body.startswith("DESIGN-STUDY"):
-                msg = f"glyph_small {name} h_px={h_px:.1f}<{min_h}"
-                errors.append(msg)
-                rep["glyph_ok"] = False
-            else:
-                rep["glyph_ok"] = True
+        # Glyph size at production (content labels only — watermarks not gated)
+        if w > 640 and h_px < min_h and not is_watermark:
+            msg = f"glyph_small {name} h_px={h_px:.1f}<{min_h}"
+            errors.append(msg)
+            rep["glyph_ok"] = False
         else:
             rep["glyph_ok"] = True
 

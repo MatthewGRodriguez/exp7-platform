@@ -28,11 +28,11 @@ MIN_TEXT_OBJECTS = 8
 MIN_AVATAR_OBJECTS = 1
 
 # World sizes chosen so production 1280 framing (after push-in) keeps secondary ≥~12px.
-TITLE_SIZE = 0.30
-SUB_SIZE = 0.16
-BODY_SIZE = 0.14
-META_SIZE = 0.12
-DAY_SIZE = 0.15
+TITLE_SIZE = 0.36
+SUB_SIZE = 0.20
+BODY_SIZE = 0.18
+META_SIZE = 0.15
+DAY_SIZE = 0.18
 
 # Display-intent sRGB 0–1 (documentation + analytical preflight). NOT scene-linear.
 INK = (0.078, 0.094, 0.133)  # #141822
@@ -183,19 +183,23 @@ def parent_to_panel(child, panel, local_xyz):
 
     Production contract: panel lift/scale/tilt move labels with the face — never leave
     labels at uncoupled world XY under/ beside a lifted card.
+
+    Blender returns a *copy* from matrix_parent_inverse — must assign Matrix.Identity(4)
+    back (in-place .identity() on the copy is a silent no-op and left v9 text on the floor).
     """
+    from mathutils import Matrix  # type: ignore
+
     face_z = float(panel.get("exp7_face_local_z", local_xyz[2] if len(local_xyz) > 2 else 0.03))
     lx, ly = float(local_xyz[0]), float(local_xyz[1])
     lz = float(local_xyz[2]) if len(local_xyz) > 2 else face_z
-    # Prefer stored face height when caller passes a sentinel / underspecified z
     if len(local_xyz) < 3 or abs(lz) < 1e-6:
         lz = face_z
+    # Clear any prior parent, then bind with identity parent-inverse so location is local
+    child.parent = None
     child.parent = panel
-    try:
-        child.matrix_parent_inverse.identity()
-    except Exception:
-        pass
+    child.matrix_parent_inverse = Matrix.Identity(4)
     child.location = (lx, ly, lz)
+    child.rotation_euler = (0.0, 0.0, 0.0)
     child["exp7_bound_parent"] = panel.name
     return child
 
@@ -332,7 +336,7 @@ def compose_calendar(make_panel, palette, geom, element_states, font_id, prefix=
                 objs.append(
                     label_on_panel(
                         panel, f"{prefix}_evt{row}{col}", "Review",
-                        (-0.14, -0.10), META_SIZE, ink_for_state(st_name, "accent"), font_id,
+                        (-0.14, -0.08), META_SIZE, ink_for_state(st_name, "primary"), font_id,
                     )
                 )
             day += 1
@@ -463,20 +467,20 @@ def compose_plan(make_panel, palette, geom, element_states, font_id, prefix="Vie
 
 
 def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="ViewChrome"):
-    """Horizontal nav — larger physical size so 1280 framing yields ≥12px glyphs + clear avatar."""
+    """Horizontal nav — sized for frontal 1280 framing (≥12px glyphs, avatar clear of labels)."""
     import bpy  # type: ignore
 
     scale = float(geom.get("scenePxScale", 0.01))
-    bar_h = max(0.55, float(geom.get("barH", 44)) * scale * 1.8)
-    avatar = max(0.55, float(geom.get("avatar", 36)) * scale * 2.2)
+    bar_h = max(0.48, float(geom.get("barH", 44)) * scale * 1.55)
+    avatar = max(0.48, float(geom.get("avatar", 36)) * scale * 1.85)
     gap = float(geom.get("gap", 8)) * scale
     objs = []
 
     bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 0.0, 0.04))
     bar = bpy.context.active_object
     bar.name = f"{prefix}_bar"
-    # ~4.6m wide × tall bar so frontal framing fills the canvas
-    bar.scale = (2.30, bar_h / 2, 0.03)
+    # ~3.6m wide — fits frontal FOV without overflow; still fills canvas after push-in
+    bar.scale = (1.80, bar_h / 2, 0.03)
     bpy.ops.object.transform_apply(scale=True)
     mat = bpy.data.materials.new(f"{prefix}_bar_mat")
     mat.use_nodes = True
@@ -485,21 +489,20 @@ def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="V
         c = palette["_rgba"]["surface"]
         bsdf.inputs["Base Color"].default_value = (c[0], c[1], c[2], 1)
     bar.data.materials.append(mat)
-    bar["exp7_face_local_z"] = 0.05
-    bar["exp7_size_x"] = 4.60
+    bar["exp7_face_local_z"] = 0.055
+    bar["exp7_size_x"] = 3.60
     bar["exp7_size_y"] = float(bar_h)
     objs.append(bar)
     objs.append(
-        label_on_panel(bar, f"{prefix}_brand", "Exp7", (-2.05, 0.0), TITLE_SIZE * 1.05, INK, font_id)
+        label_on_panel(bar, f"{prefix}_brand", "Exp7", (-1.60, 0.0), TITLE_SIZE, INK, font_id)
     )
 
-    # Apps: left-center cluster — clear of brand and of avatar
     for i, (label, st_name) in enumerate([("Budget", "selected"), ("Atlas", "idle"), ("Roster", "hover")]):
         st = dict(element_states.get(st_name, element_states["idle"]))
-        x = -0.85 + i * (0.72 + gap)
+        x = -0.70 + i * (0.58 + gap)
         panel, _, ring, _ = make_panel(
             f"{prefix}_app{i}", st, palette, geom, st_name=st_name,
-            size=(0.64, bar_h * 0.72), origin=(x, 0.0), content_lines=0,
+            size=(0.52, bar_h * 0.70), origin=(x, 0.0), content_lines=0,
         )
         objs.append(panel)
         if ring:
@@ -507,17 +510,16 @@ def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="V
         objs.append(
             label_on_panel(
                 panel, f"{prefix}_appLab{i}", label,
-                (-0.22, 0.0), BODY_SIZE * 1.25, ink_for_state(st_name), font_id,
+                (-0.18, 0.0), BODY_SIZE * 1.15, ink_for_state(st_name), font_id,
             )
         )
 
-    # Tabs further right but with ≥0.55m clearance before avatar
     for i, (label, st_name) in enumerate([("Cal", "selected"), ("Board", "idle"), ("Plan", "idle")]):
         st = dict(element_states.get(st_name, element_states["idle"]))
-        x = 0.95 + i * (0.48 + gap * 0.4)
+        x = 0.75 + i * (0.40 + gap * 0.35)
         panel, _, ring, _ = make_panel(
             f"{prefix}_tab{i}", st, palette, geom, st_name=st_name,
-            size=(0.42, bar_h * 0.62), origin=(x, 0.0), content_lines=0,
+            size=(0.36, bar_h * 0.60), origin=(x, 0.0), content_lines=0,
         )
         objs.append(panel)
         if ring:
@@ -525,20 +527,20 @@ def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="V
         objs.append(
             label_on_panel(
                 panel, f"{prefix}_tabLab{i}", label,
-                (-0.12, 0.0), BODY_SIZE * 1.1, ink_for_state(st_name), font_id,
+                (-0.10, 0.0), BODY_SIZE, ink_for_state(st_name), font_id,
             )
         )
 
     path = avatar_asset_path()
-    # Avatar on far right — no label overlaid on disc; "you" sits below with gap
-    av = make_avatar(f"{prefix}_avatar", (2.05, 0.0), avatar, path, z=0.12)
+    # Far-right avatar; login below with clearance — never over disc
+    av = make_avatar(f"{prefix}_avatar", (1.60, 0.0), avatar, path, z=0.12)
     objs.append(av)
-    objs.append(make_text(f"{prefix}_login", "you", (1.92, -0.48, 0.06), BODY_SIZE, INK_SECONDARY, font_id))
+    objs.append(make_text(f"{prefix}_login", "you", (1.48, -0.42, 0.06), BODY_SIZE, INK_SECONDARY, font_id))
     objs.append(
         make_text(
             f"{prefix}_banner",
             "DESIGN-STUDY chrome · fixture",
-            (-2.05, -0.85, 0.04),
+            (-1.60, -0.75, 0.04),
             BODY_SIZE,
             INK_SECONDARY,
             font_id,
@@ -548,7 +550,7 @@ def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="V
         make_text(
             f"{prefix}_note",
             "Best≠Selected · PAT stays DOM",
-            (-2.05, -1.05, 0.04),
+            (-1.60, -0.95, 0.04),
             BODY_SIZE * 0.9,
             INK_SECONDARY,
             font_id,
