@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" width="1280" height="800" preserveAspectRatio="xMidYMid slice">
+  <title>L0 void ambient</title>
+  <style>
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; }
+      animate, animateTransform, animateMotion { display: none; }
+    }
+  </style>
+  <defs>
+    <radialGradient id="v1" cx="85%" cy="15%" r="45%">
+      <stop offset="0%" stop-color="#bb9af7" stop-opacity="0.14">
+        <animate attributeName="stop-opacity" values="0.08;0.18;0.08" dur="8s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="100%" stop-color="#050508" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="v2" cx="12%" cy="80%" r="40%">
+      <stop offset="0%" stop-color="#7dcfff" stop-opacity="0.1">
+        <animate attributeName="stop-opacity" values="0.05;0.14;0.05" dur="11s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="100%" stop-color="#050508" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="800" fill="#050508"/>
+  <rect width="1280" height="800" fill="url(#v1)"/>
+  <rect width="1280" height="800" fill="url(#v2)"/>
+  <g opacity="0.12">
+    <circle cx="200" cy="200" r="2" fill="#bb9af7">
+      <animate attributeName="cy" values="200;180;200" dur="6s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.2;0.8;0.2" dur="6s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="900" cy="500" r="2" fill="#7dcfff">
+      <animate attributeName="cx" values="900;920;900" dur="7s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="600" cy="100" r="1.5" fill="#9ece6a">
+      <animate attributeName="r" values="1;2.5;1" dur="5s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+</svg>

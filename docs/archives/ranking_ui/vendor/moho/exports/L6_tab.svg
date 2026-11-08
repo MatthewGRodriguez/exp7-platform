@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 36" width="100" height="36" preserveAspectRatio="none">
+  <title>L6 tab switch — underline wipe sized to active tab</title>
+  <style>
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; }
+      animate, animateTransform, animateMotion { display: none; }
+    }
+  </style>
+  <!-- Soft fill over the whole tab hit area -->
+  <rect x="0" y="0" width="100" height="36" rx="4" fill="#bb9af7" opacity="0">
+    <animate attributeName="opacity" values="0;0.14;0" keyTimes="0;0.25;1" dur="0.55s" fill="freeze"/>
+  </rect>
+  <!-- Bottom underline: grows to full tab width (preserveAspectRatio=none stretches with host) -->
+  <rect x="8" y="31" width="0" height="2.5" rx="1.25" fill="#bb9af7">
+    <animate attributeName="width" values="0;84;84" keyTimes="0;0.45;1" dur="0.55s" fill="freeze"/>
+    <animate attributeName="opacity" values="1;1;0" keyTimes="0;0.65;1" dur="0.55s" fill="freeze"/>
+  </rect>
+</svg>

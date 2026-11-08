@@ -1,7 +1,7 @@
 # Exp7 Platform documentation
 
-**Scope:** project notes for the public software repo `MatthewGRodriguez/exp7-platform`.  
-**Rule:** this tree is documentation only. It does not authorize release, app, launcher, or `release.json` changes.
+**Scope:** project notes + **historical source archives** for the public software repo `MatthewGRodriguez/exp7-platform`.  
+**Rule:** documentation / inert archive only. It does not authorize release integration, app runtime changes, launcher, or `release.json` edits.
 
 ## Verified live tip (read again before acting)
 
@@ -44,20 +44,24 @@ Every substantive claim should carry an evidence class (see [EVIDENCE.md](./EVID
 | [testing-provenance.md](./testing-provenance.md) | What was tested where; Mac vs box vs mock limits |
 | [known-issues-acceptance.md](./known-issues-acceptance.md) | Recurring failures and acceptance criteria |
 | [requirements-vs-main.md](./requirements-vs-main.md) | **Gap table:** [REQ] vs verified 1.5.0 `main` vs closed PR claims |
-| [lore-migration-pending.md](./lore-migration-pending.md) | Lore import status: **158** public-safe docs imported; **not** complete/latest |
-| [lore/README.md](./lore/README.md) | Historical Lore archive home (`jeditor/`, `living-core/`, inventory + hashes) |
+| [lore-migration-pending.md](./lore-migration-pending.md) | Lore **158 + 41 redacted**; ranking_ui archive status; gaps |
+| [lore/README.md](./lore/README.md) | Lore archive home (public-safe + redacted paths) |
+| [lore/REDACTED-SUPPLEMENT.md](./lore/REDACTED-SUPPLEMENT.md) | 41 privacy-redacted Lore docs |
 | [lore/HISTORICAL-VS-CURRENT.md](./lore/HISTORICAL-VS-CURRENT.md) | Archive vs newer requirements (conflicts left unresolved) |
+| [archives/ranking_ui/README.md](./archives/ranking_ui/README.md) | Partial sanitized ranking_ui source archive (not runnable) |
 | [sources/2026-11-08-exp7-context-handoff.md](./sources/2026-11-08-exp7-context-handoff.md) | Preserved historical handoff (not proof of current code) |
 
-## Lore docs migration
+## Archive migration
 
-Public-safe box snapshot imported under [`lore/`](./lore/README.md): **158** byte-exact documents + inventory; **42** withheld (counts only). Design ≤49, ADR ≤0111. **Not** complete/latest canonical Lore — Mac freshness gap remains. See [lore-migration-pending.md](./lore-migration-pending.md).
+- Lore: **158** public-safe + **41** redacted (1 income record still withheld). Design ≤49, ADR ≤0111. **Not** complete/latest.  
+- ranking_ui: **75** snapshot files + sanitized `ranking_ui.html.txt`; schedule minutes redacted; **not** integrated/runnable.  
+See [lore-migration-pending.md](./lore-migration-pending.md).
 
-## Non-goals for documentation work
+## Non-goals for documentation / archive work
 
-- No app / HTML / launcher / `release.json` edits in docs PRs  
-- No version bump, merge, or release publication from docs work  
-- No contact with the Artist  
-- No secrets, keys, account, or private financial data  
+- No platform/runtime HTML, launcher, or `release.json` edits; no version bump/merge/release  
+- No executable integration of archives into the shipped platform  
+- No secrets, keys, account digits, or private financial/schedule values in git  
+- Raw private `ranking_ui.html` must never enter commits  
 - Do **not** resume canceled search / scheduler / Timefold / “v50” research  
-- Do **not** mix documentation into app PRs (e.g. closed PR #7)
+- Do **not** mix this into app PRs (e.g. closed PR #7)

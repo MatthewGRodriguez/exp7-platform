@@ -1,44 +1,41 @@
-# Lore-repo documentation migration — status
+# Lore & legacy archive migration — status
 
-## Status (updated 2026-11-08, docs PR)
-
-A **public-safe historical snapshot** was imported into [`lore/`](./lore/README.md).
+## Lore docs
 
 | Metric | Value |
 |--------|------:|
-| Archived documents imported (inventory) | **158** |
-| Inventory file | `lore/LORE-DOCS-PUBLIC-INVENTORY.md` |
-| SHA-256 checks vs inventory after copy | **158/158 match**, 0 mismatch |
-| Withheld (not in package; counts only) | **42** |
-| Further exclusions after import scan | **0** |
-| Design docs included through | **49** |
-| ADRs included through | **0111** |
-| Lore history / Mac freshness guarantee | **None** |
+| Public-safe docs | **158** (byte-exact) |
+| Redacted supplement | **41** (transformed; paths preserved) |
+| Still withheld | **1** personal income/pay decision (not reconstructed) |
+| Design through | **49** |
+| ADR through | **0111** |
+| Complete/latest Lore? | **No** |
 
-This is **not** a complete or latest canonical Lore migration. Later Mac docs (design >49, ADR >0111, other trees) remain **unknown / out of package**. Authoritative Lore stays on the owner’s Mac.
+Inventories: `lore/LORE-DOCS-PUBLIC-INVENTORY.md`, `lore/LORE-DOCS-REDACTED-INVENTORY.md`.
 
-## Withheld (42) — counts only; do not reconstruct
+## ranking_ui historical source archive
 
-Per package inventory (do not invent contents):
+| Metric | Value |
+|--------|------:|
+| Snapshot files from zip | **75** |
+| Hash-match to zip archived SHA (except further-redacted file) | **74/74** content SHA match† |
+| Further redacted in-repo | `vendor/model_tools_script.js` (schedule minutes) |
+| Sanitized main UI | `archives/ranking_ui/ranking_ui.html.txt` (raw never in git) |
+| Runnable / integrated? | **No** |
 
-- 35 — personal financial data  
-- 4 — local personal identifiers (machine paths)  
-- 2 — private-data location / exposure description  
-- 1 — agent operating instructions / persona-runtime (not software docs)  
+† Zip inventory byte-size column disagrees for 5 files whose **SHA matches** the archived hash; SHA is authoritative.
 
-Also omitted by packager: source/code payloads, JEditor source, macOS metadata, user-uploaded HTML.
+Home: [`archives/ranking_ui/`](./archives/ranking_ui/README.md).
 
-## Checklist
+## Remaining gaps
 
-| Item | Source | Destination | Done? |
-|------|--------|-------------|-------|
-| Public-safe JEditor docs snapshot | Attached zip (`jeditor/…`) | `docs/lore/jeditor/` | Yes (byte-exact) |
-| Public-safe living-core top docs | Attached zip (`living-core/…`) | `docs/lore/living-core/` | Yes (byte-exact) |
-| Package inventory + hashes | Attached zip | `docs/lore/LORE-DOCS-PUBLIC-INVENTORY.md` | Yes |
-| Post-49 designs / post-0111 ADRs / other Mac Lore | Mac Lore (not in package) | — | **No — freshness gap** |
-| 42 withheld records | — | — | **Never publish from this agent** |
+- Mac Lore after design 49 / ADR 0111  
+- Mac ranking_ui newer than this box snapshot  
+- Withheld ranking data/backups/frames (per ranking inventory)  
+- Raw `ranking_ui.html` (private; sanitization source only)  
+- One Lore income decision record  
 
 ## Related
 
-- [`lore/HISTORICAL-VS-CURRENT.md`](./lore/HISTORICAL-VS-CURRENT.md) — conflicts with newer requirements  
-- [`requirements-vs-main.md`](./requirements-vs-main.md) — live platform gaps  
+- [`lore/HISTORICAL-VS-CURRENT.md`](./lore/HISTORICAL-VS-CURRENT.md)  
+- [`archives/ranking_ui/SANITIZATION.md`](./archives/ranking_ui/SANITIZATION.md)  

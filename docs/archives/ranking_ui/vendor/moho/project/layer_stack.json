@@ -1,0 +1,91 @@
+{
+  "project": "JWorkbook_chrome",
+  "app": "/Applications/Moho.app",
+  "law": "Motion art SoT = Moho.app. living-core bridges only.",
+  "artboard": {
+    "w": 1280,
+    "h": 800
+  },
+  "save_as": "JWorkbook_chrome.moho",
+  "export_dir": "../exports",
+  "layers": [
+    {
+      "id": "L0_void",
+      "moho_layer": "Void",
+      "export": "L0_void.svg",
+      "ambient": true,
+      "when": null
+    },
+    {
+      "id": "L1_accent_wave",
+      "moho_layer": "AccentWave",
+      "export": "L1_accent_wave.svg",
+      "ambient": true,
+      "when": null
+    },
+    {
+      "id": "L2_chrome",
+      "moho_layer": "Chrome",
+      "export": "L2_chrome.svg",
+      "ambient": true,
+      "when": null
+    },
+    {
+      "id": "L3_panel_breathe",
+      "moho_layer": "PanelBreathe",
+      "export": "L3_panel.svg",
+      "ambient": true,
+      "when": null
+    },
+    {
+      "id": "L4_run_pulse",
+      "moho_layer": "RunPulse",
+      "export": "L4_run_pulse.svg",
+      "ambient": false,
+      "when": "live-badge.on"
+    },
+    {
+      "id": "L5_money_spark",
+      "moho_layer": "MoneySpark",
+      "export": "L5_money_spark.svg",
+      "ambient": false,
+      "when": "money-update"
+    },
+    {
+      "id": "L6_tab_switch",
+      "moho_layer": "TabSwitch",
+      "export": "L6_tab.svg",
+      "ambient": false,
+      "when": "tab-change"
+    },
+    {
+      "id": "L10_review",
+      "moho_layer": "ReviewFlash",
+      "export": "L10_review.svg",
+      "ambient": false,
+      "when": "review-decision"
+    },
+    {
+      "id": "L11_cal_drill",
+      "moho_layer": "CalDrill",
+      "export": "L11_cal_drill.svg",
+      "ambient": false,
+      "when": "calendar-drill"
+    },
+    {
+      "id": "L12_save_ok",
+      "moho_layer": "SaveOk",
+      "export": "L12_save_ok.svg",
+      "ambient": false,
+      "when": "save-ok"
+    },
+    {
+      "id": "L13_relation_graph",
+      "moho_layer": "RelationGraph",
+      "export": "L13_relation_graph.svg",
+      "ambient": false,
+      "when": "relation-graph",
+      "float": false
+    }
+  ]
+}

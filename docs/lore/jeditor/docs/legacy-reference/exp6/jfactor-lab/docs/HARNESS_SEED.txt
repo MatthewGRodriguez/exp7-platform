@@ -1,0 +1,52 @@
+JFactor Lab harness session seed.
+Law: Grok Build=harness · living-core=process · JFactor/Exp6=rank · never invent money · REVIEW human only.
+cwd: /Users/[REDACTED-USER]/Home/Dev/The Joy Machine 2/jfactor-lab
+
+Steps densest:
+1) living_sense host — quote open_next session last_capture perf
+2) living_token_view action=handoff modality=host
+3) Read docs/PROTOCOL_hop0.md and docs/hop0_latest.txt — map lines to protocol
+4) living_rank_cycle only if open_next is operate densest (not REVIEW approve unless user named ids)
+5) Paper edits only when measures/findings change — docs/ABSTRACT.md THESIS.md
+
+--- from HARNESS_SESSION.md seeds ---
+**A — hop0 read**
+
+```
+Call living_sense for host. Quote open_next, session, last_capture, perf.
+Do not list all MCP tools. Summarize densest next step only.
+```
+
+**B — protocol check**
+
+```
+Read docs/PROTOCOL_hop0.md. Map hop0_latest.txt lines to the protocol table.
+Note any missing required fields.
+```
+
+**C — paper edit**
+
+```
+Read docs/ABSTRACT.md and docs/measures_latest.json.
+If measures drifted >5% from abstract numbers, propose a one-paragraph patch only.
+```
+
+**D — law**
+
+```
+Never invent money. Do not approve REVIEW proposals unless I name ids.
+Grok Build = harness · living-core = process · JFactor = rank.
+```
+
+## After session
+
+```bash
+node scripts/dump_measures.js
+./scripts/pack_submit.sh
+```
+
+Capture densest note in living-core if intentional:
+
+```
+living_capture text="JFactor Lab harness session · …"
+```

@@ -1,0 +1,187 @@
+{
+  "project": "ranking_ui",
+  "author": "living-core probe_app_moho",
+  "law": "Design artboard + bindings are placement SoT. Function fires when=…; bindings place layer art on DOM region. fail_closed: no binding ⇒ no float. HTML stays structure/$ SoT; Moho/SVG is motion art SoT.",
+  "at": "2026-08-05T14:09:30.309Z",
+  "rev": 3,
+  "artboard": {
+    "w": 1280,
+    "h": 800,
+    "unit": "px",
+    "master": "design/ui_master.svg",
+    "map": "design/design_map.svg",
+    "moho_scene": "JWorkbook_chrome.moho"
+  },
+  "design_tool": {
+    "app": "/Applications/Moho.app",
+    "app_name": "Moho",
+    "kind": "macOS_app",
+    "not": "living-core_svg_authoring",
+    "invoke": "living_invoke external_id=app:Moho",
+    "open_project_guide": "project/OPEN_IN_MOHO.md",
+    "save_project_as": "project/JWorkbook_chrome.moho",
+    "export_to": "vendor/moho/exports/",
+    "note": "Design ONLY in Moho.app. living-core never replaces your .moho or exports."
+  },
+  "regions": {
+    "header": {
+      "id": "R_header",
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 52,
+      "sel": "header",
+      "note": "title chrome"
+    },
+    "tabs": {
+      "id": "R_tabs",
+      "x": 0,
+      "y": 52,
+      "w": 1280,
+      "h": 36,
+      "sel": "#tabs",
+      "note": "tab strip"
+    },
+    "tab_active": {
+      "id": "R_tab_active",
+      "sel": "#tabs .tab.active",
+      "note": "live DOM rect wins (tab width varies)"
+    },
+    "graph_bar": {
+      "id": "R_graph",
+      "x": 0,
+      "y": 88,
+      "w": 1280,
+      "h": 40,
+      "sel": ".graph-bar",
+      "note": "money / graph strip"
+    },
+    "pane": {
+      "id": "R_pane",
+      "x": 12,
+      "y": 128,
+      "w": 900,
+      "h": 656,
+      "sel": "#pane",
+      "note": "main content"
+    },
+    "side": {
+      "id": "R_side",
+      "x": 924,
+      "y": 128,
+      "w": 344,
+      "h": 656,
+      "sel": ".side",
+      "note": "kpi rail"
+    },
+    "status": {
+      "id": "R_status",
+      "sel": "#status",
+      "note": "save/restore toast — live DOM"
+    },
+    "live_badge": {
+      "id": "R_live",
+      "sel": "#live-badge",
+      "note": "run() badge"
+    },
+    "joy_graph": {
+      "id": "R_joy_graph",
+      "sel": "#joy-relation-graph",
+      "note": "in-pane JOYS graph SoT (never float L13 copy)"
+    },
+    "save_btn": {
+      "id": "R_save",
+      "sel": "#btn-save",
+      "note": "Save control"
+    }
+  },
+  "bindings": [
+    {
+      "when": "tab-change",
+      "layer": "L6_tab_switch",
+      "region": "tab_active",
+      "place": "cover",
+      "aspect": "none",
+      "no_ring": true,
+      "note": "underline wipe sized to active tab"
+    },
+    {
+      "when": "save-ok",
+      "layer": "L12_save_ok",
+      "region": "status",
+      "place": "highlight",
+      "highlight_class": "moho-status-ok",
+      "float": false,
+      "note": "toast owns ✓ — no floating checkmark over text"
+    },
+    {
+      "when": "live-badge.on",
+      "layer": "L4_run_pulse",
+      "region": "live_badge",
+      "place": "badge",
+      "size_from_target": true,
+      "square": true,
+      "size_mul": 1.25,
+      "max": 40,
+      "min": 28
+    },
+    {
+      "when": "money-update",
+      "layer": "L5_money_spark",
+      "region": "graph_bar",
+      "place": "badge",
+      "size_from_target": true,
+      "square": true,
+      "size_mul": 0.9,
+      "max": 48,
+      "min": 28
+    },
+    {
+      "when": "calendar-drill",
+      "layer": "L11_cal_drill",
+      "region": "pane",
+      "place": "badge",
+      "size_from_target": true,
+      "square": true,
+      "size_mul": 0.7,
+      "max": 48,
+      "min": 32
+    },
+    {
+      "when": "review-decision",
+      "layer": "L10_review",
+      "region": "pane",
+      "place": "badge",
+      "size_from_target": true,
+      "square": true,
+      "size_mul": 0.55,
+      "max": 56,
+      "min": 36
+    },
+    {
+      "when": "relation-graph",
+      "layer": "L13_relation_graph",
+      "region": "joy_graph",
+      "place": "highlight",
+      "highlight_class": "moho-target-pulse",
+      "float": false,
+      "note": "live #joy-relation-graph only — L13 export is design reference, not float"
+    }
+  ],
+  "fail_closed": true,
+  "pipeline": [
+    "1. Design in Moho on artboard 1280×800 aligned to design_map regions",
+    "2. Export layer SVG → vendor/moho/exports/L*_*.svg",
+    "3. Bind when→region→place in design_bindings.json (this file)",
+    "4. ranking_ui runtime loads bindings; places only from them",
+    "5. REVIEW if bindings/layers motion law changes"
+  ],
+  "moho_publish": {
+    "at": "2026-08-05T15:02:33.841Z",
+    "stamp": "published/moho_publish.json",
+    "motion": "published/motion_timeline.json",
+    "sequence": "published/sequence/",
+    "project": "vendor/moho/project/JWorkbook_chrome.moho"
+  },
+  "designer": "Moho.app Pro"
+}

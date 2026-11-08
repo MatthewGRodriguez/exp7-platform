@@ -1,0 +1,169 @@
+{
+  "at": "2026-08-05T18:14:29.402Z",
+  "law": "Moho Pro designs. scene_sot is baked artboard geometry. WebGPU draws ONLY this + lighting_sot. No live DOM compile.",
+  "source": "moho_pro",
+  "pipeline": "moho → design_bindings/regions + motion → scene_sot + lighting_sot → webgpu",
+  "artboard": {
+    "w": 1280,
+    "h": 800,
+    "unit": "px"
+  },
+  "camera": {
+    "kind": "ortho_artboard",
+    "fixed": true,
+    "letterbox": true
+  },
+  "nodes": [
+    {
+      "id": "R_header",
+      "region": "header",
+      "layer": null,
+      "role": "chrome",
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 52,
+      "elev": 5,
+      "depth": 16,
+      "rgb": [
+        0.12,
+        0.12,
+        0.16
+      ],
+      "sel": "header",
+      "note": "title chrome"
+    },
+    {
+      "id": "R_tabs",
+      "region": "tabs",
+      "layer": null,
+      "role": "chrome",
+      "x": 0,
+      "y": 52,
+      "w": 1280,
+      "h": 36,
+      "elev": 4.2,
+      "depth": 12,
+      "rgb": [
+        0.1,
+        0.1,
+        0.14
+      ],
+      "sel": "#tabs",
+      "note": "tab strip"
+    },
+    {
+      "id": "R_graph",
+      "region": "graph_bar",
+      "layer": null,
+      "role": "chrome",
+      "x": 0,
+      "y": 88,
+      "w": 1280,
+      "h": 40,
+      "elev": 3.8,
+      "depth": 11,
+      "rgb": [
+        0.1,
+        0.11,
+        0.15
+      ],
+      "sel": ".graph-bar",
+      "note": "money / graph strip"
+    },
+    {
+      "id": "R_pane",
+      "region": "pane",
+      "layer": null,
+      "role": "surface",
+      "x": 12,
+      "y": 128,
+      "w": 900,
+      "h": 656,
+      "elev": 3.2,
+      "depth": 14,
+      "rgb": [
+        0.09,
+        0.09,
+        0.12
+      ],
+      "sel": "#pane",
+      "note": "main content"
+    },
+    {
+      "id": "R_side",
+      "region": "side",
+      "layer": null,
+      "role": "surface",
+      "x": 924,
+      "y": 128,
+      "w": 344,
+      "h": 656,
+      "elev": 3.6,
+      "depth": 14,
+      "rgb": [
+        0.08,
+        0.09,
+        0.12
+      ],
+      "sel": ".side",
+      "note": "kpi rail"
+    }
+  ],
+  "ambient": [
+    {
+      "id": "L0_void",
+      "z": 0,
+      "export": "exports/L0_void.svg",
+      "role": "background",
+      "rgb": [
+        0.04,
+        0.04,
+        0.055
+      ]
+    },
+    {
+      "id": "L1_accent_wave",
+      "z": 1,
+      "export": "exports/L1_accent_wave.svg",
+      "role": "accent",
+      "rgb": [
+        0.2,
+        0.16,
+        0.28
+      ]
+    },
+    {
+      "id": "L2_chrome",
+      "z": 2,
+      "export": "exports/L2_chrome.svg",
+      "role": "chrome",
+      "rgb": [
+        0.1,
+        0.1,
+        0.13
+      ]
+    },
+    {
+      "id": "L3_panel_breathe",
+      "z": 3,
+      "export": "exports/L3_panel.svg",
+      "role": "surface",
+      "rgb": [
+        0.1,
+        0.1,
+        0.13
+      ]
+    }
+  ],
+  "sequence": {
+    "dir": "vendor/moho/published/sequence",
+    "pattern": "frame_%05d.jpeg",
+    "frames_n": 72,
+    "as_plate": true,
+    "note": "Moho -render pixels; optional full-bleed plate under extrusions"
+  },
+  "lighting": "vendor/moho/published/lighting_sot.json",
+  "bindings_rev": 3,
+  "nodes_n": 5
+}

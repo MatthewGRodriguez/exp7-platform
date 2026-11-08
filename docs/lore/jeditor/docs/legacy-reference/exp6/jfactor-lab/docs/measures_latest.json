@@ -1,0 +1,41 @@
+{
+  "at": "2026-08-10T06:15:55.102Z",
+  "lab": "JFactor Lab",
+  "law": "tok_est = ceil(chars/4) · not tokenizer gold · relative save densest",
+  "hop0": {
+    "chars": 2141,
+    "lines": 27,
+    "tok_est": 536,
+    "open_next": "open_next=REVIEW expense_delta · living_ranking review/approve",
+    "session": "session=craft/Y/[REDACTED-AMOUNT] jfactor_lab/Y/[REDACTED-AMOUNT] research/Y/[REDACTED-AMOUNT]",
+    "perf": "perf=total=[REDACTED-AMOUNT] explore=0 sim=[REDACTED-AMOUNT] best=8 fast",
+    "skills": "skills=craft/wrote×14 research/wrote×12 crystallize/wrote×8",
+    "last_capture": "last_capture=craft · Cathay world timeline scarce 1800 China · Dralgrunad-only access · Guo Y",
+    "related": "related=research_improve_living_core~0.8 operate_handoff~0.8 research_skills_vs_mcp~0.8 research_improve_p70~0.8"
+  },
+  "handoff": {
+    "handoff_tok_est": 73,
+    "full_sense_tok_est": 536,
+    "save_vs_full": 0.864,
+    "law": "handoff ≪ full dump · transfer densest not everything"
+  },
+  "mcp": {
+    "n": 28,
+    "n_core": 11,
+    "full_tok_est": 2938,
+    "dense_tok_est": 1893,
+    "core_tok_est": 968,
+    "save_vs_full_core": 0.671,
+    "save_vs_full_dense": 0.356,
+    "mode_default": "core"
+  },
+  "kernel": {
+    "runtime_js_lines": 359,
+    "note": "createRuntime densest wire (C1 extract)"
+  },
+  "paths": {
+    "living_core": "/Users/[REDACTED-USER]/Home/Dev/The Joy Machine 2/jfactor-lab/living-core",
+    "grok_build": "/Users/[REDACTED-USER]/Home/Dev/The Joy Machine 2/jfactor-lab/vendor/grok-build",
+    "exp6": "/Users/[REDACTED-USER]/Home/Dev/The Joy Machine 2/jfactor-lab/vendor/exp6"
+  }
+}

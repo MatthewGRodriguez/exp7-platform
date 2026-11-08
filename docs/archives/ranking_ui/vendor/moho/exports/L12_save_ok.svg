@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <title>L12 save ok</title>
+  <style>
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; }
+      animate, animateTransform, animateMotion { display: none; }
+    }
+  </style>
+  <circle cx="60" cy="60" r="32" fill="none" stroke="#9ece6a" stroke-width="3" stroke-dasharray="201" stroke-dashoffset="201">
+    <animate attributeName="stroke-dashoffset" values="201;0" dur="0.5s" fill="freeze"/>
+    <animate attributeName="opacity" values="1;1;0" keyTimes="0;0.75;1" dur="0.9s" fill="freeze"/>
+  </circle>
+  <path d="M40 62 L54 76 L84 42" fill="none" stroke="#9ece6a" stroke-width="4" stroke-linecap="round" stroke-dasharray="80" stroke-dashoffset="80">
+    <animate attributeName="stroke-dashoffset" begin="0.2s" values="80;0" dur="0.35s" fill="freeze"/>
+    <animate attributeName="opacity" begin="0.2s" values="1;1;0" keyTimes="0;0.65;1" dur="0.7s" fill="freeze"/>
+  </path>
+</svg>

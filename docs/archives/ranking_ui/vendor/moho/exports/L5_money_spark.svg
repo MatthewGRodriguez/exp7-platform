@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <title>L5 money spark</title>
+  <style>
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; }
+      animate, animateTransform, animateMotion { display: none; }
+    }
+  </style>
+  <g transform="translate(60 60)">
+    <path id="star" d="M0-28 L6-8 L28-8 L10 4 L16 26 L0 12 L-16 26 L-10 4 L-28-8 L-6-8 Z" fill="#9ece6a" opacity="0">
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.7;1" dur="0.75s" fill="freeze"/>
+      <animateTransform attributeName="transform" type="scale" values="0.4;1.15;1;0.8" dur="0.75s" fill="freeze"/>
+      <animateTransform attributeName="transform" type="rotate" values="0;25;-5;0" dur="0.75s" fill="freeze" additive="sum"/>
+    </path>
+  </g>
+  <text x="60" y="110" text-anchor="middle" fill="#9ece6a" font-family="ui-monospace,monospace" font-size="11" opacity="0">
+    +$
+    <animate attributeName="opacity" values="0;1;0" dur="0.75s" fill="freeze"/>
+  </text>
+</svg>
