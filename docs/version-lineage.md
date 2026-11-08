@@ -47,7 +47,8 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.13** | PR #38 | Free controls lift. Days and rows keep a contact shadow in the gap. |
 | **1.8.14** | PR #39 | Sampled penumbra. Dark glass read. Exp7 show stays in its slot. |
 | **1.8.15** | PR #40 | Soft face lip. Click poses ease, then the frame loop stops. |
-| **1.8.16** | this branch | Drag eases a free control. A day does not grow. Enter and Space shrink like a press. |
+| **1.8.16** | PR #41 | Drag eases a free control. A day does not grow. Enter and Space shrink like a press. |
+| **1.8.17** | this branch | A board row's first drag move snaps a gold edge. A day stays unmarked. |
 
 ### Current manifest (verbatim) [MEAS]
 
@@ -55,9 +56,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.16",
+"version": "1.8.17",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "aad90229bef099e12e40d84b0e5a054b47a6ece6fc676b70ea9eefd613baeb5d",
+"sha256": "11a93e3fc0a5c30c9e7c9e47fb633d5ebfe7e2a7f435cd7c50e6c58d9cffe4e3",
 "minLauncherMajor": 1
 ```
 
