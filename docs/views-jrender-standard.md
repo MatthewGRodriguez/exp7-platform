@@ -1,7 +1,7 @@
 # Views & JRender standard (direction)
 
 **Status:** Accepted product direction **[REQ 2026-11-08]** — documentation of the path forward.  
-**Not yet claimed complete on `main`:** every app surface and full shell chrome are still a mix; **1.7.9** paints the reserved platform top bar with JRender while DOM hits/overlays remain **[MEAS partial / OPEN]**.
+**Not yet claimed complete on `main`:** account/key overlays stay DOM (PAT never in canvas). **1.8.2** moves platform back/avatar, apps picker, and Budget Cal/Board/Plan (+ type) tabs onto the JRViews→JRender→Exp7Slabs path so they parallax with the views **[MEAS partial]**.
 
 Evidence classes: [EVIDENCE.md](./EVIDENCE.md).
 
@@ -60,7 +60,7 @@ Evidence classes: [EVIDENCE.md](./EVIDENCE.md).
 ### 3. Platform itself becomes JRender
 
 - **Destination:** the platform shell (app picker, account chrome, mount chrome) is drawn with the same JRender — “one JRender for everywhere.” **[REQ direction]**  
-- **Current:** shell is HTML/CSS; apps inject into `#appSlot-*`; each app’s Cal/Board/Plan are JRender. Bridging shell → JRender is **future work**, not claimed done. **[OPEN]**
+- **Current (1.8.2):** reserved top bar (back + avatar) and apps picker are **JRViews→JRender** canvases (`PlatformChromeJR`) so Exp7Slabs parallax applies; DOM hit targets remain for the bar; account/key overlays stay DOM. Budget Cal/Board/Plan (+ board-type) tabs are injected into the view `hostDoc` (same canvas as the view). **[MEAS partial]**
 
 ### 4. How apps use views (standard contract)
 
@@ -78,13 +78,13 @@ Apps (Exp7 demo, Budget, standalone, future):
 
 ## Current vs next
 
-| Layer | Now (typical lean / 1.7.9 path) | Next |
+| Layer | Now (typical lean / 1.8.2 path) | Next |
 |-------|----------------------------------|------|
 | View builders | Shared Exp7Views + runtime `*Html` | Keep; never fork per app |
 | JRViews → JRender | Per-canvas views; shared Core/GPUContext (shell hosts scripts once) | Same; more views per page |
-| App chrome | Often DOM beside canvases | Move into JRender scene content |
-| Platform shell | Reserved top bar: **JRender paint** (`PlatformChromeJR`); DOM hit targets + account/key overlays remain | Full shell scene (picker/menus) in JRender; PAT still never in canvas |
-| Budget boards | **1.8.1:** four Board sub-tabs (expense / income / debt / asset), each a JRender board on one atlas; Cal starts first; Cal/Plan see combined items; no load/reset/status/ranking chrome | Drop remaining DOM tab strip into JRender |
+| App chrome | **Budget tabs in-scene** via `hostDoc` (slabs/parallax); DOM tabs only as no-adapter fallback | Exp7 demo nav into scene; fewer DOM leftovers |
+| Platform shell | Bar + apps picker via **JRViews** (`PlatformChromeJR`); DOM hits for bar; account/key overlays remain | Account menus in JRender where safe; PAT still never in canvas |
+| Budget boards | **1.8.1+:** four Board type boards on one atlas; Cal starts first; combined Cal/Plan membership | Unchanged data model |
 | Data | Per-app atlas / IDB / proposal sync | Unchanged — still per-app |
 
 ---
