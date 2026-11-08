@@ -1,16 +1,17 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.7.8",
+  "version": "1.7.9",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "22a2d11012a72a02132dab84622f832b00f3236e138b81f598d3524f5de57b38",
+  "sha256": "eded6377e444e0d5fb9f2371b1b087ec60cd8c96e48fbad316820aa3b05109f6",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "exp7-lean demo + Budget as Exp7Views consumers (shared exp7-views@1: runtime HTML→JRViews→JRender); reserved top bar; exclusive avatar; Budget local-IDB only",
-    "appSha256": "37c1750160512abd79ef416eaa5f71756c0ae6c5b3a4f8f1750154868ea94ce6",
-    "budgetSha256": "37bb9f9cff86da0766b6bb3cd8aa950cf016cf832a573528839b5c061ef814cf",
+    "app": "exp7-lean demo + Budget as Exp7Views consumers; shell hosts shared exp7-views@1 / JRender once; reserved top bar painted with JRender (DOM hit targets + account overlays remain); exclusive avatar; Budget local-IDB only",
+    "appSha256": "ec696151f233c4762c6b831f4f9cbec9857f6ac24a179fcfb0aa44ffc8c9da63",
+    "budgetSha256": "6d79aff1a2c2f891003b2a748316634502790755381367c8a485be64073adb75",
     "budgetMode": "exp7-views",
     "viewsModuleId": "exp7-views@1",
     "viewsSourcesAggregateSha256": "bd7232deb159f44438e5095a34fa400543976ee4d60ca65c3907b84b95935b96",
+    "chromeJr": "platform reserved bar via PlatformChromeJR (JRender paint; DOM a11y hits)",
     "standalone": "dist/exp7-views-standalone.html",
     "standaloneSha256": "0d8979256d2617f04126d0764453671148175e707ca71c365f7e84c81302849a"
   }

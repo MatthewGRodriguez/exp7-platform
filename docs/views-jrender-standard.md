@@ -1,7 +1,7 @@
 # Views & JRender standard (direction)
 
 **Status:** Accepted product direction **[REQ 2026-11-08]** — documentation of the path forward.  
-**Not yet claimed complete on `main`:** platform chrome and every app surface are still a mix of DOM shell + JRender view canvases **[MEAS / OPEN]**.
+**Not yet claimed complete on `main`:** every app surface and full shell chrome are still a mix; **1.7.9** paints the reserved platform top bar with JRender while DOM hits/overlays remain **[MEAS partial / OPEN]**.
 
 Evidence classes: [EVIDENCE.md](./EVIDENCE.md).
 
@@ -78,12 +78,12 @@ Apps (Exp7 demo, Budget, standalone, future):
 
 ## Current vs next
 
-| Layer | Now (typical lean / 1.7.x path) | Next |
+| Layer | Now (typical lean / 1.7.9 path) | Next |
 |-------|----------------------------------|------|
 | View builders | Shared Exp7Views + runtime `*Html` | Keep; never fork per app |
-| JRViews → JRender | Per-canvas views; shared Core/GPUContext | Same; more views per page |
+| JRViews → JRender | Per-canvas views; shared Core/GPUContext (shell hosts scripts once) | Same; more views per page |
 | App chrome | Often DOM beside canvases | Move into JRender scene content |
-| Platform shell | DOM `#topChrome` / overlays | Eventually JRender everywhere |
+| Platform shell | Reserved top bar: **JRender paint** (`PlatformChromeJR`); DOM hit targets + account/key overlays remain | Full shell scene (picker/menus) in JRender; PAT still never in canvas |
 | Data | Per-app atlas / IDB / proposal sync | Unchanged — still per-app |
 
 ---
@@ -100,7 +100,7 @@ Apps (Exp7 demo, Budget, standalone, future):
 ## Open work
 
 1. ~~Formalize a small **mount API** for “N views + optional scene layers” on one shared renderer~~ → **`Exp7Views.mountSurface` + `rendererInfo`** (1.7.8+). Apps mount Cal/Board/Plan (or a custom `views[]`) on one atlas; JRViews already shares one Core/`GPUContext`. Custom scene layers still attach via `rendererInfo().gc` / future host hooks — not a second renderer. **[MEAS in source / pack]**  
-2. Migrate platform chrome into JRender scene content without breaking launcher handoff / key memory rules. **[OPEN]**  
+2. Migrate platform chrome into JRender scene content without breaking launcher handoff / key memory rules. **Partial [MEAS 1.7.9]:** reserved top bar painted with JRender; transparent DOM controls keep a11y + existing menu wiring; account/key overlays stay DOM. Remaining: apps picker / account panel as scene content; JR hit routing instead of DOM hits. **[OPEN]**  
 3. Mac **[USER-HW]** acceptance for multi-view + shell-in-JRender (box `no-adapter` ≠ GPU proof). **[OPEN]**  
 4. Keep two-file release discipline for software payloads; docs-only PRs remain an authorized exception. **[REQ]**
 
