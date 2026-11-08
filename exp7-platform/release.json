@@ -1,18 +1,18 @@
 {
  "format": "exp7-platform-release/1",
- "version": "1.7.2",
+ "version": "1.7.3",
  "file": "exp7-platform/exp7-platform-lean.html",
- "sha256": "5f77db898937099246e6e6c7cc58076e774074d1a00566028d06241b176188fd",
+ "sha256": "7bdd43287533f9a194ce2453ef5f69021a52d094c465a9028d3b478fbcfc22ee",
  "minLauncherMajor": 1,
  "contains": {
   "app": "exp7-lean demo + Budget as Exp7Views consumers (shared exp7-views@1: runtime HTML\u2192JRViews\u2192JRender); reserved top bar; exclusive avatar; Budget local-IDB only",
-  "appSha256": "830f69834b03a47a8fee661cfb0d0177be50bdb37098b026599bfef6c62d6b4e",
-  "budgetSha256": "09b9c2a952286a0479aa777d7dfcc4d9233428ae1078079f5eb3433b92bc7b4f",
+  "appSha256": "58d130585aae3f723d9aea3d0d24c9aecb1f7857abbb5fc5cd3931248e5cc39e",
+  "budgetSha256": "41535e2b2c0c07ed60e479508b2bb6db85fd3806b40d9a8912d6604d8ef46f07",
   "budgetMode": "exp7-views",
   "viewsModuleId": "exp7-views@1",
-  "viewsSourcesAggregateSha256": "f17c1a022ada5368ae0d079edd05d9950aa9f1c1dee2a5842b6f1ea41c61dd1f",
+  "viewsSourcesAggregateSha256": "2440ea89ec2550d72e49a4679cc3dd381b7260932eff03f1f3ce688eaf96b91d",
   "standalone": "dist/exp7-views-standalone.html",
-  "standaloneSha256": "4763de8e697e2538223fba7d2febfe615a9c66e76f84ce4673effbf3aaa9ce80",
-  "fix": "shared-script inject skip (Joy/VROOTS); unique Budget host ids; fake document.body for boardHtml; durable diagnostics; JRViews\u2192JRender only"
+  "standaloneSha256": "2f65c62b7369eb68a967e8e8a63a81f66f004c7be2eaaca93a0738780258259d",
+  "fix": "Budget same calendarTemplate+Exp7Slabs as demo; section.on parallax; exp7views.JVS for gpu-motion"
  }
 }
