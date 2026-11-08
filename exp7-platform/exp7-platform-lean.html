@@ -23,6 +23,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
   position:relative;z-index:1;opacity:0;pointer-events:none;
 }
 #btnBack{background:#fff;border:1px solid var(--line);border-radius:8px;min-width:36px;min-height:36px;width:36px;height:36px;padding:0;margin:0;display:inline-flex;align-items:center;justify-content:center;font-size:1.25rem;line-height:1;flex-shrink:0}
+#btnBack:focus-visible{outline:2px solid #246;outline-offset:2px}
 /* Avatar: ONLY the profile image (or one fallback disc) is the control — no button chrome, no dual children */
 #topChrome #btnAvatar{
   -webkit-appearance:none;appearance:none;
@@ -66,6 +67,10 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 .appSlot{position:relative;min-height:100%;height:100%;overflow:auto}
 .appSlot[hidden]{display:none!important}
 #out{display:none}
+/* GPU fail presentation — no substitute renderer; keep readable alert chrome */
+.jrerr{padding:12px 14px;margin:12px;border:1px solid #e8b4b4;border-radius:8px;background:#fff5f5;color:#a00;max-width:40rem}
+.jrerr.bad{color:#a00}
+.empty,.ja-section-empty{color:var(--muted)}
 /* Budget has its own #appSlot-budget with direct HTML views (not Exp7 demo base) */
 </style></head>
 <body>
@@ -5722,7 +5727,7 @@ window.JA_RUNTIME_FACTORY=function(window,document,setTimeout,setInterval,Worker
     var month = E.monthOf(Src), ds = (Src.state || {}).dayStyles || {}, A = asofOf(Src), rows = [];
     (Src.items || []).forEach(function (r) { var it = M.get(W, r); if (!it) return; var oc = E.occurrences(it, month), hit = V.rule === 'daystate' ? oc.filter(function (d) { return (V.states || []).indexOf(ds[d]) >= 0; }) : V.rule === 'past' ? oc.filter(function (d) { return d < A.day; }) : V.rule === 'future' ? oc.filter(function (d) { return d >= A.day; }) : V.rule === 'flag' ? (E.itemFlags(W, r)[V.flag || 'conflict'] ? oc : []) : oc;
       if (hit.length) rows.push('<div class="ja-srow" data-sec-item="' + esc(M.parse(r).id) + '">' + esc(it.name) + ' <i>' + hit.map(function (d) { return +d.slice(8); }).join(', ') + '</i></div>'); });
-    return '<div class="ja-section" data-rule="' + esc(V.rule || 'all') + '" data-n="' + rows.length + '">' + (rows.join('') || '<i>none this month</i>') + '</div>'; }
+    return '<div class="ja-section' + (rows.length ? '' : ' empty ja-section-empty') + '" data-rule="' + esc(V.rule || 'all') + '" data-n="' + rows.length + '"' + (rows.length ? '' : ' data-empty="1" data-jr-state="empty"') + '>' + (rows.join('') || '<i>none this month</i>') + '</div>'; }
   /* One Board surface for every app (demo / Budget / standalone). No budget-mode design fork.
      Each app still supplies its own atlas items — finance tags may live on item.values without changing this HTML. */
   function boardHtml(c) { var V = c.view || {}, T = M.get(W, V.target), inT = (T && T.items) || [], st = c.state || {}, sort = st.sort || V.sort || 'name', fil = st.filter || V.filter || 'all';
@@ -9930,7 +9935,9 @@ function layout(root,width,opt){ opt=opt||{}; const ctx={bg:[255,255,255,255],fg
         const k=key(a.el), fn=nd(k,a.el,null), bn=fn; R(fn,cx,cy,bw,bh,4,a.bg); B(bn,cx,cy,bw,bh,4,a.border);
         /* JS-side hit+tf only (no NF.HIT) so TextField's own frame receives clicks; coords drive attachFormFields */
         fn.hit=[cx,cy,bw,bh]; fn.tf=a.tf; cx+=bw+6; lh=Math.max(lh,bh); return; }
-        const bw=Math.min(full+12,w), bh=sz+9; if(column&&cx>x) nl(); else if(cx>x&&cx+bw>x+w) nl();
+        /* Honor inline min-width/min-height (chrome 36×36, apps 4.5rem) — styleOf only; no getComputedStyle */
+        const stBox=a.el?styleOf(a.el):{}, mnW=parseFloat(stBox['min-width'])||0, mnH=parseFloat(stBox['min-height'])||0;
+        let bw=Math.min(Math.max(full+12,mnW||0),w), bh=Math.max(sz+9,mnH||0); if(column&&cx>x) nl(); else if(cx>x&&cx+bw>x+w) nl();
         const k=key(a.el), act=actOf(a.el), fn=nd(k,a.el,act), bn=fn, xn=fn; /* one node: fill (item 0), border, text */
         R(fn,cx,cy+1,bw,bh-2,5,a.bg); if(act){ fn.flags=NF.HIT; fn.hit=[cx,cy+1,bw,bh-2]; fn.base=U(a.bg); fn.hov=U(over([36,88,166,18],a.bg)); }
         B(bn,cx,cy+1,bw,bh-2,5,a.on?a.ac:a.border); T(xn,cx+6,cy+1+(bh-2)/2+sz*0.36,sz,a.fg,a.t,full+12>w?w-12:0); cx+=bw+6; lh=Math.max(lh,bh); return; }
@@ -10013,11 +10020,12 @@ function layout(root,width,opt){ opt=opt||{}; const ctx={bg:[255,255,255,255],fg
       if(!wordOk(s,e.t)) return Infinity;
       const wr=CORE.wrap(FONT,s,e.t,iw,{lineHeight:lh,ellipsis:false}); h+=wr.height; }
       return h; };
+    /* Floor 6px matches comment above — never shrink to sub-pixel (was >0.35). Keep DAY_H; no chip drop / no ellipsis. */
     let size=11;
-    for(; size>0.75; size-=0.25){ if(blockH(size)<=ih+0.5) break; }
-    if(blockH(size)>ih+0.5){ /* still too tall: keep shrinking */
-      for(; size>0.35; size-=0.1){ if(blockH(size)<=ih+0.5) break; }
-    }
+    for(; size>6; size-=0.25){ if(blockH(size)<=ih+0.5) break; }
+    if(size<6) size=6;
+    if(blockH(size)>ih+0.5){ for(; size>6; size-=0.1){ if(blockH(size)<=ih+0.5) break; } }
+    if(size<6) size=6;
     let cy=iy;
     entries.forEach((e,i)=>{ const s=size; const lh=Math.max(8,s*1.35);
       const wr=CORE.wrap(FONT,s,e.t,iw,{lineHeight:lh,ellipsis:false});
@@ -10218,6 +10226,9 @@ window.x7 = window.x7 || function (t) {
  * applies wash + contour ring + geometry (scale/opacity) from art/design/state-table.
  * More than wash tokens: pressed scale-in, disabled opacity, focus/selected rings,
  * emphasis for title hierarchy. No builder forks / second renderer.
+ *
+ * Hit sync: JRViews stores n.hit as [x,y,w,h] arrays — must scale array form (not only {x,w}).
+ * Re-infer: do not sticky-return data-jr-state except avatar paint modes / locked.
  */
 (function (root) {
   'use strict';
@@ -10225,7 +10236,6 @@ window.x7 = window.x7 || function (t) {
   var T = root.EXP7_LIGHT_THEME;
   if (!V || !V.layout || !T) return;
 
-  /* Palette-derived washes (selection / accent / invalid / disabled) — matches Blender v3 */
   var WASH = {
     idle: null,
     hover: [36, 88, 166, 14],
@@ -10241,7 +10251,8 @@ window.x7 = window.x7 || function (t) {
     empty: [244, 246, 250, 255],
     error: [170, 0, 0, 16],
     photo: null,
-    pending: null
+    pending: null,
+    initials: null
   };
 
   var RING = {
@@ -10252,7 +10263,6 @@ window.x7 = window.x7 || function (t) {
     pressed: [36, 88, 166, 200]
   };
 
-  /* Shared with art/design/state-table.json elementStates (geometry cues) */
   var GEO = {
     idle: { scale: 1, opacity: 1 },
     hover: { scale: 1, opacity: 1 },
@@ -10266,7 +10276,10 @@ window.x7 = window.x7 || function (t) {
     disabled: { scale: 1, opacity: 0.38 }
   };
 
-  var INTERACTIVE = 'button,.ja-joy,.ja-chip,.ja-alt,.ja-sw,.ja-tog,.ja-day,[data-jv-act],[data-day],.ja-brow,.ja-prow';
+  /* Avatar exclusive paint modes — sticky until PlatformChrome updates / unlocks */
+  var AVATAR_MODES = { photo: 1, pending: 1, initials: 1, loading: 1 };
+
+  var INTERACTIVE = 'button,.ja-joy,.ja-chip,.ja-alt,.ja-sw,.ja-tog,.ja-day,[data-jv-act],[data-day],.ja-brow,.ja-prow,.empty,.loading,.jrerr';
 
   function inferState(el) {
     if (!el || el.nodeType !== 1) return 'idle';
@@ -10275,11 +10288,14 @@ window.x7 = window.x7 || function (t) {
     if (el.classList.contains('dragging') || el.getAttribute('data-drag') === '1') return 'dragging';
     if (el.classList.contains('drop') || el.getAttribute('data-drop') === 'pending') return 'drop-pending';
     var ds = el.getAttribute('data-jr-state');
-    if (ds && WASH[ds] !== undefined) return ds;
+    /* Before: any data-jr-state short-circuited re-infer (sticky .on / :focus never updated).
+       After: only avatar exclusive modes (or locked) stay sticky. */
+    if (ds && AVATAR_MODES[ds]) return ds;
     if (el.classList.contains('on') || el.getAttribute('data-sm') === 'selected' || el.getAttribute('aria-selected') === 'true' || el.getAttribute('aria-current') === 'page' || el.getAttribute('aria-current') === 'true') return 'selected';
-    if (el.classList.contains('hov') || el.getAttribute('data-hov') === '1' || el.matches && el.matches(':focus')) return el.matches && el.matches(':focus') ? 'focus' : 'hover';
-    if (el.classList.contains('empty')) return 'empty';
-    if (el.classList.contains('loading')) return 'loading';
+    if (el.classList.contains('hov') || el.getAttribute('data-hov') === '1' || (el.matches && el.matches(':focus'))) return el.matches && el.matches(':focus') ? 'focus' : 'hover';
+    if (el.classList.contains('empty') || el.getAttribute('data-empty') === '1') return 'empty';
+    if (el.classList.contains('loading') || el.getAttribute('data-loading') === '1') return 'loading';
+    if (el.classList.contains('jrerr') || el.getAttribute('role') === 'alert') return 'error';
     return 'idle';
   }
 
@@ -10308,8 +10324,6 @@ window.x7 = window.x7 || function (t) {
 
   function stateOf(el) {
     if (!el || el.nodeType !== 1) return 'idle';
-    var ds = el.getAttribute('data-jr-state');
-    if (ds && WASH[ds] !== undefined) return ds;
     return inferState(el);
   }
 
@@ -10323,6 +10337,29 @@ window.x7 = window.x7 || function (t) {
     it[yIdx] = cy - nh / 2;
     it[wIdx] = nw;
     it[hIdx] = nh;
+  }
+
+  function scaleHit(hit, scale) {
+    if (!hit || scale === 1) return false;
+    if (Array.isArray(hit) && typeof hit[0] === 'number' && typeof hit[2] === 'number') {
+      var x = hit[0], y = hit[1], w = hit[2], h = hit[3];
+      var cx = x + w / 2, cy = y + h / 2;
+      hit[2] = w * scale;
+      hit[3] = h * scale;
+      hit[0] = cx - hit[2] / 2;
+      hit[1] = cy - hit[3] / 2;
+      return true;
+    }
+    if (typeof hit.x === 'number' && typeof hit.w === 'number') {
+      var hx = hit.x, hy = hit.y, hw = hit.w, hh = hit.h;
+      var hcx = hx + hw / 2, hcy = hy + hh / 2;
+      hit.w = hw * scale;
+      hit.h = hh * scale;
+      hit.x = hcx - hit.w / 2;
+      hit.y = hcy - hit.h / 2;
+      return true;
+    }
+    return false;
   }
 
   function mulAlpha(packed, opacity) {
@@ -10350,38 +10387,26 @@ window.x7 = window.x7 || function (t) {
       var interactive = n.el.matches && n.el.matches(INTERACTIVE);
       if (!interactive && !n.el.hasAttribute('data-jr-state')) continue;
       var emphasis = n.el.getAttribute('data-jr-emphasis') === '1';
-      /* Keep n.hit in sync with GEO scale — paint-only scale would desync hitbounds. */
-      if (geo.scale !== 1 && n.hit && typeof n.hit.x === 'number' && typeof n.hit.w === 'number') {
-        var hx = n.hit.x, hy = n.hit.y, hw = n.hit.w, hh = n.hit.h;
-        var hcx = hx + hw / 2, hcy = hy + hh / 2;
-        n.hit.w = hw * geo.scale;
-        n.hit.h = hh * geo.scale;
-        n.hit.x = hcx - n.hit.w / 2;
-        n.hit.y = hcy - n.hit.h / 2;
-        geoTouched++;
-      }
+      if (scaleHit(n.hit, geo.scale)) geoTouched++;
       for (var j = 0; j < n.items.length; j++) {
         var it = n.items[j];
         var kind = it[0];
-        if (wash && (kind === 'rrect' || kind === 'rect') && st !== 'idle' && st !== 'photo' && st !== 'pending') {
+        if (wash && (kind === 'rrect' || kind === 'rect') && st !== 'idle' && st !== 'photo' && st !== 'pending' && st !== 'initials') {
           if (kind === 'rrect') it[6] = packRgba(over(wash, unpack(it[6])));
           else it[5] = packRgba(over(wash, unpack(it[5])));
           touched++;
         }
         if (ring && kind === 'border' && (st === 'focus' || st === 'selected' || st === 'invalid' || st === 'drop-pending' || st === 'pressed')) {
           it[it.length - 1] = packRgba(ring);
-          /* Contour weight: keep ring hugging control — bump stroke if layout stores width */
           if (typeof it[5] === 'number' && it[5] > 0 && it[5] < 8) it[5] = Math.max(it[5], emphasis ? 2 : 1.5);
           touched++;
         }
-        /* Geometry from state-table: scale boxes; opacity on fills/text */
         if (kind === 'rrect' || kind === 'rect' || kind === 'border') {
           if (kind === 'rrect') scaleBox(it, geo.scale, 1, 2, 3, 4);
           else if (kind === 'rect') scaleBox(it, geo.scale, 1, 2, 3, 4);
           else if (kind === 'border' && typeof it[1] === 'number') scaleBox(it, geo.scale, 1, 2, 3, 4);
           if (geo.scale !== 1) geoTouched++;
         }
-        /* HIT items in DL (when present as item tuples) must match scaled paint */
         if (kind === 'hit' && geo.scale !== 1 && typeof it[1] === 'number') {
           scaleBox(it, geo.scale, 1, 2, 3, 4);
           geoTouched++;
@@ -10397,11 +10422,9 @@ window.x7 = window.x7 || function (t) {
             geoTouched++;
           }
         }
-        /* Selected/focus content hierarchy: slightly stronger text (palette text, not new hue) */
         if (emphasis && (kind === 'text' || kind === 'label') && typeof it[it.length - 1] === 'number') {
           var tc = unpack(it[it.length - 1]);
           if (tc[0] + tc[1] + tc[2] < 600) {
-            /* already dark — keep; bump alpha to full */
             tc[3] = 255;
             it[it.length - 1] = packRgba(tc);
             geoTouched++;
@@ -10435,6 +10458,8 @@ window.x7 = window.x7 || function (t) {
 
   V.uxStateOf = stateOf;
   V.uxStampTree = stampTree;
+  V.uxInferState = inferState;
+  V.uxScaleHit = scaleHit;
   V.UX_WASH = WASH;
   V.UX_RING = RING;
   V.UX_GEO = GEO;
@@ -11103,7 +11128,7 @@ function setView(id,w,root,cb,ro){ const box=$(id); if(!box) return;
   let cv=V.cv||box.querySelector('canvas'); if(!cv) cv=document.createElement('canvas'); if(cv.parentNode!==box){ box.querySelectorAll('canvas').forEach(c=>c!==cv&&c.remove()); box.appendChild(cv); } V.cv=cv; /* the same canvas (and its scene) follows the view when the panel is re-rendered */
   const rev=atlasRev(w), VA=V.sess&&(V.sess.J&&V.sess.J.atlas||V.sess.s), carry=VA?Object.fromEntries(Object.keys(VA.components||{}).filter(c=>VA.components[c].state).map(c=>[c,VA.components[c].state])):null;
   if(V.sess) V.sess.dispose();
-  const fail=e=>{ V.err=String(e&&e.message||e)+(e&&e.code?' [code '+e.code+']':''); V.code=e&&e.code||null; cv.style.display='none'; const pe=box.querySelector('.jrerr')||box.appendChild(Object.assign(document.createElement('div'),{className:'jrerr bad'})); pe.textContent='JRender view not drawn: '+V.err; if(V.cb) V.cb(V); };
+  const fail=e=>{ V.err=String(e&&e.message||e)+(e&&e.code?' [code '+e.code+']':''); V.code=e&&e.code||null; cv.style.display='none'; const pe=box.querySelector('.jrerr')||box.appendChild(Object.assign(document.createElement('div'),{className:'jrerr bad'})); pe.setAttribute('role','alert'); pe.setAttribute('data-jr-state','error'); pe.textContent='JRender view not drawn: '+V.err; if(V.cb) V.cb(V); };
   V.queue=(S,why)=>{ V.chain=V.chain.then(async()=>{ if(isCalRoot(V)&&(await calStateOnlyAsync(V,why))) return; return draw(S,why); }).catch(fail); return V.chain; };
   const draw=async(S,why)=>{ if(V.sess!==S) return; const d=new DOMParser().parseFromString('<div id="app">'+S.html+'</div>','text/html').getElementById('app');
     hostDoc(d,V); if(V.plan) planDoc(V,d,S.J&&S.J.atlas||S.s);
@@ -11469,7 +11494,7 @@ function calDoc(V,d){ /* strip Board/Plan switch + subs; inject selection UX; pa
     const head=d.ownerDocument.createElement('div'); head.className='ja-bar'; head.appendChild(mk('cal:back','← Back to month'));
     const t=d.ownerDocument.createElement('b'); t.textContent=' Day '+day+(rk?' · '+rk.c+' '+RISK_COL[rk.c][1]:''); head.appendChild(t); d.appendChild(head);
     const box=d.ownerDocument.createElement('div'); box.className='ja-detail';
-    if(!its.length){ const i=d.ownerDocument.createElement('i'); i.textContent='No steps on this day.'; box.appendChild(i); }
+    if(!its.length){ box.classList.add('empty'); box.setAttribute('data-empty','1'); box.setAttribute('data-jr-state','empty'); const i=d.ownerDocument.createElement('i'); i.textContent='No steps on this day.'; box.appendChild(i); }
     its.forEach(it=>{ const row=d.ownerDocument.createElement('div'); row.className='ja-prow'; row.textContent=it.name+(it.days>1?' · '+it.days+'d from '+it.start:'')+(it.jreq?' · requires '+String(it.jreq).replace(/^item:/,''):''); box.appendChild(row); });
     d.appendChild(box); V.calSelCount=1; return; }
   /* selection chrome (month) */
@@ -11919,7 +11944,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       var on = cur === a.id ? ' on' : '';
       var st = cur === a.id ? 'selected' : 'idle';
       h += '<div class="ja-section" style="margin-top:10px">' +
-        '<button type="button" data-jv-act="plat:app:' + a.id + '" data-jr-state="' + st + '" class="ja-joy' + on + '" style="min-width:12rem;text-align:left">' +
+        '<button type="button" data-jv-act="plat:app:' + a.id + '" data-jr-state="' + st + '" class="ja-joy' + on + '" style="min-width:12rem;min-height:4.5rem;text-align:left">' +
         '<b>' + a.label + '</b> | ' + a.hint + '</button></div>';
     });
     h += '</div>';

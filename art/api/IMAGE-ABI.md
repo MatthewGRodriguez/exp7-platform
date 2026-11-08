@@ -89,9 +89,22 @@ Never dual initials+photo. Soft-disc is exclusive with photo (plate only when in
 6. Parallax: Exp7Slabs front factor shifts overlay (`images.shift`).
 7. Hits: companion DL HIT (rectangular) remains the **activation** target for `plat:avatar` (a11y-sized). Circular precision is available via `renderer.images.hit` / `PlatformChromeJR.avatarCircleHit` — not a second hit system for keyboard/DOM.
 
-## JRViews
+## JRViews — optional `data-jr-img` consumer API (UNWIRED)
 
-Optional `data-jr-img` on controls is **not wired** in 1.8.4 (ABI reserved). Bar avatar is the only JRDI consumer. Board/Cal face affordances only when atlas data already carries public avatar URLs (none in Budget IDB today). Apps: Exp7 + Budget only (no separate Atlas app surface).
+Bar avatar via `PlatformChromeJR.setAvatarInfo` is the **only** shipped JRDI consumer in 1.8.4.
+
+`data-jr-img` is an **optional reserved attribute** for a future host hook. It is **not** implemented, not stamped by builders, and must not be treated as a shipped feature.
+
+### Intended consumer contract (when wired later)
+
+```
+element[data-jr-img="<https-url>"]
+  → on layout/show: sanitizeUrl → store.load → renderer.images.set(nodeId, {clip:'circle'|rect,…})
+  → exclusive paint with any text/soft-disc sibling (never dual)
+  → free on node remove / view hide / unmount
+```
+
+Until a host implements that hook, authors must not rely on `data-jr-img`. Board/Cal face affordances remain out of scope unless atlas data already carries public avatar URLs (none in Budget IDB today). Apps: Exp7 + Budget only (no separate Atlas app surface).
 
 ## Non-goals
 

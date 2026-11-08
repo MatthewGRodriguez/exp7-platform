@@ -17,6 +17,8 @@ jobs:
         run: node tests/jrender-images.test.mjs
       - name: JRDI lifecycle tests
         run: node tests/jrender-images-lifecycle.test.mjs
+      - name: Universal UX regression
+        run: node tests/jrviews-ux-regression.test.mjs
       - name: Perspective VP tests
         run: node art/perspective/perspective-tests.mjs
       - name: Blender generator dry-run

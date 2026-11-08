@@ -19,3 +19,7 @@
 ## Gaps
 
 - `data-jr-img` unwired; LIVE-GPU OPEN; pressed mid-gesture needs re-layout; dual motion tables coexist.
+
+## Universal UX pass (beyond WASH/RING/GEO)
+
+See `UX-IMPROVEMENTS.md` for exact before/after. Common JRViews path only.

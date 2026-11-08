@@ -1,45 +1,43 @@
-# Acceptance matrix — art pass 1.8.4 / generator v6
+# Acceptance matrix — production UX + art (no blanket pass)
 
-**No blanket art-pipeline pass.** CI green ≠ visual QA. Ortho ≠ METAL.
+Live browser blocked ≠ pass. CI green ≠ visual QA. Ortho ≠ METAL.
 
-## Production (lean 1.8.4) — actual Node tests
+## Production — Node / source evidence
 
 | Gate | Result | Evidence |
 |------|--------|----------|
-| JRDI sanitize / allowlist / secrets | **PASS** | `tests/jrender-images.test.mjs` |
-| Exclusive avatar paint | **PASS** | lifecycle |
-| Load race / patch / free / recover / budget | **PASS** | lifecycle `[MOCK]` |
-| CORS credentials omit | **PASS** | lifecycle |
+| JRDI sanitize/allowlist/secrets/exclusive paint | **PASS** | `tests/jrender-images*.mjs` |
+| Load race / patch / free / recover / budget / CORS omit | **PASS** | lifecycle `[MOCK]` |
 | No second renderer | **PASS** | art-checks |
-| GEO syncs `n.hit` | **PASS** (fixed) | `jrviews-ux-states.js` packed |
-| `avatarCircleHit` API | **PASS** | chrome; activation = companion DL HIT |
-| Optional `data-jr-img` | **NOT WIRED** | IMAGE-ABI |
-| LIVE-GPU Safari avatar | **USER-HW OPEN** | — |
-| Focus/IME TextField | **UNCHANGED** | — |
-| PAT overlays | **DOM unchanged** | — |
+| Array `n.hit` GEO sync | **PASS** | `jrviews-ux-regression` |
+| Re-infer `.on` over sticky idle attr | **PASS** | regression |
+| Day text floor 6px | **PASS** (source) | lean layout |
+| Control min-width/height honored | **PASS** (source) | lean + chrome |
+| `#btnBack:focus-visible` + `.jrerr` alert | **PASS** (source) | lean CSS |
+| Empty stamps (`data-empty`) | **PASS** (source) | cal section / day detail |
+| `data-jr-img` | **UNWIRED** — consumer API documented only | `IMAGE-ABI.md` |
+| Common system Exp7+Budget+chrome | **YES** (one JRViews path) | no app forks |
+| LIVE-GPU Safari / jr-on canvas focus / finger targets | **USER-HW OPEN** | — |
+| Focus/IME TextField | **UNCHANGED** (intentional) | — |
+| Calendar fit / drag / Best≠Selected | **UNCHANGED** (intentional) | `UX-IMPROVEMENTS.md` |
 
-## Per-view production UX
+## Per-view production UX (beyond WASH/RING/GEO)
 
-| Surface | Production | Study-only |
-|---------|------------|------------|
-| Chrome bar | JRDI photo XOR initials | Blender chrome / Moho |
-| Apps picker | wash/ring/GEO | — |
-| Exp7 Cal/Board/Plan | layout WASH/RING/GEO | Blender views |
-| Budget + tabs | same UX wrap | — |
-| Atlas app | N/A (data only) | — |
+| Surface | Improved | Unchanged |
+|---------|----------|-----------|
+| Chrome bar | 36×36 hit honor; back focus-visible; avatar exclusive JRDI | barH 44; PAT DOM |
+| Apps picker | JR tiles `min-height:4.5rem` match DOM | app set Exp7+Budget |
+| Exp7/Budget Cal | empty section stamp; day text ≥6px; control mins | DAY_H=78; drag/sel/anchor |
+| Exp7/Budget Board | control mins; state re-infer | builders/model |
+| Exp7/Budget Plan | same + Best≠Selected preserved | what-if / Best pins |
+| GPU fail | `.jrerr` padding + `role=alert` | no substitute renderer |
 
-## Art pipeline (Mac) — actual probes
+## Art pipeline (Mac) — separate from production UX
 
-| Gate | Result | Evidence |
-|------|--------|----------|
-| Moho shapes + `-r` + loop `f0==f120` | **PASS** | REPORT-v5; metrics unique=102, Δ=0 |
-| Light size/dist 0.4667 | **PASS** | Mac v5 log |
-| View framing | **PASS** | Mac v5 crop shows full “November” |
-| Calendar METAL text contrast ≥4.5 | **FAIL** v5 (1.73/1.76 ghosted) → **FIX shipped v6** unlit flat text — re-probe | crop + REPORT-v5 |
-| Board/plan/chrome METAL | **NOT RUN** v5 (aborted) → v6 continues after fail | — |
-| Chrome avatar pixels | **UNTESTED** METAL | — |
-| Shadow beauty full blur | **UNMEASURABLE** v5 (occlusion) | lighting-fits v5 |
-| Shadow-cal invisible caster | **FIX shipped v6** — Mac pending | `shadow_cal_lift_*` |
-| v4 offset 0.309 | **old light only** | fits.json |
-| Ortho cloud proofs | **PASS** layout intent only — **not** METAL predictor | `qa/ortho-preview/` |
-| LIVE-GPU | **USER-HW OPEN** | — |
+| Gate | Result |
+|------|--------|
+| Moho loop | **PASS** (v5) — no further experiments |
+| Blender views text contrast | v5 FAIL; **v6 unlit fix shipped**; **Mac v6 render in flight — generator frozen this turn** |
+| Shadow-cal invisible caster | shipped; Mac pending |
+| Ortho cloud | layout intent only — not METAL predictor |
+| LIVE-GPU | **USER-HW OPEN** |

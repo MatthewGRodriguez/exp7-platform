@@ -3,6 +3,9 @@
  * applies wash + contour ring + geometry (scale/opacity) from art/design/state-table.
  * More than wash tokens: pressed scale-in, disabled opacity, focus/selected rings,
  * emphasis for title hierarchy. No builder forks / second renderer.
+ *
+ * Hit sync: JRViews stores n.hit as [x,y,w,h] arrays — must scale array form (not only {x,w}).
+ * Re-infer: do not sticky-return data-jr-state except avatar paint modes / locked.
  */
 (function (root) {
   'use strict';
@@ -10,7 +13,6 @@
   var T = root.EXP7_LIGHT_THEME;
   if (!V || !V.layout || !T) return;
 
-  /* Palette-derived washes (selection / accent / invalid / disabled) — matches Blender v3 */
   var WASH = {
     idle: null,
     hover: [36, 88, 166, 14],
@@ -26,7 +28,8 @@
     empty: [244, 246, 250, 255],
     error: [170, 0, 0, 16],
     photo: null,
-    pending: null
+    pending: null,
+    initials: null
   };
 
   var RING = {
@@ -37,7 +40,6 @@
     pressed: [36, 88, 166, 200]
   };
 
-  /* Shared with art/design/state-table.json elementStates (geometry cues) */
   var GEO = {
     idle: { scale: 1, opacity: 1 },
     hover: { scale: 1, opacity: 1 },
@@ -51,7 +53,10 @@
     disabled: { scale: 1, opacity: 0.38 }
   };
 
-  var INTERACTIVE = 'button,.ja-joy,.ja-chip,.ja-alt,.ja-sw,.ja-tog,.ja-day,[data-jv-act],[data-day],.ja-brow,.ja-prow';
+  /* Avatar exclusive paint modes — sticky until PlatformChrome updates / unlocks */
+  var AVATAR_MODES = { photo: 1, pending: 1, initials: 1, loading: 1 };
+
+  var INTERACTIVE = 'button,.ja-joy,.ja-chip,.ja-alt,.ja-sw,.ja-tog,.ja-day,[data-jv-act],[data-day],.ja-brow,.ja-prow,.empty,.loading,.jrerr';
 
   function inferState(el) {
     if (!el || el.nodeType !== 1) return 'idle';
@@ -60,11 +65,14 @@
     if (el.classList.contains('dragging') || el.getAttribute('data-drag') === '1') return 'dragging';
     if (el.classList.contains('drop') || el.getAttribute('data-drop') === 'pending') return 'drop-pending';
     var ds = el.getAttribute('data-jr-state');
-    if (ds && WASH[ds] !== undefined) return ds;
+    /* Before: any data-jr-state short-circuited re-infer (sticky .on / :focus never updated).
+       After: only avatar exclusive modes (or locked) stay sticky. */
+    if (ds && AVATAR_MODES[ds]) return ds;
     if (el.classList.contains('on') || el.getAttribute('data-sm') === 'selected' || el.getAttribute('aria-selected') === 'true' || el.getAttribute('aria-current') === 'page' || el.getAttribute('aria-current') === 'true') return 'selected';
-    if (el.classList.contains('hov') || el.getAttribute('data-hov') === '1' || el.matches && el.matches(':focus')) return el.matches && el.matches(':focus') ? 'focus' : 'hover';
-    if (el.classList.contains('empty')) return 'empty';
-    if (el.classList.contains('loading')) return 'loading';
+    if (el.classList.contains('hov') || el.getAttribute('data-hov') === '1' || (el.matches && el.matches(':focus'))) return el.matches && el.matches(':focus') ? 'focus' : 'hover';
+    if (el.classList.contains('empty') || el.getAttribute('data-empty') === '1') return 'empty';
+    if (el.classList.contains('loading') || el.getAttribute('data-loading') === '1') return 'loading';
+    if (el.classList.contains('jrerr') || el.getAttribute('role') === 'alert') return 'error';
     return 'idle';
   }
 
@@ -93,8 +101,6 @@
 
   function stateOf(el) {
     if (!el || el.nodeType !== 1) return 'idle';
-    var ds = el.getAttribute('data-jr-state');
-    if (ds && WASH[ds] !== undefined) return ds;
     return inferState(el);
   }
 
@@ -108,6 +114,29 @@
     it[yIdx] = cy - nh / 2;
     it[wIdx] = nw;
     it[hIdx] = nh;
+  }
+
+  function scaleHit(hit, scale) {
+    if (!hit || scale === 1) return false;
+    if (Array.isArray(hit) && typeof hit[0] === 'number' && typeof hit[2] === 'number') {
+      var x = hit[0], y = hit[1], w = hit[2], h = hit[3];
+      var cx = x + w / 2, cy = y + h / 2;
+      hit[2] = w * scale;
+      hit[3] = h * scale;
+      hit[0] = cx - hit[2] / 2;
+      hit[1] = cy - hit[3] / 2;
+      return true;
+    }
+    if (typeof hit.x === 'number' && typeof hit.w === 'number') {
+      var hx = hit.x, hy = hit.y, hw = hit.w, hh = hit.h;
+      var hcx = hx + hw / 2, hcy = hy + hh / 2;
+      hit.w = hw * scale;
+      hit.h = hh * scale;
+      hit.x = hcx - hit.w / 2;
+      hit.y = hcy - hit.h / 2;
+      return true;
+    }
+    return false;
   }
 
   function mulAlpha(packed, opacity) {
@@ -135,38 +164,26 @@
       var interactive = n.el.matches && n.el.matches(INTERACTIVE);
       if (!interactive && !n.el.hasAttribute('data-jr-state')) continue;
       var emphasis = n.el.getAttribute('data-jr-emphasis') === '1';
-      /* Keep n.hit in sync with GEO scale — paint-only scale would desync hitbounds. */
-      if (geo.scale !== 1 && n.hit && typeof n.hit.x === 'number' && typeof n.hit.w === 'number') {
-        var hx = n.hit.x, hy = n.hit.y, hw = n.hit.w, hh = n.hit.h;
-        var hcx = hx + hw / 2, hcy = hy + hh / 2;
-        n.hit.w = hw * geo.scale;
-        n.hit.h = hh * geo.scale;
-        n.hit.x = hcx - n.hit.w / 2;
-        n.hit.y = hcy - n.hit.h / 2;
-        geoTouched++;
-      }
+      if (scaleHit(n.hit, geo.scale)) geoTouched++;
       for (var j = 0; j < n.items.length; j++) {
         var it = n.items[j];
         var kind = it[0];
-        if (wash && (kind === 'rrect' || kind === 'rect') && st !== 'idle' && st !== 'photo' && st !== 'pending') {
+        if (wash && (kind === 'rrect' || kind === 'rect') && st !== 'idle' && st !== 'photo' && st !== 'pending' && st !== 'initials') {
           if (kind === 'rrect') it[6] = packRgba(over(wash, unpack(it[6])));
           else it[5] = packRgba(over(wash, unpack(it[5])));
           touched++;
         }
         if (ring && kind === 'border' && (st === 'focus' || st === 'selected' || st === 'invalid' || st === 'drop-pending' || st === 'pressed')) {
           it[it.length - 1] = packRgba(ring);
-          /* Contour weight: keep ring hugging control — bump stroke if layout stores width */
           if (typeof it[5] === 'number' && it[5] > 0 && it[5] < 8) it[5] = Math.max(it[5], emphasis ? 2 : 1.5);
           touched++;
         }
-        /* Geometry from state-table: scale boxes; opacity on fills/text */
         if (kind === 'rrect' || kind === 'rect' || kind === 'border') {
           if (kind === 'rrect') scaleBox(it, geo.scale, 1, 2, 3, 4);
           else if (kind === 'rect') scaleBox(it, geo.scale, 1, 2, 3, 4);
           else if (kind === 'border' && typeof it[1] === 'number') scaleBox(it, geo.scale, 1, 2, 3, 4);
           if (geo.scale !== 1) geoTouched++;
         }
-        /* HIT items in DL (when present as item tuples) must match scaled paint */
         if (kind === 'hit' && geo.scale !== 1 && typeof it[1] === 'number') {
           scaleBox(it, geo.scale, 1, 2, 3, 4);
           geoTouched++;
@@ -182,11 +199,9 @@
             geoTouched++;
           }
         }
-        /* Selected/focus content hierarchy: slightly stronger text (palette text, not new hue) */
         if (emphasis && (kind === 'text' || kind === 'label') && typeof it[it.length - 1] === 'number') {
           var tc = unpack(it[it.length - 1]);
           if (tc[0] + tc[1] + tc[2] < 600) {
-            /* already dark — keep; bump alpha to full */
             tc[3] = 255;
             it[it.length - 1] = packRgba(tc);
             geoTouched++;
@@ -220,6 +235,8 @@
 
   V.uxStateOf = stateOf;
   V.uxStampTree = stampTree;
+  V.uxInferState = inferState;
+  V.uxScaleHit = scaleHit;
   V.UX_WASH = WASH;
   V.UX_RING = RING;
   V.UX_GEO = GEO;

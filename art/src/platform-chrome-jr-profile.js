@@ -82,7 +82,7 @@
       var on = cur === a.id ? ' on' : '';
       var st = cur === a.id ? 'selected' : 'idle';
       h += '<div class="ja-section" style="margin-top:10px">' +
-        '<button type="button" data-jv-act="plat:app:' + a.id + '" data-jr-state="' + st + '" class="ja-joy' + on + '" style="min-width:12rem;text-align:left">' +
+        '<button type="button" data-jv-act="plat:app:' + a.id + '" data-jr-state="' + st + '" class="ja-joy' + on + '" style="min-width:12rem;min-height:4.5rem;text-align:left">' +
         '<b>' + a.label + '</b> | ' + a.hint + '</button></div>';
     });
     h += '</div>';
