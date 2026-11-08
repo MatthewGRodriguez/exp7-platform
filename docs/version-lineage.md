@@ -49,7 +49,8 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.15** | PR #40 | Soft face lip. Click poses ease, then the frame loop stops. |
 | **1.8.16** | PR #41 | Drag eases a free control. A day does not grow. Enter and Space shrink like a press. |
 | **1.8.17** | PR #42 | A board row's first drag move snaps a gold edge. A day stays unmarked. |
-| **1.8.18** | this branch | The top of a card fades. Press turns the edge navy, then the edge returns. |
+| **1.8.18** | PR #43 | The top of a card fades. Press turns the edge navy, then the edge returns. |
+| **1.8.19** | this branch | A dark card brightens through the middle. A white card does not. |
 
 ### Current manifest (verbatim) [MEAS]
 
@@ -57,9 +58,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.18",
+"version": "1.8.19",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "7a4ca524ec2c8273ae548c0a9dcab688533698a415bf64c520c7d8574439f6b4",
+"sha256": "21008add4e855306cc5441c0a8aa437eb3860946f6dc08163613742923452be8",
 "minLauncherMajor": 1
 ```
 

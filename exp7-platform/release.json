@@ -1,11 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.18",
+  "version": "1.8.19",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "7a4ca524ec2c8273ae548c0a9dcab688533698a415bf64c520c7d8574439f6b4",
+  "sha256": "21008add4e855306cc5441c0a8aa437eb3860946f6dc08163613742923452be8",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "1.8.18: The top of a card fades. Press turns the edge navy, then the edge returns.",
+    "app": "1.8.19: A dark card brightens through the middle. A white card does not. Specks stay out.",
     "appSha256": "4e19bdeeb76818a6a96b9cb6655d48c950d429b17d3680184231e5a67755508b",
     "budgetSha256": "673372b101ea5342552ec16a2e5d3820e322411031c52d808b68c35c3d494c67",
     "budgetMode": "exp7-views",

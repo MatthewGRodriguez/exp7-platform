@@ -78,11 +78,17 @@ The hard white bar at the top of a card is gone. The same sampled kernel as the 
 
 Cloud Node, on `View.show`: a day and a button had top alphas `[96, 17]`, fading, inside the fill, with no hard white bar. A press set the edge to `[36, 88, 166, 200]` and release restored it. Mac paint is not verified.
 
+## Glass body (1.8.19)
+
+The static glass read on a dark fill now covers the body, not only the top and bottom lines. The body is white at alpha 12. The top stays 10 and the bottom line stays 16. A near-white fill still gets none of it. Text that would fall under 4.5:1 keeps the fill unbrightened. Specks stay out. `uxCaustics` stays `not-emitted`. This is the published static brightening, not a new on/off render and not a refraction shader.
+
+Cloud Node, on `View.show`: a white day stayed `below-perception`. A dark section was `ca1-static` with a 24 px body at alpha 12 sitting between the top and bottom lines. Mac paint is not verified.
+
 ## Still not implemented
 
 - A GPU gaussian filter. 1.8.14’s shadow is the sampled kernel in display-list rows. The shipped wasm has no blur op.
 - Translated lift on calendar days and stacked rows. The next fill is too close. Free controls still rise, capped at 2px.
-- A refraction shader, and any caustic speck. The static glass read is the published brightening on a dark fill only. Specks stay out. There is no new on/off render in this build.
+- A refraction shader, and any caustic speck. The static glass read is the published brightening on a dark fill, including the body. Specks stay out. There is no new on/off render in this build.
 - Moho SVG frame playback inside the wasm renderer. The wasm has no SVG or timeline op. Click, drag, and Enter/Space poses ease on the state-table times and the frame loop stops. That ease is not the Moho timeline. A keyboard focus ring is still applied at layout, because the renderer has no focus event.
 - The 85 mm perspective scale on the lifts that fit. It is under half a pixel there, so it is not drawn. Parallax remains the existing slab motion.
 - Face images on Cal / Board / Plan cells. JRDI remains the chrome-bar avatar.
