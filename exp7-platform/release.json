@@ -1,0 +1,11 @@
+{
+ "format": "exp7-platform-release/1",
+ "version": "1.2.0",
+ "file": "exp7-platform/exp7-platform-lean.html",
+ "sha256": "e9d831d330bdfbec5f48b116715ad02d5a5d9ba1ad46a142b30b0aa20f816181",
+ "minLauncherMajor": 1,
+ "contains": {
+  "app": "exp7-lean (v17 editing; experimental views removed)",
+  "appSha256": "1d06fcd3cd75bee000e9a61f781de55447b80a82cc249be2b8e26ca71eaf90f9"
+ }
+}
