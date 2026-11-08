@@ -1,6 +1,7 @@
 # Artist coordination, animation workflow & JRender (historical archive)
 
-**Not** a complete/latest Lore snapshot. **Not** authorization to contact the Artist. **Not** a CSS animation prescription for shipped Exp7 WebGPU views.
+**Not** a complete/latest Lore snapshot. **Not** a CSS animation prescription for shipped Exp7 WebGPU views.  
+**Contact status (2026-11-08):** Matthew **authorized** coordination with **Ash Tangent Residual Artist** for a full view UX/UI art workflow + profile image render support. Living handoff: [`../../artist-coordination-brief.md`](../../artist-coordination-brief.md). This archive remains historical provenance only.
 
 | Item | Count |
 |------|------:|
@@ -22,7 +23,7 @@ Primary narrative compiled with the package: [`historical-context.md`](./histori
 | `wasi03_*` | Component-host / WIT experiments | **Unfinished**; not the shipped host. |
 | motion-**v13** | Matthew **visual** acceptance (~2026-11-06) | **Not** measured GPU quality/perf QA (box used CPU recorder; no adapter). |
 | light-v14 / experimental-v15 | Candidate/continuation docs | **Not** all accepted; v15 views later removed from lean. |
-| world → **Atlas** / storage | Must sync with Artist codec naming; wait on Artist storage update (2026-11-02) | **No confirmation** that pending storage update arrived; no full archived Artist reply. **Do not contact Artist** without new authorization. |
+| world → **Atlas** / storage | Must sync with Artist codec naming; wait on Artist storage update (2026-11-02) | **No confirmation** that pending storage update arrived; resolve in the authorized Ash coordination (do not invent). |
 | Artist report quality-gates | Message **cut off** at quality-gates section | **Source gap** — do **not** invent missing text. |
 
 ## Layout (provenance preserved; duplicates kept on purpose)
@@ -52,4 +53,4 @@ Related Lore ADRs already under `docs/lore/` (not re-copied here): ADR 0001 anim
 
 ## Non-goals
 
-No Artist contact; no app/release/runtime integration; no inventing cut-off quality gates; no treating this as full Lore.
+No inventing cut-off quality gates; no treating this archive as full Lore; no silent release HTML edits from archive files alone. Live coordination uses `docs/artist-coordination-brief.md`, not this folder as the message.

@@ -25,4 +25,6 @@
 | **Direct mount** | Inject app HTML/scripts into `#appSlot-*` in the same page | Opposed to iframe; CSS scoped under `#appSlot-*` |
 | **Reserved header** | Fixed top bar that **occupies layout space**; app starts **below** it | Transparent overlay chrome is **not** the accepted UX |
 | **Exclusive avatar** | GitHub image **or** fallback disc — never both visible | Half-button chrome / dual children are failures |
+| **Profile image render** | JRender capability to draw a bitmap/photo (bar avatar, later views) on the real renderer path | DOM `<img>` is interim; Ash art pass owns the ABI — [artist-coordination-brief.md](./artist-coordination-brief.md) |
+| **Ash / the Artist** | Ash Tangent Residual Artist — creator of JRender; art pipeline owner | Coordinate only when Matthew authorizes; packet above |
 | **Lean Exp7** | v17-based demo minus experimental views / planner-scheduler seed | Search/scheduler research is **canceled** |

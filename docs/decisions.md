@@ -19,7 +19,7 @@ Statuses: **Accepted [REQ]** · **Rejected** · **Substituted (historical)** · 
 | Chrome parallax with views | Back, avatar, apps, Budget tabs on Exp7Slabs path **[REQ]** / **[MEAS 1.8.3]** |
 | Joy units ≠ automatic dollars | Harmonic portions use joy pool units |
 | Sync honesty | Proposal-ops ≠ full app sync; say so |
-| No Artist contact without authorization | Unauthorized until Matthew opens it |
+| Artist contact | **Authorized 2026-11-08** for Ash Tangent Residual Artist — full view UX/UI art workflow + profile image render support; see [artist-coordination-brief.md](./artist-coordination-brief.md). Still: no contact with anyone else as “Artist” without a new [REQ] |
 | Search/scheduler research stopped | 2026-11-07: do not resume |
 | PAT never in JRender canvas text | Account/key UI stays DOM |
 

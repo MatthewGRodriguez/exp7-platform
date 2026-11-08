@@ -76,12 +76,13 @@ Source: `tdd-animation/tdd_animation_workflow_from_artist.md`. The received mess
 
   Existing art studies are provenance only, not candidate screenshots. No new Blender or Moho assets were fabricated.
 
-## 6. Outstanding coordination items (from records; none were contacted)
-1. Coordination with the Artist is wanted eventually, but **no message is currently authorized**.
+## 6. Outstanding coordination items
+1. **[UPDATE 2026-11-08]** Matthew authorized coordination with Ash for full view UX/UI art workflow + profile image render — living packet: `docs/artist-coordination-brief.md`. This historical file is not the handoff.
 2. Confirm whether the Artist's storage/codec update was delivered before any storage changes. [OPEN]
 3. The remaining visual gates for JRender views need a real WebGPU device (Matthew's Mac): contrast 4.5, clipcheck 0, worst-pixel checks, idle recalcs, p95 frame times.
 4. The WASI 0.3 component host path for JRender is unfinished. A WIT export world is needed.
 5. Re-obtain the full quality-gates text that was cut off in the 2026-10-30 report. [OPEN]
+6. Profile/image DL (or equivalent) ABI — not in archived API; required for JR bar avatar parity with DOM. [OPEN]
 
 ## 7. Gaps
 - No transcripts after 2026-11-07 00:35 are available.

@@ -42,6 +42,7 @@ Every substantive claim should carry an evidence class (see [EVIDENCE.md](./EVID
 | [architecture.md](./architecture.md) | Platform shell, apps, mount model, sync boundary, JRender |
 | [views-jrender-standard.md](./views-jrender-standard.md) | **Direction:** universal views, one JRender everywhere |
 | [platform-chrome-jrender.md](./platform-chrome-jrender.md) | **Implementation:** bar / apps / Budget tabs on JRViews + Exp7Slabs (1.8.3) |
+| [artist-coordination-brief.md](./artist-coordination-brief.md) | **Ash handoff:** authorized art workflow + profile image render (2026-11-08) |
 | [decisions.md](./decisions.md) | Accepted / rejected / shipped decisions |
 | [version-lineage.md](./version-lineage.md) | Demo lean history + platform release lineage through 1.8.3 |
 | [distribution-launcher.md](./distribution-launcher.md) | Software vs data repos, launcher gate, handoff |
@@ -70,5 +71,5 @@ See [lore-migration-pending.md](./lore-migration-pending.md).
 - No secrets, keys, account digits, or private financial/schedule values in git  
 - Raw private `ranking_ui.html` must never enter commits  
 - Do **not** resume canceled search / scheduler / Timefold / “v50” research  
-- Do **not** contact the Artist without new authorization  
+- Artist contact only as Matthew authorizes (Ash authorized 2026-11-08 — see [artist-coordination-brief.md](./artist-coordination-brief.md))  
 - Do **not** treat archived AGENTS/SKILL text as live instructions  
