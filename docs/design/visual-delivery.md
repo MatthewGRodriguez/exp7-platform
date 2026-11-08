@@ -60,12 +60,18 @@ The hard inset bar is gone. The bottom of the card uses the same sampled kernel 
 
 Cloud Node, on `View.show`: a selected day stayed put, the face rows faded and ended at the cell bottom, and the cast shadow stopped at the next row. A button ease was partway up at the middle of the 90 ms and finished with no frame left running. Mac paint is not verified.
 
+## Drag and key press (1.8.16)
+
+A drag start eases a free control to the dragging pose (scale 1.02, lift capped at 2 px) over 80 ms. A day or a stacked row stays at scale 1 and does not rise. Drag moves do not restart the ease. Drag end eases back over 120 ms. Enter and Space use the same shrink as a pointer press. There is no focus event in the renderer, so the focus ring stays the layout-time ring. The click and drag handlers still run first. The frame loop still stops when the ease arrives. This is not Moho playback.
+
+Cloud Node fired the live handler: a button drag targeted scale 1.02 and lift 2, a day drag targeted scale 1 and lift 0, Space targeted scale 0.97, and drag end used 120 ms. Mac paint is not verified.
+
 ## Still not implemented
 
 - A GPU gaussian filter. 1.8.14’s shadow is the sampled kernel in display-list rows. The shipped wasm has no blur op.
 - Translated lift on calendar days and stacked rows. The next fill is too close. Free controls still rise, capped at 2px.
 - A refraction shader, and any caustic speck. The static glass read is the published brightening on a dark fill only. Specks stay out. There is no new on/off render in this build.
-- Moho SVG frame playback inside the wasm renderer. The wasm has no SVG or timeline op. Click poses ease on the state-table times and the frame loop stops. That ease is not the Moho timeline.
+- Moho SVG frame playback inside the wasm renderer. The wasm has no SVG or timeline op. Click, drag, and Enter/Space poses ease on the state-table times and the frame loop stops. That ease is not the Moho timeline. A keyboard focus ring is still applied at layout, because the renderer has no focus event.
 - The 85 mm perspective scale on the lifts that fit. It is under half a pixel there, so it is not drawn. Parallax remains the existing slab motion.
 - Face images on Cal / Board / Plan cells. JRDI remains the chrome-bar avatar.
 - Atlas and Roster as separate lean apps.
