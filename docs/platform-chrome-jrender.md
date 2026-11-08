@@ -213,6 +213,10 @@ Exp7Slabs only moves a node that is a slab, or that sits inside one. The 44px ba
 
 `jrviews-ux-states` now uses the state-table lift as motion on free controls and as a contact shadow in the gap. Days and stacked rows do not translate. `style.note` reports how many controls lifted and how many contact shadows are in the display list. Pointer enter / down / up patch a transform; reduced motion skips it. No idle frame loop was added.
 
+## Measured penumbra (1.8.14)
+
+`jrviews-ux-states` samples the published shadow fit into one-pixel rows and stops at the next fill. Dark fills get the static glass brightening. The pose uses the 85 mm scale only when the shift is at least half a pixel. `style.note` counts penumbra rows. Exp7 `show` toggles sections inside `#appSlot-exp7` and does not write `window.budget`. The regression file is `exp7-platform/regression/display-list.mjs`.
+
 ## Debug handoff (1.8.9)
 
 1.8.9 does not change painting. The bar has a **Debug** button (Shift+D) that stays clickable above the chrome canvas. It copies a JSON snapshot: shell version, overlay and slot opacity, which element is on top of the content, canvas sizes, GPU and view errors, and whether the live display list contains the 1.8.8 inset bands and gold rings. `style.note` states that in one sentence. No keys or account text.
