@@ -97,7 +97,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.20. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.21. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -10730,7 +10730,7 @@ window.x7 = window.x7 || function (t) {
     L.uxRefraction = 'blocked-no-dl-op';
     L.uxMoho = 'blocked-no-svg-op';
     L.uxCaustics = 'not-emitted';
-    L.uxMotion = 'ground-shadow';
+    L.uxMotion = 'ground-shadow-fast-id';
     L.uxStamped = stamp.stamped;
     L.uxTouched = touched;
     L.uxGeoTouched = geoTouched;
@@ -10744,7 +10744,13 @@ window.x7 = window.x7 || function (t) {
     var used = {};
     for (var i = 0; i < nodes.length; i++) used[nodes[i].id] = 1;
     function reserved(band) { return band === 0x1 || band === 0x2 || band === 0x4 || band === 0x5 || band === 0x6; }
-    while (used[id] || id === 0xffffffff || reserved(id >>> 28)) id = (id + 1) >>> 0 || 1;
+    /* A reserved band is 256 million ids. Stepping one id at a time stalls the first draw. Jump the whole band, the same way layout allocates node ids. */
+    var guard = 0;
+    while ((used[id] || id === 0xffffffff || reserved(id >>> 28)) && guard < 64) {
+      if (id === 0xffffffff || reserved(id >>> 28)) id = ((id & 0xf0000000) + 0x10000000) >>> 0 || 1;
+      else id = (id + 1) >>> 0 || 1;
+      guard++;
+    }
     return id;
   }
   function reducedMotion() {
@@ -13194,7 +13200,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.20",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.21",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
