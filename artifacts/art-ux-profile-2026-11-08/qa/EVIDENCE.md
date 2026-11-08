@@ -27,3 +27,8 @@ Base merge: `3d76da1df0562e9eb527233f648976c367711871` · Review version **1.8.4
 | Prior Mac-worker bc-71d24d2f… | No changes; ignored | **[CLAIM]** superseded |
 
 **Honest summary:** Substantial JRDI + chrome + design/state/perspective/analytical lighting + pack landed. Full art workflow is **not** complete without Blender/Moho/Mac WebGPU gates.
+
+
+## Update
+- Lighting fits marked **provisional-analytical-only**; Blender/Moho Mac probes probe-ready via handoff archive.
+- MOCK screenshots/GIFs are not production visual evidence.
