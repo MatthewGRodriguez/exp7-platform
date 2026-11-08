@@ -7096,7 +7096,7 @@ root.JRender = { EV, EVNAME, NF, MOD, RS, GF, F, rgba, hex, b64ToBytes, b91ToByt
     return null;
   };
 
-  ImageLayer.prototype.draw = function (pass, dpr) {
+  ImageLayer.prototype.draw = function (pass, dpr, lifetime) {
     var r = this.r;
     var store = r._imageStore;
     if (!store || !this.nodes.size || !pass) return 0;
@@ -7104,11 +7104,13 @@ root.JRender = { EV, EVNAME, NF, MOD, RS, GF, F, rgba, hex, b64ToBytes, b91ToByt
     try { store._ensurePipe(r.fmt || 'bgra8unorm'); } catch (e) { return 0; }
     var nDraw = 0;
     var d = dpr || r.dpr || 1;
-    for (var e of r.entries) nDraw += this._drawEntry(pass, store, e, d);
+    /* Vertex buffers must outlive the open CommandEncoder; destroy only after submit. */
+    var keep = lifetime || (this._frameBuffers = []);
+    for (var e of r.entries) nDraw += this._drawEntry(pass, store, e, d, keep);
     return nDraw;
   };
 
-  ImageLayer.prototype._drawEntry = function (pass, store, e, d) {
+  ImageLayer.prototype._drawEntry = function (pass, store, e, d, keep) {
     var r = this.r, n = 0;
     if (!e || !e.scene) return 0;
     var verts = [];
@@ -7120,43 +7122,45 @@ root.JRender = { EV, EVNAME, NF, MOD, RS, GF, F, rgba, hex, b64ToBytes, b91ToByt
       verts.push({ h: h, x0: x0, y0: y0, x1: x1, y1: y1, a: node.alpha });
     }
     if (!verts.length) return 0;
+    /* One uniform + one packed VB per scene entry (writeBuffer once; all draws see submit-time contents). */
     var u = new Float32Array(8);
     u[0] = r.c.width / (r.dpr || d);
     u[1] = r.c.height / (r.dpr || d);
     u[4] = e.x; u[5] = e.y; u[6] = 1; u[7] = 1;
     r.dev.queue.writeBuffer(store.ub, 0, u);
+    var packed = new Float32Array(verts.length * 6 * 5);
     for (var i = 0; i < verts.length; i++) {
-      var v = verts[i];
-      var data = new Float32Array([
-        v.x0, v.y0, 0, 0, v.a,
-        v.x1, v.y0, 1, 0, v.a,
-        v.x1, v.y1, 1, 1, v.a,
-        v.x0, v.y0, 0, 0, v.a,
-        v.x1, v.y1, 1, 1, v.a,
-        v.x0, v.y1, 0, 1, v.a
-      ]);
-      var vb = r.dev.createBuffer({ size: data.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
-      r.dev.queue.writeBuffer(vb, 0, data);
+      var v = verts[i], o = i * 30;
+      packed[o] = v.x0; packed[o+1] = v.y0; packed[o+2] = 0; packed[o+3] = 0; packed[o+4] = v.a;
+      packed[o+5] = v.x1; packed[o+6] = v.y0; packed[o+7] = 1; packed[o+8] = 0; packed[o+9] = v.a;
+      packed[o+10] = v.x1; packed[o+11] = v.y1; packed[o+12] = 1; packed[o+13] = 1; packed[o+14] = v.a;
+      packed[o+15] = v.x0; packed[o+16] = v.y0; packed[o+17] = 0; packed[o+18] = 0; packed[o+19] = v.a;
+      packed[o+20] = v.x1; packed[o+21] = v.y1; packed[o+22] = 1; packed[o+23] = 1; packed[o+24] = v.a;
+      packed[o+25] = v.x0; packed[o+26] = v.y1; packed[o+27] = 0; packed[o+28] = 1; packed[o+29] = v.a;
+    }
+    var vb = r.dev.createBuffer({ size: packed.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
+    r.dev.queue.writeBuffer(vb, 0, packed);
+    keep.push(vb);
+    var vx = Math.round(e.x * d), vy = Math.round(e.y * d);
+    var vw = Math.round(e.w * d), vh = Math.round(e.h * d);
+    var cx = Math.max(0, vx), cy = Math.max(0, vy);
+    var cw = Math.min(r.c.width, vx + vw) - cx, chh = Math.min(r.c.height, vy + vh) - cy;
+    if (cw <= 0 || chh <= 0) return 0;
+    pass.setViewport(vx, vy, vw, vh, 0, 1);
+    pass.setScissorRect(cx, cy, cw, chh);
+    pass.setPipeline(store.pipe);
+    pass.setVertexBuffer(0, vb);
+    for (var j = 0; j < verts.length; j++) {
       var bg = r.dev.createBindGroup({
         layout: store.bgl,
         entries: [
           { binding: 0, resource: { buffer: store.ub } },
           { binding: 1, resource: store.sampler },
-          { binding: 2, resource: v.h.view }
+          { binding: 2, resource: verts[j].h.view }
         ]
       });
-      var vx = Math.round(e.x * d), vy = Math.round(e.y * d);
-      var vw = Math.round(e.w * d), vh = Math.round(e.h * d);
-      var cx = Math.max(0, vx), cy = Math.max(0, vy);
-      var cw = Math.min(r.c.width, vx + vw) - cx, chh = Math.min(r.c.height, vy + vh) - cy;
-      if (cw <= 0 || chh <= 0) { vb.destroy(); continue; }
-      pass.setViewport(vx, vy, vw, vh, 0, 1);
-      pass.setScissorRect(cx, cy, cw, chh);
-      pass.setPipeline(store.pipe);
       pass.setBindGroup(0, bg);
-      pass.setVertexBuffer(0, vb);
-      pass.draw(6, 1, 0, 0);
-      vb.destroy();
+      pass.draw(6, 1, j * 6, 0);
       n++;
     }
     return n;
@@ -7181,8 +7185,13 @@ root.JRender = { EV, EVNAME, NF, MOD, RS, GF, F, rgba, hex, b64ToBytes, b91ToByt
         p.setViewport(vx, vy, vw, vh, 0, 1); p.setScissorRect(cx, cy, cw, chh); p.setPipeline(this.pipe); p.setBindGroup(0, g.bg); p.setVertexBuffer(0, g.vb);
         for (var i = 0; i < g.ranges.length; i += 2) { p.draw(g.ranges[i + 1], 1, g.ranges[i], 0); n++; }
       }
-      if (this.images) n += this.images.draw(p, d) || 0;
-      p.end(); this.dev.queue.submit([enc.finish()]); this.draws = n; this.cursorSync(); return n;
+      var lifetime = [];
+      if (this.images) n += this.images.draw(p, d, lifetime) || 0;
+      p.end(); this.dev.queue.submit([enc.finish()]);
+      for (var bi = 0; bi < lifetime.length; bi++) {
+        try { lifetime[bi].destroy(); } catch (_) {}
+      }
+      this.draws = n; this.cursorSync(); return n;
     };
     var prevRecover = renderer.recover && renderer.recover.bind(renderer);
     if (renderer.recover) {

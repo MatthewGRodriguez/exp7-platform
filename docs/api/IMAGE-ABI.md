@@ -58,6 +58,8 @@ renderer.images.clear(nodeId?)
 
 Clip: circular discard + soft edge in WGSL. Alpha respects DPR via CSS-px → device pass with scene viewport.
 
+**CommandEncoder lifetime:** image vertex buffers are recorded into the shared render pass and must not be `destroy()`ed until after `queue.submit` of that encoder. Destroying mid-pass invalidates the encoder (Safari/Chrome: `Invalid CommandEncoder`) and latches `INITERR` for all JRViews on the shared device.
+
 ### Device loss
 
 `gc.recover()` / `renderer.recover()` re-fetch URL handles and rebuild the image pipeline. No silent software fallback.
