@@ -38,10 +38,16 @@ Environment for the checks below: cloud Node, reading the lean file and running 
 | Shared GPUContext, universal builders | Brief invariants | No second renderer, no per-app layout fork. | The hook wraps `JRViews.layout` once. |
 | Contrast of body ink on a selected wash | Brief contrast 4.5 | Ink `[28,35,51]` on the gold wash over white | Cloud Node: idle 15.70, selected wash 12.66, pressed wash 11.13. Disabled opacity 0.38 composites to about 2.16. That is the agreed disabled state. |
 
+## Lift and contact shadow (1.8.13)
+
+The state table’s lift was only a darker inset band. A full y-shift covers the next calendar day (the gap is 4px) and the next board row (the gap is 2px), so those still do not translate. Free controls — buttons, tabs, Apps cards — move up by the table lift, capped at 2px, and a solid contact shadow fills the band they left. A selected day stays put and gets a shadow of at most 3px in the gap under it. Hover lifts a free control by 1.5px. Press scales it to 0.97 around its own center. Reduced motion skips that transform.
+
+Cloud Node, on the layout hook: a selected day did not move and its shadow stayed inside the gap; a selected button sat 2px higher than the idle button beside it, with the shadow in the vacated band. Mac paint of the pointer is not verified. This is not a gaussian blur.
+
 ## Still not implemented
 
-- Gaussian / offset shadow that leaves the cell. An outside shadow covers the next day. The shade is inset on purpose.
-- Translated lift (hover 1.5 px, selected 2 px, dragging 4 px). Same overlap reason. Lift changes shade strength only. `applyCalViewStates` also resets idle day transforms to identity.
+- Gaussian blur. 1.8.13’s contact shadow is a solid rect in the gap, not a blurred bitmap. It does not cover the next day.
+- Translated lift on calendar days and stacked rows. The gap is too small. Free controls do lift, capped at 2px. Dragging’s 4px lift is capped the same way.
 - Blender caustics, refractive glass, belt waves, and the v11 study renders. Those files are not the product look and are not packed into the lean HTML.
 - Moho SVG frame playback inside the wasm renderer.
 - A perspective camera (85 mm study) on the live canvas. Exp7Slabs parallax is the motion that already ships; this pass does not add a camera.

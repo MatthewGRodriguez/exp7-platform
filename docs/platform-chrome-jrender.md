@@ -209,6 +209,10 @@ Exp7Slabs only moves a node that is a slab, or that sits inside one. The 44px ba
 
 `chromeJr.barSlabs.kinds` includes `outer`. With Back open, `chromeJr.appsSlabs.kinds` includes `inner`.
 
+## Lift and contact shadow (1.8.13)
+
+`jrviews-ux-states` now uses the state-table lift as motion on free controls and as a contact shadow in the gap. Days and stacked rows do not translate. `style.note` reports how many controls lifted and how many contact shadows are in the display list. Pointer enter / down / up patch a transform; reduced motion skips it. No idle frame loop was added.
+
 ## Debug handoff (1.8.9)
 
 1.8.9 does not change painting. The bar has a **Debug** button (Shift+D) that stays clickable above the chrome canvas. It copies a JSON snapshot: shell version, overlay and slot opacity, which element is on top of the content, canvas sizes, GPU and view errors, and whether the live display list contains the 1.8.8 inset bands and gold rings. `style.note` states that in one sentence. No keys or account text.
