@@ -36,7 +36,8 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | 1.8.2 | PR #25 | Bar + apps via JRViews; Budget tabs in `hostDoc` |
 | **1.8.3** | **PR #26** | Hide DOM tabs (scoped CSS); Plan chrome after `planDoc`; bar canvas hits |
 | **1.8.4** | PR #29 | JRDI profile images + UX state table/washes |
-| **1.8.5** | this branch | JRDI: keep image VBs until after `queue.submit` (fixes Invalid CommandEncoder) |
+| **1.8.5** | PR #30 | JRDI: keep image VBs until after `queue.submit` (fixes Invalid CommandEncoder) |
+| **1.8.6** | this branch | App-slot reuse reveals WebGPU views (fixes blank after second app switch) |
 
 ### Current manifest (verbatim) [MEAS]
 
@@ -44,9 +45,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.5",
+"version": "1.8.6",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "e2fa529aa67f85d58b68eb794963ba53074331f783cbf9bf74c5482e07e3765b",
+"sha256": "9fcb7193f72f04d3dc1c53c05c58e1d22de6a05d981d8542017db076a07a9b0a",
 "minLauncherMajor": 1
 ```
 
