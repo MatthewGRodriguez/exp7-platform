@@ -27,6 +27,22 @@ Inventories: `lore/LORE-DOCS-PUBLIC-INVENTORY.md`, `lore/LORE-DOCS-REDACTED-INVE
 
 Home: [`archives/ranking_ui/`](./archives/ranking_ui/README.md).
 
+## Artist / JRender / animation coordination archive
+
+| Metric | Value |
+|--------|------:|
+| Manifest-listed docs | **44** |
+| Package extras | **2** (`MANIFEST.md`, `historical-context.md`) |
+| In-repo overview + privacy note | **2** (`README.md`, `PRIVACY-REVIEW.md`) |
+| Package SHA verified in-repo | **44/44** |
+| Path-redacted (`modified: yes`) | **8** |
+| Secrets/finances reported or found | **None** |
+| Artist contacted? | **No** (not authorized) |
+
+Home: [`archives/artist-jrender/`](./archives/artist-jrender/README.md).
+
+**Do not confuse:** Artist 2026-10-30 TDD/Slate CSS player workflow ≠ Exp7 WebGPU/JRender view animation rules. Template ≠ execution. core-wasm+JS ≠ unfinished WASI 0.3. v13 user visual ≠ GPU QA. Atlas/storage wait on Artist remains **OPEN**.
+
 ## Remaining gaps
 
 - Mac Lore after design 49 / ADR 0111  
@@ -34,8 +50,14 @@ Home: [`archives/ranking_ui/`](./archives/ranking_ui/README.md).
 - Withheld ranking data/backups/frames (per ranking inventory)  
 - Raw `ranking_ui.html` (private; sanitization source only)  
 - One Lore income decision record  
+- Artist report **quality-gates** section cut off (source gap; do not invent)  
+- Artist full reply on storage/op rules **not archived**  
+- Confirmation that Artist **pending storage update** arrived: **none**  
+- Later Mac Artist/JRender mail beyond this package  
 
 ## Related
 
 - [`lore/HISTORICAL-VS-CURRENT.md`](./lore/HISTORICAL-VS-CURRENT.md)  
 - [`archives/ranking_ui/SANITIZATION.md`](./archives/ranking_ui/SANITIZATION.md)  
+- [`archives/artist-jrender/historical-context.md`](./archives/artist-jrender/historical-context.md)  
+- [`archives/artist-jrender/PRIVACY-REVIEW.md`](./archives/artist-jrender/PRIVACY-REVIEW.md)  

@@ -1,0 +1,35 @@
+# JRender Exp7 API
+
+## Builds
+| file | contents | size before | size after |
+|---|---|---|---|
+| wasm/jrender_dist.wasm | legacy runtime (coin, fish, room) shipped in dist/*.html; opt s, wasm-opt -Oz | 115,624 B | 130,698 B (+15,074 from the robust fill path and the jr_ptr guard) |
+| wasm/jrender_full_small.wasm | legacy + draw list (DL) + vector text + jrs_* handles; opt s | n/a | 188,604 B |
+| wasm/jrender_full_fast.wasm | same as above, opt 3 + wasm-opt -O3 | n/a | 231,596 B |
+| dist/jrender.html / jrender_ios.html | shipped single pages | 106,618 / 124,853 B | 111,687 / 130,439 B |
+
+Build: `tools/build_runtime.sh` (all three wasm files), `tools/build_dist.py` (dist), `web/exp7/build_pages.py <src.js> <out.html> <title> [wasm]` (single-file pages with inlined base64 wasm and font, checked to be ASCII).
+
+## jrender.js (ES module, ASCII, no dependencies)
+- Constants: `EV` (ENTER 1, LEAVE 2, DOWN 3, UP 4, CLICK 5, SCROLL 6, WHEEL 7, KEYDOWN 8, KEYUP 9, MOVE 10, CANCEL 11), `EVNAME`, `NF` (HIT 1, HIDDEN 2, MOVE 4, XF 8), `GF` (SCROLL_X 1, SCROLL_Y 2), `F` (scene dirty flags), `rgba()`, `hex()`.
+- Builders: `DL` (scene: node, rect, rrect, border, path with `evenodd`, text with {maxw, align, ellipsis}, group(rect, content size, flags) ... end) and `Patch` (replace, color, xform, flags, hit rect, group rect / scroll, remove, insert). Both produce the binary formats in format/JRB.md (DL v1, JRDP v1).
+- `Core` (no GPU, also works in Node): `Core.create(wasm)`, `font(bytes)` (JRF v1), `measure(text, size, font)`, `fit(text, size, maxw, ellipsis)`, `metrics(font)`, `createScene(w, h, dpr)`, `wasmBytes()`.
+- `DLScene`: `load(dl)`, `patch(p)`, `resize(w,h,dpr)`, `scroll(gid,x,y)`, `scrollPos(gid)` -> [x,y], `hit(x,y)` -> id|null, `pointer(kind,x,y,buttons)`, `wheel(x,y,dx,dy)`, `key(down,code)` (each returns the events it caused), `events()` (poll and clear queue: {kind,type,id,x,y,buttons}), `onevent`, `oncursor`, `compact()`, `flags()`, `buf(k)`, `free()`.
+- `Renderer`: `init({canvas, wasm, device?, clear, readback?})`, `resize(cssW, cssH, dpr)`, `createScene(w,h)`, `layout([{scene,x,y,w,h}])`, `draw()` (one pass; viewport and scissor per scene; one draw per contiguous vertex range), `attach()` (pointer with capture, wheel, touch via pointer events, keys, cursor), `read()` (readback), `memory()` -> {gpuBytes, gpuPeak, wasmBytes}, `destroy()`. WebGPU only (no WebGL2 fallback, as agreed).
+
+## Wasm exports
+Legacy (unchanged signatures): `jr_alloc jr_init jr_aspect jr_resize jr_reduced jr_seek jr_visible jr_pointer jr_frame jr_clicks jr_ptr jr_len`. `jr_ptr`/`jr_len` now return 0 before `jr_init` instead of panicking.
+
+Multi-instance legacy (full builds): `jrs_new(w,h,dpr,reduced)->handle (0 = fail)`, `jrs_free jrs_aspect jrs_resize jrs_pointer jrs_frame jrs_visible jrs_clicks jrs_ptr jrs_len` (same meaning as jr_*, plus a handle).
+
+Draw list (full builds): `jrd_alloc(n)` (input buffer), `jrd_create(w,h,dpr)->handle`, `jrd_free`, `jrd_load(h)`, `jrd_patch(h)`, `jrd_resize`, `jrd_compact`, `jrd_pointer(h,kind,x,y,buttons)`, `jrd_wheel(h,x,y,dx,dy)`, `jrd_key(h,down,code)`, `jrd_scroll(h,gid,x,y)`, `jrd_scroll_x/y(h,gid)`, `jrd_hit(h,x,y)` (0xFFFFFFFF = none), `jrd_flags`, `jrd_clean`, `jrd_events_clear`, `jrd_ptr(h,k)`/`jrd_len(h,k)` (k: verts, dirty range, groups, ranges, events), `jrd_font`, `jrd_measure`, `jrd_fit`, `jrd_font_metrics`, `jrd_mem_pages`. Test hooks: `jrt_tess jrt_ptr jrt_ear jrt_ear_ptr`.
+
+## Errors
+`jrd_load` / `jrd_patch`: 0 ok, -1 bad magic/version/length, -2 malformed op (the whole patch is rejected, scene untouched), -3 unknown handle. Duplicate node ids in an insert are skipped and counted. `jrd_font` -1 = bad font. `jrd_measure` -1 = unknown font. Nothing panics on bad input (fuzzed).
+
+## Memory and performance (headless Chrome on the box)
+- Demo page (requirements table + 400-row scroll list + board + glyphs), after culling: dpr 1: wasm 36.0 MB, GPU 24.0 MB peak; dpr 2: wasm 36.1 MB, GPU 56.2 MB peak (mostly the MSAA 4 colour target, 16 B per device px). Before culling it was wasm 271 MB, GPU 97 / 161 MB.
+- GPU test page, 400 text rows: load 10.9 ms, patch + draw 0.15 ms, draw only 0.007 ms, 154k verts, GPU 9.6 MB, wasm 10.4 MB.
+- JS per frame in the animated demo: 0.15 ms (dpr 1), 0.17 ms (dpr 2). Per frame JS is: read flags, writeBuffer of the dirty range, one render pass.
+- Node: wasm memory 9.8 MB for the test scenes.
+- Culling: nodes further than half a viewport outside their clip are not tessellated; nodes more than 1.5 viewports away are evicted, and tessellated again when they scroll near. Hit testing uses estimated bounds, so it works for nodes that are not tessellated.

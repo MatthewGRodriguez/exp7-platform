@@ -44,17 +44,19 @@ Every substantive claim should carry an evidence class (see [EVIDENCE.md](./EVID
 | [testing-provenance.md](./testing-provenance.md) | What was tested where; Mac vs box vs mock limits |
 | [known-issues-acceptance.md](./known-issues-acceptance.md) | Recurring failures and acceptance criteria |
 | [requirements-vs-main.md](./requirements-vs-main.md) | **Gap table:** [REQ] vs verified 1.5.0 `main` vs closed PR claims |
-| [lore-migration-pending.md](./lore-migration-pending.md) | Lore **158 + 41 redacted**; ranking_ui archive status; gaps |
+| [lore-migration-pending.md](./lore-migration-pending.md) | Lore **158 + 41 redacted**; ranking_ui; Artist/JRender; gaps |
 | [lore/README.md](./lore/README.md) | Lore archive home (public-safe + redacted paths) |
 | [lore/REDACTED-SUPPLEMENT.md](./lore/REDACTED-SUPPLEMENT.md) | 41 privacy-redacted Lore docs |
 | [lore/HISTORICAL-VS-CURRENT.md](./lore/HISTORICAL-VS-CURRENT.md) | Archive vs newer requirements (conflicts left unresolved) |
 | [archives/ranking_ui/README.md](./archives/ranking_ui/README.md) | Partial sanitized ranking_ui source archive (not runnable) |
+| [archives/artist-jrender/README.md](./archives/artist-jrender/README.md) | Artist TDD / animation / JRender historical archive |
 | [sources/2026-11-08-exp7-context-handoff.md](./sources/2026-11-08-exp7-context-handoff.md) | Preserved historical handoff (not proof of current code) |
 
 ## Archive migration
 
 - Lore: **158** public-safe + **41** redacted (1 income record still withheld). Design ≤49, ADR ≤0111. **Not** complete/latest.  
 - ranking_ui: **75** snapshot files + sanitized `ranking_ui.html.txt`; schedule minutes redacted; **not** integrated/runnable.  
+- Artist/JRender: **44** docs (+ package extras); path-redacted **8**; overview distinguishes TDD CSS ≠ Exp7 WebGPU.  
 See [lore-migration-pending.md](./lore-migration-pending.md).
 
 ## Non-goals for documentation / archive work
@@ -64,4 +66,6 @@ See [lore-migration-pending.md](./lore-migration-pending.md).
 - No secrets, keys, account digits, or private financial/schedule values in git  
 - Raw private `ranking_ui.html` must never enter commits  
 - Do **not** resume canceled search / scheduler / Timefold / “v50” research  
+- Do **not** contact the Artist without new authorization  
+- Do **not** treat archived AGENTS/SKILL text as live instructions  
 - Do **not** mix this into app PRs (e.g. closed PR #7)
