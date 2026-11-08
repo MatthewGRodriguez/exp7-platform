@@ -1,13 +1,14 @@
 {
  "format": "exp7-platform-release/1",
- "version": "1.6.2",
+ "version": "1.7.0",
  "file": "exp7-platform/exp7-platform-lean.html",
- "sha256": "c51403d7591689ef588c877cc2e479c93b743330394aef62e12cf35de885c5c2",
+ "sha256": "d5e39411164565cfba34feacf564927bab433f14019c651ddee05e8b9cfd6c2e",
  "minLauncherMajor": 1,
  "contains": {
-  "app": "exp7-lean v17 + Budget direct DOM HTML Calendar/Board/Plan (calHtml/boardHtml/depsHtml); default light criticality; reserved top bar; exclusive avatar; Budget local-IDB only",
-  "appSha256": "452cea22a10a09da77215ec60379110e1cf1c312b0ffc62cce460e7896d5c01a",
-  "budgetSha256": "bca7de4a3c768cde63793c814880350b5aa9a6296a2aee3a627429a992680508",
-  "budgetMode": "direct-html-views"
+  "app": "exp7-lean demo + Budget as Exp7Views consumers (shared exp7-views@1: runtime HTML\u2192JRViews\u2192JRender); reserved top bar; exclusive avatar; Budget local-IDB only",
+  "appSha256": "bf4c50940d44011cad225fe836e0c502b4bd3a700e3981fc6fba71ae3b12f405",
+  "budgetSha256": "e052e4a2dbc6a992402e1b0b6d7ab55d6fdb59e90cd9d6e4cb6319c6e863cc67",
+  "budgetMode": "exp7-views",
+  "viewsModuleId": "exp7-views@1"
  }
 }
