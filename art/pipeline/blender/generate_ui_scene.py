@@ -331,6 +331,11 @@ def apply_bevel(obj, width: float, segments: int = 4):
         pass
 
 
+def _srgb_to_linear(c: float) -> float:
+    x = float(c)
+    return x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4
+
+
 def principled_mat(name: str, base, opacity: float = 1.0, rough: float = 0.38, emit: float = 0.0):
     assert bpy is not None
     mat = bpy.data.materials.new(name)
@@ -352,6 +357,41 @@ def principled_mat(name: str, base, opacity: float = 1.0, rough: float = 0.38, e
                 bsdf.inputs["Emission Strength"].default_value = emit
         if "Transmission Weight" in bsdf.inputs:
             bsdf.inputs["Transmission Weight"].default_value = 0.04 if opacity > 0.9 else 0.0
+    return mat
+
+
+def ui_face_mat(name: str, base, opacity: float = 1.0):
+    """Unlit Emission face — text-hidden BG must match design ink contrast (no shade false-fail)."""
+    assert bpy is not None
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    mat.blend_method = "BLEND" if opacity < 0.999 else "OPAQUE"
+    try:
+        mat.shadow_method = "NONE"
+    except Exception:
+        pass
+    nt = mat.node_tree
+    nodes, links = nt.nodes, nt.links
+    nodes.clear()
+    out = nodes.new("ShaderNodeOutputMaterial")
+    em = nodes.new("ShaderNodeEmission")
+    r, g, b = _srgb_to_linear(base[0]), _srgb_to_linear(base[1]), _srgb_to_linear(base[2])
+    em.inputs["Color"].default_value = (r, g, b, 1.0)
+    em.inputs["Strength"].default_value = 1.0
+    if opacity < 0.999:
+        # Mix with transparent for disabled/drag fades
+        tr = nodes.new("ShaderNodeBsdfTransparent")
+        mix = nodes.new("ShaderNodeMixShader")
+        mix.inputs["Fac"].default_value = float(opacity)
+        links.new(tr.outputs["BSDF"], mix.inputs[1])
+        links.new(em.outputs["Emission"], mix.inputs[2])
+        links.new(mix.outputs["Shader"], out.inputs["Surface"])
+    else:
+        links.new(em.outputs["Emission"], out.inputs["Surface"])
+    try:
+        mat.use_backface_culling = False
+    except Exception:
+        pass
     return mat
 
 
@@ -524,7 +564,7 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_n
         minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
 
     pushed = 0
-    min_fill = 0.72
+    min_fill = 0.62 if view_name == "chrome" else 0.70
     for _ in range(20):
         minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
         fill = max(maxx - minx, maxy - miny)
@@ -545,7 +585,7 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_n
     fill = max(maxx - minx, maxy - miny)
     crop_ok = _fit(minx, maxx, miny, maxy, minz)
     scene.render.resolution_x, scene.render.resolution_y = old_res
-    ok = crop_ok and fill >= (min_fill - 0.10)
+    ok = crop_ok and fill >= (min_fill - 0.08)
     errors = []
     if not crop_ok:
         errors.append(f"crop ndc=[{minx:.3f},{miny:.3f},{maxx:.3f},{maxy:.3f}]")
@@ -709,7 +749,7 @@ def make_panel(name: str, st: dict, palette: dict, geom: dict, tilt_deg=None, st
         ring_w = px_m(3.0, geom)
 
     face = face_color_for_state(st_name, st, palette)
-    mat = principled_mat(name + "_mat", face, opacity=opacity)
+    mat = ui_face_mat(name + "_mat", face, opacity=opacity)
     zc = lift_m + thick / 2
     obj = make_box(name, sx * scale, sy * scale, thick, (origin[0], origin[1], zc), rad, mat)
     if abs(tilt) > 1e-6:
@@ -717,7 +757,8 @@ def make_panel(name: str, st: dict, palette: dict, geom: dict, tilt_deg=None, st
     # Binding contract for child labels (views_content parents text here)
     obj["exp7_lift_m"] = float(lift_m)
     obj["exp7_thick"] = float(thick)
-    obj["exp7_face_local_z"] = float(thick / 2 + 0.12)
+    # Flush to face so elevated/ortho rays sample the panel under glyphs (not ground)
+    obj["exp7_face_local_z"] = float(thick / 2 + 0.02)
     obj["exp7_size_x"] = float(sx * scale)
     obj["exp7_size_y"] = float(sy * scale)
     obj["exp7_st_name"] = str(st_name)

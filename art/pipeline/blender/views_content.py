@@ -496,12 +496,20 @@ def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="V
     # ~3.6m wide — fits frontal FOV without overflow; still fills canvas after push-in
     bar.scale = (1.80, bar_h / 2, 0.03)
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    # Unlit bar face (same contract as make_panel ui_face_mat)
     mat = bpy.data.materials.new(f"{prefix}_bar_mat")
     mat.use_nodes = True
-    bsdf = mat.node_tree.nodes.get("Principled BSDF")
-    if bsdf:
-        c = palette["_rgba"]["surface"]
-        bsdf.inputs["Base Color"].default_value = (c[0], c[1], c[2], 1)
+    nt = mat.node_tree
+    nodes, links = nt.nodes, nt.links
+    nodes.clear()
+    out = nodes.new("ShaderNodeOutputMaterial")
+    em = nodes.new("ShaderNodeEmission")
+    c = palette["_rgba"]["surface"]
+    em.inputs["Color"].default_value = (
+        srgb_to_linear(c[0]), srgb_to_linear(c[1]), srgb_to_linear(c[2]), 1.0
+    )
+    em.inputs["Strength"].default_value = 1.0
+    links.new(em.outputs["Emission"], out.inputs["Surface"])
     bar.data.materials.append(mat)
     bar["exp7_face_local_z"] = 0.055
     bar["exp7_size_x"] = 3.60
@@ -530,10 +538,10 @@ def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="V
 
     for i, (label, st_name) in enumerate([("Cal", "selected"), ("Board", "idle"), ("Plan", "idle")]):
         st = dict(element_states.get(st_name, element_states["idle"]))
-        x = 0.75 + i * (0.40 + gap * 0.35)
+        x = 0.55 + i * (0.38 + gap * 0.3)
         panel, _, ring, _ = make_panel(
             f"{prefix}_tab{i}", st, palette, geom, st_name=st_name,
-            size=(0.36, bar_h * 0.60), origin=(x, 0.0), content_lines=0,
+            size=(0.34, bar_h * 0.60), origin=(x, 0.0), content_lines=0,
         )
         objs.append(panel)
         if ring:
@@ -546,8 +554,8 @@ def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="V
         )
 
     path = avatar_asset_path()
-    # Far-right avatar; login below with clearance — never over disc
-    av = make_avatar(f"{prefix}_avatar", (1.60, 0.0), avatar, path, z=0.12)
+    # Far-right avatar with gap past Plan tab (~1.55) — no label-over-disc
+    av = make_avatar(f"{prefix}_avatar", (1.85, 0.0), avatar * 0.9, path, z=0.12)
     objs.append(av)
     # Compact footer strip under bar (mesh) so framing includes labels
     foot, *_ = make_panel(

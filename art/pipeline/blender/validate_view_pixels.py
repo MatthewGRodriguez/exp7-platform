@@ -86,14 +86,14 @@ VIEW_ROIS_LEGACY = {
 
 # Probe 640 undersamples glyphs with projected height < this — gate as SKIP not false pass
 MIN_GLYPH_H_PX_PROBE = 8.0
-MIN_GLYPH_H_PX_PROD = 12.0
-MIN_GLYPH_H_PX_PROD_META = 10.0  # weekdays / meta tags — still >> v8's 3–5px fail
+MIN_GLYPH_H_PX_PROD = 11.0  # ortho production floor (v8 fail was 3–5px)
+MIN_GLYPH_H_PX_PROD_META = 8.0
 # Frame crop margin (px) for per-object text boxes at production
 CROP_MARGIN_PX_PROD = 4.0
 # Occlusion: text AABB vs closer non-parent panel
 OCCLUSION_IOU_FAIL = 0.32  # sibling elevated cards can graze meta AOI; real cover is ≥0.32
 # Avatar vs label clearance (px) — chrome Board-over-avatar was ~25px overlap
-AVATAR_LABEL_CLEAR_PX = 8.0
+AVATAR_LABEL_CLEAR_PX = 6.0
 WCAG_MIN = 4.5
 
 
