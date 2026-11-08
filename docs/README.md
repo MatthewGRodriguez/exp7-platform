@@ -44,12 +44,14 @@ Every substantive claim should carry an evidence class (see [EVIDENCE.md](./EVID
 | [testing-provenance.md](./testing-provenance.md) | What was tested where; Mac vs box vs mock limits |
 | [known-issues-acceptance.md](./known-issues-acceptance.md) | Recurring failures and acceptance criteria |
 | [requirements-vs-main.md](./requirements-vs-main.md) | **Gap table:** [REQ] vs verified 1.5.0 `main` vs closed PR claims |
-| [lore-migration-pending.md](./lore-migration-pending.md) | Lore-repo docs import: pending package |
+| [lore-migration-pending.md](./lore-migration-pending.md) | Lore import status: **158** public-safe docs imported; **not** complete/latest |
+| [lore/README.md](./lore/README.md) | Historical Lore archive home (`jeditor/`, `living-core/`, inventory + hashes) |
+| [lore/HISTORICAL-VS-CURRENT.md](./lore/HISTORICAL-VS-CURRENT.md) | Archive vs newer requirements (conflicts left unresolved) |
 | [sources/2026-11-08-exp7-context-handoff.md](./sources/2026-11-08-exp7-context-handoff.md) | Preserved historical handoff (not proof of current code) |
 
 ## Lore docs migration
 
-Matthew asked to bring remaining Lore-repo docs into this GitHub repo. Those files are **not** inventable from this handoff. See [lore-migration-pending.md](./lore-migration-pending.md). Until the follow-up package arrives, treat Lore material as **[PENDING]**.
+Public-safe box snapshot imported under [`lore/`](./lore/README.md): **158** byte-exact documents + inventory; **42** withheld (counts only). Design ≤49, ADR ≤0111. **Not** complete/latest canonical Lore — Mac freshness gap remains. See [lore-migration-pending.md](./lore-migration-pending.md).
 
 ## Non-goals for documentation work
 

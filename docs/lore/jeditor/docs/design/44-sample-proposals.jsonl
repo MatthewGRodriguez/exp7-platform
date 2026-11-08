@@ -1,0 +1,30 @@
+{"id":"p_1","proc":"ui:syn_user","baseRev":1000,"t":17,"ops":[{"path":"items/syn_8/state/userPick","op":"add","value":"item:syn_11"}]}
+{"id":"p_2","proc":"ui:syn_user","baseRev":1001,"t":56,"ops":[{"path":"items/syn_208/alts/pref","op":"ref","value":"item:syn_209"}]}
+{"id":"p_3","proc":"ui:syn_user","baseRev":1002,"t":78,"ops":[{"path":"items/syn_272/alts/unavail","op":"add","value":"item:syn_275"}]}
+{"id":"p_4","proc":"ui:syn_user","baseRev":1003,"t":110,"ops":[{"path":"items/syn_346/values/landed","op":"add","value":"2027-09-13"}]}
+{"id":"p_5","proc":"ui:syn_user","baseRev":1004,"t":116,"ops":[{"path":"items/syn_36/values/start","op":"set","value":"2027-05-20"}]}
+{"id":"p_6","proc":"ui:syn_user","baseRev":1005,"t":156,"ops":[{"path":"items/syn_298/values/start","op":"add","value":"2027-03-09"}]}
+{"id":"p_7","proc":"ui:syn_user","baseRev":1006,"t":188,"ops":[{"path":"joys/syn_j49/value","op":"delta","value":-24.5}]}
+{"id":"p_8","proc":"clock","baseRev":1007,"t":190,"ops":[{"path":"joys/syn_clock/value","op":"delta","value":1}]}
+{"id":"p_9","proc":"ui:syn_user","baseRev":1008,"t":215,"ops":[{"path":"items/syn_18/name","op":"set","value":"Placeholder xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}]}
+{"id":"p_a","proc":"ui:syn_user","baseRev":1009,"t":221,"ops":[{"path":"components/syn_c4/items","op":"add","value":"item:syn_7"}]}
+{"id":"p_b","proc":"planner:syn_bot","baseRev":1010,"t":3704,"ops":[{"path":"items/syn_176/alts/pref","op":"ref","value":"item:syn_179"},{"path":"items/syn_128/alts/pref","op":"ref","value":"item:syn_129"},{"path":"joys/syn_j90/value","op":"delta","value":122},{"path":"items/syn_333/values/start","op":"set","value":"2027-10-06"},{"path":"items/syn_238/values/start","op":"set","value":"2027-03-22"},{"path":"items/syn_363/values/start","op":"set","value":"2027-12-14"},{"path":"joys/syn_j10/value","op":"delta","value":-203},{"path":"items/syn_167/values/start","op":"set","value":"2027-03-12"},{"path":"joys/syn_j18/value","op":"delta","value":-438},{"path":"joys/syn_j39/value","op":"delta","value":-441}],"note":"synthetic batch"}
+{"id":"p_c","proc":"ui:syn_user","baseRev":1011,"t":3723,"ops":[{"path":"joys/syn_j77/value","op":"delta","value":-19.1},{"path":"joys/syn_j22/value","op":"delta","value":96.4}]}
+{"id":"p_d","proc":"ui:syn_user","baseRev":1012,"t":3763,"ops":[{"path":"items/syn_252/name","op":"set","value":"Placeholder xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}]}
+{"id":"p_e","proc":"ui:syn_user","baseRev":1013,"t":3797,"ops":[{"path":"items/syn_40/alts/pref","op":"ref","value":"item:syn_42"}]}
+{"id":"p_f","proc":"ui:syn_user","baseRev":1014,"t":3826,"ops":[{"path":"items/syn_312/values/landed","op":"add","value":"2027-03-08"}]}
+{"id":"p_g","proc":"ui:syn_user","baseRev":1015,"t":3842,"ops":[{"path":"items/syn_56/alts/pref","op":"ref","value":"item:syn_61"}]}
+{"id":"p_h","proc":"ui:syn_user","baseRev":1016,"t":3879,"ops":[{"path":"joys/syn_j49/value","op":"delta","value":52.7}]}
+{"id":"p_i","proc":"ui:syn_user","baseRev":1017,"t":3902,"ops":[{"path":"components/syn_c2/items","op":"add","value":"item:syn_78"}]}
+{"id":"p_j","proc":"ui:syn_user","baseRev":1018,"t":3903,"ops":[{"path":"joys/syn_j28/value","op":"delta","value":85.6},{"path":"joys/syn_j25/value","op":"delta","value":77.7}]}
+{"id":"p_k","proc":"ui:syn_user","baseRev":1019,"t":3909,"ops":[{"path":"items/syn_224/state/userPick","op":"add","value":"item:syn_225"}]}
+{"id":"p_l","proc":"ui:syn_user","baseRev":1020,"t":3919,"ops":[{"path":"items/syn_271/values/start","op":"set","value":"2027-11-03"}]}
+{"id":"p_m","proc":"ui:syn_user","baseRev":1021,"t":3957,"ops":[{"path":"joys/syn_j50/value","op":"delta","value":44.1},{"path":"joys/syn_j53/value","op":"delta","value":-31.3},{"path":"joys/syn_j15/value","op":"delta","value":71.2}]}
+{"id":"p_n","proc":"ui:syn_user","baseRev":1022,"t":3980,"ops":[{"path":"items/syn_168/name","op":"set","value":"Placeholder xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}]}
+{"id":"p_o","proc":"ui:syn_user","baseRev":1023,"t":4017,"ops":[{"path":"components/syn_c10/items","op":"add","value":"item:syn_440"}]}
+{"id":"p_p","proc":"ui:syn_user","baseRev":1024,"t":4018,"ops":[{"path":"items/syn_166/name","op":"set","value":"Placeholder xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}]}
+{"id":"p_q","proc":"ui:syn_user","baseRev":1025,"t":4050,"ops":[{"path":"items/syn_120/state/userPick","op":"add","value":"item:syn_123"}]}
+{"id":"p_r","proc":"ui:syn_user","baseRev":1026,"t":4083,"ops":[{"path":"items/syn_128/state/userPick","op":"add","value":"item:syn_130"}]}
+{"id":"p_s","proc":"ui:syn_user","baseRev":1027,"t":4117,"ops":[{"path":"joys/syn_j79/value","op":"delta","value":61.2}]}
+{"id":"p_t","proc":"ui:syn_user","baseRev":1028,"t":4119,"ops":[{"path":"items/syn_287/values/landed","op":"add","value":"2027-01-16"}]}
+{"id":"p_u","proc":"ui:syn_user","baseRev":1029,"t":4135,"ops":[{"path":"items/syn_384/values/start","op":"set","value":"2027-05-22"}]}

@@ -1,29 +1,44 @@
-# Lore-repo documentation migration — PENDING
+# Lore-repo documentation migration — status
 
-## Status
+## Status (updated 2026-11-08, docs PR)
 
-**[PENDING]** Matthew asked to bring remaining Lore-repo docs into this GitHub repository. A follow-up package will be provided.  
+A **public-safe historical snapshot** was imported into [`lore/`](./lore/README.md).
 
-Until that package arrives:
+| Metric | Value |
+|--------|------:|
+| Archived documents imported (inventory) | **158** |
+| Inventory file | `lore/LORE-DOCS-PUBLIC-INVENTORY.md` |
+| SHA-256 checks vs inventory after copy | **158/158 match**, 0 mismatch |
+| Withheld (not in package; counts only) | **42** |
+| Further exclusions after import scan | **0** |
+| Design docs included through | **49** |
+| ADRs included through | **0111** |
+| Lore history / Mac freshness guarantee | **None** |
 
-- Do **not** invent Lore document contents.  
-- Do **not** assume access to Matthew’s local Lore box paths or CEO-tree snapshots.  
-- Do **not** treat the historical handoff’s `/workspace/deliver/...` index as if those files were copied here.  
-- Preserve provenance: when Lore docs land, record source Lore identity/version and import date in this tree.
+This is **not** a complete or latest canonical Lore migration. Later Mac docs (design >49, ADR >0111, other trees) remain **unknown / out of package**. Authoritative Lore stays on the owner’s Mac.
 
-## What already lives here (GitHub)
+## Withheld (42) — counts only; do not reconstruct
 
-- This `docs/` tree (from the 2026-11-08 context handoff + verified `main` inspection).  
-- Root `README.md` (software-vs-data one-pager).  
-- Release artifacts under `exp7-platform/` (not documentation).
+Per package inventory (do not invent contents):
 
-## Planned import checklist (fill when package arrives)
+- 35 — personal financial data  
+- 4 — local personal identifiers (machine paths)  
+- 2 — private-data location / exposure description  
+- 1 — agent operating instructions / persona-runtime (not software docs)  
 
-| Item | Source (Lore id / path) | Destination under `docs/` | Imported? |
-|------|-------------------------|---------------------------|-----------|
-| *(awaiting package)* | | | No |
+Also omitted by packager: source/code payloads, JEditor source, macOS metadata, user-uploaded HTML.
 
-## Related open foundations
+## Checklist
 
-- Outside-process connection design doc 47 (referenced in handoff) — expected via Lore import **[PENDING]**.  
-- JRender compare / coverage notes — referenced as box deliverables; import only if included in the package.
+| Item | Source | Destination | Done? |
+|------|--------|-------------|-------|
+| Public-safe JEditor docs snapshot | Attached zip (`jeditor/…`) | `docs/lore/jeditor/` | Yes (byte-exact) |
+| Public-safe living-core top docs | Attached zip (`living-core/…`) | `docs/lore/living-core/` | Yes (byte-exact) |
+| Package inventory + hashes | Attached zip | `docs/lore/LORE-DOCS-PUBLIC-INVENTORY.md` | Yes |
+| Post-49 designs / post-0111 ADRs / other Mac Lore | Mac Lore (not in package) | — | **No — freshness gap** |
+| 42 withheld records | — | — | **Never publish from this agent** |
+
+## Related
+
+- [`lore/HISTORICAL-VS-CURRENT.md`](./lore/HISTORICAL-VS-CURRENT.md) — conflicts with newer requirements  
+- [`requirements-vs-main.md`](./requirements-vs-main.md) — live platform gaps  

@@ -8,6 +8,6 @@ Software-only public repository for Exp7 Platform release artifacts.
 
 ## Documentation
 
-Project notes (requirements, architecture, lineage, gaps vs live `main`) live under [`docs/`](./docs/README.md). Lore-repo doc import is **pending** a follow-up package — see [`docs/lore-migration-pending.md`](./docs/lore-migration-pending.md).
+Project notes (requirements, architecture, lineage, gaps vs live `main`) live under [`docs/`](./docs/README.md). A **historical public-safe** Lore snapshot (158 docs; not complete/latest) lives under [`docs/lore/`](./docs/lore/README.md) — see [`docs/lore-migration-pending.md`](./docs/lore-migration-pending.md).
 
 Documentation PRs must not change release HTML or `release.json`.

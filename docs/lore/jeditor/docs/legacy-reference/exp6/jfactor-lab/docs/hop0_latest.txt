@@ -1,0 +1,27 @@
+here=host path=host modality=host status=stable
+law=speed≠everything · smarter≠faster · clearer≠optimal · write_only_needed · thorough ok if densest help
+loop_ok=Y repeat=Y gate=Y budget=Y tools=Y · preflight_ok
+goals=g:Keep_a_live,_attention-packed_process_th/open g:Maintain_hop0_with_loop_phase_always_pre/open g:Surface_externals_for_Grok_to_author_new/open g:Advance_densest_roadmap_without_note_far/open g:Prefer_densest_parent-goal_help_over_min/open
+links=hop0_digest research_latest roadmap_densest operate_close operate_token_pilot operate_review
+skills=craft/wrote×14 research/wrote×12 crystallize/wrote×8
+open_next=REVIEW expense_delta · living_ranking review/approve
+forecast=living_ranking review · page:operate_review
+accel=simd workers=4 gpu=1 · thr simd≥8 w≥64 gpu≥512
+binary=wasm=simd w=4 gpu=1 cold=gzip:36 src=js
+related=research_improve_living_core~0.8 operate_handoff~0.8 research_skills_vs_mcp~0.8 research_improve_p70~0.8
+exo=host p=rank_modalities_by_parent-go s=hop0_attention-live_re-enter →outer_author:hope_outer_author_develops_i
+bonds=research,data
+bytes_est=762016 bytes_cap=67108864 pressure=0.011
+loop=sense open_goal=Keep a live, attention-packed process that ranks modalities by parent-goal effectiveness under bytes last_best=research parent_j=0.1510
+perf=total=24 explore=0 sim=10 best=8 fast
+mem=free_gb=0.22 pressure=high
+lifecycle=joy_models:probe!invoke
+session=craft/Y/0.13 jfactor_lab/Y/0.19 research/Y/0.15
+last_capture=craft · Cathay world timeline scarce 1800 China · Dralgrunad-only access · Guo Y
+last_lore=main r5@e28cb517 srv=N
+why=research help=Y j=0.15 did=wrote:research_latest pick=top · +wrote:research_latest·+struct·+self·+bytes
+children_ranked=jfactor_lab:0.186:stable research:0.151:stable crystallize:0.150:stable craft:0.134:stable probe_app_safari:0.098:stable probe_app_inkscape:0.098:stable calendar_layers:0.089:stable probe_app_moho:0.087:stable data:0.070:stable joy_models:—:probe
+nested=pages
+research_tail=REVIEW human · C1 wire ~351 · hop0 re-enter · operate_close · sheet $ SoT
+token_view=toon samples_tok~154 save~0.526
+hidden=L4_raw,L5_archive cold=gzip:36 algo=gzip

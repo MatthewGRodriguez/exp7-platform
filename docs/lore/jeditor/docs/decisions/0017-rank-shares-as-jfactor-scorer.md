@@ -1,0 +1,6 @@
+# ADR 0017: Rank shares become a JFactor scorer
+Status: decided (2026-10-30)
+Decision (Matthew: "JFactor first class here"): the harmonic rank-share scoring used by ranking_ui is rebuilt as a JFactor scorer/jmethod and is no longer plain JS beside the engine. Dimension scoring in JEditor goes through JFactor.
+Reference behavior (to reproduce exactly): ranking_ui.html `harmonicShares(order, invert)` (~L1830). For position i (1-based) in the drag order of n items, the weight is w = 1/r, where r = i (or max(1, n-i+1) when inverted). Each share is w/Σw, so the shares sum to 1. A, E and M are inverted. `factorWeights()` = harmonicShares(WB.factorOrder, false). The composite is scoreRaw = Σ fw[d]·score[d] (`calcRanks` ~L1950-2040; same law in vendor/joy_factors.js `compositeItemScore` and vendor/model_tools_script.js `harmonicSharesLocal`).
+Acceptance: a parity check. For the same orders, inversions and factorOrder, the JFactor scorer must produce per-dimension shares and composite scores identical to ranking_ui's numbers (within float epsilon). Fixtures are taken read-only from ranking_ui.
+Consequences: downstream JAction/JGroup ordering (SimulatedBest/Best) stays as is and now uses JFactor-native scores. Scorer shape is a proposal in docs/design/06.
