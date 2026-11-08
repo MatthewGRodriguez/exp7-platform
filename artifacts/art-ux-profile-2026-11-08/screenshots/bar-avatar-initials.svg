@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="44" viewBox="0 0 360 44">
+  <title>MOCK bar avatar mode=initials — not WebGPU proof</title>
+  <rect width="360" height="44" fill="#fff" stroke="#dde2ec"/>
+  <rect x="8" y="4" width="36" height="36" rx="8" fill="#fff" stroke="#8a96aa"/>
+  <text x="26" y="27" text-anchor="middle" font-size="16" fill="#1c2333">←</text>
+  <circle cx="34" cy="22" r="16" fill="#eef1f6"/><text x="34" y="26" text-anchor="middle" font-family="DejaVu Sans,sans-serif" font-size="12" fill="#1c2333">MR</text>
+  <text x="60" y="27" font-family="DejaVu Sans,sans-serif" font-size="13" fill="#49556a">Exp7</text>
+  <text x="350" y="14" text-anchor="end" font-size="9" fill="#a00">[MOCK]</text>
+</svg>

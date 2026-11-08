@@ -1,0 +1,24 @@
+{
+  "version": "1.8.4",
+  "before": {
+    "chars": 1867688,
+    "lines": 11530,
+    "sha256": "2033acab6ed923098b4ab37b52581a7490cb0da5b77ef05016593ff9015d6c98"
+  },
+  "after": {
+    "chars": 1898516,
+    "lines": 12389,
+    "sha256": "9a5a83d097ee6b4f31d6dd9639e8a2aebbcec00426b4249af86490ba4b2cd21d"
+  },
+  "delta": {
+    "chars": 30828,
+    "lines": 859
+  },
+  "blocks": {
+    "jrender-images": 21400,
+    "jrviews-ux-states": 3565,
+    "platform-chrome-jr-profile": 11516
+  },
+  "asciiSafe": true,
+  "stamp": "2026-11-08T16:32:07.794Z"
+}

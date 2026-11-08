@@ -35,22 +35,24 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | 1.8.1 | PR #24 | Budget chrome cleanup; four Board type tabs |
 | 1.8.2 | PR #25 | Bar + apps via JRViews; Budget tabs in `hostDoc` |
 | **1.8.3** | **PR #26** | Hide DOM tabs (scoped CSS); Plan chrome after `planDoc`; bar canvas hits |
+| **1.8.4** | art review (this branch) | JRDI profile images + UX state table/washes; Blender/Moho/Mac GPU gates still open |
 
 ### Current manifest (verbatim) [MEAS]
 
-Tip: `d8f6ccdc171b49385e0a738e7451714741f5dd99` (merge #26).
+Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f5dd99` (merge #26).  
+Art-pass **1.8.4** review branch updates lean + manifest (see PR); Mac acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.3",
+"version": "1.8.4",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "2033acab6ed923098b4ab37b52581a7490cb0da5b77ef05016593ff9015d6c98",
+"sha256": "9a5a83d097ee6b4f31d6dd9639e8a2aebbcec00426b4249af86490ba4b2cd21d",
 "minLauncherMajor": 1
 ```
 
-Payload byte length on tip: **1 868 344**. SHA matches manifest.
+1.8.3 payload byte length: **1 868 344**. 1.8.4 packed metrics: `artifacts/art-ux-profile-2026-11-08/pack/metrics.json`.
 
 `contains.viewsModuleId`: `exp7-views@1`  
-`contains.chromeJr`: PlatformChromeJR bar + apps via JRViews (Exp7Slabs); Budget tabs in hostDoc; DOM fallback when no-adapter.
+`contains.chromeJr`: PlatformChromeJR + JRDI circular avatar; bar/apps JRViews; Budget tabs in hostDoc.
 
 ## PR disposition (chrome / views era) [MEAS]
 

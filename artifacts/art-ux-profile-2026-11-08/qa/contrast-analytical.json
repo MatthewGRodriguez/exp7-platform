@@ -1,0 +1,75 @@
+{
+  "method": "sRGB relative luminance analytical (text colors vs solid fills; not pixel-with-text-hidden GPU)",
+  "worst": 6.242,
+  "gate": 4.5,
+  "pass": true,
+  "pairs": [
+    {
+      "fg": "text",
+      "bg": "surface",
+      "ratio": 15.7,
+      "pass": true
+    },
+    {
+      "fg": "text",
+      "bg": "subtle",
+      "ratio": 14.511,
+      "pass": true
+    },
+    {
+      "fg": "muted",
+      "bg": "surface",
+      "ratio": 7.525,
+      "pass": true
+    },
+    {
+      "fg": "accent",
+      "bg": "surface",
+      "ratio": 7.142,
+      "pass": true
+    },
+    {
+      "fg": "text",
+      "bg": "softDisc",
+      "ratio": 13.867,
+      "pass": true
+    },
+    {
+      "fg": "text",
+      "bg": "critical",
+      "ratio": 14.107,
+      "pass": true
+    },
+    {
+      "fg": "text",
+      "bg": "moderate",
+      "ratio": 14.554,
+      "pass": true
+    },
+    {
+      "fg": "text",
+      "bg": "low",
+      "ratio": 14.009,
+      "pass": true
+    },
+    {
+      "fg": "criticalText",
+      "bg": "critical",
+      "ratio": 7.14,
+      "pass": true
+    },
+    {
+      "fg": "moderateText",
+      "bg": "moderate",
+      "ratio": 8.018,
+      "pass": true
+    },
+    {
+      "fg": "lowText",
+      "bg": "low",
+      "ratio": 6.242,
+      "pass": true
+    }
+  ],
+  "evidenceClass": "[MEAS] analytical; GPU text-hidden [OPEN][USER-HW]"
+}

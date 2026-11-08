@@ -46,7 +46,8 @@ Exp7Slabs wraps `JRViews.View.prototype.show` and registers a slabs controller p
 
 - `start()` / `redraw()` — paint bar  
 - `redrawApps()` — paint apps overlay  
-- `setAvatarInfo(url, login)` — initials for avatar glyph in the bar scene  
+- `setAvatarInfo(url, login)` — JRDI circular profile photo when ready; exclusive initials/soft-disc on absent/failure (1.8.4-art)  
+
 - `active()` / `appsActive()` / `error()` — diagnostics (`chrome_jr` records at startup)
 
 Acts are routed through `window.__platformChromeAct`:
