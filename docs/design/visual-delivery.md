@@ -1,6 +1,8 @@
 # Visual delivery (1.8.8)
 
-The live screen after 1.8.8 was reported unchanged. The idle material in that build is a 2px inset line, so a display list can contain it and still look like the old cards. 1.8.9 does not restyle anything. Its Debug snapshot says whether those bands and gold rings are in the live display list (`style.note`) and which shell version actually loaded.
+The 1.8.9 Mac paste showed `hook: true` and `ux: false` on every view. `View.show` called the local `layout` function, not `JRViews.layout`, so the state-table pass never ran. 1.8.10 calls the exported layout. Idle days had no border in that paste; the pass now adds the state-table border plus the inset light.
+
+The same paste showed the return to Budget skipping `budget-vf-cal` because `budget-t-cal` was `display:none`. Exp7 `show()` queried every `section` in the document and removed `.on` from Budget's sections. 1.8.10 limits that query to `#appSlot-exp7` and restores Budget's current tab before reveal.
 
 The styling that was agreed in `docs/artist-coordination-brief.md` and `docs/design/state-table.json` is shipped only when it is in `exp7-platform/exp7-platform-lean.html` and shows up in the JRender display list. A Blender or Moho file is not a shipped surface.
 

@@ -193,6 +193,10 @@ Safari / Shortcuts: `display:none` or `#appShell { visibility:hidden }` zeroes l
 
 What this pass does not emit: Blender caustics, a gaussian shadow outside the cell, Moho frame playback, or a perspective camera on the live canvas. Those remain study artifacts. See `docs/design/visual-delivery.md`.
 
+## Style pass and Budget return (1.8.10)
+
+`View.show` calls `window.JRViews.layout`, which is the state-table wrapper. Exp7 `show()` only toggles sections inside `#appSlot-exp7`. `revealAppViews('budget')` restores the Budget tab from `__budgetUi` before it measures canvases.
+
 ## Debug handoff (1.8.9)
 
 1.8.9 does not change painting. The bar has a **Debug** button (Shift+D) that stays clickable above the chrome canvas. It copies a JSON snapshot: shell version, overlay and slot opacity, which element is on top of the content, canvas sizes, GPU and view errors, and whether the live display list contains the 1.8.8 inset bands and gold rings. `style.note` states that in one sentence. No keys or account text.

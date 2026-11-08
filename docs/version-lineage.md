@@ -40,7 +40,8 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.6** | PR #31 | App-slot reuse reveals WebGPU views |
 | **1.8.7** | PR #32 | WebGPU keepalive (no display:none) |
 | **1.8.8** | PR #33 | Opaque Back cover; visible-only reveal; state-table rings and inset light in the draw list |
-| **1.8.9** | this branch | Debug handoff. Does not change the look. Copy debug on the bar. |
+| **1.8.9** | PR #34 | Debug handoff. Copy debug on the bar. |
+| **1.8.10** | this branch | Wire the style pass into View.show. Stop Exp7 tabs from hiding Budget sections. |
 
 ### Current manifest (verbatim) [MEAS]
 
@@ -48,9 +49,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.9",
+"version": "1.8.10",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "ae2188d234387158380fb9349f72c8e995285cecfc3c8bb2a3d1c136bf04bf4e",
+"sha256": "0a69d8206e0747d9d72270331d954b5a956c92ec4718db9c358f6d742021a0cb",
 "minLauncherMajor": 1
 ```
 
