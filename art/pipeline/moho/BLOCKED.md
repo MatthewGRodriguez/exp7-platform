@@ -1,41 +1,25 @@
-# Moho stage — BLOCKED on observed Mac probe (2026-11-08)
+# Moho stage — VERIFIED CLI (Mac 14.3, 2026-11-08) + remaining probes
 
-## Observed
+## Verified on Matthew Mac (Moho 14.3)
 
-| Probe | Command form used | Result |
-|-------|-------------------|--------|
-| SmokeQuit | `Moho SmokeQuit.lua` | **exit 139** (SIGSEGV) in ~seconds, empty logs |
-| CreateExp7ArtComparison | `Moho CreateExp7ArtComparison.lua` | **exit 139**, no `.moho` created |
+| Form | Command | Result |
+|------|---------|--------|
+| **A — document + script (canonical)** | `/Applications/Moho.app/Contents/MacOS/Moho <abs seed.moho> <abs SmokeQuit.lua>` | **rc=0**, stderr `SMOKE_OK` |
+| **B — CLI render** | `/Applications/Moho.app/Contents/MacOS/Moho -r <abs seed> -f png -outfolder <dir> -start 1 -end 1 -v` | **rc=0**, writes `seed_00001.png` |
+| Bare `Moho script.lua` | (no document) | **exit 139** SIGSEGV — **wrong argv**, not licensing/first-launch |
 
-No DiagnosticReport. Animate/Render steps not run. **No evidence this is licensing/first-launch** — only SIGSEGV on bare script argv.
+Bundled Optional Scripts / Command Line Scripts document form A. Put **document path first**.
 
-## Documented invocation (Lost Marble / Moho 14.x forum + 14.2 notes) — NOT yet proven on this Mac
+## Still open (not yet run on Mac as of this handoff)
 
-Do **not** treat these as completed. They are the researched replacements for the failing bare `Moho script.lua` form:
+- `CreateExp7ArtComparison.lua` → comparison `.moho`
+- `AnimateExp7States.lua` (provisional keys)
+- `RenderExp7Preview.lua` / FileRender side-by-side GIF
 
-1. **CLI render** (FAQ / Appendix G style; still cited for 14.3):
-   ```bash
-   /Applications/Moho.app/Contents/MacOS/Moho \
-     -r "/ABS/path/to/seed.moho" \
-     -f png \
-     -outfolder "/ABS/path/out" \
-     -start 1 -end 1 \
-     -v
-   ```
-
-2. **Startup command-line script** (Moho 14.2+: fully qualified paths to BOTH document and script):
-   ```bash
-   /Applications/Moho.app/Contents/MacOS/Moho \
-     "/ABS/path/art/pipeline/moho/seed/JWorkbook_chrome.moho" \
-     "/ABS/path/art/pipeline/moho/scripts/SmokeQuit.lua"
-   ```
-
-3. Bundled examples (on Mac install, if present):
-   `Moho.app/Contents/Resources/Support/Pro/Extra Files/Optional Scripts/Command Line Scripts`
+These are **PROBE-READY** with form A (seed or comparison doc + script). Do not use bare Lua.
 
 ## Explicit non-claims
 
-- We do **not** recommend GUI activation as a workaround without evidence.
-- We do **not** fabricate Moho PNG/GIF output.
-- Seed `seed/JWorkbook_chrome.moho` remains a real archived document for when a non-crashing CLI form is confirmed.
-- Stage status for Exp7 art pass: **BLOCKED** until a documented form exits 0 with logs on Matthew's Moho 14.3.
+- Moho `-h` still unproven as help text.
+- No fabricated Moho PNG/GIF in-repo beyond what Mac CLI wrote under ArtScratch.
+- Seed `seed/JWorkbook_chrome.moho` sha must remain unchanged unless Moho rewrites it.

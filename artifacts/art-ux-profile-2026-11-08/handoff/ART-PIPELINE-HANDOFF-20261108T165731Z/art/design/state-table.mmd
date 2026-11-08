@@ -1,0 +1,31 @@
+stateDiagram-v2
+  [*] --> idle
+  idle --> hover: pointerenter\n90ms
+  hover --> idle: pointerleave\n100ms
+  idle --> focus: focusin\n90ms
+  focus --> idle: focusout\n100ms
+  idle --> pressed: pointerdown\n60ms
+  hover --> pressed: pointerdown\n60ms
+  focus --> pressed: pointerdown\n60ms
+  pressed --> hover: pointerup\n80ms
+  pressed --> selected: click\n100ms
+  selected --> idle: deselect
+  idle --> dragging: dragstart\n80ms
+  selected --> dragging: dragstart\n80ms
+  dragging --> dropPending: drag
+  dropPending --> settling: drop\n120ms
+  dragging --> idle: cancel/Escape\n120ms
+  idle --> invalid: invalid\n120ms
+  invalid --> idle: cancel\n120ms
+  settling --> idle: settle-done\n100ms
+  idle --> disabled: disable
+  disabled --> idle: enable
+
+  state avatar {
+    [*] --> initials
+    initials --> pending: url
+    pending --> photo: load-ok
+    pending --> initials: load-fail
+    photo --> pending: update
+    photo --> initials: free/absent
+  }

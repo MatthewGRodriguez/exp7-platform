@@ -1,7 +1,7 @@
 -- Exp7 art-pass: scaffold a state-table comparison Moho document via Pro MohoScript.
--- Verified historical pattern (Moho 14.3): Moho script.lua  OR  Moho file.moho script.lua
--- Do NOT use `open -a Moho` with a document (SIGSEGV crash law).
--- Do NOT invent -h/--help proof: -h produced no text within 20s on inventory Mac.
+-- VERIFIED Mac 14.3: Moho <abs seed.or.doc.moho> <abs this.lua>  → use document FIRST.
+-- Bare `Moho this.lua` exits 139 (wrong argv; not licensing). Do NOT use open -a Moho.
+-- CLI render of a saved doc: Moho -r <doc.moho> -f png -outfolder <dir> -start 1 -end 1 -v
 --
 -- Env:
 --   EXP7_ART_SCRATCH  default /Users/user-rodri/ArtScratch/exp7-art
