@@ -22,6 +22,12 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 #topChrome.jr-on #btnAvatar{
   position:relative;z-index:1;opacity:0;pointer-events:none;
 }
+/* Handoff control stays clickable above the JR bar canvas when content is blank. */
+#btnDebug{margin-left:auto;position:relative;z-index:6;min-height:32px;padding:0 8px;font-size:12px;background:#fff;border:1px solid #246;color:#123;border-radius:8px}
+#topChrome.jr-on #btnDebug{opacity:1;pointer-events:auto;z-index:6}
+#exp7DbgPanel{position:fixed;top:calc(var(--bar-h) + 8px);left:8px;right:8px;z-index:80;background:#fff;color:#1a1d23;border:1px solid #246;border-radius:10px;padding:10px;max-height:70vh;display:flex;flex-direction:column;gap:8px;box-shadow:0 8px 28px rgba(20,30,50,.18)}
+#exp7DbgPanel[hidden]{display:none!important}
+#exp7DbgPanel textarea{width:100%;height:42vh;font:12px/1.35 ui-monospace,monospace;color:#1a1d23;background:#f6f7f9}
 #btnBack{background:#fff;border:1px solid var(--line);border-radius:8px;min-width:36px;min-height:36px;width:36px;height:36px;padding:0;margin:0;display:inline-flex;align-items:center;justify-content:center;font-size:1.25rem;line-height:1;flex-shrink:0}
 #btnBack:focus-visible{outline:2px solid #246;outline-offset:2px}
 /* Avatar: ONLY the profile image (or one fallback disc) is the control — no button chrome, no dual children */
@@ -84,11 +90,30 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 <header id="topChrome" aria-label="Platform">
 <div id="jrChromeHost" aria-hidden="true"><canvas id="jrChromeCanvas"></canvas></div>
 <button type="button" id="btnBack" class="jr-hit" aria-label="Show apps" title="Apps">←</button>
+<button type="button" id="btnDebug" title="Copy a debug snapshot after the screen goes wrong">Debug</button>
 <button type="button" id="btnAvatar" class="jr-hit" aria-label="Account" aria-haspopup="dialog" aria-expanded="false" aria-controls="accountMenu" title="Account">
 <img id="avatarImg" alt="" hidden width="36" height="36" decoding="async" referrerpolicy="no-referrer">
 <span id="avatarFallback" aria-hidden="true" hidden></span>
 </button>
 </header>
+<div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.9. style.note says whether the draw list actually contains the new rings and light bands. No keys or account text.</p>
+<textarea id="exp7DbgText" readonly></textarea>
+<div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
+</div>
+<script id="exp7-dbg-boot">
+(function(w){
+  var log=[], t0=Date.now();
+  function push(kind, detail){
+    var row={t:Date.now()-t0, kind:String(kind)};
+    if(detail!==undefined) row.detail=detail;
+    log.push(row);
+    if(log.length>80) log.shift();
+    try{ console.info("[exp7dbg]", row.kind, detail===undefined?"":detail); }catch(e){}
+  }
+  w.__exp7Dbg={push:push, log:log, t0:t0};
+})(window);
+</script>
 <div id="accountScrim" hidden></div>
 <div id="appsOverlay" hidden role="dialog" aria-label="Apps">
 <div id="jrAppsHost" aria-hidden="true"></div>
@@ -9879,7 +9904,7 @@ let CORE=null, FONT=0, FONTB=0, GC=null, BOOT=null, INITERR=null; const GID=7;
 async function core(){ if(!CORE){ if(typeof WebAssembly!=='object') throw new Error('WebAssembly not available'); CORE=await Core.create(embedded('jr-wasm')); FONT=CORE.font(embedded('jr-font')); try{ FONTB=CORE.font(embedded('jr-font-bold')); }catch(e){ FONTB=FONT; } } return CORE; }
 /* one shared GPUContext; its errors are JRender's own plain Errors with .code (no-webgpu | no-adapter | no-device | no-canvas-context) */
 function boot(){ if(BOOT) return BOOT; BOOT=(async()=>{ await core(); GC=await GPUContext.create();
-  GC.dev.addEventListener('uncapturederror',e=>{ INITERR='WebGPU error: '+e.error.message; console.warn(INITERR); }); GC.dev.lost.then(i=>{ INITERR='WebGPU device lost: '+i.message; }); })(); return BOOT; }
+  GC.dev.addEventListener('uncapturederror',e=>{ INITERR='WebGPU error: '+e.error.message; console.warn(INITERR); try{ if(window.__exp7Dbg) window.__exp7Dbg.push('gpu-error', INITERR); }catch(_){} }); GC.dev.lost.then(i=>{ INITERR='WebGPU device lost: '+i.message; try{ if(window.__exp7Dbg) window.__exp7Dbg.push('gpu-lost', INITERR); }catch(_){} }); })(); return BOOT; }
 /* text measure (wasm, cached) */
 const MC=new Map(); function tw(t,sz,f){ const font=f==null?FONT:f; const k=font+'|'+sz+'|'+t; let v=MC.get(k); if(v===undefined){ v=CORE.measure(font,sz,t); if(!(v>=0)) v=t.length*sz*0.55; MC.set(k,v); } return v; }
 /* colours: [r,g,b,a] arrays */
@@ -11186,7 +11211,7 @@ function setView(id,w,root,cb,ro){ const box=$(id); if(!box) return;
   let cv=V.cv||box.querySelector('canvas'); if(!cv) cv=document.createElement('canvas'); if(cv.parentNode!==box){ box.querySelectorAll('canvas').forEach(c=>c!==cv&&c.remove()); box.appendChild(cv); } V.cv=cv; /* the same canvas (and its scene) follows the view when the panel is re-rendered */
   const rev=atlasRev(w), VA=V.sess&&(V.sess.J&&V.sess.J.atlas||V.sess.s), carry=VA?Object.fromEntries(Object.keys(VA.components||{}).filter(c=>VA.components[c].state).map(c=>[c,VA.components[c].state])):null;
   if(V.sess) V.sess.dispose();
-  const fail=e=>{ V.err=String(e&&e.message||e)+(e&&e.code?' [code '+e.code+']':''); V.code=e&&e.code||null; cv.style.display='none'; const pe=box.querySelector('.jrerr')||box.appendChild(Object.assign(document.createElement('div'),{className:'jrerr bad'})); pe.setAttribute('role','alert'); pe.setAttribute('data-jr-state','error'); pe.textContent='JRender view not drawn: '+V.err; if(V.cb) V.cb(V); };
+  const fail=e=>{ V.err=String(e&&e.message||e)+(e&&e.code?' [code '+e.code+']':''); V.code=e&&e.code||null; cv.style.display='none'; const pe=box.querySelector('.jrerr')||box.appendChild(Object.assign(document.createElement('div'),{className:'jrerr bad'})); pe.setAttribute('role','alert'); pe.setAttribute('data-jr-state','error'); pe.textContent='JRender view not drawn: '+V.err; try{ if(window.__exp7Dbg) window.__exp7Dbg.push('view-fail',{id:id,err:V.err}); }catch(_){} if(V.cb) V.cb(V); };
   V.queue=(S,why)=>{ V.chain=V.chain.then(async()=>{ if(isCalRoot(V)&&(await calStateOnlyAsync(V,why))) return; return draw(S,why); }).catch(fail); return V.chain; };
   const draw=async(S,why)=>{ if(V.sess!==S) return; const d=new DOMParser().parseFromString('<div id="app">'+S.html+'</div>','text/html').getElementById('app');
     hostDoc(d,V); if(V.plan) planDoc(V,d,S.J&&S.J.atlas||S.s);
@@ -11200,7 +11225,9 @@ function setView(id,w,root,cb,ro){ const box=$(id); if(!box) return;
       chips:d.querySelectorAll('.ja-chip').length,brows:d.querySelectorAll('.ja-brow').length,brownames:[].map.call(d.querySelectorAll('.ja-brow'),x=>x.textContent.replace(/\s+/g,' ').trim()),
       month:(d.querySelector('.ja-month')||{}).textContent||null,show:(d.querySelector('.ja-sw.on')||{}).textContent||null,detail:!!d.querySelector('.ja-detail'),
       flags:[].map.call(d.querySelectorAll('.ja-flag'),x=>x.textContent),text:d.textContent.replace(/\s+/g,' ').slice(0,4000),at:Date.now()});
-    cv.style.display=''; const pe=box.querySelector('.jrerr'); if(pe) pe.remove(); cv.dataset.jrRev=rev; cv.dataset.jrDraw=V.n; if(V.cb) V.cb(V); };
+    cv.style.display=''; const pe=box.querySelector('.jrerr'); if(pe) pe.remove(); cv.dataset.jrRev=rev; cv.dataset.jrDraw=V.n;
+    try{ if(window.__exp7Dbg&&(why==='reveal'||V.n===1)){ var sample=null; if(L&&L.nodes){ for(var si=0;si<L.nodes.length&&!sample;si++){ var sn=L.nodes[si]; if(!(sn.el&&sn.el.classList)) continue; if(!(sn.el.classList.contains('ja-day')||sn.el.classList.contains('ja-brow')||sn.el.classList.contains('ja-joy')||sn.el.classList.contains('ja-prow'))) continue; sample={cls:String(sn.el.className).slice(0,80), state:sn.el.getAttribute('data-jr-state'), kinds:(sn.items||[]).slice(0,8).map(function(it){ return it[0]+((it[0]==='rect'||it[0]==='rrect'||it[0]==='border')?(':'+Math.round(it[3])+'x'+Math.round(it[4])):''); })}; } } window.__exp7Dbg.push('draw',{id:id,why:why,mode:r.mode,n:V.n,ux:!!(L&&L.uxStates),light:L&&L.uxLight||null,touched:L&&L.uxTouched||0,sample:sample}); } }catch(_){}
+    if(V.cb) V.cb(V); };
   V.view.onact=(el,act,n,mods)=>{ const S=V.sess; if(!S) return; V.clicks++;
     if(act==='jv'){ blurTextFields(V); const a=el.getAttribute('data-jv-act')||'';
       /* Budget / platform chrome drawn in-scene (same JRViews+slabs canvas as the view). */
@@ -12531,23 +12558,90 @@ function renderAppButtons(){const box=$("appButtons");if(!box)return;box.innerHT
   b.innerHTML=`<b>${a.label}</b><br><span class="na">${a.hint||""}</span>`;
   b.onclick=()=>openApp(a.id,{fromPicker:true});box.appendChild(b)})}
 
+function dbgPush(kind,detail){try{if(window.__exp7Dbg)window.__exp7Dbg.push(kind,detail)}catch(e){}}
+function dbgChrome(kind){const ov=$("appsOverlay"), sh=$("appShell");
+ dbgPush(kind,{appsOpen:!!UI.appsOpen,mounted:UI.mountedAppId||null,overlayHidden:!(ov&&!ov.hidden),overlayClass:ov?String(ov.className):"",shellClass:sh?String(sh.className):"",
+  slots:["exp7","budget"].map(function(id){const el=slotEl(id);if(!el)return{id:id,missing:true};var cs;try{cs=getComputedStyle(el)}catch(e){cs={opacity:"",display:""}}
+   return{id:id,active:el.classList.contains("is-active"),dormant:el.classList.contains("is-dormant"),opacity:cs.opacity,display:cs.display}})})}
 function showAppsOverlay(){UI.appsOpen=true;try{window.__platUi={mountedAppId:UI.mountedAppId,appsOpen:true}}catch(e){}
  const o=$("appsOverlay");if(o)o.hidden=false;
  /* Keep shell laid out (no visibility:hidden / display:none). Opacity 0 + opaque overlay so the old WebGPU scene cannot show through Back. */
  const sh=$("appShell"); if(sh){sh.classList.add("is-apps-covered"); sh.style.pointerEvents="none"; sh.setAttribute("aria-hidden","true")}
  closeAccountMenu();renderAppButtons();
  try{if(window.PlatformChromeJR&&PlatformChromeJR.redrawApps)PlatformChromeJR.redrawApps()}catch(e){}
- rec("apps_overlay","info","shown (opaque cover; app GPU kept sized)");$("btnBack").focus()}
+ rec("apps_overlay","info","shown (opaque cover; app GPU kept sized)");dbgChrome("overlay-show");$("btnBack").focus()}
 function hideAppsOverlay(opts){opts=opts||{};UI.appsOpen=false;try{window.__platUi={mountedAppId:UI.mountedAppId,appsOpen:false}}catch(e){}
  const o=$("appsOverlay");if(o){o.hidden=true;o.classList.remove("jr-on")}
  const sh=$("appShell"); if(sh){sh.classList.remove("is-apps-covered"); sh.style.pointerEvents=""; sh.style.visibility=""; sh.removeAttribute("aria-hidden")}
- if(!opts.skipReveal && UI.mountedAppId){try{revealAppViews(UI.mountedAppId)}catch(e){}}}
+ dbgChrome(opts.skipReveal?"overlay-hide-skip":"overlay-hide");
+ if(!opts.skipReveal && UI.mountedAppId){try{revealAppViews(UI.mountedAppId)}catch(e){dbgPush("reveal-throw",String(e&&e.message||e))}}}
 
 function openAccountMenu(){UI.accountOpen=true;const m=$("accountMenu"),s=$("accountScrim");if(m)m.hidden=false;if(s)s.hidden=false;$("btnAvatar").setAttribute("aria-expanded","true");
  const focusable=m.querySelector("input:not([disabled]),button:not([disabled]),textarea:not([disabled]),a[href]");if(focusable)focusable.focus()}
 function closeAccountMenu(){UI.accountOpen=false;const m=$("accountMenu"),s=$("accountScrim");if(m)m.hidden=true;if(s)s.hidden=true;$("btnAvatar").setAttribute("aria-expanded","false")}
 function toggleAccountMenu(){if(UI.accountOpen)closeAccountMenu();else openAccountMenu()}
 
+function dbgBox(el){if(!el)return null; var cs,r; try{cs=getComputedStyle(el)}catch(e){cs={display:"",visibility:"",opacity:"",zIndex:"",backgroundColor:""}} r=el.getBoundingClientRect();
+ return {id:el.id||"",class:String(el.className).slice(0,140),hidden:!!el.hidden,display:cs.display,visibility:cs.visibility,opacity:cs.opacity,z:cs.zIndex,bg:cs.backgroundColor,w:Math.round(r.width),h:Math.round(r.height),top:Math.round(r.top)}}
+function dbgUnpack(c){if(typeof c!=="number")return null; return [c&255,(c>>8)&255,(c>>16)&255,(c>>>24)&255]}
+function styleProbe(){
+ const J=window.JRViews;
+ const hook=!!(J&&J.UX_LIFT&&J.uxStampTree);
+ const JVS=(window.exp7views&&window.exp7views.JVS)||window.JVS||{};
+ const views=[];
+ Object.keys(JVS).forEach(function(id){
+  const V=JVS[id]; const L=V.view&&V.view.L; let days=0,sel=0,gold=0,bands=0,sample=null;
+  if(L&&L.nodes) L.nodes.forEach(function(n){
+   if(!n.el||!n.el.classList) return;
+   const day=n.el.classList.contains("ja-day"), row=n.el.classList.contains("ja-brow")||n.el.classList.contains("ja-prow")||n.el.classList.contains("ja-joy");
+   if(!day&&!row) return;
+   if(day) days++;
+   if(n.el.classList.contains("ja-sel")||n.el.getAttribute("data-jr-state")==="selected") sel++;
+   (n.items||[]).forEach(function(it){
+    if(it[0]==="rect"&&it[4]===2){ const col=dbgUnpack(it[it.length-1]); if(col&&((col[0]===255&&col[1]===255&&col[2]===255&&col[3]===70)||(col[0]===20&&col[1]===30&&col[2]===50))) bands++; }
+    if(it[0]==="border"){ const col=dbgUnpack(it[it.length-1]); if(col&&col[0]===117&&col[1]===81&&col[2]===15) gold++; }
+   });
+   if(!sample) sample={cls:String(n.el.className).slice(0,80), state:n.el.getAttribute("data-jr-state"), items:(n.items||[]).slice(0,6).map(function(it){ return {k:it[0], wh:(typeof it[3]==="number"&&typeof it[4]==="number")?[Math.round(it[3]),Math.round(it[4])]:null, rgba:dbgUnpack(it[it.length-1])}; })};
+  });
+  views.push({id:id, err:V.err?String(V.err).slice(0,180):"", draws:V.n||0, ux:!!(L&&L.uxStates), light:(L&&L.uxLight)||null, touched:(L&&L.uxTouched)||0, days:days, selected:sel, goldBorders:gold, thinBands:bands, sample:sample});
+ });
+ let note="ux hook is not installed";
+ if(hook&&!views.length) note="ux hook is installed; no view has been drawn yet";
+ else if(hook){
+  const drawn=views.filter(function(v){return v.draws>0});
+  const banded=drawn.reduce(function(s,v){return s+v.thinBands},0);
+  const g=drawn.reduce(function(s,v){return s+v.goldBorders},0);
+  const s=drawn.reduce(function(a,v){return a+v.selected},0);
+  if(!drawn.length) note="ux hook is installed; views exist but none have drawn";
+  else if(!banded) note="hook installed but the live display list has no inset light bands";
+  else note="inset bands are in the display list ("+banded+"). Idle is a 2px line, so the screen can look unchanged.";
+  if(s>0&&g===0) note+=" A control is selected and no gold ring is in the display list.";
+  if(s>0&&g>0) note+=" Selected gold rings in the display list: "+g+".";
+ }
+ return {hook:hook, lightTheme:!!window.EXP7_LIGHT_THEME, note:note, views:views};
+}
+function exp7Handoff(){
+ const shell=$("appShell"), mid=shell?shell.getBoundingClientRect():null; let topEl=null;
+ if(mid&&mid.width>2){ const x=Math.round(mid.left+mid.width/2), y=Math.round(mid.top+Math.min(48,Math.max(8,mid.height/2))); const el=document.elementFromPoint(x,y);
+  topEl=el?{x:x,y:y,id:el.id||"",tag:el.tagName,class:String(el.className).slice(0,80)}:null; }
+ const canvases=[].map.call(document.querySelectorAll("#appShell canvas,#jrChromeCanvas,#appsOverlay canvas"),function(c){ var cs; try{cs=getComputedStyle(c)}catch(e){cs={display:""}} return {parent:c.parentElement&&(c.parentElement.id||c.parentElement.className), display:cs.display, client:[c.clientWidth,c.clientHeight], px:[c.width,c.height]}; });
+ return {shell:SHELL_VERSION, ua:navigator.userAgent, gpu:!!navigator.gpu, dpr:window.devicePixelRatio||1, when:new Date().toISOString(),
+  mounted:UI.mountedAppId||null, appsOpen:!!UI.appsOpen,
+  chrome:{overlay:dbgBox($("appsOverlay")), shell:dbgBox($("appShell")), slots:["exp7","budget"].map(function(id){return dbgBox(slotEl(id))})},
+  topEl:topEl, canvases:canvases, jrerr:[].map.call(document.querySelectorAll(".jrerr"),function(e){return String(e.textContent||"").slice(0,200)}),
+  pageerr:(window.PAGEERR||[]).slice(-8), style:styleProbe(), log:(window.__exp7Dbg&&window.__exp7Dbg.log||[]).slice()};
+}
+function openDbg(){ const panel=$("exp7DbgPanel"), ta=$("exp7DbgText"); if(!panel||!ta) return; ta.value=JSON.stringify(exp7Handoff(),null,2); panel.hidden=false; try{ta.focus(); ta.select()}catch(e){} }
+function wireDebug(){
+ const b=$("btnDebug"); if(b) b.onclick=openDbg;
+ const copy=$("exp7DbgCopy"); if(copy) copy.onclick=function(){ const ta=$("exp7DbgText"); if(!ta) return; ta.focus(); ta.select(); const note=$("exp7DbgNote");
+  function say(ok){ if(note) note.textContent=ok?"Copied. Paste the whole box back.":"The box is selected. Copy it yourself, then paste it back."; }
+  let legacy=false; try{legacy=document.execCommand("copy")}catch(e){}
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(function(){say(true)}).catch(function(){say(legacy)}); else say(legacy); };
+ const close=$("exp7DbgClose"); if(close) close.onclick=function(){ const p=$("exp7DbgPanel"); if(p) p.hidden=true; };
+ addEventListener("keydown",function(e){ if((e.key!=="D"&&e.key!=="d")||!e.shiftKey||e.metaKey||e.ctrlKey||e.altKey) return; const t=e.target; if(t&&(t.tagName==="INPUT"||t.tagName==="TEXTAREA"||t.isContentEditable)) return; e.preventDefault(); openDbg(); });
+ window.__exp7Handoff=exp7Handoff;
+}
 function wireChrome(){
  $("btnBack").onclick=()=>{if(UI.accountOpen){closeAccountMenu();return}if(UI.appsOpen){if(UI.mountedAppId)hideAppsOverlay();return}showAppsOverlay()};
  $("btnAvatar").onclick=()=>toggleAccountMenu();
@@ -12556,6 +12650,7 @@ function wireChrome(){
   if(e.key==="Escape"){if(UI.accountOpen){e.preventDefault();closeAccountMenu();$("btnAvatar").focus();return}
    if(UI.appsOpen&&UI.mountedAppId){e.preventDefault();hideAppsOverlay();$("btnBack").focus()}}
  });
+ wireDebug();
  wireReservedBarLayout();
 }
 /** Keep app shell / overlays strictly below the solid reserved bar; expose hit-test proof. */
@@ -12587,7 +12682,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.8",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.9",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
@@ -12607,20 +12702,23 @@ function viewsInSlot(appId){const host=slotEl(appId); const out=[]; if(!host)ret
  const JVS=(window.exp7views&&window.exp7views.JVS)||window.JVS||{};
  Object.keys(JVS).forEach(id=>{const box=document.getElementById(id); if(box&&host.contains(box)) out.push(JVS[id]);});
  return out}
-/** On-screen host only. display:none Budget panes must not be resized — that invalidates the shared device and blanks the visible canvas. */
-function viewHostShown(box){
- if(!box||!box.isConnected) return false;
- if(box.closest&&box.closest(".appSlot.is-dormant")) return false;
- if(box.closest&&box.closest("#appShell.is-apps-covered")) return false;
+/** Why a view host is or is not safe to resize. "shown" is the only yes. */
+function viewHostWhy(box){
+ if(!box||!box.isConnected) return "missing";
+ if(box.closest&&box.closest(".appSlot.is-dormant")) return "dormant-slot";
+ if(box.closest&&box.closest("#appShell.is-apps-covered")) return "apps-covered";
  let n=box;
  while(n&&n.nodeType===1){
-  if(n.hidden && !(n.classList&&n.classList.contains("appSlot"))) return false;
-  try{ const cs=getComputedStyle(n); if(cs.display==="none"||cs.visibility==="hidden") return false; }catch(e){}
+  if(n.hidden && !(n.classList&&n.classList.contains("appSlot"))) return "hidden:"+ (n.id||n.className||n.tagName);
+  try{ const cs=getComputedStyle(n); if(cs.display==="none") return "display-none:"+(n.id||n.className||n.tagName); if(cs.visibility==="hidden") return "visibility-hidden:"+(n.id||""); }catch(e){}
   n=n.parentElement;
  }
  const r=box.getBoundingClientRect?box.getBoundingClientRect():null;
- return !!(r&&r.width>=2&&r.height>=2);
+ if(!(r&&r.width>=2&&r.height>=2)) return "box<"+(r?Math.round(r.width)+"x"+Math.round(r.height):"0");
+ return "shown";
 }
+/** On-screen host only. display:none Budget panes must not be resized — that invalidates the shared device and blanks the visible canvas. */
+function viewHostShown(box){ return viewHostWhy(box)==="shown"; }
 /** Force swapchain reconfigure + draw for a canvas that is actually on screen. */
 function reconfigureViewGpu(V){
  if(!V||!V.view||!V.view.r||V.view.r.lost) return false;
@@ -12637,19 +12735,21 @@ function reconfigureViewGpu(V){
  return true;
 }
 /** Redraw the active app after Back closes or a slot is shown again. */
-function revealAppViews(appId){const host=slotEl(appId); if(!host||host.classList.contains("is-dormant"))return {revealed:0,reconfigured:0,skipped:"dormant"};
- const shell=$("appShell"); if(shell&&shell.classList.contains("is-apps-covered"))return {revealed:0,reconfigured:0,skipped:"covered"};
+function revealAppViews(appId){const host=slotEl(appId); if(!host||host.classList.contains("is-dormant")){dbgPush("reveal",{appId:appId,skipped:"dormant"});return {revealed:0,reconfigured:0,skipped:"dormant"};}
+ const shell=$("appShell"); if(shell&&shell.classList.contains("is-apps-covered")){dbgPush("reveal",{appId:appId,skipped:"covered"});return {revealed:0,reconfigured:0,skipped:"covered"};}
  try{void host.offsetWidth}catch(e){}
- let n=0, rc=0, skipped=0;
+ let n=0, rc=0, skipped=0; const hosts=[];
  viewsInSlot(appId).forEach(V=>{
   try{
-   const box=document.getElementById(V.id);
-   if(!viewHostShown(box)){ skipped++; return; }
+   const box=document.getElementById(V.id); const why=viewHostWhy(box); const rr=V.view&&V.view.r;
+   hosts.push({id:V.id,why:why,err:V.err?String(V.err).slice(0,180):"",lost:!!(rr&&rr.lost),rendererHidden:!!(rr&&rr.hidden),draws:V.n||0,canvasDisplay:V.cv?V.cv.style.display:""});
+   if(why!=="shown"){ skipped++; return; }
    if(reconfigureViewGpu(V)) rc++;
    if(V.sess&&V.html!=null&&typeof V.queue==="function"){V.queue(V.sess,"reveal"); n++}
    else if(V.view&&V.view.r&&!V.view.r.lost&&typeof V.view.r.draw==="function"){V.view.r.draw(); n++}
-  }catch(e){}
+  }catch(e){hosts.push({id:V&&V.id,throw:String(e&&e.message||e).slice(0,180)})}
  });
+ dbgPush("reveal",{appId:appId,revealed:n,reconfigured:rc,skippedHidden:skipped,hosts:hosts});
  try{if(window.Exp7Slabs&&Exp7Slabs.notify)Exp7Slabs.notify()}catch(e){}
  try{if(window.budget&&typeof budget.reveal==="function")budget.reveal()}catch(e){}
  try{if(window.exp7&&typeof exp7.reveal==="function")exp7.reveal()}catch(e){}
@@ -12756,7 +12856,7 @@ async function mountAppFresh(appId){if(UI.mounting)return;UI.mounting=true;
 async function persistLiveApp(appId){if(appId==="budget"&&window.budget&&window.budget.persist){try{await window.budget.persist()}catch(e){}}}
 async function openApp(appId,opts){opts=opts||{};
  if(!availableApps().some(a=>a.id===appId)){appId=DEFAULT_APP_ID;rec("open_app","info",{fallback:DEFAULT_APP_ID})}
- if(UI.slots[appId]&&UI.slots[appId].mounted){hideAppsOverlay({skipReveal:true});const sh=$("appShell"); if(sh){sh.classList.remove("is-apps-covered"); sh.style.visibility=""; sh.style.pointerEvents=""; sh.removeAttribute("aria-hidden")} showOnlySlot(appId);UI.mountedAppId=appId;await rememberAppForUser(appId);try{layoutReservedChrome();window.dispatchEvent(new Event("resize")); await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))); revealAppViews(appId)}catch(e){}rec("open_app","pass",{appId,reused:true,ready:!!UI.slots[appId].ready,revealed:true,keepalive:true});return}
+ if(UI.slots[appId]&&UI.slots[appId].mounted){hideAppsOverlay({skipReveal:true});const sh=$("appShell"); if(sh){sh.classList.remove("is-apps-covered"); sh.style.visibility=""; sh.style.pointerEvents=""; sh.removeAttribute("aria-hidden")} showOnlySlot(appId);UI.mountedAppId=appId;await rememberAppForUser(appId);try{layoutReservedChrome();window.dispatchEvent(new Event("resize")); await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))); revealAppViews(appId)}catch(e){dbgPush("open-reuse-error",String(e&&e.message||e))}dbgPush("open-reuse",{appId:appId});rec("open_app","pass",{appId,reused:true,ready:!!UI.slots[appId].ready,revealed:true,keepalive:true});return}
  if(UI.mountedAppId&&UI.mountedAppId!==appId){await persistLiveApp(UI.mountedAppId)}
  await mountAppFresh(appId);
 }
