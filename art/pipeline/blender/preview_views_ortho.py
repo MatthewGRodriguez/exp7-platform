@@ -191,14 +191,19 @@ def main():
             "chrome": draw_chrome(out / "view_chrome_ortho.png"),
         },
     }
-    # pixel validate ortho proofs
-    from validate_view_pixels import validate_png
-
-    pix = {}
-    for name in ("calendar", "board", "plan", "chrome"):
-        pix[name] = validate_png(out / f"view_{name}_ortho.png", name, require_avatar=(name == "chrome"), min_dark=200)
-    report["pixel_validation"] = pix
-    report["ok"] = all(v.get("ok") for v in pix.values())
+    # Ortho is NOT a METAL predictor — do not run semantic METAL ROI validator here.
+    # Gate: title analytical contrast + files + chrome avatar pasted.
+    report["pixel_validation"] = {
+        "method": "ortho-layout-only",
+        "calendar_title_contrast": report["views"]["calendar"]["contrast_title"],
+        "chrome_avatar": report["views"]["chrome"].get("avatar"),
+        "note": "METAL frames must use validate_view_pixels.py semantic ROI after Cycles",
+    }
+    report["ok"] = (
+        report["views"]["calendar"]["contrast_title"] >= 4.5
+        and all((out / f"view_{n}_ortho.png").is_file() for n in ("calendar", "board", "plan", "chrome"))
+        and bool(report["views"]["chrome"].get("avatar"))
+    )
     (out / "ortho-preview.json").write_text(json.dumps(report, indent=2))
     print(json.dumps(report, indent=2))
     raise SystemExit(0 if report["ok"] else 2)

@@ -60,6 +60,7 @@ class ViewsContent(unittest.TestCase):
     def test_readable_text_constants(self):
         self.assertGreaterEqual(VC.TITLE_SIZE, 0.22)
         self.assertGreaterEqual(VC.BODY_SIZE, 0.08)
+        self.assertGreaterEqual(VC.DAY_SIZE, 0.10)
 
     def test_assets(self):
         self.assertTrue((Path(__file__).parent / "assets/avatar-photo-study.png").is_file())
@@ -75,7 +76,7 @@ class MohoLoop(unittest.TestCase):
 
 
 class DryRun(unittest.TestCase):
-    def test_v6_dry_run(self):
+    def test_v7_dry_run(self):
         r = subprocess.run(
             [
                 sys.executable,
@@ -93,7 +94,7 @@ class DryRun(unittest.TestCase):
         )
         self.assertEqual(r.returncode, 0, r.stderr)
         meta = json.loads(r.stdout)
-        self.assertEqual(meta["generator_rev"], "front-readable-v6")
+        self.assertEqual(meta["generator_rev"], "front-readable-v7")
 
 
 class UnlitText(unittest.TestCase):
@@ -104,7 +105,23 @@ class UnlitText(unittest.TestCase):
         self.assertIn("visible_shadow = False", src)
         self.assertNotIn("default_value = 2.4", src)
         self.assertIn('em.inputs["Strength"].default_value = 1.0', src)
+        self.assertIn("primitive_plane_add", src)
         self.assertIn("set_caster_invisible_to_camera", Path(__file__).with_name("generate_ui_scene.py").read_text())
+        # Secondary uses dark ink family — not pale muted
+        self.assertLess(VC.INK_SECONDARY[0], 0.20)
+        self.assertLess(VC.INK_DISABLED[0], 0.30)
+
+    def test_preflight_and_semantic_validator(self):
+        r = subprocess.run(
+            [sys.executable, str(Path(__file__).with_name("preflight_views.py"))],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        vsrc = Path(__file__).with_name("validate_view_pixels.py").read_text()
+        self.assertIn("darkest8%", vsrc)
+        self.assertIn("Semantic ROI", vsrc)
+        self.assertNotIn("min_dark=400", vsrc)
 
 
 class OrthoPreview(unittest.TestCase):

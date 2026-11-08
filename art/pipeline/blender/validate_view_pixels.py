@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""Pixel-level gates for view PNGs — object counts are NOT proof (Mac v4).
+"""Semantic ROI pixel gates for METAL view PNGs.
 
-Checks:
-  - dark text pixels (luma < threshold) with sufficient count
-  - approximate contrast of darkest 5% vs median background ≥ 4.5 (WCAG-ish)
-  - chrome: non-grey chroma cluster (avatar photo hues) in expected corner ROI
-  - framing: no heavy clipping by requiring title-region dark pixels present
+Does NOT use global dark-pixel counts as the contrast proof (Mac v6: that metric
+could not distinguish title ink from washed secondary).
+
+Per view, named ROIs:
+  - FG = mean of darkest 8% luma samples inside ROI (glyph cores)
+  - BG = mean of brightest 25% luma samples inside ROI (local surface under/around glyphs)
+  - contrast = WCAG relative-luminance ratio; require ≥4.5 for text ROIs
+
+Avatar ROI: require non-black, non-neutral chroma (photo texture) — not object-count.
+Ortho PNGs are NOT METAL predictors; pass/fail here is for actual Cycles/METAL frames.
 """
 from __future__ import annotations
 
@@ -14,6 +19,40 @@ import json
 import struct
 import zlib
 from pathlib import Path
+
+# Fractional frame ROIs (x0,y0,x1,y1) — top-left origin, y down
+VIEW_ROIS = {
+    "calendar": {
+        "title": (0.04, 0.04, 0.55, 0.16),
+        "weekdays": (0.04, 0.18, 0.96, 0.28),
+        "day_numbers": (0.06, 0.30, 0.94, 0.82),
+        "banner": (0.04, 0.88, 0.70, 0.98),
+    },
+    "board": {
+        "title": (0.04, 0.04, 0.55, 0.16),
+        "card_titles": (0.06, 0.28, 0.94, 0.85),
+        "banner": (0.04, 0.88, 0.80, 0.98),
+    },
+    "plan": {
+        "title": (0.04, 0.04, 0.60, 0.16),
+        "row_titles": (0.06, 0.22, 0.70, 0.78),
+        "row_meta": (0.06, 0.30, 0.85, 0.88),
+        "banner": (0.04, 0.88, 0.80, 0.98),
+    },
+    "chrome": {
+        "brand": (0.04, 0.28, 0.28, 0.52),
+        "app_labels": (0.28, 0.32, 0.70, 0.55),
+        "avatar": (0.72, 0.28, 0.92, 0.58),
+        "banner": (0.04, 0.62, 0.70, 0.78),
+    },
+}
+
+TEXT_ROIS = {
+    "calendar": ["title", "weekdays", "day_numbers"],
+    "board": ["title", "card_titles"],
+    "plan": ["title", "row_titles", "row_meta"],
+    "chrome": ["brand", "app_labels", "banner"],
+}
 
 
 def read_png_rgba(path: Path):
@@ -99,63 +138,118 @@ def contrast_ratio(l1, l2):
     return (a + 0.05) / (b + 0.05)
 
 
-def validate_png(path: Path, view: str, require_avatar=False, min_dark=400, dark_luma=110) -> dict:
-    w, h, px = read_png_rgba(Path(path))
-    dark = []
-    all_l = []
-    chroma_hits = 0
-    # Avatar ROI: upper-right quadrant for chrome
-    ax0, ay0, ax1, ay1 = int(w * 0.72), int(h * 0.15), int(w * 0.95), int(h * 0.55)
-    for y in range(h):
-        for x in range(w):
+def roi_samples(px, w, h, box, step=2):
+    x0, y0, x1, y1 = box
+    xa, xb = int(w * x0), int(w * x1)
+    ya, yb = int(h * y0), int(h * y1)
+    ls = []
+    rgb = []
+    for y in range(ya, yb, step):
+        for x in range(xa, xb, step):
             i = (y * w + x) * 4
-            r, g, b = px[i], px[i + 1], px[i + 2]
+            r, g, b, a = px[i], px[i + 1], px[i + 2], px[i + 3]
+            if a < 200:
+                continue
             L = luma(r, g, b)
-            all_l.append(L)
-            if L < dark_luma and px[i + 3] > 200:
-                dark.append((x, y, L, r, g, b))
-            if require_avatar and ax0 <= x <= ax1 and ay0 <= y <= ay1:
-                # non-neutral chroma (photo-study is blue→gold gradient)
-                if max(r, g, b) - min(r, g, b) > 28 and L > 40:
-                    chroma_hits += 1
+            ls.append(L)
+            rgb.append((r, g, b, L))
+    return ls, rgb, (xa, ya, xb, yb)
 
+
+def roi_contrast(px, w, h, box) -> dict:
+    ls, rgb, pxbox = roi_samples(px, w, h, box)
+    if len(ls) < 40:
+        return {"ok": False, "error": "roi too sparse", "n": len(ls), "pxbox": pxbox}
+    ls_sorted = sorted(ls)
+    n = len(ls_sorted)
+    # Glyph cores: darkest 8%; local bg: brightest 25%
+    fg = ls_sorted[: max(1, n * 8 // 100)]
+    bg = ls_sorted[n * 75 // 100 :]
+    fg_m = sum(fg) / len(fg)
+    bg_m = sum(bg) / len(bg)
+    # If ROI is mostly uniform wash (no glyphs), fg≈bg → fail honestly
+    cr = contrast_ratio(rel_lum(bg_m), rel_lum(fg_m))
+    return {
+        "ok": cr >= 4.5 and (bg_m - fg_m) >= 25,
+        "contrast": cr,
+        "fg_luma": fg_m,
+        "bg_luma": bg_m,
+        "delta_luma": bg_m - fg_m,
+        "n": n,
+        "pxbox": pxbox,
+        "method": "darkest8%_vs_brightest25%_same_ROI",
+    }
+
+
+def avatar_roi_proof(px, w, h, box) -> dict:
+    _, rgb, pxbox = roi_samples(px, w, h, box, step=1)
+    if len(rgb) < 50:
+        return {"ok": False, "error": "avatar roi sparse", "n": len(rgb)}
+    chroma = 0
+    near_black = 0
+    mean = [0.0, 0.0, 0.0]
+    for r, g, b, L in rgb:
+        mean[0] += r
+        mean[1] += g
+        mean[2] += b
+        if max(r, g, b) - min(r, g, b) > 28 and L > 35:
+            chroma += 1
+        if L < 25:
+            near_black += 1
+    n = len(rgb)
+    mean = [m / n for m in mean]
+    mean_L = luma(*mean)
+    # Photo must show chroma and not be a near-black disc
+    ok = chroma >= 80 and near_black / n < 0.55 and mean_L > 40
+    return {
+        "ok": ok,
+        "chroma_hits": chroma,
+        "near_black_frac": near_black / n,
+        "mean_rgb": mean,
+        "mean_luma": mean_L,
+        "n": n,
+        "pxbox": pxbox,
+        "note": "Requires opaque photo texture — black disc FAIL",
+    }
+
+
+def validate_png(path: Path, view: str, require_avatar=False, **_legacy) -> dict:
+    """API compatible with generate_ui_scene import; ignores legacy min_dark kwargs."""
+    w, h, px = read_png_rgba(Path(path))
+    rois = VIEW_ROIS.get(view, {})
+    text_names = TEXT_ROIS.get(view, list(rois.keys()))
     errors = []
-    if len(dark) < min_dark:
-        errors.append(f"only {len(dark)} dark text-ish pixels (need ≥{min_dark}) — faint/tiny typography FAIL")
-
-    # Contrast: darkest 2% vs median of bright half
-    all_l.sort()
-    if all_l:
-        dark_sample = all_l[: max(1, len(all_l) // 50)]
-        bright = all_l[len(all_l) // 2 :]
-        med_bg = bright[len(bright) // 2]
-        mean_dark = sum(dark_sample) / len(dark_sample)
-        cr = contrast_ratio(rel_lum(med_bg), rel_lum(mean_dark))
-    else:
-        cr = 0.0
-        mean_dark = med_bg = 0
-    if cr < 4.5:
-        errors.append(f"approx contrast {cr:.2f} < 4.5 (dark≈{mean_dark:.0f} vs bg≈{med_bg:.0f})")
-
-    # Crop heuristic: if title expected, leftmost 3% of frame should not be the only dark cluster
-    if dark:
-        left_frac = sum(1 for x, _, _, *_ in dark if x < w * 0.04) / len(dark)
-        mid_left = sum(1 for x, _, _, *_ in dark if w * 0.08 < x < w * 0.35) / len(dark)
-        if left_frac > 0.35 and mid_left < 0.05:
-            errors.append("dark pixels hug left edge — likely cropped title (e.g. 'vember')")
-
-    if require_avatar and chroma_hits < 80:
-        errors.append(f"avatar ROI chroma hits={chroma_hits} (<80) — photo disc not visible")
-
+    roi_reports = {}
+    for name in text_names:
+        if name not in rois:
+            continue
+        r = roi_contrast(px, w, h, rois[name])
+        roi_reports[name] = r
+        if not r.get("ok"):
+            errors.append(
+                f"{view}.{name} contrast {r.get('contrast', 0):.2f} < 4.5 "
+                f"(fgL={r.get('fg_luma', 0):.0f} bgL={r.get('bg_luma', 0):.0f}) "
+                f"[{r.get('method')}]"
+            )
+    avatar = None
+    if require_avatar or view == "chrome":
+        if "avatar" in rois:
+            avatar = avatar_roi_proof(px, w, h, rois["avatar"])
+            roi_reports["avatar"] = avatar
+            if not avatar.get("ok"):
+                errors.append(
+                    f"{view}.avatar photo FAIL chroma={avatar.get('chroma_hits')} "
+                    f"near_black={avatar.get('near_black_frac')} meanL={avatar.get('mean_luma')}"
+                )
+    # Crop heuristic: title ROI must exist and pass — left-edge-only dark clusters not used
     return {
         "ok": not errors,
         "errors": errors,
-        "dark_pixels": len(dark),
-        "contrast_approx": cr,
-        "avatar_chroma_hits": chroma_hits if require_avatar else None,
+        "rois": roi_reports,
         "size": [w, h],
         "view": view,
-        "note": "Pixel proof — not object-count",
+        "note": "Semantic ROI FG/BG contrast — not global dark-pixel count",
+        "not": ["DESIGN-STUDY-ORTHO predictor", "fake threshold relax"],
     }
 
 
@@ -176,7 +270,7 @@ def main():
         r = validate_png(p, view, require_avatar=(view == "chrome"))
         report[view] = r
         ok = ok and r["ok"]
-    out = {"ok": ok, "views": report}
+    out = {"ok": ok, "views": report, "validator": "semantic-roi-v7"}
     text = json.dumps(out, indent=2)
     if args.out:
         Path(args.out).write_text(text)

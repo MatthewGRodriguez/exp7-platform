@@ -37,7 +37,7 @@ except ImportError:
     Vector = None
 
 DEFAULT_SCRATCH = "/Users/user-rodri/ArtScratch/exp7-art"
-GENERATOR_REV = "front-readable-v6"
+GENERATOR_REV = "front-readable-v7"
 
 # Ensure sibling import works inside Blender --python
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -83,7 +83,7 @@ def parse_args(argv=None):
     p.add_argument("--params", required=True)
     p.add_argument("--states", required=True)
     p.add_argument("--scratch", default=os.environ.get("ART_SCRATCH", DEFAULT_SCRATCH))
-    p.add_argument("--stage", default="ui-states-v6")
+    p.add_argument("--stage", default="ui-states-v7")
     p.add_argument("--run-id", default=None)
     p.add_argument("--samples", type=int, default=64)
     p.add_argument("--resolution", default="1280x720")
@@ -955,10 +955,10 @@ def main():
         "generator_rev": GENERATOR_REV,
         "blender_target": "4.2.1 LTS",
         "fix_note": (
-            "v6: unlit flat text (no extrude/Principled ghost); continue views after pixel fail; "
-            "shadow-cal camera-invisible caster; light=params; Moho PASS closed"
+            "v7: ALL-label dark unlit inks; opaque Emission photo plane avatar; semantic ROI "
+            "pixel validator; shadow-cal PASS recorded (no re-render); Moho PASS"
         ),
-        "mac_v5_fail_ref": "calendar contrast~1.76 ghosted glyphs; shadow y90 occluded; Moho PASS",
+        "mac_v6_fail_ref": "secondary pale gray; avatar black disc; dark-count validator weak",
         "executable_expected": "/Applications/Blender.app/Contents/MacOS/Blender",
         "cycles_device_requested": args.device,
         "scratch": str(scratch),
@@ -1149,6 +1149,14 @@ def main():
         if "views" in want:
             if VC is None:
                 raise SystemExit("views_content module missing — cannot render non-empty views")
+            try:
+                assets = VC.assert_assets()
+                log(f"AVATAR_ASSETS {json.dumps(assets)}")
+                meta["avatar_assets"] = assets
+                if not assets.get("photo_exists") and not args.skip_validate:
+                    raise SystemExit("AVATAR_ASSET_FAIL: avatar-photo-study.png missing from blender/assets")
+            except AttributeError:
+                pass
             font_id = VC._load_font_id(VC.find_font())
             # Start elevated; frame_camera_to_objects pulls back until ALL content fits
             view_cam = make_camera_front(

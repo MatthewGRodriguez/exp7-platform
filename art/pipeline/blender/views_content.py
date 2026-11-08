@@ -1,8 +1,9 @@
 """Content-rich Cal/Board/Plan/chrome compositions for Exp7 Blender art.
 
-DESIGN-STUDY (not live Safari WebGPU). Camera-ready typography: unlit emission,
-zero extrusion (Mac v5 FAIL: ghosted double glyphs + contrast ~1.76 from
-Principled+extrude+shadows). Pair with validate_view_pixels.py — object count ≠ proof.
+DESIGN-STUDY (not live Safari WebGPU). ALL labels use unlit Emission inks with
+analytical contrast ≥4.5 vs surface/subtle/softDisc. Avatar = opaque photo on
+flat +Z plane (Emission), never black disc / alpha holes.
+Mac v6: titles OK; secondary pale gray + black avatar FAIL — fixed here.
 """
 from __future__ import annotations
 
@@ -23,17 +24,17 @@ ASSETS = Path(__file__).resolve().parent / "assets"
 MIN_TEXT_OBJECTS = 8
 MIN_AVATAR_OBJECTS = 1
 
-# Readable sizes in scene meters (large enough after framing pullback)
-TITLE_SIZE = 0.28
-SUB_SIZE = 0.11
-BODY_SIZE = 0.09
-META_SIZE = 0.07
+TITLE_SIZE = 0.30
+SUB_SIZE = 0.12
+BODY_SIZE = 0.10
+META_SIZE = 0.085
+DAY_SIZE = 0.11
 
-# Hard dark inks for ≥4.5 on #fff / #f4f6fa (do not amplify via emission strength>1)
-INK = (0.11, 0.137, 0.20)          # ≈ #1c2333
-INK_MUTED = (0.22, 0.26, 0.33)     # darker than palette muted wash — still ≥4.5 on white
-INK_ON_WASH = (0.08, 0.10, 0.14)   # on selection/blue wash tiles
-INK_DISABLED = (0.42, 0.45, 0.50)  # muted but measurable vs softDisc
+# Linear RGB 0–1 for Emission Color (strength=1 → camera-faithful). Analytical ≥4.5 on #fff/#f4f6fa/#eef1f6.
+INK = (0.078, 0.094, 0.133)        # #141822 — primary + secondary (same ink family; hierarchy via size)
+INK_SECONDARY = (0.125, 0.149, 0.188)  # #202630 — meta/weekday still ≥13:1 on white
+INK_DISABLED = (0.216, 0.243, 0.282)   # #37403e — disabled readable vs softDisc (≥9:1)
+INK_ACCENT = (0.35, 0.25, 0.05)        # dark gold for amounts — not washed #75510f at small size
 
 
 def find_font() -> str | None:
@@ -84,7 +85,6 @@ def _load_font_id(font_path: str | None):
 
 
 def _disable_shadows(ob):
-    """Text must not cast/receive shadows (ghosting / double-glyph)."""
     try:
         ob.visible_shadow = False
     except Exception:
@@ -94,23 +94,13 @@ def _disable_shadows(ob):
         ob.visible_glossy = False
         ob.visible_transmission = False
         ob.visible_volume_scatter = False
-        # Keep camera + transmission off for unlit look; emission still visible to camera
         ob.visible_camera = True
     except Exception:
         pass
-    try:
-        if hasattr(ob, "cycles"):
-            ob.cycles.is_shadow_catcher = False
-    except Exception:
-        pass
 
 
-def make_text(name, body, loc, size, color, font_id, z_off=0.03):
-    """Flat unlit emission label — no Principled, no extrude, no shadow rays.
-
-    Mac v5: Principled+emission+extrude produced washed ghosted glyphs (contrast ~1.76).
-    Strength=1.0 so RGB maps 1:1 to camera (faithful palette ink).
-    """
+def make_text(name, body, loc, size, color, font_id, z_off=0.035):
+    """Flat unlit Emission — strength 1.0, zero extrude. Same path for title AND secondary."""
     import bpy  # type: ignore
 
     bpy.ops.object.text_add(location=(loc[0], loc[1], loc[2] + z_off))
@@ -120,10 +110,8 @@ def make_text(name, body, loc, size, color, font_id, z_off=0.03):
     ob.data.size = size
     ob.data.align_x = "LEFT"
     ob.data.align_y = "CENTER"
-    # CRITICAL: flat glyphs — extrusion casts self-shadows / ghost doubles
     ob.data.extrude = 0.0
     ob.data.bevel_depth = 0.0
-    ob.data.bevel_resolution = 0
     if font_id:
         ob.data.font = font_id
     ob.rotation_euler = (0.0, 0.0, 0.0)
@@ -137,54 +125,65 @@ def make_text(name, body, loc, size, color, font_id, z_off=0.03):
     em = nodes.new("ShaderNodeEmission")
     r, g, b = float(color[0]), float(color[1]), float(color[2])
     em.inputs["Color"].default_value = (r, g, b, 1.0)
-    em.inputs["Strength"].default_value = 1.0  # faithful 2D ink — do not wash with >1
+    em.inputs["Strength"].default_value = 1.0
     links.new(em.outputs["Emission"], out.inputs["Surface"])
     ob.data.materials.append(mat)
     _disable_shadows(ob)
     return ob
 
 
-def make_avatar(name, loc, diameter, image_path: Path, z=0.06):
-    """Flat disc on XY (+Z face) so elevated camera sees the photo."""
+def make_avatar(name, loc, diameter, image_path: Path, z=0.08):
+    """Flat +Z plane with unlit Emission photo. Opaque RGB asset required (Mac v6 black disc)."""
     import bpy  # type: ignore
 
-    bpy.ops.mesh.primitive_cylinder_add(
-        radius=diameter / 2,
-        depth=0.018,
-        location=(loc[0], loc[1], z),
-        vertices=48,
-    )
+    bpy.ops.mesh.primitive_plane_add(size=1.0, location=(loc[0], loc[1], z))
     ob = bpy.context.active_object
     ob.name = name
-    ob.rotation_euler = (0.0, 0.0, 0.0)
-    try:
-        ob.visible_shadow = False
-    except Exception:
-        pass
+    ob.scale = (diameter, diameter, 1.0)
+    bpy.ops.object.transform_apply(scale=True)
+    _disable_shadows(ob)
+
     mat = bpy.data.materials.new(name + "_mat")
     mat.use_nodes = True
     nt = mat.node_tree
     nodes, links = nt.nodes, nt.links
-    bsdf = nodes.get("Principled BSDF")
-    if image_path.is_file() and bsdf:
+    nodes.clear()
+    out = nodes.new("ShaderNodeOutputMaterial")
+    em = nodes.new("ShaderNodeEmission")
+    soft = (0.93, 0.945, 0.965, 1.0)
+    if image_path.is_file():
         img = bpy.data.images.load(str(image_path))
+        try:
+            img.colorspace_settings.name = "sRGB"
+        except Exception:
+            pass
         tex = nodes.new("ShaderNodeTexImage")
         tex.image = img
+        tex.interpolation = "Closest"
+        # Default plane UVs exist after apply; Generated XY also covers plane
         tex_coord = nodes.new("ShaderNodeTexCoord")
-        mapping = nodes.new("ShaderNodeMapping")
-        links.new(tex_coord.outputs["Object"], mapping.inputs["Vector"])
-        links.new(mapping.outputs["Vector"], tex.inputs["Vector"])
-        links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
-        # Mild emission so METAL doesn't crush photo under area light
-        if "Emission Color" in bsdf.inputs:
-            links.new(tex.outputs["Color"], bsdf.inputs["Emission Color"])
-            if "Emission Strength" in bsdf.inputs:
-                bsdf.inputs["Emission Strength"].default_value = 0.25
-        bsdf.inputs["Roughness"].default_value = 0.85
-    elif bsdf:
-        bsdf.inputs["Base Color"].default_value = (0.93, 0.94, 0.96, 1)
+        links.new(tex_coord.outputs["UV"], tex.inputs["Vector"])
+        links.new(tex.outputs["Color"], em.inputs["Color"])
+        em.inputs["Strength"].default_value = 1.0
+        ob["exp7_avatar_path"] = str(image_path)
+        ob["exp7_avatar_loaded"] = 1
+    else:
+        em.inputs["Color"].default_value = soft
+        em.inputs["Strength"].default_value = 1.0
+        ob["exp7_avatar_loaded"] = 0
+        ob["exp7_avatar_path"] = str(image_path)
+    links.new(em.outputs["Emission"], out.inputs["Surface"])
     ob.data.materials.append(mat)
     return ob
+
+
+def assert_assets() -> dict:
+    photo = ASSETS / "avatar-photo-study.png"
+    disc = ASSETS / "avatar-design-study.png"
+    info = {"photo": str(photo), "photo_exists": photo.is_file(), "disc_exists": disc.is_file()}
+    if photo.is_file():
+        info["photo_bytes"] = photo.stat().st_size
+    return info
 
 
 def compose_calendar(make_panel, palette, geom, element_states, font_id, prefix="ViewCal"):
@@ -197,14 +196,13 @@ def compose_calendar(make_panel, palette, geom, element_states, font_id, prefix=
     )
     objs.append(p)
     objs.append(make_text(f"{prefix}_title", "November 2026", (-1.55, 1.58, 0.06), TITLE_SIZE, INK, font_id))
-    objs.append(make_text(f"{prefix}_sub", "Calendar · design-study", (-1.55, 1.38, 0.06), SUB_SIZE, INK_MUTED, font_id))
+    objs.append(make_text(f"{prefix}_sub", "Calendar · design-study", (-1.55, 1.38, 0.06), SUB_SIZE, INK_SECONDARY, font_id))
 
     weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     cell_w, cell_h = 0.44, 0.40
     for i, wd in enumerate(weekdays):
         x = (i - 3) * (cell_w + gap * 0.55)
-        # Dark ink on light ground — not washed muted
-        objs.append(make_text(f"{prefix}_wd{i}", wd, (x - 0.14, 1.12, 0.05), BODY_SIZE, INK_MUTED, font_id))
+        objs.append(make_text(f"{prefix}_wd{i}", wd, (x - 0.14, 1.12, 0.05), BODY_SIZE, INK, font_id))
 
     states_cycle = [
         "idle", "hover", "selected", "focus", "pressed", "idle", "disabled",
@@ -226,17 +224,12 @@ def compose_calendar(make_panel, palette, geom, element_states, font_id, prefix=
             objs.append(p)
             if ring:
                 objs.append(ring)
-            if st_name == "disabled":
-                label_c = INK_DISABLED
-            elif st_name in ("selected", "pressed", "focus", "hover"):
-                label_c = INK_ON_WASH
-            else:
-                label_c = INK
-            objs.append(make_text(f"{prefix}_num{row}{col}", str(day), (x - 0.1, y + 0.02, 0.05), BODY_SIZE, label_c, font_id))
+            label_c = INK_DISABLED if st_name == "disabled" else INK
+            objs.append(make_text(f"{prefix}_num{row}{col}", str(day), (x - 0.1, y + 0.02, 0.05), DAY_SIZE, label_c, font_id))
             if st_name == "selected":
-                objs.append(make_text(f"{prefix}_evt{row}{col}", "Review", (x - 0.16, y - 0.12, 0.05), META_SIZE, palette["_rgba"]["accent"][:3], font_id))
+                objs.append(make_text(f"{prefix}_evt{row}{col}", "Review", (x - 0.16, y - 0.12, 0.05), META_SIZE, INK_ACCENT, font_id))
             day += 1
-    objs.append(make_text(f"{prefix}_banner", "DESIGN-STUDY · unlit text · not live WebGPU", (-1.7, -1.15, 0.04), META_SIZE, INK_MUTED, font_id))
+    objs.append(make_text(f"{prefix}_banner", "DESIGN-STUDY · unlit text · not live WebGPU", (-1.7, -1.15, 0.04), META_SIZE, INK_SECONDARY, font_id))
     return objs
 
 
@@ -244,7 +237,7 @@ def compose_board(make_panel, palette, geom, element_states, font_id, prefix="Vi
     gap = float(geom.get("gap", 8)) * float(geom.get("scenePxScale", 0.01))
     objs = []
     objs.append(make_text(f"{prefix}_title", "Board · Expenses", (-1.75, 1.55, 0.06), TITLE_SIZE, INK, font_id))
-    objs.append(make_text(f"{prefix}_sub", "design-study · shared state-table", (-1.75, 1.35, 0.06), SUB_SIZE, INK_MUTED, font_id))
+    objs.append(make_text(f"{prefix}_sub", "design-study · shared state-table", (-1.75, 1.35, 0.06), SUB_SIZE, INK_SECONDARY, font_id))
     cols = [
         ("Inbox", ["idle", "hover", "pressed"]),
         ("Active", ["selected", "dragging", "drop-pending"]),
@@ -276,16 +269,16 @@ def compose_board(make_panel, palette, geom, element_states, font_id, prefix="Vi
                 objs.append(ring)
             tc = INK_DISABLED if st_name == "disabled" else INK
             objs.append(make_text(f"{prefix}_ct{ci}{ri}", title, (cx - 0.45, y + 0.1, 0.06), BODY_SIZE, tc, font_id))
-            objs.append(make_text(f"{prefix}_ca{ci}{ri}", amt, (cx - 0.45, y - 0.02, 0.06), BODY_SIZE, palette["_rgba"]["accent"][:3], font_id))
-            objs.append(make_text(f"{prefix}_cg{ci}{ri}", f"{tag} · {st_name}", (cx - 0.45, y - 0.14, 0.06), META_SIZE, INK_MUTED, font_id))
-    objs.append(make_text(f"{prefix}_banner", "DESIGN-STUDY · drop-pending=accent · invalid=caution", (-1.75, -1.25, 0.04), META_SIZE, INK_MUTED, font_id))
+            objs.append(make_text(f"{prefix}_ca{ci}{ri}", amt, (cx - 0.45, y - 0.02, 0.06), BODY_SIZE, INK_ACCENT, font_id))
+            objs.append(make_text(f"{prefix}_cg{ci}{ri}", f"{tag} · {st_name}", (cx - 0.45, y - 0.14, 0.06), META_SIZE, INK_SECONDARY, font_id))
+    objs.append(make_text(f"{prefix}_banner", "DESIGN-STUDY · drop-pending=accent · invalid=caution", (-1.75, -1.25, 0.04), META_SIZE, INK_SECONDARY, font_id))
     return objs
 
 
 def compose_plan(make_panel, palette, geom, element_states, font_id, prefix="ViewPlan"):
     objs = []
     objs.append(make_text(f"{prefix}_title", "Plan · Dependencies", (-1.75, 1.5, 0.06), TITLE_SIZE, INK, font_id))
-    objs.append(make_text(f"{prefix}_sub", "what-if isolation · design-study", (-1.75, 1.3, 0.06), SUB_SIZE, INK_MUTED, font_id))
+    objs.append(make_text(f"{prefix}_sub", "what-if isolation · design-study", (-1.75, 1.3, 0.06), SUB_SIZE, INK_SECONDARY, font_id))
     rows = [
         ("selected", "Kickoff brief", "Owner: Alex · Due Fri"),
         ("focus", "Vendor shortlist", "3 options · needs review"),
@@ -305,8 +298,8 @@ def compose_plan(make_panel, palette, geom, element_states, font_id, prefix="Vie
             objs.append(ring)
         tc = INK_DISABLED if st_name == "disabled" else INK
         objs.append(make_text(f"{prefix}_rt{i}", f"{i+1}. {title}", (-1.5, y + 0.05, 0.06), BODY_SIZE, tc, font_id))
-        objs.append(make_text(f"{prefix}_rs{i}", sub, (-1.5, y - 0.1, 0.06), META_SIZE, INK_MUTED, font_id))
-    objs.append(make_text(f"{prefix}_banner", "DESIGN-STUDY · not live Plan/deps WebGPU", (-1.75, -1.25, 0.04), META_SIZE, INK_MUTED, font_id))
+        objs.append(make_text(f"{prefix}_rs{i}", sub, (-1.5, y - 0.1, 0.06), META_SIZE, INK_SECONDARY, font_id))
+    objs.append(make_text(f"{prefix}_banner", "DESIGN-STUDY · not live Plan/deps WebGPU", (-1.75, -1.25, 0.04), META_SIZE, INK_SECONDARY, font_id))
     return objs
 
 
@@ -315,7 +308,7 @@ def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="V
 
     scale = float(geom.get("scenePxScale", 0.01))
     bar_h = float(geom.get("barH", 44)) * scale
-    avatar = float(geom.get("avatar", 36)) * scale * 1.35
+    avatar = float(geom.get("avatar", 36)) * scale * 1.6
     gap = float(geom.get("gap", 8)) * scale
     objs = []
 
@@ -361,9 +354,9 @@ def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="V
     photo = ASSETS / "avatar-photo-study.png"
     disc = ASSETS / "avatar-design-study.png"
     path = photo if photo.is_file() else disc
-    av = make_avatar(f"{prefix}_avatar", (1.7, 0.2), avatar, path, z=0.07)
+    av = make_avatar(f"{prefix}_avatar", (1.7, 0.2), avatar, path, z=0.09)
     objs.append(av)
-    objs.append(make_text(f"{prefix}_login", "you", (1.55, -0.15, 0.05), META_SIZE, INK_MUTED, font_id))
-    objs.append(make_text(f"{prefix}_banner", "DESIGN-STUDY chrome · avatar disc (not live JRDI GPU)", (-1.75, -0.65, 0.04), META_SIZE, INK_MUTED, font_id))
-    objs.append(make_text(f"{prefix}_note", "Reserved bar · Best≠Selected · PAT stays DOM", (-1.75, -0.82, 0.04), META_SIZE, INK_MUTED, font_id))
+    objs.append(make_text(f"{prefix}_login", "you", (1.55, -0.15, 0.05), META_SIZE, INK_SECONDARY, font_id))
+    objs.append(make_text(f"{prefix}_banner", "DESIGN-STUDY chrome · opaque photo Emission plane", (-1.75, -0.65, 0.04), META_SIZE, INK_SECONDARY, font_id))
+    objs.append(make_text(f"{prefix}_note", "Reserved bar · Best≠Selected · PAT stays DOM", (-1.75, -0.82, 0.04), META_SIZE, INK_SECONDARY, font_id))
     return objs

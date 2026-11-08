@@ -1,23 +1,16 @@
 {
   "id": "exp7-art-pass-1.8.4",
   "branch": "cursor/art-ux-profile-image-15ae",
-  "generator_rev": "front-readable-v6",
+  "generator_rev": "front-readable-v7",
   "shell_version": "1.8.4",
-  "moho": {
-    "status": "PASS",
-    "frames": 120,
-    "unique": 102,
-    "f0_vs_f120": 0.0,
-    "note": "No further loop experiments"
-  },
+  "moho": "PASS-v5",
   "blender_views": {
     "status": "FAIL-v5-contrast; FIX-v6-unlit-pending-Mac"
   },
   "authoritative_handoff": {
-    "archive": "ART-PIPELINE-HANDOFF-20261108T174433Z.tar.gz",
-    "sha256": "c945c1ba4663f4750b6add6e7b44692ba3bfa3953ef03a62bdc78db5d7fbe5ea",
-    "location": "/opt/cursor/artifacts/ART-PIPELINE-HANDOFF-20261108T174433Z.tar.gz",
-    "history": "/opt/cursor/artifacts/handoff-history/"
+    "archive": "ART-PIPELINE-HANDOFF-20261108T175631Z.tar.gz",
+    "sha256": "5d2b7f80e0b7bbc0640a5e7292e32903e8b4b1ec13d7d636ae0f16a23bd71a48",
+    "location": "/opt/cursor/artifacts/ART-PIPELINE-HANDOFF-20261108T175631Z.tar.gz"
   },
   "production_sources": [
     "art/src/jrender-images.js",
@@ -34,5 +27,8 @@
     "art/lighting/",
     "artifacts/art-ux-profile-2026-11-08/qa/"
   ],
-  "pr_policy": "Do not commit unpacked handoff trees or per-iteration tarballs into the PR; keep sources + VERSION-MANIFEST + concise qa."
+  "pr_policy": "Do not commit unpacked handoff trees or per-iteration tarballs into the PR; keep sources + VERSION-MANIFEST + concise qa.",
+  "git_head_at_pack": "95a1299769881516a1c75032650213d404b9bef7",
+  "shadow_cal": "PASS-offset-v6-empirical-blur",
+  "views": "v6-FAIL; v7-fix-pending-Mac-probe"
 }

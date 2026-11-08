@@ -1,6 +1,6 @@
-archive=ART-PIPELINE-HANDOFF-20261108T174433Z.tar.gz
-sha256=c945c1ba4663f4750b6add6e7b44692ba3bfa3953ef03a62bdc78db5d7fbe5ea
-tool_artifacts=/opt/cursor/artifacts/ART-PIPELINE-HANDOFF-20261108T174433Z.tar.gz
+archive=ART-PIPELINE-HANDOFF-20261108T175652Z.tar.gz
+sha256=2137e458cb34efe078e84ad804ca1b1c4f34b3b47b7a30351e4e1719390a0a60
+tool_artifacts=/opt/cursor/artifacts/ART-PIPELINE-HANDOFF-20261108T175652Z.tar.gz
 history=/opt/cursor/artifacts/handoff-history/
 generator_rev=front-readable-v6
 scratch=/Users/user-rodri/ArtScratch/exp7-art
