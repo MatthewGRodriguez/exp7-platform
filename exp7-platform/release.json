@@ -1,12 +1,12 @@
 {
  "format": "exp7-platform-release/1",
- "version": "1.5.0",
+ "version": "1.6.1",
  "file": "exp7-platform/exp7-platform-lean.html",
- "sha256": "7420b9f6c459133f2f8f1cd3f5b223f1c1fc9f487b5be7ce6d71f5c9867c6d09",
+ "sha256": "482e853015861d9d6a6268bde04590338d3f757bb0d5a6d7958d5e7f54b6ed0d",
  "minLauncherMajor": 1,
  "contains": {
-  "app": "exp7-lean v17 + Budget (calendar/board/plan; local IDB; harmonic rank shares)",
-  "appSha256": "8b96d6b58b9ab6718af78076b75a5841fb1a80de2de9fca8f8eb73fb90d8a2b8",
-  "budgetSha256": "811660a9066150ae4c318d77b70a0897d47408026d74ce503784c676992ac6bc"
+  "app": "exp7-lean v17 + Budget as moneyCalendarTemplate Cal/Board/Plan mode on shared engine; reserved top bar; exclusive avatar icon; Budget local-IDB only (non-destructive vs stub)",
+  "appSha256": "452cea22a10a09da77215ec60379110e1cf1c312b0ffc62cce460e7896d5c01a",
+  "budgetMode": "shared-engine"
  }
 }
