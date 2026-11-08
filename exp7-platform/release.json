@@ -1,11 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.19",
+  "version": "1.8.20",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "21008add4e855306cc5441c0a8aa437eb3860946f6dc08163613742923452be8",
+  "sha256": "f5d400967c4e9e6c5346f8e98a2e77bd0b0b3997464530c45c0effd48693384c",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "1.8.19: A dark card brightens through the middle. A white card does not. Specks stay out.",
+    "app": "1.8.20: The cast shadow stays on the ground when the face rises.",
     "appSha256": "4e19bdeeb76818a6a96b9cb6655d48c950d429b17d3680184231e5a67755508b",
     "budgetSha256": "673372b101ea5342552ec16a2e5d3820e322411031c52d808b68c35c3d494c67",
     "budgetMode": "exp7-views",
