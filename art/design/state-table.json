@@ -12,7 +12,7 @@
     "drop-pending": { "lift": 3, "tilt": 0, "scale": 1.01, "opacity": 0.9, "ring": "gold", "bg": "subtle", "border": "accent", "note": "accent/gold ring — must NOT share invalid/caution red" },
     "invalid": { "lift": 0, "tilt": 0, "scale": 1, "opacity": 1, "ring": "caution", "bg": "surface", "border": "invalid" },
     "settling": { "lift": 1, "tilt": 0, "scale": 1, "opacity": 1, "ring": "none", "bg": "surface", "border": "border" },
-    "disabled": { "lift": 0, "tilt": 0, "scale": 1, "opacity": 0.42, "ring": "none", "bg": "softDisc", "border": "disabled", "note": "opacity+softDisc+disabled border — ROI alpha, not global mean" }
+    "disabled": { "lift": 0, "tilt": 0, "scale": 1, "opacity": 0.38, "ring": "none", "bg": "softDisc", "border": "disabled", "note": "opacity+softDisc+disabled border — measure ROI opacity/contrast, not global mean; must read disabled" }
   },
   "appStates": {
     "loading": { "ambient": "paused", "pointer": "off", "loader": true },

@@ -1,0 +1,79 @@
+{
+  "label": "DESIGN-STUDY-ORTHO",
+  "not": [
+    "Blender METAL",
+    "Safari WebGPU",
+    "GPU acceptance"
+  ],
+  "views": {
+    "calendar": {
+      "path": "artifacts/art-ux-profile-2026-11-08/qa/ortho-preview/view_calendar_ortho.png",
+      "contrast_title": 14.510674823749085
+    },
+    "board": {
+      "path": "artifacts/art-ux-profile-2026-11-08/qa/ortho-preview/view_board_ortho.png"
+    },
+    "plan": {
+      "path": "artifacts/art-ux-profile-2026-11-08/qa/ortho-preview/view_plan_ortho.png"
+    },
+    "chrome": {
+      "path": "artifacts/art-ux-profile-2026-11-08/qa/ortho-preview/view_chrome_ortho.png",
+      "avatar": true
+    }
+  },
+  "pixel_validation": {
+    "calendar": {
+      "ok": true,
+      "errors": [],
+      "dark_pixels": 45030,
+      "contrast_approx": 15.437922100850123,
+      "avatar_chroma_hits": null,
+      "size": [
+        1280,
+        720
+      ],
+      "view": "calendar",
+      "note": "Pixel proof \u2014 not object-count"
+    },
+    "board": {
+      "ok": true,
+      "errors": [],
+      "dark_pixels": 21997,
+      "contrast_approx": 13.744580646763435,
+      "avatar_chroma_hits": null,
+      "size": [
+        1280,
+        720
+      ],
+      "view": "board",
+      "note": "Pixel proof \u2014 not object-count"
+    },
+    "plan": {
+      "ok": true,
+      "errors": [],
+      "dark_pixels": 39095,
+      "contrast_approx": 13.676882746746603,
+      "avatar_chroma_hits": null,
+      "size": [
+        1280,
+        720
+      ],
+      "view": "plan",
+      "note": "Pixel proof \u2014 not object-count"
+    },
+    "chrome": {
+      "ok": true,
+      "errors": [],
+      "dark_pixels": 15140,
+      "contrast_approx": 6.892052168138083,
+      "avatar_chroma_hits": 3766,
+      "size": [
+        1280,
+        720
+      ],
+      "view": "chrome",
+      "note": "Pixel proof \u2014 not object-count"
+    }
+  },
+  "ok": true
+}

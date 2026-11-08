@@ -37,21 +37,13 @@ cat > "$STAGE/README.md" <<EOF
 
 Self-contained Exp7 art pipeline handoff. **No .git. No PATs/keys.**
 
-Generator: **front-readable-v4** — content views (typography+avatar DESIGN-STUDY), semantic state rings,
-shadow ground calibration (image-px slopes rejected), Moho shapes + \`-r\` only.
-Fail evidence: v1 slivers, v2 torii, v3 generic bars / empty Moho layers / image-space shadow mismatch.
+Generator: **front-readable-v5** — content-aware framing, readable text (≥4.5 intent), visible avatar,
+pixel gates (not object-count), light=params size/dist, Moho loop closure, ortho preview proofs.
+Fail evidence: v1–v4 under \`qa/mac-fail-*\`.
 
-Mac scratch: \`/Users/user-rodri/ArtScratch/exp7-art\` — prefer \`--only views|states|shadow\`.
+Mac: prefer \`--only views|states|shadow\`. Run \`preview_views_ortho.py\` + \`validate_view_pixels.py\` before METAL.
 
-## Start here
-1. \`art/pipeline/mac/MAC_RUNBOOK.md\`
-2. \`qa/GATE-MATRIX.md\` + \`qa/ALL-VIEWS-QA.md\`
-3. Blender \`ui-states-v4\` with content validation (no empty views)
-4. Moho Create must log shapes>0; render with \`-r\` (not FileRender)
-5. \`fits.json\` provisional — do not adopt Mac v3 image-px slopes
-
-Still not a full visual QA pass. Do not merge/promote.
-CI green ≠ visual QA.
+Still not a full visual QA pass. Do not merge/promote. CI green ≠ visual QA.
 EOF
 
 # Manifest

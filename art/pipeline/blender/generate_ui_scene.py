@@ -37,7 +37,7 @@ except ImportError:
     Vector = None
 
 DEFAULT_SCRATCH = "/Users/user-rodri/ArtScratch/exp7-art"
-GENERATOR_REV = "front-readable-v4"
+GENERATOR_REV = "front-readable-v5"
 
 # Ensure sibling import works inside Blender --python
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -63,7 +63,7 @@ WASH_RGBA = {
     "drop-pending": (117, 81, 15, 28),  # accent — not invalid red
     "invalid": (170, 0, 0, 22),
     "settling": (36, 88, 166, 12),
-    "disabled": (154, 163, 178, 72),
+    "disabled": (154, 163, 178, 96),  # stronger mute — still disabled gray, ROI-visible
 }
 
 
@@ -83,7 +83,7 @@ def parse_args(argv=None):
     p.add_argument("--params", required=True)
     p.add_argument("--states", required=True)
     p.add_argument("--scratch", default=os.environ.get("ART_SCRATCH", DEFAULT_SCRATCH))
-    p.add_argument("--stage", default="ui-states-v4")
+    p.add_argument("--stage", default="ui-states-v5")
     p.add_argument("--run-id", default=None)
     p.add_argument("--samples", type=int, default=64)
     p.add_argument("--resolution", default="1280x720")
@@ -309,13 +309,21 @@ def make_ground(catcher: bool = False):
     return ground
 
 
-def make_light(params: dict):
+def make_light(params: dict, geom: dict | None = None):
+    """One-light from params — preserve size/distance RATIO (Mac v4: do not hardcode 4.5 / *0.004).
+
+    params.light.size & distance are design units (same as analytical 420/900).
+    Scene meters use scenePxScale (default 0.01) so size/dist == params ratio == penumbra model.
+    """
     assert bpy is not None
     light = params["light"]
     elev = math.radians(float(light["elevationDeg"]))
     az = math.radians(float(light.get("azimuthDeg", 0)))
-    dist = 4.5
-    size = max(0.35, float(light["size"]) * 0.004)
+    scale = float((geom or {}).get("scenePxScale", params.get("geometry", {}).get("scenePxScale", 0.01)))
+    dist = float(light["distance"]) * scale
+    size = float(light["size"]) * scale
+    # Faithful emission: energy scales mildly with distance^2 so brightness stays readable
+    energy = float(light.get("energy", 500.0)) * (dist / max(1e-6, 9.0)) ** 2
     x = dist * math.cos(elev) * math.sin(az)
     y = -dist * math.cos(elev) * math.cos(az)
     z = dist * math.sin(elev)
@@ -324,10 +332,70 @@ def make_light(params: dict):
     obj.name = "Exp7KeyLight"
     obj.data.shape = "DISK"
     obj.data.size = size
-    obj.data.energy = 420
+    obj.data.energy = energy
     direction = Vector((0, 0, 0.05)) - obj.location
     obj.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
+    obj["exp7_light_dist_m"] = dist
+    obj["exp7_light_size_m"] = size
+    obj["exp7_light_size_over_dist"] = size / max(1e-9, dist)
+    log(f"LIGHT dist_m={dist:.4f} size_m={size:.4f} size/dist={size/dist:.4f} (params {light['size']}/{light['distance']})")
     return obj
+
+
+def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=8):
+    """Content-aware framing: ensure ALL object world bounds project inside NDC with margin.
+
+    Hypothesis (Mac v4): previous view camera framed a single panel, cropping 'November'→'vember'.
+    Pull camera back along view axis until projected AABB fits.
+    """
+    assert bpy is not None
+    if not objects:
+        return {"ok": False, "errors": ["no objects"]}
+    from bpy_extras.object_utils import world_to_camera_view  # type: ignore
+
+    scene = bpy.context.scene
+    pts = []
+    for ob in objects:
+        if ob is None:
+            continue
+        try:
+            for c in ob.bound_box:
+                pts.append(ob.matrix_world @ Vector(c))
+        except Exception:
+            pts.append(ob.location.copy())
+    if not pts:
+        return {"ok": False, "errors": ["no bounds"]}
+    target = sum(pts, Vector((0, 0, 0))) / len(pts)
+    errors = []
+    for _ in range(max_iters):
+        xs, ys, zs = [], [], []
+        for p in pts:
+            co = world_to_camera_view(scene, cam, p)
+            xs.append(co.x)
+            ys.append(co.y)
+            zs.append(co.z)
+        minx, maxx = min(xs), max(xs)
+        miny, maxy = min(ys), max(ys)
+        ok = (
+            minx >= margin and maxx <= 1.0 - margin
+            and miny >= margin and maxy <= 1.0 - margin
+            and min(zs) > 0
+        )
+        if ok:
+            return {
+                "ok": True,
+                "ndc_bounds": [minx, miny, maxx, maxy],
+                "margin": margin,
+                "cam_loc": list(cam.location),
+            }
+        # Pull back along camera→target axis
+        loc = cam.location.copy()
+        direction = (loc - target).normalized()
+        cam.location = loc + direction * 0.45
+        # Keep looking at content centroid
+        cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
+        errors = [f"ndc=[{minx:.3f},{miny:.3f},{maxx:.3f},{maxy:.3f}]"]
+    return {"ok": False, "errors": errors or ["framing failed"], "ndc_bounds": [minx, miny, maxx, maxy]}
 
 
 def make_camera_front(focal_mm: float, near: float, far: float, loc=None, target=None):
@@ -850,10 +918,10 @@ def main():
         "generator_rev": GENERATOR_REV,
         "blender_target": "4.2.1 LTS",
         "fix_note": (
-            "v4: content views+avatar DESIGN-STUDY; semantic rings; shadow ground calibration; "
-            "Moho shapes; --only focused passes"
+            "v5: content-aware framing; readable text emission; avatar +Z disc; light=params ratio; "
+            "pixel gates; Moho loop closure; --only focused passes"
         ),
-        "mac_v3_fail_ref": "run-v3 views=generic bars; shadow image-px≠ground; Moho empty layers",
+        "mac_v4_fail_ref": "cropped 'vember'; faint text; invisible avatar; light 4.5/*0.004; Moho loop open",
         "executable_expected": "/Applications/Blender.app/Contents/MacOS/Blender",
         "cycles_device_requested": args.device,
         "scratch": str(scratch),
@@ -924,7 +992,7 @@ def main():
         clear_scene()
         meta["device_info"] = configure_cycles_metal(args.samples, args.device)
         make_ground(catcher=False)
-        make_light(params)
+        make_light(params, geom)
         cam = make_camera_front(focal, params["camera"].get("near", 10), params["camera"].get("far", 4000))
 
         # Framing + ring hug validation on focus (has ring)
@@ -1022,13 +1090,13 @@ def main():
             if VC is None:
                 raise SystemExit("views_content module missing — cannot render non-empty views")
             font_id = VC._load_font_id(VC.find_font())
-            # Wider framing so compositions are full-frame, not cropped fragments
+            # Start elevated; frame_camera_to_objects pulls back until ALL content fits
             view_cam = make_camera_front(
-                focal,
+                min(focal, 50.0),  # wider FOV for compositions vs single-panel 85mm
                 params["camera"].get("near", 10),
                 params["camera"].get("far", 4000),
-                loc=Vector((0.0, -4.2, 3.4)),
-                target=Vector((0.0, 0.15, 0.2)),
+                loc=Vector((0.0, -5.5, 4.2)),
+                target=Vector((0.0, 0.1, 0.15)),
             )
             bpy.context.scene.camera = view_cam
             composers = {
@@ -1041,21 +1109,49 @@ def main():
                 clear_named("View")
                 clear_named("UIPanel_")
                 ensure_ground(catcher=False)
-                composer(make_panel, palette, geom, states_doc["elementStates"], font_id)
+                built = composer(make_panel, palette, geom, states_doc["elementStates"], font_id)
+                objs = [o for o in (built or []) if o is not None]
+                # Also collect any View* objects created as side-effects
+                for o in bpy.data.objects:
+                    if o.name.startswith("View") and o not in objs:
+                        objs.append(o)
+                frame = frame_camera_to_objects(view_cam, objs, (rx, ry), margin=0.06)
                 inv = VC.content_inventory("View")
                 vval = VC.validate_view_content(inv, view_name)
+                vval["framing"] = frame
+                if not frame.get("ok") and not args.skip_validate:
+                    raise SystemExit(
+                        "VIEW_FRAMING_FAIL " + view_name + ": " + "; ".join(frame.get("errors") or [])
+                    )
                 view_content_reports[view_name] = vval
                 if not vval["ok"] and not args.skip_validate:
                     raise SystemExit("VIEW_CONTENT_FAIL " + view_name + ": " + "; ".join(vval["errors"]))
                 out_png = out_dir / f"view_{view_name}.png"
-                log(f"RENDER view={view_name} texts={inv['texts']} avatars={inv['avatars']} DESIGN-STUDY")
+                log(
+                    f"RENDER view={view_name} texts={inv['texts']} avatars={inv['avatars']} "
+                    f"frame_ok={frame.get('ok')} DESIGN-STUDY"
+                )
                 render_still(out_png, (rx, ry))
+                # Pixel proof (not object-count): dark text + avatar chroma gates
+                try:
+                    from validate_view_pixels import validate_png
+
+                    pix = validate_png(out_png, view_name, require_avatar=(view_name == "chrome"))
+                    vval["pixels"] = pix
+                    if not pix.get("ok") and not args.skip_validate:
+                        raise SystemExit(
+                            "VIEW_PIXEL_FAIL " + view_name + ": " + "; ".join(pix.get("errors") or [])
+                        )
+                except ImportError:
+                    log("WARN validate_view_pixels missing")
                 renders.append({
                     "series": "view",
                     "view": view_name,
                     "path": str(out_png),
                     "label": "DESIGN-STUDY",
                     "content": inv,
+                    "framing": frame,
+                    "pixels": vval.get("pixels"),
                 })
             bpy.context.scene.camera = cam
 

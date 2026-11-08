@@ -1,32 +1,41 @@
 {
   "id": "exp7-lighting-fits/1",
-  "status": "provisional-analytical-only",
-  "notMeasured": true,
-  "measuredImageSpaceRejected": true,
-  "blender": "PROBE-READY via generate_ui_scene.py on Mac Blender 4.2.1 METAL",
-  "method": "Ground-plane prediction from params.light ONLY. Mac v3 image-px slopes are NOT adopted.",
-  "mac_v3_image_space_note": {
-    "exposed_offset_r50_slope": 8.75,
-    "penumbra_10_90_slope": 4.0,
-    "panel_bottom_edge_motion_slope": -12.87,
-    "measured_penumbra_over_offset": 0.46,
-    "model_penumbra_over_offset": 1.436,
-    "verdict": "REJECT as ground-plane model — image-space includes silhouette motion; use calibrate_shadow_ground.py + camera_instrumentation.json unprojection before revising predictions"
-  },
+  "status": "provisional-analytical-with-measured-offset",
+  "blender": "make_light unified to params size/distance × scenePxScale (v5) — no hardcoded 4.5 / *0.004",
+  "method": "Ground-plane predictions from params.light; Mac v4 ground unprojection for offset",
   "light": {
     "elevationDeg": 72,
     "size": 420,
-    "distance": 900
+    "distance": 900,
+    "scenePxScale": 0.01,
+    "sceneSizeM": 4.2,
+    "sceneDistM": 9.0,
+    "sizeOverDist": 0.4667,
+    "note": "Generator must keep size/dist == 420/900. Prior bug: dist=4.5 size=1.68 → 0.373"
   },
   "predictions": {
     "shadowOffsetPerLiftPx": 0.3249,
-    "noteOffset": "h * cot(elevation) = h * cot(72 deg) approx h * 0.3249 — GROUND design-px, not image-px",
+    "noteOffset": "h * cot(72°) ≈ 0.3249 design-px on ground",
     "penumbraPerLiftPx": 0.4667,
-    "notePenumbra": "h * lightSize / distance = h * 420/900 approx h * 0.4667 — GROUND design-px",
+    "notePenumbra": "Analytic h*size/distance for infinitesimal source. Finite disk softens differently; measured blur ≠ forced equality.",
     "highlightShiftPerTiltDeg": 0,
-    "rimPerTiltDeg": 0,
-    "shadePerTiltDeg": 0,
-    "tiltNote": "Tilts <=5 deg change lighting <3% and move highlights <0.5px under fixed UI camera — keep highlights static"
+    "tiltNote": "Tilts ≤5°: keep highlights static"
+  },
+  "measuredGroundV4": {
+    "offset_per_lift": 0.309,
+    "offset_error_pct": -4.8,
+    "offset_rmse_m": 0.0005,
+    "offset_verdict": "PASS within 5%",
+    "penumbra_per_lift_measured": 0.219,
+    "penumbra_scene_size_over_dist_pre_fix": 0.373,
+    "penumbra_params_model": 0.467,
+    "penumbra_note": "Sampling Δy=2.5mm coarse; finite-area soft shadow ≠ analytic penumbra width. Accept measured relation with documented difference — do not fake a coefficient to force equality.",
+    "far_side": "unmeasurable (occluded by panel silhouette)"
+  },
+  "blurThresholdDefinition": {
+    "metric": "2×(y50−y10) of near-side alpha profile on ground after homography",
+    "uncertainty": "quantization 0.0025 m; RMSE reported per fit; prefer ≥3 lift samples",
+    "do_not": "Rescale measured blur by ad-hoc factor to match 0.4667"
   },
   "stateResolved": {
     "idle": { "lift": 0, "shadowOffset": 0, "shadowBlur": 0, "shadowAlpha": 0 },
@@ -40,10 +49,5 @@
     "settling": { "lift": 1, "shadowOffset": 0.325, "shadowBlur": 0.47, "shadowAlpha": 0.14 },
     "disabled": { "lift": 0, "shadowOffset": 0, "shadowBlur": 0, "shadowAlpha": 0 }
   },
-  "caustics": {
-    "enabled": false,
-    "reason": "Optional stage deferred until ground-space shadow fit exists"
-  },
-  "measuredFitsPath": "lighting/fits.measured.json (create on Mac after GROUND unprojection — not raw image slopes)",
-  "evidenceClass": "[PROVISIONAL] analytical; measured ground-space [OPEN][USER-HW]"
+  "evidenceClass": "[PROVISIONAL] analytical + measured offset PASS; penumbra documented difference [USER-HW]"
 }

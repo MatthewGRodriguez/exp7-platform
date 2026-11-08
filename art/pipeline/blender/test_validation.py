@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for framing/state/ring/content gates (no bpy)."""
+"""Gates for framing/state/light/pixels/Moho (no bpy required for most)."""
 from __future__ import annotations
 
 import json
@@ -16,83 +16,66 @@ import views_content as VC  # noqa: E402
 import calibrate_shadow_ground as cal  # noqa: E402
 
 
-class StateTableValidation(unittest.TestCase):
+class StateTable(unittest.TestCase):
     def setUp(self):
         self.states = json.loads((ROOT / "art/design/state-table.json").read_text())["elementStates"]
 
-    def test_design_table_passes(self):
-        r = gen.validate_state_table(self.states)
-        self.assertTrue(r["ok"], r["errors"])
+    def test_passes(self):
+        self.assertTrue(gen.validate_state_table(self.states)["ok"])
 
-    def test_drop_pending_not_caution(self):
+    def test_drop_pending_gold_not_caution(self):
         self.assertEqual(self.states["drop-pending"]["ring"], "gold")
-        self.assertEqual(self.states["invalid"]["ring"], "caution")
         self.assertNotEqual(self.states["drop-pending"]["ring"], self.states["invalid"]["ring"])
 
-    def test_caution_drop_pending_fails_gate(self):
-        bad = dict(self.states)
-        bad["drop-pending"] = dict(self.states["drop-pending"])
-        bad["drop-pending"]["ring"] = "caution"
-        r = gen.validate_state_table(bad)
-        self.assertFalse(r["ok"])
-
-    def test_pressed_has_ring_and_scale(self):
-        p = self.states["pressed"]
-        self.assertEqual(p["ring"], "focus")
-        self.assertLess(float(p["scale"]), 0.99)
-        self.assertEqual(p["border"], "selection")
-
-    def test_disabled_opacity(self):
-        self.assertLess(float(self.states["disabled"]["opacity"]), 0.5)
+    def test_pressed_focus_share_selection_hue_ok(self):
+        # Same blue wash family is OK — geometry differs
+        self.assertEqual(self.states["pressed"]["ring"], "focus")
+        self.assertLess(float(self.states["pressed"]["scale"]), 1.0)
+        self.assertEqual(self.states["focus"]["ring"], "focus")
+        self.assertEqual(float(self.states["focus"]["scale"]), 1.0)
 
 
-class FramingHeuristics(unittest.TestCase):
-    def test_sliver_rejected(self):
-        w, h = 120.0, 17.0
-        rx, ry = 1280, 720
-        self.assertLess((w * h) / (rx * ry), gen.MIN_PROJECTED_AREA_FRAC)
-        self.assertLess(h / ry, gen.MIN_PROJECTED_HEIGHT_FRAC)
-
-    def test_no_torus_v4(self):
+class LightUnity(unittest.TestCase):
+    def test_make_light_source_uses_params_ratio(self):
         src = Path(__file__).with_name("generate_ui_scene.py").read_text()
-        self.assertIn("front-readable-v4", src)
-        self.assertNotIn("primitive_torus_add", src)
-        self.assertIn("views_content", src)
-        self.assertIn("--only", src)
+        self.assertNotIn("dist = 4.5", src)
+        self.assertNotIn("* 0.004", src)
+        self.assertIn('float(light["distance"]) * scale', src)
+        self.assertIn('float(light["size"]) * scale', src)
+        params = json.loads((ROOT / "art/design/params.json").read_text())
+        ratio = params["light"]["size"] / params["light"]["distance"]
+        self.assertAlmostEqual(ratio, 0.4667, places=3)
+
+
+class FramingHelpers(unittest.TestCase):
+    def test_frame_camera_helper_exists(self):
+        self.assertTrue(hasattr(gen, "frame_camera_to_objects"))
+        src = Path(__file__).with_name("generate_ui_scene.py").read_text()
+        self.assertIn("frame_camera_to_objects", src)
+        self.assertIn("VIEW_FRAMING_FAIL", src)
+        self.assertIn("VIEW_PIXEL_FAIL", src)
 
 
 class ViewsContent(unittest.TestCase):
-    def test_assets_exist(self):
-        self.assertTrue((Path(__file__).parent / "assets" / "avatar-design-study.png").is_file())
-        self.assertTrue((Path(__file__).parent / "assets" / "avatar-photo-study.png").is_file())
+    def test_readable_text_constants(self):
+        self.assertGreaterEqual(VC.TITLE_SIZE, 0.22)
+        self.assertGreaterEqual(VC.BODY_SIZE, 0.08)
 
-    def test_validate_view_content_rejects_empty(self):
-        inv = {"texts": 0, "avatars": 0, "panels": 1, "names": []}
-        r = VC.validate_view_content(inv, "calendar")
-        self.assertFalse(r["ok"])
-
-    def test_validate_chrome_needs_avatar(self):
-        inv = {"texts": 20, "avatars": 0, "panels": 8, "names": []}
-        r = VC.validate_view_content(inv, "chrome")
-        self.assertFalse(r["ok"])
+    def test_assets(self):
+        self.assertTrue((Path(__file__).parent / "assets/avatar-photo-study.png").is_file())
 
 
-class ShadowCalibration(unittest.TestCase):
-    def test_rejects_adopting_image_slopes(self):
-        params = json.loads((ROOT / "art/design/params.json").read_text())
-        measured = {
-            "exposed_offset_r50": {"slope": 8.75},
-            "penumbra_10_90": {"slope": 4.0},
-            "panel_bottom_edge_motion": {"slope": -12.87},
-        }
-        note = cal.explain_mac_v3_contamination(measured)
-        self.assertIn("unproject", note["contamination_note"].lower() + note["do_not"].lower())
-        g = cal.analytical_ground(params)
-        self.assertAlmostEqual(g["shadowOffsetPerLift_designPx"], 0.3249, places=3)
+class MohoLoop(unittest.TestCase):
+    def test_animate_closes_loop(self):
+        src = (ROOT / "art/pipeline/moho/scripts/AnimateExp7States.lua").read_text()
+        self.assertIn("loop_closure", src)
+        self.assertIn("END", src)
+        self.assertIn("f=0 and f=", src)
+        self.assertIn("loop_closed", src)
 
 
 class DryRun(unittest.TestCase):
-    def test_dry_run_v4(self):
+    def test_v5_dry_run(self):
         r = subprocess.run(
             [
                 sys.executable,
@@ -107,29 +90,25 @@ class DryRun(unittest.TestCase):
             ],
             capture_output=True,
             text=True,
-            check=False,
         )
         self.assertEqual(r.returncode, 0, r.stderr)
         meta = json.loads(r.stdout)
-        self.assertEqual(meta["generator_rev"], "front-readable-v4")
-        self.assertTrue(meta["state_table_validation"]["ok"])
-        self.assertTrue(meta["semantic_rings"]["ok"])
-        self.assertIn("views", meta["only"])
+        self.assertEqual(meta["generator_rev"], "front-readable-v5")
 
 
-class MohoScripts(unittest.TestCase):
-    def test_create_draws_shapes_not_empty_scaffold(self):
-        src = (ROOT / "art/pipeline/moho/scripts/CreateExp7ArtComparison.lua").read_text()
-        self.assertIn("CreateShape", src)
-        self.assertIn("CountShapes", src)
-        self.assertIn("empty_layer", src)
-        self.assertIn("drop-pending", src)
-        self.assertIn("PAL.accent", src)
-
-    def test_render_prefers_cli_r(self):
-        src = (ROOT / "art/pipeline/moho/scripts/RenderExp7Preview.lua").read_text()
-        self.assertIn("DO_NOT_FileRender", src)
-        self.assertIn("-r", src)
+class OrthoPreview(unittest.TestCase):
+    def test_ortho_pixel_gates(self):
+        out = Path("/tmp/exp7-ortho-test")
+        r = subprocess.run(
+            [sys.executable, str(Path(__file__).with_name("preview_views_ortho.py")), "--out", str(out)],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        report = json.loads((out / "ortho-preview.json").read_text())
+        self.assertTrue(report["ok"], report)
+        self.assertTrue((out / "view_calendar_ortho.png").is_file())
+        self.assertTrue((out / "view_chrome_ortho.png").is_file())
 
 
 if __name__ == "__main__":

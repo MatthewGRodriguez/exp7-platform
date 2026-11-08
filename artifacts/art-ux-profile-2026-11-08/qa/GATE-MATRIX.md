@@ -1,17 +1,16 @@
-# Gate matrix (v4)
+# Gate matrix (v5)
 
-| Gate | Class | Status |
-|------|-------|--------|
-| Blender ui-states-v4 views (text+avatar DESIGN-STUDY) | rendered | **PROBE-READY** `--only views` — content validation required |
-| Blender states semantic fix | rendered | **PROBE-READY** `--only states` |
-| Blender v3 Mac run | fail quality | views=generic bars; drop-pending≈invalid; pressed/disabled weak; image-px shadow ≠ ground |
-| Shadow ground unprojection | provisional | `calibrate_shadow_ground.py` + `camera_instrumentation.json` — fits stay provisional |
-| Moho form A/B | verified | doc-first + `-r` |
-| Moho Create with shapes | rendered | **PROBE-READY** — must log shapes>0; empty FAIL |
-| Moho Animate | rendered | refuses empty layers |
-| Moho FileRender Lua | fail | exit 139 — **do not use** |
-| Moho `-r` multi-frame | rendered | only after shapes exist |
-| Live Safari WebGPU before/after | USER-HW | **OPEN** — cloud has no accepted GPU proof |
-| Analytical fits.json | provisional | image-space slopes **rejected** as model |
+| Gate | Status |
+|------|--------|
+| Ortho DESIGN-STUDY preview + pixel gates | **runnable on cloud** (`preview_views_ortho.py`) — not METAL/WebGPU |
+| Blender views content-aware frame + pixel fail | **PROBE-READY** `--only views` stage `ui-states-v5` |
+| Light size/dist == params 420/900 | **FIXED in generator** (was 4.5/*0.004→0.373) |
+| Shadow ground offset | **PASS** 0.309 vs 0.3249 (−4.8%) |
+| Shadow penumbra | **documented difference** vs analytic 0.467 — no fake coefficient |
+| Moho shapes + `-r` nonempty | **PASS** (v4) |
+| Moho loop f1≈f120 | **FIX in Animate** (rest at 0 and END) — re-probe |
+| Pressed vs focus | same blue OK; scale/ring weight differ — keep |
+| Disabled ROI-visible | opacity 0.38 + wash 96 — re-probe |
+| LIVE-GPU Safari before/after | **USER-HW OPEN** |
 
-CI green ≠ visual QA. Still not full pass. Do not merge/promote.
+Still not full pass. No merge/promote.
