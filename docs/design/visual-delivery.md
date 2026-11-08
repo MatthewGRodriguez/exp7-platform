@@ -4,7 +4,7 @@
 
 Shells 1.8.10 through 1.8.21 put the state table, a sampled shadow, a face lip, a soft top, a dark glass body, a ground-shadow node, and short pose eases into the lean file. Matthew's read of that work is that a lot was added and the picture barely changed. The design he wants is the one Ash Tangent Residual Artist already used: paint the light and the shadow in an SVG animation, and let the state machine switch the drawings. The rectangle passes stay in 1.8.21 until a drawn pose replaces them. They are not the next thing to extend.
 
-The trial sheet is `docs/design/svg-state-card.svg`. The ask to Ash, the pose list, and which drawing apps were available on this machine are in `docs/artist-coordination-brief.md`. The lean shell is still 1.8.21. This page does not claim the SVG is on screen in the product.
+`docs/design/svg-state-card.svg` is an integration fixture, not final art and not a product frame. Ash's Mac trials and the playback check are in `docs/artist-coordination-brief.md`. The shipped view shader is a solid vertex color plus an axis-aligned clip. A cubic fill loads. A gradient opcode is rejected. Chrome showing an SVG filter is not that shader. The lean shell is still 1.8.21. Headless Chrome here returned a null GPU adapter, so this page has no live canvas before/after.
 
 ## Apps picker and icon flicker (1.8.11)
 

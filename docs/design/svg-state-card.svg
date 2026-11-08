@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="980" height="520" viewBox="0 0 980 520">
   <title>Exp7 pose drawings. The state machine shows one. This file shows all eight.</title>
-  <desc>Trial drawing for the 2026-11-08 direction. Contact shadows are Gaussian blurs in the SVG. The state machine selects a pose with data-sm on the root (idle, hover, focus, pressed, selected, dragging, drop-pending, invalid). With no data-sm, the contact sheet is visible. This is a free-control button. A calendar day uses the same drawings and does not move or grow. Not Moho output. Not wired into the lean shell.</desc>
+  <desc>Integration fixture, not final art. Contact shadows here are SVG Gaussian blurs. Chrome displaying those filters does not mean the JRender draw list can play them. The shipped view shader is a solid vertex color plus an axis-aligned clip. data-sm on the root (idle, hover, focus, pressed, selected, dragging, drop-pending, invalid) shows one pose. With no data-sm, the contact sheet is visible. Not DesignCraft, Moho, or Blender output. Not wired into the lean shell.</desc>
   <style>
     .pose { display: none; }
     svg:not([data-sm]) .sheet { display: inline; }

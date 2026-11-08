@@ -30,13 +30,44 @@ The design is the one Ash already runs. An SVG drawing carries the light, the so
 
 Glass is a drawn layer on dark fills, static, with no speckles. A caustic speck waits on a new on/off proof that it is real caustic light. Days and stacked rows must not overlap or crop. The same drawings cover the calendar, the board, the plan, sections, free buttons, Apps cards, and the bar.
 
-JRender stays the only product renderer. There is no second CSS renderer beside the canvas. The open job is playback: the events the views already emit select the drawn pose, and that pose is what the user sees for light and shadow. The old TDD/Slate `data-sm` player is a record of how a state attribute indexed drawings. It is not a renderer to ship.
+JRender stays the only product renderer. There is no second CSS renderer beside the canvas. The events the views already emit are what should select the drawn pose. The next two sections record which apps authored the trials, and what the shipped draw-list shader actually accepts. The old TDD/Slate `data-sm` player is a record of how a state attribute indexed drawings. It is not a renderer to ship.
 
-### Drawing apps
+### Drawing apps (Ash, 2026-11-08 evening CT)
 
-The pipeline names Affinity for the drawing and Moho Pro for the animation, then Blender for the one light, then Moho again. The 2026-10-30 rule was to drive those apps from the command line and not open them. Matthew is asking to open the drawing apps, so the SVG is drawn and the blur and the soft edge are in the file.
+Historic pipeline name Affinity is not the app set Ash just ran. The trials that actually ran, on Matthew's Mac, are:
 
-This cloud machine has Chrome and Python. It does not have Affinity, Moho, Blender, or Inkscape, and the package index here has no Inkscape or librsvg package. The trial file [docs/design/svg-state-card.svg](./design/svg-state-card.svg) is layered SVG (a Gaussian-blurred contact shadow, a top light, a lip, and a pose edge per state) and was opened in headless Chrome. The sheet shows all eight poses. A `data-sm` attribute on the root shows one pose and hides the sheet. It is not Moho output, not a Blender render, and it is not wired into the lean shell. Affinity and Moho on Matthew's Mac are the apps for the real set.
+| App | Version | What the trial established |
+|---|---|---|
+| DesignCraft | 0.18 | Native drawing, gradients, cubic curves, clips, and feather masks. Ordinary unflattened PDF, then Inkscape SVG, had zero embedded raster nodes for the features tested. Reopening the native master rendered the same pixels. |
+| PhotoCraft | 0.21 | Assigning sRGB on one mislabeled Moho preview left the RGB codes unchanged. That fix is for that preview. It is not a rule to relabel other profiles. |
+| SolidCraft | 0.30.1 | Geometry roundtrip of the native file passed. OBJ/MTL carried basic `Kd` colors, not a full PBR material. 3D is reference for the SVG, not a substitute for it. |
+| Moho | 14.5 | Used for timing studies. Faithful SVG import and final finishing are not proven. A gradient-strip reconstruction showed visible seams. Do not use that reconstruction as final art. |
+| Blender | 5.2.3 | One-light reference renders. Not a measured lighting fit, and not the shipped surface. |
+
+DesignCraft's SVG paste importer drops gradients, clips, and masks. An explicit PDF/X-1a export rasterizes transparent regions. Native layer names do not survive the PDF bridge, so a layer that must stay separate is exported on its own and reassembled. VectorCraft and FigCraft were not exercised: their installed bundles had no separate CLI.
+
+`docs/design/svg-state-card.svg` is an integration fixture from this repo, written by hand and opened in Chrome. It is not DesignCraft output, not final art, and not a frame from the product canvas. A Chrome SVG filter does not mean JRender can play that filter.
+
+### What the shipped renderer can play (probed on the 1.8.21 wasm)
+
+The views paint with the draw-list shader, read from `jrd_ptr(0, 6)` (608 bytes in the wasm embedded in `exp7-platform-lean.html`, 208,675 bytes after decoding the `jr-wasm` block). That shader takes a vertex color (`unorm8x4`) and discards fragments outside one axis-aligned rectangle per group. It has no gradient, no mask, and no blur.
+
+The same wasm accepts these draw-list loads (`jrd_load` return 0) and tessellates them to vertices:
+
+| Load | Result |
+|---|---|
+| Rounded rect, one solid color | accepted, 1,056 vertex bytes |
+| One cubic filled path, one solid color | accepted, 1,824 vertex bytes |
+| Axis-aligned group clip around a rect | accepted |
+| An opcode shaped like a gradient (`0x0C`) | rejected, code `-2`, 0 vertex bytes |
+
+There is no draw-list opcode for a linear gradient, a radial gradient, an SVG mask, a feather mask, or `feGaussianBlur`. A path clip is not the group clip. The group clip is a rectangle. Rounded corners in the product are tessellated geometry, not a clip.
+
+A second shader, `jr_ptr(4)` (3,339 bytes), does evaluate linear and radial paints and an erf edge feather (`ty` 1, 2, and 3). The views do not submit scenes to that shader. They submit draw lists. Treating the legacy shader as playback for calendar and board art would be a second path. It is not wired, and this note does not turn it on.
+
+The avatar image store is a textured quad with a circular discard. Putting the card art through it would rasterize the drawing. That is not the integration.
+
+What can be selected by the state machine today, without a new opcode and without stacking a second shadow under the 1.8.21 rectangles: solid fills, cubic and quadratic paths, rounded rects, borders, text, an axis-aligned group clip, and a `REPLACE` / `XFORM` / `COLOR_ITEM` patch on the existing node. A soft contact shadow, a feather mask, and a real gradient are the blocker. They are in Ash's DesignCraft SVG and they are not in the draw-list shader. No product frame was rendered for this check. Headless Chrome on this machine exposed `navigator.gpu` and `requestAdapter` returned null, so there is no live before/after of the canvas here. The lean file is still 1.8.21.
 
 ---
 
@@ -44,7 +75,7 @@ This cloud machine has Chrome and Python. It does not have Affinity, Moho, Blend
 
 | Role | Owns |
 |------|------|
-| **Ash (Artist)** | JRender (wasm + host ABI), art/motion pipeline (Affinity → Moho → Blender → Moho → web/JRender emission), view visual language, **profile/image rendering capability**, state tables / lighting / parallax quality bar |
+| **Ash (Artist)** | JRender (wasm + host ABI), art/motion pipeline, view visual language, **profile/image rendering capability**, state tables / lighting / parallax quality bar. Current Mac trials: DesignCraft 0.18, PhotoCraft 0.21, SolidCraft 0.30.1, Moho 14.5, Blender 5.2.3. Affinity is the historic draw-app name, not the app that authored those trials. |
 | **Exp7 Platform (this repo)** | Shell, Exp7Views host (`exp7-views@1`), atlas/proposal circuits, Budget IDB, packing lean release, DOM PAT overlays |
 | **Matthew** | Acceptance on Mac Safari **[USER-HW]**; opens/closes Artist contact |
 
@@ -58,7 +89,7 @@ This cloud machine has Chrome and Python. It does not have Affinity, Moho, Blend
 2. **Profile image render support** in JRender (and then wired into platform chrome avatar + any view that needs faces/photos).  
 3. Keep **universal views, per-app data**: Cal/Board/Plan design changes land once in Exp7Views / JRViews / JRender; atlases stay per app. **[REQ]**
 
-Historical TDD/Slate **CSS player** contract is **not** a prescription to replace WebGPU JRender with CSS. The light and shadow still come from SVG drawings the state machine selects, as in the direction section above. Engine design, state table, and QA gates **do** apply; packing limits for Slate do **not** apply to Exp7 single-HTML. See [archives/artist-jrender/README.md](./archives/artist-jrender/README.md).
+Historical TDD/Slate **CSS player** contract is **not** a prescription to replace WebGPU JRender with CSS. The intended light and shadow are authored SVG poses the existing state machine selects, played by the one draw-list renderer. That playback is not in the lean file yet. The blocker is in the direction section. Engine design, state table, and QA gates **do** apply; packing limits for Slate do **not** apply to Exp7 single-HTML. See [archives/artist-jrender/README.md](./archives/artist-jrender/README.md).
 
 ---
 
@@ -149,7 +180,7 @@ Ash runs the full pipeline (parameters → draw → perspective → state table 
 1. Full **quality-gates** text cut off in the 2026-10-30 Artist report — re-obtain. **[OPEN]**  
 2. Whether the **storage/codec update** after `atlas/1` landed — confirm before Exp7 storage changes. **[OPEN]**  
 3. Image ABI shape (DL node vs external atlas vs GPU texture handle; CORS; memory caps).  
-4. Playback of the drawn SVG inside the one JRender view. Matthew's answer on the art is settled: the pixels of light and shadow are drawings, and the state machine picks the pose. `ja-*` HTML can stay the layout source for text, hits, and forms. The open piece is how a pose SVG is shown by the existing renderer (image, tessellated paths, or another emission Ash already has) without a second paint engine and without another stack of shadow rectangles.  
+4. Playback of authored SVG inside the one draw-list renderer. Settled: the pixels of light and shadow are drawings, and the state machine picks the pose. `ja-*` HTML stays the layout source for text, hits, and forms. Measured on the 1.8.21 wasm: solid cubic fills and an axis-aligned group clip load; a gradient-shaped opcode is rejected; the view shader is a vertex color plus a rectangle discard. Soft shadows, feather masks, and gradients in the DesignCraft SVG have no draw-list opcode. Do not rasterize them through the avatar image store, and do not stack them on the 1.8.21 rectangle shadows. The legacy `jr_ptr(4)` shader's gradient and erf feather are not the view path.  
 5. WASI 0.3 host — still unfinished; shipped path remains wasm32 + thin JS. Do not block UX on WASI unless Matthew asks.
 
 ---
@@ -170,6 +201,7 @@ Ash runs the full pipeline (parameters → draw → perspective → state table 
 |------|--------|
 | Before 2026-11-08 | Artist contact **not** authorized |
 | **2026-11-08** | Matthew authorized coordination with **Ash Tangent Residual Artist** for view UX/UI art workflow + profile image render support **[REQ]** |
-| **2026-11-08** (evening CT) | Matthew directed that 1.8.10–1.8.21 rectangle lighting be replaced by SVG drawings the state machine plays, and that the drawing apps be used for that art. Trial sheet: `docs/design/svg-state-card.svg`. Shell stays 1.8.21 until a drawing is wired in. |
+| **2026-11-08** (evening CT) | Matthew directed that 1.8.10–1.8.21 rectangle lighting be replaced by SVG drawings the state machine plays, and that the drawing apps be used for that art. `docs/design/svg-state-card.svg` is an integration fixture, not final art. Shell stays 1.8.21 until a drawing is wired in. |
+| **2026-11-08** (later the same evening) | Ash reported Mac trials of DesignCraft 0.18, PhotoCraft 0.21, SolidCraft 0.30.1, Moho 14.5, and Blender 5.2.3, and asked for a playback check rather than another rectangle pass. The shipped draw-list shader is solid vertex color plus an axis-aligned clip. Gradients, masks, and blur have no opcode. No live canvas before/after: this machine's `requestAdapter` returned null. |
 
 Messages to Ash should carry this brief (or a short pointer to it) and must not include PATs, private financial data, or software-repo write keys.

@@ -54,7 +54,7 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.20** | PR #45 | The cast shadow stays on the ground when the face rises. |
 | **1.8.21** | PR #46 | Shadow ids jump reserved bands, so the first draw does not stall. |
 
-1.8.10 through 1.8.21 are the procedural lighting passes. On 2026-11-08 Matthew directed that those passes be replaced by SVG drawings played by the state machine. The note and the trial sheet are in `docs/artist-coordination-brief.md` and `docs/design/svg-state-card.svg`. The shell version stays 1.8.21 until a drawing is actually wired in.
+1.8.10 through 1.8.21 are the procedural lighting passes. On 2026-11-08 Matthew directed that those passes be replaced by SVG drawings played by the state machine. `docs/design/svg-state-card.svg` is an integration fixture, not final art. The same evening a probe of the 1.8.21 wasm showed the view shader is a solid vertex color plus an axis-aligned clip: a cubic fill loads, and a gradient-shaped opcode is rejected. The note is in `docs/artist-coordination-brief.md`. The shell version stays 1.8.21 until a drawing is actually wired in.
 
 ### Current manifest (verbatim) [MEAS]
 
