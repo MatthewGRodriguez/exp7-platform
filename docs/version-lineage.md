@@ -50,7 +50,8 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.16** | PR #41 | Drag eases a free control. A day does not grow. Enter and Space shrink like a press. |
 | **1.8.17** | PR #42 | A board row's first drag move snaps a gold edge. A day stays unmarked. |
 | **1.8.18** | PR #43 | The top of a card fades. Press turns the edge navy, then the edge returns. |
-| **1.8.19** | this branch | A dark card brightens through the middle. A white card does not. |
+| **1.8.19** | PR #44 | A dark card brightens through the middle. A white card does not. |
+| **1.8.20** | this branch | The cast shadow stays on the ground when the face rises. |
 
 ### Current manifest (verbatim) [MEAS]
 
@@ -58,9 +59,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.19",
+"version": "1.8.20",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "21008add4e855306cc5441c0a8aa437eb3860946f6dc08163613742923452be8",
+"sha256": "f5d400967c4e9e6c5346f8e98a2e77bd0b0b3997464530c45c0effd48693384c",
 "minLauncherMajor": 1
 ```
 

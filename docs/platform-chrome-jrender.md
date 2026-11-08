@@ -237,6 +237,10 @@ The top of a card fades through the same sampled kernel as the shadow. Press tur
 
 A dark fill brightens through the middle at white alpha 12, between the existing top and bottom lines. A near-white fill does not. Specks stay out.
 
+## Ground shadow (1.8.20)
+
+The cast shadow is a node behind the face. Hover lifts the face and leaves the shadow on the ground. A day still does not rise.
+
 ## Debug handoff (1.8.9)
 
 1.8.9 does not change painting. The bar has a **Debug** button (Shift+D) that stays clickable above the chrome canvas. It copies a JSON snapshot: shell version, overlay and slot opacity, which element is on top of the content, canvas sizes, GPU and view errors, and whether the live display list contains the 1.8.8 inset bands and gold rings. `style.note` states that in one sentence. No keys or account text.

@@ -97,7 +97,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.19. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. A dark card brightens through the middle. A white card does not. No sparkle. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.20. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -10245,6 +10245,7 @@ let kind=n.el.matches('.ja-comp,[data-plat="bar"],[data-plat="apps"]')?'outer':n
  /* Existing logical month/plan containers have no separate fill node. Map their real drawn bounds to the original inner-glass part, sides only; no background fill or replacement geometry. */
  const containers=new Set();for(const n of view.L.nodes){const el=n.el&&n.el.closest('.ja-cal,.ja-plan');if(el)containers.add(el);}for(const el of containers){if(byEl.has(el))continue;const ns=view.L.nodes.filter(n=>n.el&&(el===n.el||el.contains(n.el)));let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;for(const n of ns)for(const a of n.items){let x,y,w,h;if(['rect','rrect','border'].includes(a[0]))[x,y,w,h]=a.slice(1,5);else if(a[0]==='text'||a[0]==='tbox'){x=a[1];y=a[2]-a[3];w=view.s.core.measure(V.font(),a[3],a[5]);if(a[0]==='tbox'){w=Math.min(a[6],w);h=view.s.core.wrap(V.font(),a[3],a[5],a[6],{lineHeight:a[7]}).height;}else h=a[3]*1.3;}else continue;x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x+w);y1=Math.max(y1,y+h);}if(!ns.length||!(x1>x0&&y1>y0))continue;let h=2166136261;for(const ch of 'px2-glass:'+ns[0].key)h=Math.imul(h^ch.charCodeAt(0),16777619)>>>0;let id=(0x60000000|(h&0x0fffffff))>>>0;while(used.has(id))id=(id+1)>>>0;used.add(id);this.ids.add(id);const z={id,owner:ns[0].id,el,kind:'inner',b:[x0,y0,x1-x0,y1-y0,10],logical:true};byEl.set(el,z);this.slabs.push(z);}
  for(const n of view.L.nodes){let el=n.el;while(el&&!byEl.has(el))el=el.parentElement;if(el)this.nodes.set(n.id,byEl.get(el));}
+ for(const n of view.L.nodes){if(n.uxGroundFor){const z=this.nodes.get(n.uxGroundFor);if(z)this.nodes.set(n.id,z);}}
  const init=new J.Patch();for(const z of this.slabs)init.insert(z.owner,q=>q.node(z.id,0));if(this.slabs.length)this.raw(init);
  s.patch=p=>{const b=(p instanceof Uint8Array?p:p.bytes()).slice(),u=new Uint32Array(b.buffer,b.byteOffset,b.byteLength/4),f=new Float32Array(b.buffer,b.byteOffset,b.byteLength/4);for(let i=2;i<u.length;){const op=u[i]>>>24,n=u[i]&0xffffff;if(i+n>=u.length)throw Error('Malformed patch during parallax composition');if(op===0x24&&this.nodes.has(u[i+1])){this.base.set(u[i+1],Array.from(f.slice(i+2,i+8)));const z=this.nodes.get(u[i+1]),k=this.active()?C.front[z.kind]:0;f[i+6]+=this.xy[0]*k;f[i+7]+=this.xy[1]*k;}i+=n+1;}D.patches++;return this.raw(b);};
  const one=s.onevent;this.beforeEvent=one;s.onevent=this.event=e=>{if(e.kind===12){this.drag=true;this.sync();}if(one)one(e);if(e.kind===14||e.kind===11){this.drag=false;this.sync();this.last=clock();this.ask();}if(e.kind===6){const now=s.scrollPos(V.GID)[1],dy=now-this.prevScroll;this.prevScroll=now;this.scroll(dy);}};
@@ -10687,15 +10688,17 @@ window.x7 = window.x7 || function (t) {
           }
           if (phys > 0 && gap > 0) {
             var pen = penumbraStrips(phys, gap);
+            var groundRows = [];
             for (var si = 0; si < pen.strips.length; si++) {
               var row = pen.strips[si];
-              n.items.push(['rect', fx + 4, origBottom + row.d, Math.max(1, fw - 8), row.h, packRgba([20, 30, 50, Math.round(row.a * 255)])]);
+              groundRows.push(['rect', fx + 4, origBottom + row.d, Math.max(1, fw - 8), row.h, packRgba([20, 30, 50, Math.round(row.a * 255)])]);
             }
-            if (pen.strips.length) {
-              n.uxContact = pen.strips.length;
+            if (groundRows.length) {
+              n.uxGroundItems = groundRows;
+              n.uxContact = groundRows.length;
               n.uxPenumbra = { offset: pen.offset, blur: pen.blur, clipped: pen.clipped, alphas: pen.strips.map(function (row) { return Math.round(row.a * 255); }) };
               contacts++;
-              touched += pen.strips.length;
+              touched += groundRows.length;
               if (pen.clipped) L._penClip = (L._penClip || 0) + 1;
             }
           }
@@ -10711,6 +10714,15 @@ window.x7 = window.x7 || function (t) {
         }
       }
     }
+    /* The cast shadow is its own node, painted behind the face. A live lift moves the face and leaves the shadow on the ground. */
+    for (var gi = L.nodes.length - 1; gi >= 0; gi--) {
+      var owner = L.nodes[gi];
+      if (!owner.uxGroundItems || !owner.uxGroundItems.length) continue;
+      var gid = groundId(L.nodes, owner.id);
+      var gnode = { key: (owner.key || 'n') + '/ground', id: gid, flags: 0, items: owner.uxGroundItems, hit: null, el: null, act: null, uxGroundFor: owner.id };
+      owner.uxGround = gid;
+      L.nodes.splice(gi, 0, gnode);
+    }
     L.uxStates = true;
     L.uxLight = 'penumbra-0.79-0.93-elev50';
     L.uxPenumbraClipped = L._penClip || 0;
@@ -10718,7 +10730,7 @@ window.x7 = window.x7 || function (t) {
     L.uxRefraction = 'blocked-no-dl-op';
     L.uxMoho = 'blocked-no-svg-op';
     L.uxCaustics = 'not-emitted';
-    L.uxMotion = 'glass-body';
+    L.uxMotion = 'ground-shadow';
     L.uxStamped = stamp.stamped;
     L.uxTouched = touched;
     L.uxGeoTouched = geoTouched;
@@ -10727,6 +10739,14 @@ window.x7 = window.x7 || function (t) {
     return L;
   };
 
+  function groundId(nodes, owner) {
+    var id = (owner + 0x01000003) >>> 0;
+    var used = {};
+    for (var i = 0; i < nodes.length; i++) used[nodes[i].id] = 1;
+    function reserved(band) { return band === 0x1 || band === 0x2 || band === 0x4 || band === 0x5 || band === 0x6; }
+    while (used[id] || id === 0xffffffff || reserved(id >>> 28)) id = (id + 1) >>> 0 || 1;
+    return id;
+  }
   function reducedMotion() {
     try { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; }
   }
@@ -13174,7 +13194,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.19",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.20",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}

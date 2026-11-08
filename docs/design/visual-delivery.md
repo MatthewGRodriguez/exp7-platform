@@ -84,6 +84,12 @@ The static glass read on a dark fill now covers the body, not only the top and b
 
 Cloud Node, on `View.show`: a white day stayed `below-perception`. A dark section was `ca1-static` with a 24 px body at alpha 12 sitting between the top and bottom lines. Mac paint is not verified.
 
+## Ground shadow (1.8.20)
+
+The cast shadow is its own node, painted behind the face. A live lift moves the face and leaves the shadow where it was drawn. A selected control keeps a 2 px gap. A day does not rise, so its shadow still starts at the cell bottom. The ground node is not a hit target. Where the face belongs to a parallax slab, the shadow is registered with that same slab, so the pointer shift moves them together and the lift stays on the face.
+
+Cloud Node, on `View.show`: a day shadow started at the cell bottom, a selected button kept a 2 px gap, and a hover pose targeted lift 1.5 on the button while the shadow row did not move. Mac paint is not verified.
+
 ## Still not implemented
 
 - A GPU gaussian filter. 1.8.14’s shadow is the sampled kernel in display-list rows. The shipped wasm has no blur op.
