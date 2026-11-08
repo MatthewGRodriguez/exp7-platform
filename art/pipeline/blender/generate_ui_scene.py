@@ -493,19 +493,19 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_n
     fit = extent * (1.0 + 2.0 * margin) * 1.12
     dist = max(fit / max(1e-6, math.tan(min(fov_x, fov_y) * 0.5)), 3.8)
 
-    # Flat nav (chrome): more frontal so the bar has vertical presence + readable glyphs
+    # Prefer frontal study angle so glyphs project larger (elevated view foreshortens type)
     flat = (view_name == "chrome") or (span_x > 2.5 * max(span_y, 0.01) and span_z < 0.8)
-    if flat:
-        view_dir = Vector((0.0, -0.95, 0.32)).normalized()
-        min_fill = 0.58
-        min_cam_dist = 2.4
+    if flat or view_name == "chrome":
+        view_dir = Vector((0.0, -0.98, 0.20)).normalized()
+        min_fill = 0.70
+        min_cam_dist = 2.0
     else:
-        view_dir = Vector((0.0, -0.78, 0.50)).normalized()
-        min_fill = 0.52
-        min_cam_dist = 2.6
+        view_dir = Vector((0.0, -0.88, 0.38)).normalized()
+        min_fill = 0.68
+        min_cam_dist = 2.2
 
-    # Start further back than extent estimate so large chrome/plan always fits first
-    cam.location = target + view_dir * (dist * 1.25)
+    # Start well back so content always fits; then dolly in for fill + glyph size
+    cam.location = target + view_dir * max(dist * 1.6, 8.0)
     cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
 
     def _fit(mx0, mx1, my0, my1, mz):
@@ -516,7 +516,7 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_n
         )
 
     minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
-    for _ in range(max(max_iters, 40)):
+    for _ in range(60):
         if _fit(minx, maxx, miny, maxy, minz):
             break
         overflow = max(
@@ -526,40 +526,39 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_n
             maxy - (1.0 - margin),
             0.02,
         )
-        cam.location = cam.location + view_dir * max(0.5, overflow * 10.0)
+        cam.location = cam.location + view_dir * max(0.6, overflow * 12.0)
         cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
         minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
-    else:
-        overflow = max(
-            margin - minx,
-            maxx - (1.0 - margin),
-            margin - miny,
-            maxy - (1.0 - margin),
-            0.0,
-        )
-        if overflow > 0.04 or minz <= 0:
-            scene.render.resolution_x, scene.render.resolution_y = old_res
-            return {
-                "ok": False,
-                "errors": [f"crop ndc=[{minx:.3f},{miny:.3f},{maxx:.3f},{maxy:.3f}] overflow={overflow:.3f}"],
-                "ndc_bounds": [minx, miny, maxx, maxy],
-                "cam_dist": (cam.location - target).length,
-                "method": "extent_fullcontent_v9",
-            }
 
-    # Dolly-in until larger NDC span meets min_fill (chrome was ~10% visual mass)
+    # Always finish with a fitted camera even if fill later fails (avoid blank chrome)
+    if not _fit(minx, maxx, miny, maxy, minz):
+        for _ in range(40):
+            overflow = max(
+                margin - minx,
+                maxx - (1.0 - margin),
+                margin - miny,
+                maxy - (1.0 - margin),
+                0.01,
+            )
+            cam.location = cam.location + view_dir * max(1.0, overflow * 14.0)
+            cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
+            minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
+            if _fit(minx, maxx, miny, maxy, minz):
+                break
+
+    # Dolly-in for canvas fill (readable compositions, not 10% chrome)
     pushed = 0
-    for _ in range(28):
+    for _ in range(40):
         minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
         span_nx = maxx - minx
         span_ny = maxy - miny
         fill = max(span_nx, span_ny)
         slack = min(minx - margin, 1.0 - margin - maxx, miny - margin, 1.0 - margin - maxy)
         dist_now = (cam.location - target).length
-        if fill >= min_fill or slack < 0.02 or dist_now <= min_cam_dist:
+        if fill >= min_fill or slack < 0.015 or dist_now <= min_cam_dist:
             break
         loc = cam.location.copy()
-        step = min(0.55, max(0.15, (min_fill - fill) * 3.0), slack * 2.5)
+        step = min(0.65, max(0.18, (min_fill - fill) * 3.5), slack * 3.0)
         trial = loc - view_dir * step
         if (trial - target).length < min_cam_dist:
             break
@@ -579,11 +578,11 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_n
     fill = max(span_nx, span_ny)
     crop_ok = _fit(minx, maxx, miny, maxy, minz)
     scene.render.resolution_x, scene.render.resolution_y = old_res
-    ok = crop_ok and fill >= (min_fill - 0.10)
+    ok = crop_ok and fill >= (min_fill - 0.12)
     errors = []
     if not crop_ok:
         errors.append(f"crop ndc=[{minx:.3f},{miny:.3f},{maxx:.3f},{maxy:.3f}]")
-    if fill < (min_fill - 0.10):
+    if fill < (min_fill - 0.12):
         errors.append(f"underscale fill={fill:.3f} < min_fill={min_fill:.2f}")
     return {
         "ok": ok,
@@ -596,7 +595,7 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_n
         "fill": fill,
         "min_fill": min_fill,
         "flat_view": flat,
-        "method": "extent_fullcontent_v9",
+        "method": "extent_mesh_glyphfill_v9",
     }
 
 
@@ -750,7 +749,7 @@ def make_panel(name: str, st: dict, palette: dict, geom: dict, tilt_deg=None, st
     # Binding contract for child labels (views_content parents text here)
     obj["exp7_lift_m"] = float(lift_m)
     obj["exp7_thick"] = float(thick)
-    obj["exp7_face_local_z"] = float(thick / 2 + 0.04)
+    obj["exp7_face_local_z"] = float(thick / 2 + 0.12)
     obj["exp7_size_x"] = float(sx * scale)
     obj["exp7_size_y"] = float(sy * scale)
     obj["exp7_st_name"] = str(st_name)

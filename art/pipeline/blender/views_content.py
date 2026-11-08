@@ -28,11 +28,11 @@ MIN_TEXT_OBJECTS = 8
 MIN_AVATAR_OBJECTS = 1
 
 # World sizes chosen so production 1280 framing (after push-in) keeps secondary ≥~12px.
-TITLE_SIZE = 0.36
-SUB_SIZE = 0.20
-BODY_SIZE = 0.18
-META_SIZE = 0.15
-DAY_SIZE = 0.18
+TITLE_SIZE = 0.42
+SUB_SIZE = 0.24
+BODY_SIZE = 0.22
+META_SIZE = 0.18
+DAY_SIZE = 0.22
 
 # Display-intent sRGB 0–1 (documentation + analytical preflight). NOT scene-linear.
 INK = (0.078, 0.094, 0.133)  # #141822
@@ -129,8 +129,7 @@ def _disable_shadows(ob):
 def ink_for_state(st_name: str, role: str = "primary"):
     """Pick ink that survives worst-BG measurement on the panel face."""
     if st_name in FACE_LIGHT_INK_STATES:
-        if role == "accent":
-            return INK_ON_FACE_ACCENT
+        # Pure light family on dark solids — gold accent on gold drop-pending failed worst-BG
         if role == "secondary":
             return INK_ON_FACE_SECONDARY
         return INK_ON_FACE
@@ -401,19 +400,19 @@ def compose_board(make_panel, palette, geom, element_states, font_id, prefix="Vi
             objs.append(
                 label_on_panel(
                     panel, f"{prefix}_ct{ci}{ri}", title,
-                    (-0.50, 0.12), BODY_SIZE, ink_for_state(st_name), font_id,
+                    (-0.42, 0.10), BODY_SIZE, ink_for_state(st_name), font_id,
                 )
             )
             objs.append(
                 label_on_panel(
                     panel, f"{prefix}_ca{ci}{ri}", amt,
-                    (-0.50, 0.0), BODY_SIZE, ink_for_state(st_name, "accent"), font_id,
+                    (-0.42, -0.02), BODY_SIZE, ink_for_state(st_name, "accent"), font_id,
                 )
             )
             objs.append(
                 label_on_panel(
                     panel, f"{prefix}_cg{ci}{ri}", f"{tag} · {st_name}",
-                    (-0.50, -0.14), META_SIZE, ink_for_state(st_name, "secondary"), font_id,
+                    (-0.42, -0.14), META_SIZE, ink_for_state(st_name, "secondary"), font_id,
                 )
             )
     objs.append(
@@ -459,13 +458,13 @@ def compose_plan(make_panel, palette, geom, element_states, font_id, prefix="Vie
         objs.append(
             label_on_panel(
                 panel, f"{prefix}_rt{i}", f"{i+1}. {title}",
-                (-1.50, 0.06), BODY_SIZE, ink_for_state(st_name), font_id,
+                (-1.35, 0.06), BODY_SIZE, ink_for_state(st_name), font_id,
             )
         )
         objs.append(
             label_on_panel(
                 panel, f"{prefix}_rs{i}", sub,
-                (-1.50, -0.08), META_SIZE, ink_for_state(st_name, "secondary"), font_id,
+                (-1.35, -0.08), META_SIZE, ink_for_state(st_name, "secondary"), font_id,
             )
         )
     objs.append(
@@ -550,19 +549,23 @@ def compose_chrome(make_panel, palette, geom, element_states, font_id, prefix="V
     # Far-right avatar; login below with clearance — never over disc
     av = make_avatar(f"{prefix}_avatar", (1.60, 0.0), avatar, path, z=0.12)
     objs.append(av)
-    objs.append(
-        label_on_panel(bar, f"{prefix}_login", "you", (1.48, -0.55), BODY_SIZE, INK_SECONDARY, font_id)
+    # Compact footer strip under bar (mesh) so framing includes labels
+    foot, *_ = make_panel(
+        f"{prefix}_foot", element_states["idle"], palette, geom, st_name="idle",
+        size=(3.6, 0.36), origin=(0.0, -0.55), content_lines=0,
     )
+    objs.append(foot)
+    objs.append(label_on_panel(foot, f"{prefix}_login", "you", (1.40, 0.0), BODY_SIZE, INK_SECONDARY, font_id))
     objs.append(
         label_on_panel(
-            bar, f"{prefix}_banner", "DESIGN-STUDY chrome · fixture",
-            (-1.60, -0.70), META_SIZE, INK_SECONDARY, font_id,
+            foot, f"{prefix}_banner", "DESIGN-STUDY chrome · fixture",
+            (-1.60, 0.06), META_SIZE, INK_SECONDARY, font_id,
         )
     )
     objs.append(
         label_on_panel(
-            bar, f"{prefix}_note", "Best≠Selected · PAT stays DOM",
-            (-1.60, -0.90), META_SIZE, INK_SECONDARY, font_id,
+            foot, f"{prefix}_note", "Best≠Selected · PAT stays DOM",
+            (-1.60, -0.08), META_SIZE, INK_SECONDARY, font_id,
         )
     )
     return objs
