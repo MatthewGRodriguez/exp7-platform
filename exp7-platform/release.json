@@ -2,16 +2,16 @@
   "format": "exp7-platform-release/1",
   "version": "1.7.6",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "6816eb4ceaafe76c54dc1cd18c27e34a8e02fb6c12f808cb331af20e1eea6b61",
+  "sha256": "dba5434fe2b2b2fddb17e56a173a45538152e02e752499cd20c567be21b3c0e4",
   "minLauncherMajor": 1,
   "contains": {
     "app": "exp7-lean demo + Budget as Exp7Views consumers (shared exp7-views@1: runtime HTML→JRViews→JRender); reserved top bar; exclusive avatar; Budget local-IDB only",
-    "appSha256": "5af1cb7c084c54ebaa505377530d33276b6c5b1a431004b84434d98fa7c6a7ee",
-    "budgetSha256": "1415e00844b0cc5e30648f3a8fae0462db52d8a3171300b8cc166ea4adecae90",
+    "appSha256": "1fcd9ffd43ecacf6c139da51fe4c4ff0ed799d34402f3247664c1a8760c9a17d",
+    "budgetSha256": "2d16e4c7f9a7524ff3e57b1500a297bc5934f1461af74199bbd4e3eb99f3a9ce",
     "budgetMode": "exp7-views",
     "viewsModuleId": "exp7-views@1",
-    "viewsSourcesAggregateSha256": "6d231c506e0a3996d8f16e18f32562687c4ff8371c390b709345b9b40abfea4f",
+    "viewsSourcesAggregateSha256": "dc99278f07dba6a1743439a5fcb1f2f97439c8e4fea4c813fe5108a56008d441",
     "standalone": "dist/exp7-views-standalone.html",
-    "standaloneSha256": "2303cbb8624ac77deec3e393490bdacc50c5af67418ec93d77b643bba33dbd80"
+    "standaloneSha256": "e5fb3bd3f4fca0ca85966ab7f6d259257ad0cf0a2037e5e2a828f61edefd5f3e"
   }
 }
