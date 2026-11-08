@@ -37,7 +37,7 @@ except ImportError:
     Vector = None
 
 DEFAULT_SCRATCH = "/Users/user-rodri/ArtScratch/exp7-art"
-GENERATOR_REV = "front-readable-v9"
+GENERATOR_REV = "front-readable-v10"
 
 # Ensure sibling import works inside Blender --python
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -470,12 +470,11 @@ def _project_pts(scene, cam, pts):
 
 
 def _collect_content_pts(objects):
-    """Frame from MESH + avatar bounds (incl. parented mesh children).
+    """Frame from MESH + avatar + evaluated FONT glyph verts (parented and free).
 
-    FONT bound_boxes are notoriously oversized in Blender and push the camera so far
-    that glyphs collapse to 3–6px (v9b/c). Parented labels ride on panel meshes, so
-    mesh AABB is the production content extent. Only unparented FONT titles/banners
-    are added via their evaluated mesh verts (not bound_box).
+    Mesh AABB alone missed title glyphs that extend past the header plate (calendar
+    title y<0 crop). Evaluated FONT verts (not bound_box) stay tight enough that
+    framing does not collapse glyphs to 3–6px.
     """
     assert bpy is not None
     seen = set()
@@ -489,7 +488,6 @@ def _collect_content_pts(objects):
             pts.append(ob.location.copy())
 
     def add_font_verts(ob):
-        # Tight glyph extent — avoid FONT bound_box inflation
         for p in _object_world_points(ob):
             pts.append(p)
 
@@ -499,7 +497,7 @@ def _collect_content_pts(objects):
         seen.add(id(ob))
         if ob.type == "MESH" or ("avatar" in ob.name.lower()):
             add_mesh_bb(ob)
-        elif ob.type == "FONT" and ob.parent is None:
+        if ob.type == "FONT":
             add_font_verts(ob)
         for ch in getattr(ob, "children", []) or []:
             visit(ch)
@@ -512,9 +510,10 @@ def _collect_content_pts(objects):
 def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_name: str | None = None):
     """Orthographic content framing for DESIGN-STUDY views.
 
-    Perspective foreshortening made wide boards fill NDC while glyphs stayed 3–6px.
-    Ortho scale maps world extent → pixels uniformly so parented labels stay legible.
-    Slight look-down keeps panel thickness readable without crushing type.
+    Steep look-down (~76°) maps panel face XY → screen so parented labels stay inside
+    card footprints (v9i used ~23° elevation → edge-on cards + floating glyphs).
+    Ortho scale maps world extent → pixels uniformly. Fill gates require BOTH axes
+    (width-only fill let chrome stay ~10% of canvas).
     """
     assert bpy is not None
     if not objects:
@@ -532,23 +531,23 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_n
     xs = [p.x for p in pts]
     ys = [p.y for p in pts]
     zs = [p.z for p in pts]
+    # Prefer XY face span (desk plane); include small Z for lift rings
     span_x = max(max(xs) - min(xs), 0.5)
     span_y = max(max(ys) - min(ys), 0.5)
     aspect = float(res[0]) / max(1.0, float(res[1]))
 
-    # Slight elevated look so cards still read as 3D plates
-    view_dir = Vector((0.0, -0.92, 0.40)).normalized()
+    # Steep desk view — face normal ≈ toward camera; thickness still casts a short shadow
+    view_dir = Vector((0.0, -0.22, 0.975)).normalized()
     cam.data.type = "ORTHO"
-    cam.location = target + view_dir * 12.0
+    cam.location = target + view_dir * 14.0
     cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
 
-    # Ortho scale = larger of world width vs height*aspect, with margin
     pad = 1.0 + 2.0 * margin
     scale_x = span_x * pad
     scale_y = span_y * pad * aspect
-    ortho = max(scale_x, scale_y) * 1.08
-    # Prefer filling ~78% of the frame (tighten from padded fit)
-    ortho = ortho / 0.78
+    ortho = max(scale_x, scale_y) * 1.05
+    # Start slightly loose; push-in tightens while preserving dual-axis margins
+    ortho = ortho / 0.72
     cam.data.ortho_scale = float(ortho)
 
     def _fit(mx0, mx1, my0, my1, mz):
@@ -558,9 +557,8 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_n
             and mz > 0
         )
 
-    # Iteratively adjust ortho_scale until content fits with margin, then tighten for fill
     minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
-    for _ in range(24):
+    for _ in range(max_iters):
         if _fit(minx, maxx, miny, maxy, minz):
             break
         overflow = max(
@@ -574,14 +572,25 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_n
         minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
 
     pushed = 0
-    min_fill = 0.62 if view_name == "chrome" else 0.70
-    for _ in range(20):
+    # Primary fill on the limiting axis; secondary axis only needs margin (no crop).
+    # Chrome previously passed on width-only while height stayed ~10% — require min_h there.
+    min_fill = 0.70
+    min_h = 0.52 if view_name == "chrome" else 0.42
+    min_w = 0.42 if view_name == "chrome" else 0.50
+    for _ in range(24):
         minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
-        fill = max(maxx - minx, maxy - miny)
+        fill_w = maxx - minx
+        fill_h = maxy - miny
+        fill = max(fill_w, fill_h)
         slack = min(minx - margin, 1.0 - margin - maxx, miny - margin, 1.0 - margin - maxy)
-        if fill >= min_fill or slack < 0.02:
+        h_ok = fill_h >= min_h
+        w_ok = fill_w >= min_w
+        if fill >= min_fill and h_ok and w_ok:
             break
-        trial = float(cam.data.ortho_scale) * max(0.92, 1.0 - (min_fill - fill) * 0.5)
+        if slack < 0.02:
+            break
+        need = max(min_fill - fill, (min_h - fill_h) if not h_ok else 0.0, (min_w - fill_w) if not w_ok else 0.0, 0.0)
+        trial = float(cam.data.ortho_scale) * max(0.91, 1.0 - need * 0.5)
         prev = float(cam.data.ortho_scale)
         cam.data.ortho_scale = trial
         minx2, maxx2, miny2, maxy2, minz2 = _project_pts(scene, cam, pts)
@@ -591,16 +600,54 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_n
         pushed += 1
         minx, maxx, miny, maxy, minz = minx2, maxx2, miny2, maxy2, minz2
 
-    minx, maxx, miny, maxy, minz = _project_pts(scene, cam, pts)
-    fill = max(maxx - minx, maxy - miny)
+    # Glyph safety: pull ortho out until every FONT AABB clears margin (titles were
+    # still y<0 after mesh-only push-in when FONT to_mesh lagged parenting).
+    font_pts = []
+    seen_f = set()
+
+    def _fonts(ob):
+        if ob is None or id(ob) in seen_f:
+            return
+        seen_f.add(id(ob))
+        if ob.type == "FONT":
+            font_pts.extend(_object_world_points(ob))
+        for ch in getattr(ob, "children", []) or []:
+            _fonts(ch)
+
+    for ob in objects or []:
+        _fonts(ob)
+    glyph_pull = 0
+    all_pts = pts + font_pts
+    for _ in range(28):
+        minx, maxx, miny, maxy, minz = _project_pts(scene, cam, all_pts if all_pts else pts)
+        if _fit(minx, maxx, miny, maxy, minz):
+            break
+        overflow = max(
+            margin - minx,
+            maxx - (1.0 - margin),
+            margin - miny,
+            maxy - (1.0 - margin),
+            0.01,
+        )
+        cam.data.ortho_scale = float(cam.data.ortho_scale) * (1.0 + overflow * 2.0)
+        glyph_pull += 1
+
+    minx, maxx, miny, maxy, minz = _project_pts(scene, cam, all_pts if all_pts else pts)
+    fill_w = maxx - minx
+    fill_h = maxy - miny
+    fill = max(fill_w, fill_h)
     crop_ok = _fit(minx, maxx, miny, maxy, minz)
     scene.render.resolution_x, scene.render.resolution_y = old_res
-    ok = crop_ok and fill >= (min_fill - 0.08)
+    ok = crop_ok and fill >= (min_fill - 0.12) and fill_h >= (min_h - 0.12) and fill_w >= (min_w - 0.12)
     errors = []
     if not crop_ok:
         errors.append(f"crop ndc=[{minx:.3f},{miny:.3f},{maxx:.3f},{maxy:.3f}]")
-    if fill < (min_fill - 0.10):
+    if fill < (min_fill - 0.14):
         errors.append(f"underscale fill={fill:.3f} < min_fill={min_fill:.2f}")
+    if fill_h < (min_h - 0.14):
+        errors.append(f"underscale_h fill_h={fill_h:.3f} < min_h={min_h:.2f}")
+    if fill_w < (min_w - 0.14):
+        errors.append(f"underscale_w fill_w={fill_w:.3f} < min_w={min_w:.2f}")
     return {
         "ok": ok,
         "errors": errors,
@@ -609,11 +656,17 @@ def frame_camera_to_objects(cam, objects, res, margin=0.08, max_iters=24, view_n
         "cam_loc": list(cam.location),
         "cam_dist": (cam.location - target).length,
         "push_in_steps": pushed,
+        "glyph_pull_steps": glyph_pull,
         "fill": fill,
+        "fill_w": fill_w,
+        "fill_h": fill_h,
         "min_fill": min_fill,
+        "min_h": min_h,
+        "min_w": min_w,
         "ortho_scale": float(cam.data.ortho_scale),
         "camera_type": "ORTHO",
-        "method": "ortho_mesh_extent_v9",
+        "view_elevation_deg": 76.3,
+        "method": "ortho_mesh_extent_v10_steep_glyphsafe",
     }
 
 
@@ -655,11 +708,18 @@ def make_camera_study(name: str, mode: int, focal_mm: float):
 
 
 def make_box(name, sx, sy, sz, loc, bevel_w, mat):
+    """Axis-aligned box with world dimensions (sx, sy, sz) at loc.
+
+    Blender's default cube (size=1) already spans 1 on each axis (−0.5…+0.5).
+    Scale must be the full desired dimensions — scale=(sx/2,…) (v≤v9) produced
+    half-size meshes while label locals used full half-extents, so text sat
+    outside/above cards (board occlusion / chrome overlap / plan crop).
+    """
     assert bpy is not None
     bpy.ops.mesh.primitive_cube_add(size=1.0, location=loc)
     obj = bpy.context.active_object
     obj.name = name
-    obj.scale = (sx / 2, sy / 2, sz / 2)
+    obj.scale = (float(sx), float(sy), float(sz))
     # Blender 4.2: transform_apply(scale=True) alone can zero location — pin loc/rot False
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     if bevel_w > 0:
@@ -669,22 +729,23 @@ def make_box(name, sx, sy, sz, loc, bevel_w, mat):
     return obj
 
 
-# Darker solid faces for states that use light on-face ink (wash-only blues were ~L0.9
-# and failed independent worst-BG against INK_ON_FACE).
-FACE_SOLID_FOR_LIGHT_INK = {
-    "selected": (0.06, 0.16, 0.38),
-    "dragging": (0.07, 0.18, 0.42),
-    "pressed": (0.05, 0.14, 0.34),
-    "focus": (0.08, 0.20, 0.44),
-    "drop-pending": (0.28, 0.18, 0.04),
-    "invalid": (0.48, 0.04, 0.04),
+# Pastel face tints for state chips — dark ink + indep 10th-percentile AA survives.
+# (v9/v10c dark navy + white ink failed indep: AA fringe → fgY≈0.1 vs dark face.)
+FACE_PASTEL_FOR_DARK_INK = {
+    "selected": (0.72, 0.80, 0.94),
+    "dragging": (0.68, 0.78, 0.92),
+    "pressed": (0.70, 0.78, 0.90),
+    "focus": (0.74, 0.84, 0.96),
+    "drop-pending": (0.94, 0.86, 0.62),
+    "invalid": (0.94, 0.72, 0.70),
+    "hover": (0.88, 0.91, 0.95),
 }
 
 
 def face_color_for_state(st_name: str, st: dict, palette: dict):
-    """JRViews wash over surface; saturated states use darker solids for light ink."""
-    if st_name in FACE_SOLID_FOR_LIGHT_INK:
-        return FACE_SOLID_FOR_LIGHT_INK[st_name]
+    """JRViews wash over surface; accent states use pastel tints for dark on-face ink."""
+    if st_name in FACE_PASTEL_FOR_DARK_INK:
+        return FACE_PASTEL_FOR_DARK_INK[st_name]
     bg_key = st.get("bg", "surface")
     base = list(palette["_rgba"].get(bg_key) or palette["_rgba"]["surface"])
     wash = WASH_RGBA.get(st_name) or WASH_RGBA.get(st.get("washKey", ""), None)
@@ -767,8 +828,8 @@ def make_panel(name: str, st: dict, palette: dict, geom: dict, tilt_deg=None, st
     # Binding contract for child labels (views_content parents text here)
     obj["exp7_lift_m"] = float(lift_m)
     obj["exp7_thick"] = float(thick)
-    # Above face top (+bevel); below would sink into volume / under rim
-    obj["exp7_face_local_z"] = float(thick / 2 + 0.05)
+    # Just above face top; steep ortho maps Z weakly — keep tiny to avoid screen float
+    obj["exp7_face_local_z"] = float(thick / 2 + 0.018)
     obj["exp7_size_x"] = float(sx * scale)
     obj["exp7_size_y"] = float(sy * scale)
     obj["exp7_st_name"] = str(st_name)
@@ -1389,7 +1450,14 @@ def main():
         meta["device_info"] = configure_cycles_metal(args.samples, args.device)
         make_ground(catcher=False)
         make_light(params, geom)
-        cam = make_camera_front(focal, params["camera"].get("near", 10), params["camera"].get("far", 4000))
+        # Correct make_box dimensions are ~2× prior half-size bug — pull camera back for gate
+        cam = make_camera_front(
+            focal,
+            params["camera"].get("near", 10),
+            params["camera"].get("far", 4000),
+            loc=Vector((0.12, -4.2, 3.6)),
+            target=Vector((0.0, 0.05, 0.12)),
+        )
 
         # Framing + ring hug validation on focus (has ring)
         panel, rim, ring, _ = make_panel(
@@ -1544,14 +1612,17 @@ def main():
                 for o in bpy.data.objects:
                     if o.name.startswith("View") and o not in objs:
                         objs.append(o)
-                # Reset camera each view — ortho framing recomputes scale from mesh extent
+                # Parenting + FONT mesh must be evaluated before framing / ROI projection
+                bpy.context.view_layer.update()
+                bpy.context.evaluated_depsgraph_get().update()
+                # Reset camera each view — ortho framing recomputes scale from mesh+glyph extent
                 view_cam.data.type = "ORTHO"
                 view_cam.location = Vector((0.0, -7.2, 5.4))
                 view_cam.rotation_euler = (
                     Vector((0.0, 0.1, 0.15)) - view_cam.location
                 ).to_track_quat("-Z", "Y").to_euler()
                 frame = frame_camera_to_objects(
-                    view_cam, objs, (rx, ry), margin=0.06, view_name=view_name
+                    view_cam, objs, (rx, ry), margin=0.08, view_name=view_name
                 )
                 inv = VC.content_inventory("View")
                 vval = VC.validate_view_content(inv, view_name)

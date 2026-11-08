@@ -58,12 +58,20 @@ class FramingHelpers(unittest.TestCase):
 
 class ViewsContent(unittest.TestCase):
     def test_readable_text_constants(self):
-        self.assertGreaterEqual(VC.TITLE_SIZE, 0.22)
-        self.assertGreaterEqual(VC.BODY_SIZE, 0.12)
-        self.assertGreaterEqual(VC.DAY_SIZE, 0.12)
+        # Face-budgeted type (must fit panel half-extents); steep ortho maps to ≥10px
+        self.assertGreaterEqual(VC.TITLE_SIZE, 0.14)
+        self.assertLessEqual(VC.TITLE_SIZE, 0.28)
+        self.assertGreaterEqual(VC.BODY_SIZE, 0.07)
+        self.assertLessEqual(VC.BODY_SIZE, 0.24)
+        self.assertGreaterEqual(VC.DAY_SIZE, 0.06)
         self.assertIn("Matrix.Identity(4)", Path(__file__).with_name("views_content.py").read_text())
         gen_src = Path(__file__).with_name("generate_ui_scene.py").read_text()
         self.assertIn("location=False, rotation=False, scale=True", gen_src)
+        self.assertIn("ortho_mesh_extent_v10_steep", gen_src)
+        self.assertIn("fill_h", gen_src)
+        # Half-size mesh bug: scale must be full sx (cube size=1), not sx/2
+        self.assertIn("obj.scale = (float(sx), float(sy), float(sz))", gen_src)
+        self.assertNotIn("obj.scale = (sx / 2, sy / 2, sz / 2)", gen_src)
 
     def test_assets(self):
         root = Path(__file__).parent / "assets"
@@ -104,7 +112,7 @@ class DryRun(unittest.TestCase):
         )
         self.assertEqual(r.returncode, 0, r.stderr)
         meta = json.loads(r.stdout)
-        self.assertEqual(meta["generator_rev"], "front-readable-v9")
+        self.assertEqual(meta["generator_rev"], "front-readable-v10")
 
 
 class UnlitText(unittest.TestCase):
