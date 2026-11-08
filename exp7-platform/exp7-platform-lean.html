@@ -97,7 +97,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.17. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. Drag a board row and its edge turns gold. Drag a day and it stays the same size, with no gold edge. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.18. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The top of a card fades. Press a control and its edge turns navy, then the edge returns. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -10622,11 +10622,34 @@ window.x7 = window.x7 || function (t) {
         }
         if ((interactive || materialHost) && fill && fill[3] >= 16 && fill[4] >= 16) {
           var fx = fill[1], fy = fill[2], fw = fill[3], fh = fill[4], fr = fill[0] === 'rrect' ? (fill[5] || 0) : 0;
-          var hi = ['rect', fx + 2, fy + 2, Math.max(1, fw - 4), 2, packRgba([255, 255, 255, 120])];
-          /* Same kernel as the cast shadow, drawn up into the face so the lip is soft and stays inside the cell. */
+          /* Same kernel as the cast shadow. The lit edge fades down from the top. The lip fades up from the bottom. Both stay inside the cell. */
           var faceLift = Math.max(physicalLift(n.el, st), LIGHT.restPx);
           var face = penumbraStrips(faceLift, Math.min(3, Math.max(1, Math.floor(fh / 6))));
-          var extra = [hi];
+          var peak = 0;
+          for (var pk = 0; pk < face.strips.length; pk++) if (face.strips[pk].a > peak) peak = face.strips[pk].a;
+          var fillCol = unpack(fill[fill.length - 1]);
+          var extra = [];
+          var topAlphas = [];
+          for (var ti = 0; ti < face.strips.length; ti++) {
+            var trow = face.strips[ti];
+            var ta = peak > 0 ? Math.round(trow.a / peak * 96) : 0;
+            if (ta < 8) continue;
+            var ty = fy + 1 + trow.d;
+            if (ty + 1 >= fy + fh - 4) continue;
+            var litBg = over([255, 255, 255, ta], fillCol);
+            var litOk = true;
+            for (var tc = 0; tc < n.items.length; tc++) {
+              var tx = n.items[tc];
+              if (tx[0] !== 'text' && tx[0] !== 'tbox' && tx[0] !== 'label' && tx[0] !== 'glyph') continue;
+              if (typeof tx[4] !== 'number' || typeof tx[2] !== 'number') continue;
+              if (tx[2] < ty - 1 || tx[2] > ty + 2) continue;
+              if (contrastRatio(unpack(tx[4]), litBg) < 4.5) { litOk = false; break; }
+            }
+            if (!litOk) continue;
+            extra.push(['rect', fx + 3, ty, Math.max(1, fw - 6), 1, packRgba([255, 255, 255, ta])]);
+            topAlphas.push(ta);
+          }
+          n.uxTop = topAlphas;
           for (var frw = 0; frw < face.strips.length; frw++) {
             var frow = face.strips[frw];
             extra.push(['rect', fx + 3, fy + fh - 1 - frow.d, Math.max(1, fw - 6), 1, packRgba([20, 30, 50, Math.round(frow.a * 255)])]);
@@ -10694,7 +10717,7 @@ window.x7 = window.x7 || function (t) {
     L.uxRefraction = 'blocked-no-dl-op';
     L.uxMoho = 'blocked-no-svg-op';
     L.uxCaustics = 'not-emitted';
-    L.uxMotion = 'drop-pending-gold';
+    L.uxMotion = 'soft-top-press-ring';
     L.uxStamped = stamp.stamped;
     L.uxTouched = touched;
     L.uxGeoTouched = geoTouched;
@@ -10834,12 +10857,26 @@ window.x7 = window.x7 || function (t) {
       var restoreRing = n._uxDrop ? n.baseBorder : null;
       if (e.kind === EV.ENTER && kind === 'free' && rest <= 0) view._uxPose(n, 1, hoverLift, null, CLICK_MS.hover);
       else if (e.kind === EV.LEAVE || e.kind === EV.CANCEL) {
+        var leaveRing = (n._uxDrop || n._uxPress) ? n.baseBorder : null;
         n._uxDrop = false;
-        view._uxPose(n, 1, 0, n.base, e.kind === EV.CANCEL ? CLICK_MS.cancel : CLICK_MS.leave, restoreRing);
+        n._uxPress = false;
+        view._uxPose(n, 1, 0, n.base, e.kind === EV.CANCEL ? CLICK_MS.cancel : CLICK_MS.leave, leaveRing);
       }
-      else if (e.kind === EV.DOWN || (e.kind === EV.KEYDOWN && keyPress)) view._uxPose(n, GEO.pressed.scale, 0, pressedFill, CLICK_MS.press);
-      else if (e.kind === EV.UP || (e.kind === EV.KEYUP && keyPress)) view._uxPose(n, 1, hoverLift, n.hov != null ? n.hov : n.base, CLICK_MS.up);
-      else if (e.kind === EV.DRAGSTART) view._uxPose(n, dragScale, dragLift, null, CLICK_MS.drag);
+      else if (e.kind === EV.DOWN || (e.kind === EV.KEYDOWN && keyPress)) {
+        n._uxPress = true;
+        view._uxPose(n, GEO.pressed.scale, 0, pressedFill, CLICK_MS.press, n._uxDrop ? null : packRgba(RING.pressed));
+      }
+      else if (e.kind === EV.UP || (e.kind === EV.KEYUP && keyPress)) {
+        var upRing = (n._uxPress || n._uxDrop) ? n.baseBorder : null;
+        n._uxPress = false;
+        n._uxDrop = false;
+        view._uxPose(n, 1, hoverLift, n.hov != null ? n.hov : n.base, CLICK_MS.up, upRing);
+      }
+      else if (e.kind === EV.DRAGSTART) {
+        var dragRing = n._uxPress ? n.baseBorder : null;
+        n._uxPress = false;
+        view._uxPose(n, dragScale, dragLift, null, CLICK_MS.drag, dragRing);
+      }
       /* The first move snaps to drop-pending. Later moves do not start another ease. */
       else if (e.kind === EV.DRAG && dropHost(n.el) && !n._uxDrop) {
         n._uxDrop = true;
@@ -13045,7 +13082,8 @@ function styleProbe(){
     if(day) days++;
    if(n.el.classList.contains("ja-sel")||n.el.getAttribute("data-jr-state")==="selected") sel++;
    (n.items||[]).forEach(function(it){
-    if(it[0]==="rect"&&(it[4]===2||it[4]===3)){ const col=dbgUnpack(it[it.length-1]); if(col&&((col[0]===255&&col[1]===255&&col[2]===255&&col[3]>=70)||(col[0]===20&&col[1]===30&&col[2]===50))) bands++; }
+    if(it[0]==="rect"&&it[4]===1){ const soft=dbgUnpack(it[it.length-1]); if(soft&&soft[0]===255&&soft[1]===255&&soft[2]===255&&soft[3]>=8) bands++; }
+   if(it[0]==="rect"&&(it[4]===2||it[4]===3)){ const col=dbgUnpack(it[it.length-1]); if(col&&((col[0]===255&&col[1]===255&&col[2]===255&&col[3]>=70)||(col[0]===20&&col[1]===30&&col[2]===50))) bands++; }
     if(it[0]==="border"){ const col=dbgUnpack(it[it.length-1]); if(col&&col[0]===117&&col[1]===81&&col[2]===15) gold++; }
    });
    if(!sample) sample={cls:String(n.el.className).slice(0,80), state:n.el.getAttribute("data-jr-state"), items:(n.items||[]).slice(0,6).map(function(it){ return {k:it[0], wh:(typeof it[3]==="number"&&typeof it[4]==="number")?[Math.round(it[3]),Math.round(it[4])]:null, rgba:dbgUnpack(it[it.length-1])}; })};
@@ -13061,7 +13099,7 @@ function styleProbe(){
   const s=drawn.reduce(function(a,v){return a+v.selected},0);
   if(!drawn.length) note="ux hook is installed; views exist but none have drawn";
   else if(!banded) note="hook installed but the live display list has no inset light bands";
-  else note="inset light bands are in the display list ("+banded+"). Idle cards also get the state-table border when they had none.";
+  else note="soft top light rows are in the display list ("+banded+"). Idle cards also get the state-table border when they had none.";
   if(s>0&&g===0) note+=" A control is selected and no gold ring is in the display list.";
    if(s>0&&g>0) note+=" Selected gold rings in the display list: "+g+".";
    const liftedN=drawn.reduce(function(a,v){return a+(v.lifted||0)},0);
@@ -13133,7 +13171,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.17",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.18",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}

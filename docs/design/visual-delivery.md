@@ -72,6 +72,12 @@ The first drag move on a board row snaps to drop-pending. The edge is gold `[117
 
 Cloud Node fired the live handler: the board-row edge unpacked to `[117, 81, 15, 255]`, the wash was the warm composite `[240, 236, 229]`, a second move did not restamp, and a day, a plan row, and a button stayed unmarked. Mac paint is not verified.
 
+## Soft top light and pressed edge (1.8.18)
+
+The hard white bar at the top of a card is gone. The same sampled kernel as the shadow draws a white edge that fades downward and stays inside the cell. A row is left out when it would put nearby text under 4.5:1. Press and Enter or Space turn the edge navy `[36, 88, 166]`. Release, leave, or the start of a drag restores the edge. A day still shrinks to 0.97 and does not rise. The focus ring is still the one drawn at layout.
+
+Cloud Node, on `View.show`: a day and a button had top alphas `[96, 17]`, fading, inside the fill, with no hard white bar. A press set the edge to `[36, 88, 166, 200]` and release restored it. Mac paint is not verified.
+
 ## Still not implemented
 
 - A GPU gaussian filter. 1.8.14’s shadow is the sampled kernel in display-list rows. The shipped wasm has no blur op.
