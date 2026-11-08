@@ -1,8 +1,7 @@
 {
   "id": "exp7-lighting-fits/1",
-  "status": "provisional-analytical-with-measured-offset",
-  "blender": "make_light unified to params size/distance × scenePxScale (v5) — no hardcoded 4.5 / *0.004",
-  "method": "Ground-plane predictions from params.light; Mac v4 ground unprojection for offset",
+  "status": "provisional-with-occlusion-limits",
+  "blender": "make_light = params size/distance × scenePxScale (9.0m / 4.2m = 0.4667). Shadow-cal uses camera-invisible caster.",
   "light": {
     "elevationDeg": 72,
     "size": 420,
@@ -10,44 +9,33 @@
     "scenePxScale": 0.01,
     "sceneSizeM": 4.2,
     "sceneDistM": 9.0,
-    "sizeOverDist": 0.4667,
-    "note": "Generator must keep size/dist == 420/900. Prior bug: dist=4.5 size=1.68 → 0.373"
+    "sizeOverDist": 0.4667
   },
   "predictions": {
     "shadowOffsetPerLiftPx": 0.3249,
-    "noteOffset": "h * cot(72°) ≈ 0.3249 design-px on ground",
+    "noteOffset": "h * cot(72°) ≈ 0.3249",
     "penumbraPerLiftPx": 0.4667,
-    "notePenumbra": "Analytic h*size/distance for infinitesimal source. Finite disk softens differently; measured blur ≠ forced equality.",
-    "highlightShiftPerTiltDeg": 0,
-    "tiltNote": "Tilts ≤5°: keep highlights static"
+    "notePenumbra": "Analytic h*size/distance. Finite disk ≠ analytic width. Do not fake coefficients."
   },
   "measuredGroundV4": {
+    "light": "OLD make_light dist=4.5 size*0.004 → size/dist 0.373",
     "offset_per_lift": 0.309,
     "offset_error_pct": -4.8,
-    "offset_rmse_m": 0.0005,
-    "offset_verdict": "PASS within 5%",
-    "penumbra_per_lift_measured": 0.219,
-    "penumbra_scene_size_over_dist_pre_fix": 0.373,
-    "penumbra_params_model": 0.467,
-    "penumbra_note": "Sampling Δy=2.5mm coarse; finite-area soft shadow ≠ analytic penumbra width. Accept measured relation with documented difference — do not fake a coefficient to force equality.",
-    "far_side": "unmeasurable (occluded by panel silhouette)"
+    "offset_verdict": "PASS for that light only — do not apply to v5+ params light",
+    "penumbra_per_lift_measured": 0.219
+  },
+  "measuredGroundV5": {
+    "light": "params-unified 9.0/4.2 = 0.4667",
+    "offset_slope_contaminated": 0.466,
+    "offset_note": "y90 always at occlusion edge (5/5 lifts) — DO NOT USE as ground truth",
+    "outer_y10_slope_approx": 0.184,
+    "penumbra_full": "UNMEASURABLE on beauty pass — panel silhouette hides inner 50%",
+    "next": "Use shadow_cal_lift_* (invisible caster) or top-down calibration camera; report uncertainty vs analytic"
   },
   "blurThresholdDefinition": {
-    "metric": "2×(y50−y10) of near-side alpha profile on ground after homography",
-    "uncertainty": "quantization 0.0025 m; RMSE reported per fit; prefer ≥3 lift samples",
-    "do_not": "Rescale measured blur by ad-hoc factor to match 0.4667"
+    "metric": "Prefer 2×(y50−y10) on near-side alpha when y90 is NOT at occlusion edge",
+    "uncertainty": "quantization + occlusion truncation; if y90≈occ_edge treat blur as lower-bound only",
+    "do_not": "Force measured blur equal to 0.4667 by rescaling"
   },
-  "stateResolved": {
-    "idle": { "lift": 0, "shadowOffset": 0, "shadowBlur": 0, "shadowAlpha": 0 },
-    "hover": { "lift": 1.5, "shadowOffset": 0.487, "shadowBlur": 0.7, "shadowAlpha": 0.18 },
-    "focus": { "lift": 1.5, "shadowOffset": 0.487, "shadowBlur": 0.7, "shadowAlpha": 0.18 },
-    "pressed": { "lift": 0, "shadowOffset": 0, "shadowBlur": 0, "shadowAlpha": 0 },
-    "selected": { "lift": 2, "shadowOffset": 0.65, "shadowBlur": 0.93, "shadowAlpha": 0.22 },
-    "dragging": { "lift": 4, "shadowOffset": 1.3, "shadowBlur": 1.87, "shadowAlpha": 0.28 },
-    "drop-pending": { "lift": 3, "shadowOffset": 0.975, "shadowBlur": 1.4, "shadowAlpha": 0.24 },
-    "invalid": { "lift": 0, "shadowOffset": 0, "shadowBlur": 0, "shadowAlpha": 0 },
-    "settling": { "lift": 1, "shadowOffset": 0.325, "shadowBlur": 0.47, "shadowAlpha": 0.14 },
-    "disabled": { "lift": 0, "shadowOffset": 0, "shadowBlur": 0, "shadowAlpha": 0 }
-  },
-  "evidenceClass": "[PROVISIONAL] analytical + measured offset PASS; penumbra documented difference [USER-HW]"
+  "evidenceClass": "[PROVISIONAL] v4 offset PASS (old light); v5 beauty contaminated; shadow-cal pending Mac [USER-HW]"
 }

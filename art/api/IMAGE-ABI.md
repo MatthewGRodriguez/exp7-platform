@@ -86,11 +86,12 @@ Never dual initials+photo. Soft-disc is exclusive with photo (plate only when in
 3. Ready: re-layout bar **without** initials text; place circular overlay on `plat:avatar` node.
 4. Fail/absent: initials on soft disc only; overlay cleared.
 5. `unmount()` frees textures; `onContextLost` / `jrender-devicelost` recovers store then redraws.
-6. Parallax: Exp7Slabs front factor shifts overlay (`images.shift`); hit uses circular `images.hit`.
+6. Parallax: Exp7Slabs front factor shifts overlay (`images.shift`).
+7. Hits: companion DL HIT (rectangular) remains the **activation** target for `plat:avatar` (a11y-sized). Circular precision is available via `renderer.images.hit` / `PlatformChromeJR.avatarCircleHit` — not a second hit system for keyboard/DOM.
 
 ## JRViews
 
-Optional `data-jr-img` on controls can be wired later; bar is the first consumer. Board/Cal face affordances only when atlas data already carries public avatar URLs (none in Budget IDB today).
+Optional `data-jr-img` on controls is **not wired** in 1.8.4 (ABI reserved). Bar avatar is the only JRDI consumer. Board/Cal face affordances only when atlas data already carries public avatar URLs (none in Budget IDB today). Apps: Exp7 + Budget only (no separate Atlas app surface).
 
 ## Non-goals
 

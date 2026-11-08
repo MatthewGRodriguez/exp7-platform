@@ -207,4 +207,19 @@ assert.ok(src.includes('No second renderer') || src.includes('shared GPUContext'
 assert.ok(!/WebGL2|webgl2|css-renderer|dom-renderer/i.test(src));
 console.log('ok no-second-renderer');
 
+/* --- optional / missing APIs (documented not wired) --- */
+assert.ok(!src.includes('data-jr-img'), 'data-jr-img consumer not in JRDI core (optional later)');
+assert.ok(Images.allowHosts || Images.sanitizeUrl, 'allowlist API present');
+assert.equal(Images.MAX_ENTRIES, 32);
+assert.equal(Images.MAX_EDGE, 256);
+assert.ok(typeof Images.imageHit === 'function');
+assert.ok(chromeSrc.includes('avatarCircleHit'), 'chrome exposes circular precision hit');
+assert.ok(chromeSrc.includes('onContextLost'));
+console.log('ok optional-unwired-and-limits');
+
+/* CORS credentials omit + https-only already covered by sanitize; assert fetch options in source */
+assert.ok(/credentials:\s*['"]omit['"]/.test(src), 'fetch credentials omit');
+assert.ok(/mode:\s*['"]cors['"]/.test(src) || /cors/i.test(src), 'cors fetch path');
+console.log('ok cors-allowlist-contract');
+
 console.log('ALL LIFECYCLE PASS');

@@ -201,6 +201,15 @@
     } catch (_) {}
   }
 
+  /** Circular precision hit for avatar photo overlay (JRDI ImageLayer.hit). Companion DL HIT stays the activation target. */
+  function avatarCircleHit(cssX, cssY) {
+    var view = state.barView;
+    if (!view || !view.r || !view.r.images || state.avatarNodeId == null) return false;
+    if (state.avatarMode !== 'photo') return false;
+    var id = view.r.images.hit(cssX, cssY);
+    return id === state.avatarNodeId;
+  }
+
   async function drawBar() {
     if (state.unmounted || state.drawing) return;
     state.drawing = true;
@@ -362,6 +371,7 @@
     setAvatarInfo: setAvatarInfo,
     unmount: unmount,
     onContextLost: onContextLost,
+    avatarCircleHit: avatarCircleHit,
     active: function () { return !!state.on; },
     appsActive: function () { return !!state.appsOn; },
     avatarMode: function () { return state.avatarMode; },

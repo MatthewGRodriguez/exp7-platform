@@ -37,7 +37,7 @@ except ImportError:
     Vector = None
 
 DEFAULT_SCRATCH = "/Users/user-rodri/ArtScratch/exp7-art"
-GENERATOR_REV = "front-readable-v5"
+GENERATOR_REV = "front-readable-v6"
 
 # Ensure sibling import works inside Blender --python
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -83,7 +83,7 @@ def parse_args(argv=None):
     p.add_argument("--params", required=True)
     p.add_argument("--states", required=True)
     p.add_argument("--scratch", default=os.environ.get("ART_SCRATCH", DEFAULT_SCRATCH))
-    p.add_argument("--stage", default="ui-states-v5")
+    p.add_argument("--stage", default="ui-states-v6")
     p.add_argument("--run-id", default=None)
     p.add_argument("--samples", type=int, default=64)
     p.add_argument("--resolution", default="1280x720")
@@ -96,16 +96,46 @@ def parse_args(argv=None):
     p.add_argument("--skip-views", action="store_true")
     p.add_argument("--skip-shadow-passes", action="store_true")
     p.add_argument(
+        "--probe",
+        action="store_true",
+        help="Focused preflight: 640x360 / 8 samples (still runs pixel gates). Prefer before full METAL.",
+    )
+    p.add_argument(
+        "--continue-on-view-fail",
+        action="store_true",
+        default=True,
+        help="Render remaining views after a pixel fail (default True; Mac v5 aborted board/plan/chrome)",
+    )
+    p.add_argument("--halt-on-view-fail", action="store_true", help="Stop at first VIEW_PIXEL_FAIL")
+    p.add_argument(
         "--only",
         default="",
-        help="Comma list: views,states,lift,shadow,tilt,persp — skip other expensive series",
+        help="Comma list: views,states,lift,shadow,shadow-cal,tilt,persp",
     )
     return p.parse_args(argv)
 
 
 def only_set(args) -> set:
     raw = [x.strip() for x in (args.only or "").split(",") if x.strip()]
-    return set(raw) if raw else {"views", "states", "lift", "shadow", "tilt", "persp"}
+    s = set(raw) if raw else {"views", "states", "lift", "shadow", "tilt", "persp"}
+    if "shadow-cal" in s:
+        s.add("shadow")
+    return s
+
+
+def set_caster_invisible_to_camera(prefix: str = "UIPanel_"):
+    """Panel casts shadows but is invisible to camera — full penumbra measurable (Mac v5)."""
+    assert bpy is not None
+    for o in bpy.data.objects:
+        if not o.name.startswith(prefix):
+            continue
+        try:
+            o.visible_camera = False
+            o.visible_shadow = True
+            o.visible_diffuse = True
+            o.visible_glossy = True
+        except Exception as e:
+            log(f"WARN caster visibility {o.name}: {e}")
 
 
 def hex_rgba(h: str, a: float = 1.0):
@@ -907,6 +937,13 @@ def main():
     if not st_val_full["ok"] and not args.skip_validate:
         raise SystemExit("STATE_TABLE_VALIDATION_FAIL: " + "; ".join(st_val_full["errors"]))
 
+    if getattr(args, "probe", False):
+        # Focused preflight before full METAL — still pixel-validated
+        if args.samples == 64:
+            args.samples = 8
+        if args.resolution == "1280x720":
+            args.resolution = "640x360"
+        log(f"PROBE mode samples={args.samples} res={args.resolution}")
     scratch = Path(args.scratch)
     run_id = args.run_id or time.strftime("%Y%m%d-%H%M%S")
     out_dir = scratch / "blender" / args.stage / run_id
@@ -918,10 +955,10 @@ def main():
         "generator_rev": GENERATOR_REV,
         "blender_target": "4.2.1 LTS",
         "fix_note": (
-            "v5: content-aware framing; readable text emission; avatar +Z disc; light=params ratio; "
-            "pixel gates; Moho loop closure; --only focused passes"
+            "v6: unlit flat text (no extrude/Principled ghost); continue views after pixel fail; "
+            "shadow-cal camera-invisible caster; light=params; Moho PASS closed"
         ),
-        "mac_v4_fail_ref": "cropped 'vember'; faint text; invisible avatar; light 4.5/*0.004; Moho loop open",
+        "mac_v5_fail_ref": "calendar contrast~1.76 ghosted glyphs; shadow y90 occluded; Moho PASS",
         "executable_expected": "/Applications/Blender.app/Contents/MacOS/Blender",
         "cycles_device_requested": args.device,
         "scratch": str(scratch),
@@ -1037,6 +1074,7 @@ def main():
                 renders.append({"state": name, "path": str(out_png), "visual": visual_keys(st), "projected": metrics, "pass": "beauty"})
 
         if "lift" in want or "shadow" in want:
+            shadow_cal = "shadow-cal" in want or True  # always emit cal pair when shadow requested
             for lift_px in (0, 1, 2, 4, 8):
                 clear_named("UIPanel_")
                 st = dict(element_states["idle"])
@@ -1048,9 +1086,29 @@ def main():
                     renders.append({"series": "lift", "lift_px": lift_px, "path": str(out_png), "pass": "beauty"})
                 if "shadow" in want:
                     ensure_ground(catcher=True)
+                    # Beauty shadow (panel visible) — y90 often occluded (Mac v5)
                     out_sh = out_dir / f"shadow_lift_{lift_px:02d}px.png"
                     render_still(out_sh, (rx, ry), transparent=True)
                     renders.append({"series": "lift-shadow", "lift_px": lift_px, "path": str(out_sh), "pass": "shadow_catcher"})
+                    # Calibration: panel invisible to camera, still casts — full penumbra visible
+                    if shadow_cal:
+                        set_caster_invisible_to_camera("UIPanel_")
+                        out_cal = out_dir / f"shadow_cal_lift_{lift_px:02d}px.png"
+                        render_still(out_cal, (rx, ry), transparent=True)
+                        renders.append({
+                            "series": "lift-shadow-cal",
+                            "lift_px": lift_px,
+                            "path": str(out_cal),
+                            "pass": "shadow_catcher_invisible_caster",
+                            "note": "Camera-invisible caster; measure full blur; do not force-match analytic",
+                        })
+                        # restore camera visibility for surface pass
+                        for o in bpy.data.objects:
+                            if o.name.startswith("UIPanel_"):
+                                try:
+                                    o.visible_camera = True
+                                except Exception:
+                                    pass
                     g = bpy.data.objects.get("Ground")
                     if g:
                         g.hide_render = True
@@ -1086,6 +1144,8 @@ def main():
                 renders.append({"series": "perspective", "mode": mode, "path": str(out_png)})
             bpy.context.scene.camera = cam
 
+        view_pixel_failures = []
+        halt_views = bool(getattr(args, "halt_on_view_fail", False))
         if "views" in want:
             if VC is None:
                 raise SystemExit("views_content module missing — cannot render non-empty views")
@@ -1111,7 +1171,6 @@ def main():
                 ensure_ground(catcher=False)
                 built = composer(make_panel, palette, geom, states_doc["elementStates"], font_id)
                 objs = [o for o in (built or []) if o is not None]
-                # Also collect any View* objects created as side-effects
                 for o in bpy.data.objects:
                     if o.name.startswith("View") and o not in objs:
                         objs.append(o)
@@ -1120,28 +1179,36 @@ def main():
                 vval = VC.validate_view_content(inv, view_name)
                 vval["framing"] = frame
                 if not frame.get("ok") and not args.skip_validate:
-                    raise SystemExit(
-                        "VIEW_FRAMING_FAIL " + view_name + ": " + "; ".join(frame.get("errors") or [])
-                    )
+                    msg = "VIEW_FRAMING_FAIL " + view_name + ": " + "; ".join(frame.get("errors") or [])
+                    if halt_views:
+                        raise SystemExit(msg)
+                    log(msg)
+                    view_pixel_failures.append(msg)
                 view_content_reports[view_name] = vval
                 if not vval["ok"] and not args.skip_validate:
-                    raise SystemExit("VIEW_CONTENT_FAIL " + view_name + ": " + "; ".join(vval["errors"]))
+                    msg = "VIEW_CONTENT_FAIL " + view_name + ": " + "; ".join(vval["errors"])
+                    if halt_views:
+                        raise SystemExit(msg)
+                    log(msg)
+                    view_pixel_failures.append(msg)
+                    continue
                 out_png = out_dir / f"view_{view_name}.png"
                 log(
                     f"RENDER view={view_name} texts={inv['texts']} avatars={inv['avatars']} "
-                    f"frame_ok={frame.get('ok')} DESIGN-STUDY"
+                    f"frame_ok={frame.get('ok')} unlit_text DESIGN-STUDY"
                 )
                 render_still(out_png, (rx, ry))
-                # Pixel proof (not object-count): dark text + avatar chroma gates
                 try:
                     from validate_view_pixels import validate_png
 
                     pix = validate_png(out_png, view_name, require_avatar=(view_name == "chrome"))
                     vval["pixels"] = pix
                     if not pix.get("ok") and not args.skip_validate:
-                        raise SystemExit(
-                            "VIEW_PIXEL_FAIL " + view_name + ": " + "; ".join(pix.get("errors") or [])
-                        )
+                        msg = "VIEW_PIXEL_FAIL " + view_name + ": " + "; ".join(pix.get("errors") or [])
+                        log(msg)
+                        view_pixel_failures.append(msg)
+                        if halt_views:
+                            raise SystemExit(msg)
                 except ImportError:
                     log("WARN validate_view_pixels missing")
                 renders.append({
@@ -1154,6 +1221,13 @@ def main():
                     "pixels": vval.get("pixels"),
                 })
             bpy.context.scene.camera = cam
+            if view_pixel_failures and not args.skip_validate:
+                meta["view_pixel_failures"] = view_pixel_failures
+                (out_dir / "run.json").write_text(json.dumps(meta, indent=2))
+                raise SystemExit(
+                    "VIEW_PIXEL_FAIL after all views (" + str(len(view_pixel_failures)) + "): "
+                    + " | ".join(view_pixel_failures)
+                )
 
         meta["renders"] = renders
         meta["view_content_validation"] = view_content_reports
@@ -1171,10 +1245,15 @@ def main():
         )
         (out_dir / "run.json").write_text(json.dumps(meta, indent=2))
         (out_dir / "TRACE_NEXT.md").write_text(
-            "# Measure / Moho (v4)\n\n"
-            "1. Shadow: use `camera_instrumentation.json` + `calibrate_shadow_ground.py` — "
+            "# Measure / Moho (v6)\n\n"
+            "1. Shadow-cal: `shadow_cal_lift_*.png` — caster invisible to camera; measure full penumbra. "
+            "Do not force-match analytic size/dist. v5 beauty y90 occluded — contaminated.\n"
+            "2. Moho: PASS closed loop (v5) — no further loop experiments.\n"
+            "3. Views: unlit flat emission text; continue after pixel fail; chrome avatar pixel gate.\n"
+            "4. Prefer `--probe --only views` before full 64/1280.\n"
+            "5. Shadow: use `camera_instrumentation.json` + `calibrate_shadow_ground.py` — "
             "do **not** treat image-px exposed offset (Mac v3 ~8.75) as ground-plane model.\n"
-            "2. Panel edge motion (~12.9 px/lift) contaminates image-space offset; unproject first.\n"
+            "6. Panel edge motion contaminates image-space offset; unproject first.\n"
             "3. State ROI: pressed=scale+ring, disabled=opacity — not global mean.\n"
             "4. Views are DESIGN-STUDY with typography/avatar; not live WebGPU acceptance.\n"
             "5. Moho: CreateExp7ArtComparison draws shapes; render with proven `-r` only (FileRender SEGV).\n"

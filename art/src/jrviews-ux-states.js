@@ -135,6 +135,16 @@
       var interactive = n.el.matches && n.el.matches(INTERACTIVE);
       if (!interactive && !n.el.hasAttribute('data-jr-state')) continue;
       var emphasis = n.el.getAttribute('data-jr-emphasis') === '1';
+      /* Keep n.hit in sync with GEO scale — paint-only scale would desync hitbounds. */
+      if (geo.scale !== 1 && n.hit && typeof n.hit.x === 'number' && typeof n.hit.w === 'number') {
+        var hx = n.hit.x, hy = n.hit.y, hw = n.hit.w, hh = n.hit.h;
+        var hcx = hx + hw / 2, hcy = hy + hh / 2;
+        n.hit.w = hw * geo.scale;
+        n.hit.h = hh * geo.scale;
+        n.hit.x = hcx - n.hit.w / 2;
+        n.hit.y = hcy - n.hit.h / 2;
+        geoTouched++;
+      }
       for (var j = 0; j < n.items.length; j++) {
         var it = n.items[j];
         var kind = it[0];
@@ -155,6 +165,11 @@
           else if (kind === 'rect') scaleBox(it, geo.scale, 1, 2, 3, 4);
           else if (kind === 'border' && typeof it[1] === 'number') scaleBox(it, geo.scale, 1, 2, 3, 4);
           if (geo.scale !== 1) geoTouched++;
+        }
+        /* HIT items in DL (when present as item tuples) must match scaled paint */
+        if (kind === 'hit' && geo.scale !== 1 && typeof it[1] === 'number') {
+          scaleBox(it, geo.scale, 1, 2, 3, 4);
+          geoTouched++;
         }
         if (geo.opacity < 1) {
           if (kind === 'rrect') { it[6] = mulAlpha(it[6], geo.opacity); geoTouched++; }

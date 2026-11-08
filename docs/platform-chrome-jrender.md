@@ -1,8 +1,8 @@
-# Platform chrome on JRender (1.8.3)
+# Platform chrome on JRender (1.8.4)
 
-**Status:** Implementation reference for the shipped lean tip **1.8.3** **[MEAS]**.  
+**Status:** Implementation reference for the shipped lean tip **1.8.4** **[MEAS]** (art-pass JRDI + UX states).  
 **Direction doc:** [views-jrender-standard.md](./views-jrender-standard.md).  
-**Evidence:** source + packed `exp7-platform-lean.html` on `main`; Mac parallax paint still **[USER-HW][OPEN]**.
+**Evidence:** `art/src/platform-chrome-jr-profile.js` packed into `exp7-platform-lean.html`; Mac parallax/LIVE-GPU still **[USER-HW][OPEN]**.
 
 ---
 
@@ -30,7 +30,7 @@ Exp7Slabs wraps `JRViews.View.prototype.show` and registers a slabs controller p
 
 ## Surfaces
 
-| Surface | How it is drawn (1.8.3) | Hits | Fallback without WebGPU |
+| Surface | How it is drawn (1.8.4) | Hits | Fallback without WebGPU |
 |---------|-------------------------|------|-------------------------|
 | Reserved top bar (back + avatar + “Exp7”) | `PlatformChromeJR` → JRViews on `#jrChromeCanvas` | **Canvas** (`#jrChromeHost` `pointer-events:auto` when `jr-on`); DOM `#btnBack` / `#btnAvatar` opacity 0 + `pointer-events:none` (keyboard still reaches DOM) | DOM buttons visible; `jr-on` off |
 | Apps picker | `PlatformChromeJR.redrawApps` → JRViews on `#jrAppsHost` canvas | Canvas (`data-jv-act=plat:app:*`) | DOM `#appButtons` |
@@ -42,7 +42,7 @@ Exp7Slabs wraps `JRViews.View.prototype.show` and registers a slabs controller p
 
 ## PlatformChromeJR
 
-**Packed from** `src/shell/platform-chrome-jr.js` into the lean shell (next to chrome HTML + shell script).
+**Packed from** `art/src/platform-chrome-jr-profile.js` via `tools/pack-art-lean.mjs` into the lean shell.
 
 - `start()` / `redraw()` — paint bar  
 - `redrawApps()` — paint apps overlay  

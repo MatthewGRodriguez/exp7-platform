@@ -2,10 +2,10 @@
   "format": "exp7-platform-release/1",
   "version": "1.8.4",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "e966ce721f338016bb3c3f08116cb0bbd82fa82a1b6b1c1551b4ff2e9993e4ab",
+  "sha256": "47186a241612b2ac7b682b058754475cff968fb55276a8c0c8159d7d018dfc73",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "exp7-lean demo + Budget Exp7Views consumers; JRViews platform bar/apps (canvas hits); Budget Cal/Board/Plan (+ type) tabs in-scene after planDoc; DOM tabs hidden via #budgetRoot.jr-chrome (scoped CSS safe); 4 Board type boards; Budget local-IDB only; art-pass JRDI profile images + UX state table; exclusive avatar photo/initials; art-pass JRDI profile images + UX state table; exclusive avatar photo/initials",
+    "app": "exp7-lean demo + Budget Exp7Views consumers; JRViews platform bar/apps (canvas hits); Budget Cal/Board/Plan (+ type) tabs in-scene after planDoc; DOM tabs hidden via #budgetRoot.jr-chrome (scoped CSS safe); 4 Board type boards; Budget local-IDB only; art-pass JRDI profile images + UX state table; exclusive avatar photo/initials; art-pass JRDI profile images + UX state table; exclusive avatar photo/initials; art-pass JRDI profile images + UX state table; exclusive avatar photo/initials",
     "appSha256": "ec696151f233c4762c6b831f4f9cbec9857f6ac24a179fcfb0aa44ffc8c9da63",
     "budgetSha256": "673372b101ea5342552ec16a2e5d3820e322411031c52d808b68c35c3d494c67",
     "budgetMode": "exp7-views",

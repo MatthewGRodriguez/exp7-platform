@@ -75,7 +75,7 @@ class MohoLoop(unittest.TestCase):
 
 
 class DryRun(unittest.TestCase):
-    def test_v5_dry_run(self):
+    def test_v6_dry_run(self):
         r = subprocess.run(
             [
                 sys.executable,
@@ -93,7 +93,18 @@ class DryRun(unittest.TestCase):
         )
         self.assertEqual(r.returncode, 0, r.stderr)
         meta = json.loads(r.stdout)
-        self.assertEqual(meta["generator_rev"], "front-readable-v5")
+        self.assertEqual(meta["generator_rev"], "front-readable-v6")
+
+
+class UnlitText(unittest.TestCase):
+    def test_make_text_is_emission_flat(self):
+        src = Path(__file__).with_name("views_content.py").read_text()
+        self.assertIn("ShaderNodeEmission", src)
+        self.assertIn("extrude = 0.0", src)
+        self.assertIn("visible_shadow = False", src)
+        self.assertNotIn("default_value = 2.4", src)
+        self.assertIn('em.inputs["Strength"].default_value = 1.0', src)
+        self.assertIn("set_caster_invisible_to_camera", Path(__file__).with_name("generate_ui_scene.py").read_text())
 
 
 class OrthoPreview(unittest.TestCase):
@@ -109,6 +120,8 @@ class OrthoPreview(unittest.TestCase):
         self.assertTrue(report["ok"], report)
         self.assertTrue((out / "view_calendar_ortho.png").is_file())
         self.assertTrue((out / "view_chrome_ortho.png").is_file())
+        # Ortho is NOT METAL predictor (Mac v5)
+        self.assertEqual(report["label"], "DESIGN-STUDY-ORTHO")
 
 
 if __name__ == "__main__":

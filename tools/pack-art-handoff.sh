@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Build self-contained ART-PIPELINE-HANDOFF archive (no .git, no secrets).
+# Publishes to /opt/cursor/artifacts; does NOT leave unpacked trees for the PR.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STAMP="${ART_HANDOFF_STAMP:-$(date -u +%Y%m%dT%H%M%SZ)}"
 NAME="ART-PIPELINE-HANDOFF-${STAMP}"
 OUT_DIR="$ROOT/artifacts/art-ux-profile-2026-11-08/handoff"
+TOOL_ART="${CURSOR_ARTIFACTS:-/opt/cursor/artifacts}"
 STAGE="$OUT_DIR/$NAME"
 rm -rf "$STAGE"
-mkdir -p "$STAGE"
+mkdir -p "$STAGE" "$TOOL_ART/handoff-history"
 
 copy_tree() {
   local src="$1" dst="$2"
@@ -24,10 +26,16 @@ copy_tree "$ROOT/art/src" "$STAGE/art/src"
 copy_tree "$ROOT/tests" "$STAGE/tests"
 copy_tree "$ROOT/tools/pack-art-lean.mjs" "$STAGE/tools/pack-art-lean.mjs"
 copy_tree "$ROOT/artifacts/art-ux-profile-2026-11-08/qa" "$STAGE/qa"
-copy_tree "$ROOT/artifacts/art-ux-profile-2026-11-08/contact-sheets" "$STAGE/contact-sheets"
-copy_tree "$ROOT/artifacts/art-ux-profile-2026-11-08/perspective" "$STAGE/perspective-results"
+if [ -d "$ROOT/artifacts/art-ux-profile-2026-11-08/contact-sheets" ]; then
+  copy_tree "$ROOT/artifacts/art-ux-profile-2026-11-08/contact-sheets" "$STAGE/contact-sheets"
+fi
+if [ -d "$ROOT/artifacts/art-ux-profile-2026-11-08/perspective" ]; then
+  copy_tree "$ROOT/artifacts/art-ux-profile-2026-11-08/perspective" "$STAGE/perspective-results"
+fi
+for f in ACCEPTANCE-MATRIX.md PRODUCTION-DELTA.md VERSION-MANIFEST.json; do
+  [ -f "$ROOT/artifacts/art-ux-profile-2026-11-08/$f" ] && cp -f "$ROOT/artifacts/art-ux-profile-2026-11-08/$f" "$STAGE/$f"
+done
 
-# Strip secrets + bytecode
 find "$STAGE" -type f \( -name '*.pem' -o -name '*token*' -o -name '*.env' \) -delete 2>/dev/null || true
 find "$STAGE" -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
 find "$STAGE" -type f -name '*.pyc' -delete 2>/dev/null || true
@@ -35,33 +43,54 @@ find "$STAGE" -type f -name '*.pyc' -delete 2>/dev/null || true
 cat > "$STAGE/README.md" <<EOF
 # $NAME
 
-Self-contained Exp7 art pipeline handoff. **No .git. No PATs/keys.**
+Generator: **front-readable-v6** — unlit flat text (no extrude/ghost); content-aware framing;
+pixel gates; light=params 9m/4.2m; shadow-cal invisible caster; Moho loop **PASS** (no more loop work).
+Cloud ortho ≠ METAL predictor. Still not full visual QA. Do not merge/promote.
 
-Generator: **front-readable-v5** — content-aware framing, readable text (≥4.5 intent), visible avatar,
-pixel gates (not object-count), light=params size/dist, Moho loop closure, ortho preview proofs.
-Fail evidence: v1–v4 under \`qa/mac-fail-*\`.
-
-Mac: prefer \`--only views|states|shadow\`. Run \`preview_views_ortho.py\` + \`validate_view_pixels.py\` before METAL.
-
-Still not a full visual QA pass. Do not merge/promote. CI green ≠ visual QA.
+Mac: \`--probe --only views\` then full; \`--only shadow\` emits \`shadow_cal_lift_*\`.
 EOF
 
-# Manifest
 (
   cd "$OUT_DIR"
   find "$NAME" -type f | sort > "$NAME/MANIFEST.txt"
   tar -czf "${NAME}.tar.gz" "$NAME"
   sha256sum "${NAME}.tar.gz" | tee "${NAME}.tar.gz.sha256"
-  # also copy sha into artifacts root note
-  ls -la "${NAME}.tar.gz"
 )
 
-# Pointer file for coordinator
+SHA=$(cut -d' ' -f1 "$OUT_DIR/${NAME}.tar.gz.sha256")
+# Publish to tool artifacts; keep history of prior tarballs
+cp -f "$OUT_DIR/${NAME}.tar.gz" "$TOOL_ART/"
+cp -f "$OUT_DIR/${NAME}.tar.gz.sha256" "$TOOL_ART/"
+# Move any older repo tarballs into history before deleting from PR tree
+for old in "$OUT_DIR"/ART-PIPELINE-HANDOFF-*.tar.gz; do
+  [ -f "$old" ] || continue
+  base=$(basename "$old")
+  if [ "$base" != "${NAME}.tar.gz" ]; then
+    cp -f "$old" "$TOOL_ART/handoff-history/" 2>/dev/null || true
+    cp -f "${old}.sha256" "$TOOL_ART/handoff-history/" 2>/dev/null || true
+  fi
+done
+
 cat > "$OUT_DIR/LATEST.txt" <<EOF
 archive=${NAME}.tar.gz
-sha256=$(cut -d' ' -f1 "$OUT_DIR/${NAME}.tar.gz.sha256")
-path=artifacts/art-ux-profile-2026-11-08/handoff/${NAME}.tar.gz
+sha256=${SHA}
+tool_artifacts=${TOOL_ART}/${NAME}.tar.gz
+history=${TOOL_ART}/handoff-history/
+generator_rev=front-readable-v6
 scratch=/Users/user-rodri/ArtScratch/exp7-art
+note=Authoritative archive in tool artifacts; PR keeps sources + VERSION-MANIFEST + concise qa only.
 EOF
+cp -f "$OUT_DIR/LATEST.txt" "$TOOL_ART/ART-PIPELINE-HANDOFF-LATEST.txt"
+cp -f "$ROOT/artifacts/art-ux-profile-2026-11-08/VERSION-MANIFEST.json" "$TOOL_ART/" 2>/dev/null || true
+cp -f "$ROOT/artifacts/art-ux-profile-2026-11-08/ACCEPTANCE-MATRIX.md" "$TOOL_ART/" 2>/dev/null || true
 
-echo "HANDOFF $OUT_DIR/${NAME}.tar.gz"
+# Drop unpacked stage + tarball from repo tree (reviewable PR)
+rm -rf "$STAGE"
+# Keep LATEST only in handoff/; move current tar exclusively to tool artifacts
+mv -f "$OUT_DIR/${NAME}.tar.gz" "$TOOL_ART/${NAME}.tar.gz"
+mv -f "$OUT_DIR/${NAME}.tar.gz.sha256" "$TOOL_ART/${NAME}.tar.gz.sha256"
+# Remove any leftover tarballs/unpacked from handoff dir
+rm -rf "$OUT_DIR"/ART-PIPELINE-HANDOFF-*
+
+echo "HANDOFF ${TOOL_ART}/${NAME}.tar.gz"
+echo "sha256 ${SHA}"

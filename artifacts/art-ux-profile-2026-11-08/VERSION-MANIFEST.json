@@ -1,0 +1,38 @@
+{
+  "id": "exp7-art-pass-1.8.4",
+  "branch": "cursor/art-ux-profile-image-15ae",
+  "generator_rev": "front-readable-v6",
+  "shell_version": "1.8.4",
+  "moho": {
+    "status": "PASS",
+    "frames": 120,
+    "unique": 102,
+    "f0_vs_f120": 0.0,
+    "note": "No further loop experiments"
+  },
+  "blender_views": {
+    "status": "FAIL-v5-contrast; FIX-v6-unlit-pending-Mac"
+  },
+  "authoritative_handoff": {
+    "archive": "ART-PIPELINE-HANDOFF-20261108T174433Z.tar.gz",
+    "sha256": "c945c1ba4663f4750b6add6e7b44692ba3bfa3953ef03a62bdc78db5d7fbe5ea",
+    "location": "/opt/cursor/artifacts/ART-PIPELINE-HANDOFF-20261108T174433Z.tar.gz",
+    "history": "/opt/cursor/artifacts/handoff-history/"
+  },
+  "production_sources": [
+    "art/src/jrender-images.js",
+    "art/src/jrviews-ux-states.js",
+    "art/src/platform-chrome-jr-profile.js",
+    "art/api/IMAGE-ABI.md",
+    "art/design/params.json",
+    "art/design/state-table.json",
+    "exp7-platform/exp7-platform-lean.html",
+    "exp7-platform/release.json"
+  ],
+  "study_only": [
+    "art/pipeline/",
+    "art/lighting/",
+    "artifacts/art-ux-profile-2026-11-08/qa/"
+  ],
+  "pr_policy": "Do not commit unpacked handoff trees or per-iteration tarballs into the PR; keep sources + VERSION-MANIFEST + concise qa."
+}
