@@ -95,6 +95,21 @@ OCCLUSION_IOU_FAIL = 0.32  # sibling elevated cards can graze meta AOI; real cov
 # Avatar vs label clearance (px) — chrome Board-over-avatar was ~25px overlap
 AVATAR_LABEL_CLEAR_PX = 6.0
 WCAG_MIN = 4.5
+# Composition gates (Mac v10 board footer/card + label bleed)
+FOOTER_CARD_OVERLAP_PX = 4.0
+LABEL_LABEL_OVERLAP_PX = 3.0
+CONTAINMENT_PAD_PX = 3.0
+# State face distinguishability — median RGB L2 in face ROI (0–255)
+STATE_FACE_MIN_L2 = 28.0
+STATE_PAIRS = (
+    ("invalid", "selected"),
+    ("invalid", "idle"),
+    ("drop-pending", "selected"),
+    ("drop-pending", "invalid"),
+    ("dragging", "idle"),
+    ("focus", "idle"),
+    ("selected", "idle"),
+)
 
 
 def read_png_rgba(path: Path):
@@ -534,6 +549,186 @@ def gate_object_layout(sidecar: dict, w: int, h: int) -> dict:
     return {"ok": not errors, "errors": errors, "objects": reports}
 
 
+def gate_composition(sidecar: dict, w: int, h: int) -> dict:
+    """Footer/card overlap, label↔label overlap, parent containment (Mac v10 board FAIL).
+
+    Contrast scripts do NOT cover these — keep this gate in validate_view_pixels.
+    """
+    objects = sidecar.get("objects") or {}
+    key = "px_tl_640" if w <= 640 else "px_tl_1280"
+    errors = []
+    reports = {"footer_card": [], "label_label": [], "containment": []}
+
+    texts = {k: v for k, v in objects.items() if v.get("kind") == "text" or "body" in v}
+    panels = {
+        k: v
+        for k, v in objects.items()
+        if v.get("kind") == "panel"
+        and not any(t in k for t in ("_border", "_ring", "_outer", "_inner", "_foot", "_shell", "_bar", "_wdbar", "_header", "_col"))
+    }
+    # Card-like panels for footer clearance
+    cards = {k: v for k, v in panels.items() if any(t in k for t in ("_card", "_day", "_row", "_app", "_tab"))}
+
+    def _box(od):
+        b = od.get(key) or od.get("px_tl")
+        return [float(v) for v in b] if b else None
+
+    # Footer / DESIGN-STUDY banner must not overlap cards
+    for tname, td in texts.items():
+        body = td.get("body") or ""
+        is_footer = body.startswith("DESIGN-STUDY") or tname.endswith("_banner")
+        if not is_footer:
+            continue
+        tb = _box(td)
+        if not tb:
+            continue
+        for cname, cd in cards.items():
+            cb = _box(cd)
+            if not cb:
+                continue
+            ov = _box_overlap_px(tb, cb)
+            if ov > FOOTER_CARD_OVERLAP_PX:
+                msg = f"footer_card_overlap {tname} overlaps {cname} by {ov:.1f}px"
+                errors.append(msg)
+                reports["footer_card"].append({"footer": tname, "card": cname, "overlap_px": ov})
+
+    # Label↔label: different parents must not overlap (drop-pending into focus neighbor)
+    titems = list(texts.items())
+    for i, (a_name, a_d) in enumerate(titems):
+        ab = _box(a_d)
+        if not ab:
+            continue
+        a_parent = a_d.get("bound_parent") or a_d.get("parent")
+        a_body = a_d.get("body") or ""
+        if a_body.startswith("DESIGN-STUDY"):
+            continue
+        for b_name, b_d in titems[i + 1 :]:
+            bb = _box(b_d)
+            if not bb:
+                continue
+            b_parent = b_d.get("bound_parent") or b_d.get("parent")
+            if a_parent and b_parent and a_parent == b_parent:
+                continue  # same card — stacked lines OK
+            b_body = b_d.get("body") or ""
+            if b_body.startswith("DESIGN-STUDY"):
+                continue
+            ov = _box_overlap_px(ab, bb)
+            if ov > LABEL_LABEL_OVERLAP_PX:
+                msg = f"label_label_overlap {a_name}↔{b_name} by {ov:.1f}px"
+                errors.append(msg)
+                reports["label_label"].append({"a": a_name, "b": b_name, "overlap_px": ov})
+
+    # Containment: content label AABB inside parent panel (pad)
+    name_to_panel = {k: v for k, v in objects.items() if v.get("kind") == "panel"}
+    for tname, td in texts.items():
+        body = td.get("body") or ""
+        if body.startswith("DESIGN-STUDY"):
+            continue
+        parent = td.get("bound_parent") or td.get("parent")
+        if not parent or parent not in name_to_panel:
+            continue
+        tb = _box(td)
+        pb = _box(name_to_panel[parent])
+        if not tb or not pb:
+            continue
+        pad = CONTAINMENT_PAD_PX
+        # Allow slight left overhang for LEFT-aligned glyphs' AA, but not right bleed into neighbor
+        ok = (
+            tb[0] >= pb[0] - pad * 2
+            and tb[1] >= pb[1] - pad
+            and tb[2] <= pb[2] + pad
+            and tb[3] <= pb[3] + pad
+        )
+        if not ok:
+            msg = (
+                f"containment {tname} outside {parent} "
+                f"text={[round(x,1) for x in tb]} panel={[round(x,1) for x in pb]}"
+            )
+            errors.append(msg)
+            reports["containment"].append({"text": tname, "parent": parent})
+
+    return {"ok": not errors, "errors": errors, "details": reports}
+
+
+def _median_rgb(beauty, w: int, h: int, box):
+    """Median RGB from flat RGBA bytes (read_png_rgba layout)."""
+    import statistics
+
+    x0, y0, x1, y1 = [int(v) for v in box]
+    x0, y0 = max(0, x0), max(0, y0)
+    x1, y1 = min(w, x1), min(h, y1)
+    if x1 <= x0 + 2 or y1 <= y0 + 2:
+        return None
+    # Sample inset core (avoid rim/ring)
+    inset = max(2, int(min(x1 - x0, y1 - y0) * 0.22))
+    step_x = max(1, (x1 - x0) // 10)
+    step_y = max(1, (y1 - y0) // 10)
+    rs, gs, bs = [], [], []
+    for y in range(y0 + inset, max(y0 + inset + 1, y1 - inset), step_y):
+        for x in range(x0 + inset, max(x0 + inset + 1, x1 - inset), step_x):
+            i = (y * w + x) * 4
+            if i + 3 >= len(beauty):
+                continue
+            if beauty[i + 3] < 200:
+                continue
+            rs.append(float(beauty[i]))
+            gs.append(float(beauty[i + 1]))
+            bs.append(float(beauty[i + 2]))
+    if len(rs) < 4:
+        return None
+    return (statistics.median(rs), statistics.median(gs), statistics.median(bs))
+
+
+def gate_state_distinguishability(sidecar: dict, beauty, w: int, h: int) -> dict:
+    """Faces of semantic states must differ in rendered RGB (Mac v10 washed pastels FAIL)."""
+    objects = sidecar.get("objects") or {}
+    key = "px_tl_640" if w <= 640 else "px_tl_1280"
+    errors = []
+    by_state = {}
+    for name, od in objects.items():
+        if od.get("kind") != "panel":
+            continue
+        if any(t in name for t in ("_border", "_ring", "_foot", "_header", "_col", "_shell", "_bar", "_wd")):
+            continue
+        st = od.get("st_name")
+        if not st:
+            continue
+        box = od.get(key) or od.get("px_tl")
+        if not box:
+            continue
+        med = _median_rgb(beauty, w, h, box)
+        if med is None:
+            continue
+        by_state.setdefault(st, []).append({"name": name, "rgb": med})
+
+    pairs_checked = []
+    for a, b in STATE_PAIRS:
+        if a not in by_state or b not in by_state:
+            continue
+        # Compare first sample of each state
+        ra, ga, ba = by_state[a][0]["rgb"]
+        rb, gb, bb = by_state[b][0]["rgb"]
+        dist = ((ra - rb) ** 2 + (ga - gb) ** 2 + (ba - bb) ** 2) ** 0.5
+        pairs_checked.append({"a": a, "b": b, "l2": round(dist, 2)})
+        if dist < STATE_FACE_MIN_L2:
+            errors.append(f"state_face_similar {a}≈{b} L2={dist:.1f}<{STATE_FACE_MIN_L2}")
+
+    # Ring-bearing panels must have sibling *_ring in the ROI sidecar
+    ring_states = {"focus", "selected", "drop-pending", "invalid"}
+    for st in ring_states:
+        for entry in by_state.get(st) or []:
+            base = entry["name"]
+            if f"{base}_ring" not in objects:
+                errors.append(f"state_ring_missing {base} ({st})")
+
+    return {
+        "ok": not errors,
+        "errors": errors,
+        "pairs": pairs_checked,
+        "states_sampled": {k: len(v) for k, v in by_state.items()},
+    }
+
+
 def gate_per_object_worst_bg(sidecar: dict, beauty, bg, w: int, h: int) -> dict:
     """Run indep worst-BG on every text object; production fails any C_worst_bg < 4.5."""
     objects = sidecar.get("objects") or {}
@@ -757,11 +952,20 @@ def validate_png(
                 )
 
     layout = None
+    composition = None
+    state_vis = None
     worst = None
     if sidecar:
         layout = gate_object_layout(sidecar, w, h)
         if not layout.get("ok"):
             errors.extend(layout.get("errors") or [])
+        if w > 640:
+            composition = gate_composition(sidecar, w, h)
+            if not composition.get("ok"):
+                errors.extend(composition.get("errors") or [])
+            state_vis = gate_state_distinguishability(sidecar, beauty, w, h)
+            if not state_vis.get("ok"):
+                errors.extend(state_vis.get("errors") or [])
         if bg_px is not None:
             worst = gate_per_object_worst_bg(sidecar, beauty, bg_px, w, h)
             if not worst.get("ok"):
@@ -785,6 +989,8 @@ def validate_png(
         "skips": skips,
         "rois": roi_reports,
         "layout": layout,
+        "composition": composition,
+        "state_visibility": state_vis,
         "worst_bg": {
             "min_C_worst_bg": (worst or {}).get("min_C_worst_bg"),
             "n_measured": (worst or {}).get("n_measured"),
@@ -798,8 +1004,14 @@ def validate_png(
         "roi_source": source,
         "bg_pass": bool(bg_px),
         "min_glyph_h_px": min_h,
-        "note": "Projected ROI + indep worst-BG + crop/occlusion/glyph gates (v9)",
-        "not": ["DESIGN-STUDY-ORTHO predictor", "hardcoded title y14-57", "gradient-as-photo", "darkest8% alone"],
+        "note": "Projected ROI + indep worst-BG + crop/occlusion/glyph + composition/state gates (v11)",
+        "not": [
+            "DESIGN-STUDY-ORTHO predictor",
+            "hardcoded title y14-57",
+            "gradient-as-photo",
+            "darkest8% alone",
+            "contrast-script-as-composition-coverage",
+        ],
     }
 
 
@@ -826,7 +1038,30 @@ def main():
         )
         report[view] = r
         ok = ok and r["ok"]
-    out = {"ok": ok, "views": report, "validator": "projected-roi-textmask-v9-adversarial"}
+    out = {
+        "ok": ok,
+        "views": report,
+        "validator": "projected-roi-textmask-v11-composition",
+        "gates": [
+            "worst_bg_contrast",
+            "crop",
+            "glyph_size",
+            "occlusion",
+            "avatar_clear",
+            "footer_card_overlap",
+            "label_label_overlap",
+            "containment",
+            "state_face_distinguishability",
+            "state_ring_presence",
+        ],
+        "contrast_only_scripts_do_not_cover": [
+            "footer_card_overlap",
+            "label_label_overlap",
+            "containment",
+            "state_face_distinguishability",
+            "state_ring_presence",
+        ],
+    }
     text = json.dumps(out, indent=2)
     if args.out:
         Path(args.out).write_text(text)

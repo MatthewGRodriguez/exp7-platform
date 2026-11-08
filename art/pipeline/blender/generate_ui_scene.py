@@ -37,7 +37,7 @@ except ImportError:
     Vector = None
 
 DEFAULT_SCRATCH = "/Users/user-rodri/ArtScratch/exp7-art"
-GENERATOR_REV = "front-readable-v10"
+GENERATOR_REV = "front-readable-v11"
 
 # Ensure sibling import works inside Blender --python
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -381,9 +381,14 @@ def ui_face_mat(name: str, base, opacity: float = 1.0):
     out = nodes.new("ShaderNodeOutputMaterial")
     em = nodes.new("ShaderNodeEmission")
     lum = 0.2126 * float(base[0]) + 0.7152 * float(base[1]) + 0.0722 * float(base[2])
-    if lum >= 0.45:
+    # Near-white idle faces need strength>1 under Standard; mid pastels stay at 1.0
+    # so state chroma survives (v10i strength=1.8 washed selected/invalid toward white).
+    if lum >= 0.85:
         r, g, b = float(base[0]), float(base[1]), float(base[2])
         strength = 1.8
+    elif lum >= 0.45:
+        r, g, b = float(base[0]), float(base[1]), float(base[2])
+        strength = 1.0
     else:
         r, g, b = _srgb_to_linear(base[0]), _srgb_to_linear(base[1]), _srgb_to_linear(base[2])
         strength = 1.0
@@ -729,21 +734,31 @@ def make_box(name, sx, sy, sz, loc, bevel_w, mat):
     return obj
 
 
-# Pastel face tints for state chips — dark ink + indep 10th-percentile AA survives.
-# (v9/v10c dark navy + white ink failed indep: AA fringe → fgY≈0.1 vs dark face.)
+# Mid pastels: chroma enough to read state at a glance, Y still high for dark-ink WCAG≥4.5.
+# v10i washed pastels made invalid≈white and selected≈idle (Mac METAL composition FAIL).
 FACE_PASTEL_FOR_DARK_INK = {
-    "selected": (0.72, 0.80, 0.94),
-    "dragging": (0.68, 0.78, 0.92),
-    "pressed": (0.70, 0.78, 0.90),
-    "focus": (0.74, 0.84, 0.96),
-    "drop-pending": (0.94, 0.86, 0.62),
-    "invalid": (0.94, 0.72, 0.70),
-    "hover": (0.88, 0.91, 0.95),
+    "selected": (0.52, 0.68, 0.92),
+    "dragging": (0.42, 0.58, 0.86),
+    "pressed": (0.58, 0.70, 0.88),
+    "focus": (0.48, 0.72, 0.96),
+    "drop-pending": (0.96, 0.78, 0.28),
+    "invalid": (0.92, 0.38, 0.34),
+    "hover": (0.78, 0.86, 0.94),
+    "disabled": (0.82, 0.84, 0.86),
+}
+
+# Ring/border display colors (emission) — must stay distinct under Standard view
+RING_EMIT_RGB = {
+    "focus": (0.15, 0.45, 0.95),
+    "gold": (0.95, 0.72, 0.08),
+    "caution": (0.92, 0.12, 0.08),
+    "selection": (0.20, 0.50, 0.95),
+    "accent": (0.92, 0.68, 0.10),
 }
 
 
 def face_color_for_state(st_name: str, st: dict, palette: dict):
-    """JRViews wash over surface; accent states use pastel tints for dark on-face ink."""
+    """JRViews wash over surface; accent states use mid pastels for dark on-face ink."""
     if st_name in FACE_PASTEL_FOR_DARK_INK:
         return FACE_PASTEL_FOR_DARK_INK[st_name]
     bg_key = st.get("bg", "surface")
@@ -753,13 +768,17 @@ def face_color_for_state(st_name: str, st: dict, palette: dict):
 
 
 def make_contour_ring(name, sx, sy, z, scale, radius_m, ring_w, color, tilt, emit=0.12):
-    """Rounded-rect focus ring hugging panel outline (boolean outer − inner)."""
+    """Rounded-rect focus ring hugging panel outline (boolean outer − inner).
+
+    Uses unlit Emission (ui_face_mat) so rings stay chroma-true next to bright faces
+    (principled+low emit washed out under Standard — Mac v10 'faint outline' FAIL).
+    """
     assert bpy is not None
     ox = (sx + 2 * ring_w) * scale
     oy = (sy + 2 * ring_w) * scale
-    ix = max(0.02, (sx - 2 * ring_w * 0.15) * scale)
-    iy = max(0.02, (sy - 2 * ring_w * 0.15) * scale)
-    thick = max(0.006, ring_w * 0.9)
+    ix = max(0.02, (sx - 2 * ring_w * 0.35) * scale)
+    iy = max(0.02, (sy - 2 * ring_w * 0.35) * scale)
+    thick = max(0.01, ring_w * 1.1)
 
     outer = make_box(
         name + "_outer",
@@ -774,9 +793,9 @@ def make_contour_ring(name, sx, sy, z, scale, radius_m, ring_w, color, tilt, emi
         name + "_inner",
         ix,
         iy,
-        thick * 1.4,
+        thick * 1.5,
         (0.0, 0.0, z),
-        max(0.001, radius_m - ring_w * 0.5),
+        max(0.001, radius_m - ring_w * 0.35),
         None,
     )
     mod = outer.modifiers.new("RingBool", "BOOLEAN")
@@ -790,7 +809,10 @@ def make_contour_ring(name, sx, sy, z, scale, radius_m, ring_w, color, tilt, emi
         log(f"WARN ring boolean: {e}")
     bpy.data.objects.remove(inner, do_unlink=True)
     outer.name = name
-    outer.data.materials.append(principled_mat(name + "_mat", color, emit=emit, rough=0.28))
+    # Emission strength from color chroma; ignore principled emit param
+    rgb = (float(color[0]), float(color[1]), float(color[2]))
+    outer.data.materials.append(ui_face_mat(name + "_mat", rgb, opacity=1.0))
+    outer["exp7_ring"] = 1
     if abs(tilt) > 1e-6:
         outer.rotation_euler[0] = math.radians(tilt)
     return outer
@@ -813,11 +835,18 @@ def make_panel(name: str, st: dict, palette: dict, geom: dict, tilt_deg=None, st
     opacity = float(st.get("opacity", 1.0))
     tilt = float(st.get("tilt", 0) if tilt_deg is None else tilt_deg)
     rad = panel_radius_m(geom, sx * scale, sy * scale)
-    ring_w = px_m(2.5, geom)  # design focus ring ~2–3px
+    # Readable ring width in steep ortho (v10 Mac: 2.5px → faint hairline)
+    ring_w = px_m(2.5, geom)
     if st_name == "focus" or st.get("ring") == "focus":
-        ring_w = px_m(3.5, geom)  # Mac v3: focus ring was faint
-    if st_name == "drop-pending":
-        ring_w = px_m(3.0, geom)
+        ring_w = px_m(7.0, geom)
+    elif st_name in ("selected", "drop-pending") or st.get("ring") in ("gold", "accent"):
+        ring_w = px_m(6.0, geom)
+    elif st_name == "invalid" or st.get("ring") == "caution":
+        ring_w = px_m(6.5, geom)
+    elif st_name == "dragging":
+        ring_w = px_m(5.0, geom)  # no state-table ring; thick selection border only
+    elif st_name == "pressed":
+        ring_w = px_m(5.0, geom)
 
     face = face_color_for_state(st_name, st, palette)
     mat = ui_face_mat(name + "_mat", face, opacity=opacity)
@@ -833,41 +862,54 @@ def make_panel(name: str, st: dict, palette: dict, geom: dict, tilt_deg=None, st
     obj["exp7_size_x"] = float(sx * scale)
     obj["exp7_size_y"] = float(sy * scale)
     obj["exp7_st_name"] = str(st_name)
+    obj["exp7_face_rgb"] = [float(face[0]), float(face[1]), float(face[2])]
 
     border_key = st.get("border", "border")
     border_col = palette["_rgba"].get(border_key) or palette["_rgba"]["border"]
-    # Edge stroke as slightly larger thin plate under face rim (rounded)
-    # Rim sits under the face so labels on face_z never render beneath the border plate
+    # Prefer saturated emit colors for semantic borders
+    if border_key in RING_EMIT_RGB:
+        border_col = RING_EMIT_RGB[border_key]
+    elif st_name == "invalid":
+        border_col = RING_EMIT_RGB["caution"]
+    elif st_name == "drop-pending":
+        border_col = RING_EMIT_RGB["accent"]
+    elif st_name in ("selected", "focus", "pressed", "dragging"):
+        border_col = RING_EMIT_RGB.get("selection", border_col)
+    # Visible rim plate under face — grow with semantic ring_w so borders read at 1280
+    rim_pad = max(ring_w * 1.15, px_m(3.0, geom))
     rim = make_box(
         name + "_border",
-        (sx + ring_w * 0.6) * scale,
-        (sy + ring_w * 0.6) * scale,
-        0.006,
-        (origin[0], origin[1], max(0.001, lift_m - 0.002)),
-        rad + ring_w * 0.2,
+        (sx + rim_pad * 2) * scale,
+        (sy + rim_pad * 2) * scale,
+        0.01,
+        (origin[0], origin[1], max(0.001, lift_m - 0.001)),
+        rad + rim_pad * 0.35,
         ui_face_mat(name + "_border_mat", border_col, opacity=1.0),
     )
+    rim["exp7_border_for"] = st_name
     if abs(tilt) > 1e-6:
         rim.rotation_euler[0] = math.radians(tilt)
 
     ring_key = st.get("ring", "none")
-    ring_col = palette["_ring"].get(ring_key)
+    ring_col = None
+    if ring_key and ring_key != "none":
+        ring_col = RING_EMIT_RGB.get(ring_key) or (palette["_ring"].get(ring_key))
     ring_obj = None
     if ring_col:
-        emit = 0.28 if st_name in ("focus", "selected", "drop-pending") else 0.12
         ring_obj = make_contour_ring(
             name + "_ring",
             sx,
             sy,
-            lift_m + thick + 0.01,
+            lift_m + thick + 0.02,
             scale,
             rad,
             ring_w,
             ring_col,
             tilt,
-            emit=emit,
+            emit=1.0,
         )
-        ring_obj.location = (origin[0], origin[1], ring_obj.location.z)
+        ring_obj.location = (origin[0], origin[1], lift_m + thick + 0.02)
+        ring_obj["exp7_ring_for"] = st_name
 
     # Content hierarchy strips (title + muted lines) — validates more than wash tokens
     texts = []

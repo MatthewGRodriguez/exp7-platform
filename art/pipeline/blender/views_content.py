@@ -33,7 +33,7 @@ MIN_AVATAR_OBJECTS = 1
 TITLE_SIZE = 0.28
 SUB_SIZE = 0.15
 BODY_SIZE = 0.20
-META_SIZE = 0.18
+META_SIZE = 0.16  # fit on card + ≥7px meta floor after steep-ortho framing
 DAY_SIZE = 0.16
 
 # Display-intent sRGB 0–1 (documentation + analytical preflight). NOT scene-linear.
@@ -378,19 +378,33 @@ def compose_calendar(make_panel, palette, geom, element_states, font_id, prefix=
     return objs
 
 
+# On-card state tokens must fit card width (Mac v10: "Housing · drop-pending" spilled into neighbor)
+STATE_CARD_LABEL = {
+    "drop-pending": "drop-pend",
+    "dragging": "dragging",
+    "selected": "selected",
+    "invalid": "invalid",
+    "disabled": "disabled",
+    "pressed": "pressed",
+    "focus": "focus",
+    "hover": "hover",
+    "idle": "idle",
+}
+
+
 def compose_board(make_panel, palette, geom, element_states, font_id, prefix="ViewBoard"):
     gap = float(geom.get("gap", 8)) * float(geom.get("scenePxScale", 0.01))
     objs = []
     header, *_ = make_panel(
         f"{prefix}_header", element_states["idle"], palette, geom, st_name="idle",
-        size=(4.6, 0.55), origin=(0.0, 2.05), content_lines=0,
+        size=(5.2, 0.55), origin=(0.0, 2.15), content_lines=0,
     )
     objs.append(header)
-    objs.append(label_on_panel(header, f"{prefix}_title", "Board · Expenses", (-2.10, 0.04), TITLE_SIZE, INK, font_id))
+    objs.append(label_on_panel(header, f"{prefix}_title", "Board · Expenses", (-2.35, 0.04), TITLE_SIZE, INK, font_id))
     objs.append(
         label_on_panel(
             header, f"{prefix}_sub", "design-study · shared state-table",
-            (-2.10, -0.14), SUB_SIZE, INK_SECONDARY, font_id,
+            (-2.35, -0.14), SUB_SIZE, INK_SECONDARY, font_id,
         )
     )
     cols = [
@@ -403,14 +417,17 @@ def compose_board(make_panel, palette, geom, element_states, font_id, prefix="Vi
         ("Transit pass", "$120.00", "Travel"),
         ("Studio rent", "$1,450", "Housing"),
     ]
-    card_w, card_h = 1.50, 1.05
-    col_pitch = 1.55
-    row_pitch = card_h + 0.18 + gap
+    # Wider cards + larger col gap so state META fits with pad (no neighbor bleed)
+    card_w, card_h = 1.55, 0.92
+    col_pitch = 1.78
+    row_pitch = card_h + 0.28 + gap
+    top_card_y = 0.85
+    bottom_card_y = None
     for ci, (cname, states) in enumerate(cols):
         cx = (ci - 1) * col_pitch
         col_p, *_ = make_panel(
             f"{prefix}_col{ci}", element_states["idle"], palette, geom, st_name="idle",
-            size=(card_w, 0.36), origin=(cx, 1.45), content_lines=0,
+            size=(card_w, 0.36), origin=(cx, 1.55), content_lines=0,
         )
         objs.append(col_p)
         objs.append(
@@ -421,7 +438,8 @@ def compose_board(make_panel, palette, geom, element_states, font_id, prefix="Vi
         )
         for ri, st_name in enumerate(states):
             st = dict(element_states.get(st_name, element_states["idle"]))
-            y = 0.75 - ri * row_pitch
+            y = top_card_y - ri * row_pitch
+            bottom_card_y = y if bottom_card_y is None else min(bottom_card_y, y)
             title, amt, tag = cards[ri]
             panel, _, ring, _ = make_panel(
                 f"{prefix}_card{ci}{ri}", st, palette, geom, st_name=st_name,
@@ -430,28 +448,31 @@ def compose_board(make_panel, palette, geom, element_states, font_id, prefix="Vi
             objs.append(panel)
             if ring:
                 objs.append(ring)
-            # Three lines INSIDE face half-extents (±0.41 y) with pad — no float-above
+            # Labels inside face half-extents with pad; state line uses META + abbrev
+            st_lab = STATE_CARD_LABEL.get(st_name, st_name)
             objs.append(
                 label_on_panel(
                     panel, f"{prefix}_ct{ci}{ri}", title,
-                    (-0.55, 0.26), BODY_SIZE, ink_for_state(st_name), font_id,
+                    (-0.62, 0.24), BODY_SIZE, ink_for_state(st_name), font_id,
                 )
             )
             objs.append(
                 label_on_panel(
                     panel, f"{prefix}_ca{ci}{ri}", amt,
-                    (-0.55, 0.02), BODY_SIZE, ink_for_state(st_name, "accent"), font_id,
+                    (-0.62, 0.02), BODY_SIZE, ink_for_state(st_name, "accent"), font_id,
                 )
             )
             objs.append(
                 label_on_panel(
-                    panel, f"{prefix}_cg{ci}{ri}", f"{tag} · {st_name}",
-                    (-0.55, -0.28), BODY_SIZE, ink_for_state(st_name, "secondary"), font_id,
+                    panel, f"{prefix}_cg{ci}{ri}", f"{tag} · {st_lab}",
+                    (-0.62, -0.26), BODY_SIZE * 0.92, ink_for_state(st_name, "secondary"), font_id,
                 )
             )
+    # Footer CLEAR of bottom card row (v10 Mac: foot at -1.65 overlapped Studio rent)
+    foot_y = float(bottom_card_y) - card_h * 0.5 - 0.42
     foot, *_ = make_panel(
         f"{prefix}_foot", element_states["idle"], palette, geom, st_name="idle",
-        size=(4.6, 0.28), origin=(0.0, -1.65), content_lines=0,
+        size=(5.2, 0.30), origin=(0.0, foot_y), content_lines=0,
     )
     objs.append(foot)
     objs.append(

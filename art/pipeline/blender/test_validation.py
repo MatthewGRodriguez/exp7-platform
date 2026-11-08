@@ -72,6 +72,12 @@ class ViewsContent(unittest.TestCase):
         # Half-size mesh bug: scale must be full sx (cube size=1), not sx/2
         self.assertIn("obj.scale = (float(sx), float(sy), float(sz))", gen_src)
         self.assertNotIn("obj.scale = (sx / 2, sy / 2, sz / 2)", gen_src)
+        self.assertIn("FACE_PASTEL_FOR_DARK_INK", gen_src)
+        self.assertIn("RING_EMIT_RGB", gen_src)
+        self.assertTrue(Path(__file__).with_name("validate_composition.py").is_file())
+        adv = Path(__file__).with_name("indep_check_adversarial.py").read_text()
+        self.assertIn("contrast-only", adv)
+        self.assertIn("validate_composition", adv)
 
     def test_assets(self):
         root = Path(__file__).parent / "assets"
@@ -112,7 +118,7 @@ class DryRun(unittest.TestCase):
         )
         self.assertEqual(r.returncode, 0, r.stderr)
         meta = json.loads(r.stdout)
-        self.assertEqual(meta["generator_rev"], "front-readable-v10")
+        self.assertEqual(meta["generator_rev"], "front-readable-v11")
 
 
 class UnlitText(unittest.TestCase):
@@ -148,9 +154,12 @@ class UnlitText(unittest.TestCase):
         vsrc = Path(__file__).with_name("validate_view_pixels.py").read_text()
         self.assertIn("projected_sidecar", vsrc)
         self.assertIn("textmask_vs_hiddenBG", vsrc)
-        self.assertIn("projected-roi-textmask-v9-adversarial", vsrc)
+        self.assertIn("projected-roi-textmask-v11-composition", vsrc)
         self.assertIn("indep_worst_bg", vsrc)
         self.assertIn("gate_object_layout", vsrc)
+        self.assertIn("gate_composition", vsrc)
+        self.assertIn("gate_state_distinguishability", vsrc)
+        self.assertIn("footer_card_overlap", vsrc)
         self.assertIn("parent_to_panel", Path(__file__).with_name("views_content.py").read_text())
         self.assertNotIn("min_dark=400", vsrc)
         # Hardcoded y14–57 title ROI must not be the primary path
