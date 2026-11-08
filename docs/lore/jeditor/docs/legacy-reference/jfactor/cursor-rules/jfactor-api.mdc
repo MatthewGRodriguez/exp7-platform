@@ -1,0 +1,30 @@
+---
+description: JFactor API — preferred surfaces, polarity, docs location
+globs: JFactor.js,docs/api/**/*.md,test_*.js
+alwaysApply: false
+---
+
+# JFactor API guidance
+
+Canonical API reference: **`docs/api/README.md`** (Markdown preview / Cursor Docs index).
+
+## Preferred path
+
+- New work → `JBlueprint` (+ `JWorld` for multiple planners).
+- After `build()`, the handle **is** a `JGroup` (`Best` / `SimulatedBest` / `Consider`). `.plan()` is an alternate bag-shaped handle for the same compiled BP — not deprecated.
+- Raw `Joy` / `JAction` / `JGroup` / `JRelation` for low-level control.
+- Do **not** revive parallel `Best()` (Exp3 shelved).
+- Do **not** extend `legacy/` — archived ranking UI / Category / Apps Script pipeline.
+
+## Critical rules
+
+- Produced resources: **negative** action deltas increase `jmax`.
+- `jreq` targets must be **atomic** groups (non-atomic unpack loses identity).
+- Relation default: **no** auto-chain unless `{ chain: true }`.
+- `JWorld.runAsync()` = cooperative `updateAsync` interleave on shared Map; not transactional isolation.
+- Blueprint resource events need Blueprint-tagged resources (`bp.resource` / `fromBlueprint`).
+- `resource(name)` looks up; `resource(name, opts)` registers. Multi-`build()` returns a fresh handle per root (shared resources).
+
+## When documenting or extending
+
+Update the matching page under `docs/api/` and the index table in `docs/api/README.md`.
