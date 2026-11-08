@@ -38,6 +38,7 @@ Older gap tables that pinned **1.5.0** / PR #7 are **historical**; this file is 
 ## What remains [OPEN]
 
 - Mac Safari USER-HW acceptance of parallax + multi-board Budget + bar hits.  
+- **Artist art pass** (Ash): UX/UI for all views + **profile image render** ABI — authorized **[REQ 2026-11-08]**; packet [artist-coordination-brief.md](./artist-coordination-brief.md).  
 - Full application-level sync (beyond Exp7 proposal-ops).  
 - Account / share panel as JRender (only if PAT stays out of canvas).  
 - Exp7 demo `#tabs` into scene (optional).  

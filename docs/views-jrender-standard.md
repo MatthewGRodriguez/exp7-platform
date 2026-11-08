@@ -23,7 +23,7 @@ Implementation detail: [platform-chrome-jrender.md](./platform-chrome-jrender.md
 | Views are universal | Cal / Board / Plan share one Exp7Views + builder path (`calHtml` / `boardHtml` / `planHtml` / `depsHtml` → JRViews → JRender). A view *design* change lands once and applies in every app. **[REQ]** |
 | Data is not shared | Each app keeps its own atlas / membership. Demo trip data ≠ Budget IDB ≠ future apps. Universal views ≠ shared Board items. **[REQ]** |
 | Views emit; they do not write atlases | Events → circuits / host → proposals. Spec 42 pattern. **[REQ]** |
-| No Artist contact without authorization | Still unauthorized unless Matthew explicitly opens it. **[REQ]** |
+| Artist coordination | **Authorized 2026-11-08** with Ash Tangent Residual Artist (full view UX/UI art workflow + profile image render). Packet: [artist-coordination-brief.md](./artist-coordination-brief.md). Still: real JRender only; no second renderer. **[REQ]** |
 
 ---
 
@@ -100,7 +100,7 @@ Apps (Exp7 demo, Budget, standalone, future):
 - Sharing one Board/Cal/Plan **dataset** across apps.  
 - A second renderer or DOM substitute when GPU is missing.  
 - Resuming canceled search / scheduler experiments.  
-- Contacting the Artist without a new explicit authorization.
+- Contacting parties other than the authorized Artist agent without a new explicit authorization.
 
 ---
 
@@ -110,12 +110,14 @@ Apps (Exp7 demo, Budget, standalone, future):
 2. ~~Platform bar + apps + Budget tabs on JRViews~~ — done (1.8.2–1.8.3); account/key remain DOM.  
 3. Mac **[USER-HW]** acceptance for parallax + multi-board + bar hits (box `no-adapter` ≠ GPU proof). **[OPEN]**  
 4. Exp7 demo tab strip into scene (optional). **[OPEN]**  
-5. Keep two-file release discipline; docs-only PRs remain an authorized exception. **[REQ]**
+5. Keep two-file release discipline; docs-only PRs remain an authorized exception. **[REQ]**  
+6. **Artist art pass + profile image ABI** — coordinate with Ash; integrate wasm/host bump when delivered. **[OPEN]** — [artist-coordination-brief.md](./artist-coordination-brief.md)
 
 ---
 
 ## Related docs
 
+- [artist-coordination-brief.md](./artist-coordination-brief.md) — Ash handoff: views inventory, invariants, profile image gap  
 - [platform-chrome-jrender.md](./platform-chrome-jrender.md) — chrome / parallax / Budget tabs implementation  
 - [architecture.md](./architecture.md) — layers, mount model, sync honesty  
 - [vocabulary.md](./vocabulary.md) — calHtml / boardHtml / Atlas / direct mount  

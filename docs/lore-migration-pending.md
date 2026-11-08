@@ -37,7 +37,7 @@ Home: [`archives/ranking_ui/`](./archives/ranking_ui/README.md).
 | Package SHA verified in-repo | **44/44** |
 | Path-redacted (`modified: yes`) | **8** |
 | Secrets/finances reported or found | **None** |
-| Artist contacted? | **No** (not authorized) |
+| Artist contacted? | **Authorized 2026-11-08** to coordinate with Ash (see `docs/artist-coordination-brief.md`); this archive still does not itself send messages |
 
 Home: [`archives/artist-jrender/`](./archives/artist-jrender/README.md).
 

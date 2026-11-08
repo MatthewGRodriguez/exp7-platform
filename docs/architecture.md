@@ -29,7 +29,7 @@ Views direction: [views-jrender-standard.md](./views-jrender-standard.md).
 - Shipped path: core wasm (`wasm32-unknown-unknown`, 0 imports) + thin JS host. WASI 0.3 migration **not done**.  
 - Light theme; transparent backgrounds; panels/text must stay readable.  
 - Motion: **Exp7Slabs** wraps `JRViews.View.show` (pointer parallax + ambient).  
-- **No message to the Artist is authorized** unless Matthew opens it. **[REQ]**
+- Artist coordination with **Ash Tangent Residual Artist** authorized **2026-11-08** for view UX/UI art workflow + profile image render — [artist-coordination-brief.md](./artist-coordination-brief.md). **[REQ]**
 
 ## Views standard — one JRender everywhere [REQ 2026-11-08]
 

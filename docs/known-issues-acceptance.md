@@ -17,7 +17,7 @@ Intended to prevent recurrence of failures already seen.
 | Inferring repo state from PR descriptions | Verify `main` commit + files directly. |
 | Claiming full app sync | Only claim what is implemented (today: Exp7 proposal-ops; Budget local). |
 | Mixing docs into app/release PRs | Prefer separate documentation PR. |
-| Contacting Artist without authorization | Forbidden until Matthew authorizes. |
+| Contacting Artist without authorization | Forbidden unless Matthew authorizes. **Authorized 2026-11-08:** Ash Tangent Residual Artist for view art workflow + profile images — [artist-coordination-brief.md](./artist-coordination-brief.md). |
 | Secrets in docs, logs, or commits | Never. PAT never in JRender canvas text. |
 | Doubled Budget tabs (DOM + JR) | When JR paints, hide DOM via `#budgetRoot.jr-chrome` + inline `!important`; never rely on `html`/`body` selectors under `scopeAppCss`. |
 | Plan tab missing Cal/Board/Plan controls | Apply `budgetChromeDoc` **after** `planDoc`. |
