@@ -1,18 +1,18 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.7.9",
+  "version": "1.8.0",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "eded6377e444e0d5fb9f2371b1b087ec60cd8c96e48fbad316820aa3b05109f6",
+  "sha256": "8516430493b8c791883f87e4cd369da6e069da5267a43e7a25152c35c86f07c3",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "exp7-lean demo + Budget as Exp7Views consumers; shell hosts shared exp7-views@1 / JRender once; reserved top bar painted with JRender (DOM hit targets + account overlays remain); exclusive avatar; Budget local-IDB only",
+    "app": "exp7-lean demo + Budget as Exp7Views consumers; shell hosts shared exp7-views@1 / JRender once; reserved top bar painted with JRender; Budget mounts 1 cal + 3 type boards (expense/income/debt) + plan on one atlas (combined Cal/Plan membership); exclusive avatar; Budget local-IDB only",
     "appSha256": "ec696151f233c4762c6b831f4f9cbec9857f6ac24a179fcfb0aa44ffc8c9da63",
-    "budgetSha256": "6d79aff1a2c2f891003b2a748316634502790755381367c8a485be64073adb75",
+    "budgetSha256": "490b1018f12b0c8c83a5d7b6327247c77af2a68196764487707492f2fe3324ed",
     "budgetMode": "exp7-views",
     "viewsModuleId": "exp7-views@1",
-    "viewsSourcesAggregateSha256": "bd7232deb159f44438e5095a34fa400543976ee4d60ca65c3907b84b95935b96",
+    "viewsSourcesAggregateSha256": "528e310e5568fdbf1564a877380017fa3a9b63c21b26689776a56b5f41f61ba5",
     "chromeJr": "platform reserved bar via PlatformChromeJR (JRender paint; DOM a11y hits)",
     "standalone": "dist/exp7-views-standalone.html",
-    "standaloneSha256": "0d8979256d2617f04126d0764453671148175e707ca71c365f7e84c81302849a"
+    "standaloneSha256": "46e6e2d309bd5b8c28fa8c1153f3b9b23e1f31f80de1a95be11d0549463254ba"
   }
 }

@@ -84,6 +84,7 @@ Apps (Exp7 demo, Budget, standalone, future):
 | JRViews → JRender | Per-canvas views; shared Core/GPUContext (shell hosts scripts once) | Same; more views per page |
 | App chrome | Often DOM beside canvases | Move into JRender scene content |
 | Platform shell | Reserved top bar: **JRender paint** (`PlatformChromeJR`); DOM hit targets + account/key overlays remain | Full shell scene (picker/menus) in JRender; PAT still never in canvas |
+| Budget boards | **1.8.0:** three type boards (expense / income / debt&assets) as separate JRender canvases on one atlas; Cal/Plan see combined items; ranking drawn in-scene | Optional fourth board; drop remaining DOM tab strip |
 | Data | Per-app atlas / IDB / proposal sync | Unchanged — still per-app |
 
 ---
