@@ -2,10 +2,41 @@
 
 **Authorized by:** Matthew **[REQ 2026-11-08]** — coordinate with **Ash Tangent Residual Artist** (creator of JRender) for a **full art workflow** pass: update UX/UI for **all views**, and **add profile image render support**.
 
-**Platform tip this brief targets:** Exp7 Platform **1.8.3** on `main` (lean SHA-256 `2033acab6ed923098b4ab37b52581a7490cb0da5b77ef05016593ff9015d6c98`).  
+**Platform tip when this brief was opened:** Exp7 Platform **1.8.3** (lean SHA-256 `2033acab6ed923098b4ab37b52581a7490cb0da5b77ef05016593ff9015d6c98`).  
+**Shell on main when the SVG direction was written:** **1.8.21** (PR #46, lean SHA-256 `8a767838f1af3f5ceb1f5b96faaa5711348957ad4b54381eec4055457dca1136`).  
 **Evidence:** [EVIDENCE.md](./EVIDENCE.md). Implementation chrome: [platform-chrome-jrender.md](./platform-chrome-jrender.md). Direction: [views-jrender-standard.md](./views-jrender-standard.md).
 
 **This document is the handoff packet.** It does not replace Ash’s art pipeline; it scopes what Exp7 consumes and what must stay invariant.
+
+## Direction (2026-11-08, evening CT): draw the light, let the state machine play it
+
+Matthew looked at shells 1.8.10 through 1.8.21 and said a lot was added and little of it reads as a visual change. Those shells approximate lighting with extra rectangles in the JRender display list: sampled penumbra rows, a face lip, a fading top, a glass body, a separate ground node, and short pose eases. He likes that the effort is there. It is not the design, and it will be replaced.
+
+The design is the one Ash already runs. An SVG drawing carries the light, the soft shadow, the glass, and the lip. The state machine only chooses which drawing is on screen. Hover, press, focus, selected, dragging, drop-pending, and invalid are drawings (or the same drawing with opacity and scale keyed from the state table). The engine does not invent a new shadow out of rectangles. Click-path motion stays at most 120 ms, and the click itself is not delayed. Nothing loops while the pointer is still. Reduced motion shows the resting drawing.
+
+`exp7-platform-lean.html` stays at 1.8.21, including the ground-shadow nodes and the id jump that stopped the first draw from stalling, until a drawn pose replaces a procedural node. When a drawing replaces a node, remove that node in the same change so the two do not stack. Do not add another rectangle-lighting pass.
+
+| Pose | What the drawing shows |
+|---|---|
+| idle | Rest card. Contact shadow for the 1.15 px rest height. Top light from the one light (azimuth 90, elevation 50). |
+| hover | Tighter shadow, lift 2. Scale 1.01 on a free control. A day or a stacked row does not move or grow. |
+| focus | Navy edge `[36,88,166]`. Same body as rest. |
+| pressed | Scale 0.97. Shadow tightens. The edge may go navy while the pointer is down. |
+| selected | Gold edge `[117,81,15]`. Best is not this pose. Best stays the idle drawing. |
+| dragging | Wider, softer shadow (the table's drag lift is 12). A day does not scale up. A free control may go to scale 1.02. |
+| drop-pending | Gold edge and a warm wash, board rows only, on the first drag move. This is not the invalid red. |
+| invalid | Caution edge `[170,0,0]`. |
+| disabled | The resting drawing at the table's disabled treatment. The label stays readable. The old 2.16 contrast on faded text does not pass. |
+
+Glass is a drawn layer on dark fills, static, with no speckles. A caustic speck waits on a new on/off proof that it is real caustic light. Days and stacked rows must not overlap or crop. The same drawings cover the calendar, the board, the plan, sections, free buttons, Apps cards, and the bar.
+
+JRender stays the only product renderer. There is no second CSS renderer beside the canvas. The open job is playback: the events the views already emit select the drawn pose, and that pose is what the user sees for light and shadow. The old TDD/Slate `data-sm` player is a record of how a state attribute indexed drawings. It is not a renderer to ship.
+
+### Drawing apps
+
+The pipeline names Affinity for the drawing and Moho Pro for the animation, then Blender for the one light, then Moho again. The 2026-10-30 rule was to drive those apps from the command line and not open them. Matthew is asking to open the drawing apps, so the SVG is drawn and the blur and the soft edge are in the file.
+
+This cloud machine has Chrome and Python. It does not have Affinity, Moho, Blender, or Inkscape, and the package index here has no Inkscape or librsvg package. The trial file [docs/design/svg-state-card.svg](./design/svg-state-card.svg) is layered SVG (a Gaussian-blurred contact shadow, a top light, a lip, and a pose edge per state) and was opened in headless Chrome. The sheet shows all eight poses. A `data-sm` attribute on the root shows one pose and hides the sheet. It is not Moho output, not a Blender render, and it is not wired into the lean shell. Affinity and Moho on Matthew's Mac are the apps for the real set.
 
 ---
 
@@ -27,7 +58,7 @@
 2. **Profile image render support** in JRender (and then wired into platform chrome avatar + any view that needs faces/photos).  
 3. Keep **universal views, per-app data**: Cal/Board/Plan design changes land once in Exp7Views / JRViews / JRender; atlases stay per app. **[REQ]**
 
-Historical TDD/Slate **CSS player** contract is **not** a prescription to replace WebGPU JRender with CSS. Engine design, state table, and QA gates **do** apply; packing limits for Slate do **not** apply to Exp7 single-HTML. See [archives/artist-jrender/README.md](./archives/artist-jrender/README.md).
+Historical TDD/Slate **CSS player** contract is **not** a prescription to replace WebGPU JRender with CSS. The light and shadow still come from SVG drawings the state machine selects, as in the direction section above. Engine design, state table, and QA gates **do** apply; packing limits for Slate do **not** apply to Exp7 single-HTML. See [archives/artist-jrender/README.md](./archives/artist-jrender/README.md).
 
 ---
 
@@ -118,7 +149,7 @@ Ash runs the full pipeline (parameters → draw → perspective → state table 
 1. Full **quality-gates** text cut off in the 2026-10-30 Artist report — re-obtain. **[OPEN]**  
 2. Whether the **storage/codec update** after `atlas/1` landed — confirm before Exp7 storage changes. **[OPEN]**  
 3. Image ABI shape (DL node vs external atlas vs GPU texture handle; CORS; memory caps).  
-4. Whether view HTML (`ja-*`) stays the layout source with richer JRViews styling, or Ash prefers a different emission path into DL.  
+4. Playback of the drawn SVG inside the one JRender view. Matthew's answer on the art is settled: the pixels of light and shadow are drawings, and the state machine picks the pose. `ja-*` HTML can stay the layout source for text, hits, and forms. The open piece is how a pose SVG is shown by the existing renderer (image, tessellated paths, or another emission Ash already has) without a second paint engine and without another stack of shadow rectangles.  
 5. WASI 0.3 host — still unfinished; shipped path remains wasm32 + thin JS. Do not block UX on WASI unless Matthew asks.
 
 ---
@@ -139,5 +170,6 @@ Ash runs the full pipeline (parameters → draw → perspective → state table 
 |------|--------|
 | Before 2026-11-08 | Artist contact **not** authorized |
 | **2026-11-08** | Matthew authorized coordination with **Ash Tangent Residual Artist** for view UX/UI art workflow + profile image render support **[REQ]** |
+| **2026-11-08** (evening CT) | Matthew directed that 1.8.10–1.8.21 rectangle lighting be replaced by SVG drawings the state machine plays, and that the drawing apps be used for that art. Trial sheet: `docs/design/svg-state-card.svg`. Shell stays 1.8.21 until a drawing is wired in. |
 
 Messages to Ash should carry this brief (or a short pointer to it) and must not include PATs, private financial data, or software-repo write keys.

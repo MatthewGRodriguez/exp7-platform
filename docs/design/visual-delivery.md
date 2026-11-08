@@ -1,5 +1,11 @@
 # Visual delivery (1.8.8)
 
+## Drawn SVG replaces the rectangle lighting (2026-11-08)
+
+Shells 1.8.10 through 1.8.21 put the state table, a sampled shadow, a face lip, a soft top, a dark glass body, a ground-shadow node, and short pose eases into the lean file. Matthew's read of that work is that a lot was added and the picture barely changed. The design he wants is the one Ash Tangent Residual Artist already used: paint the light and the shadow in an SVG animation, and let the state machine switch the drawings. The rectangle passes stay in 1.8.21 until a drawn pose replaces them. They are not the next thing to extend.
+
+The trial sheet is `docs/design/svg-state-card.svg`. The ask to Ash, the pose list, and which drawing apps were available on this machine are in `docs/artist-coordination-brief.md`. The lean shell is still 1.8.21. This page does not claim the SVG is on screen in the product.
+
 ## Apps picker and icon flicker (1.8.11)
 
 1.8.10 made the Apps overlay opaque and the JR canvas the thing on screen. That canvas was not the DOM cards. Its buttons used `min-height:4.5rem`, which layout read as 4.5px, and the label and hint were joined with ` | ` on one line. Each button also sat in a full-width section frame. 1.8.11 draws two-line cards at least about 220×70.
