@@ -59,9 +59,10 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.25** | PR #52 | Text typed in the resource name field is drawn inside that field. |
 | **1.8.26** | PR #52 | Set values flips a positive amount to a negative one. A resource can be removed. The star prefers an alternative, and × makes it unavailable. |
 | **1.8.27** | PR #54 | The view store loads JRDL views on the shared renderer. An overlay falls through where it has no hit. basE91 keeps a low-entropy pack. |
-| **1.8.28** | this branch | The Fish app is the overlay demo: card and button slots, with the fish swimming over them. |
+| **1.8.28** | PR #55 | The Fish app is the overlay demo: card and button slots, with the fish swimming over them. |
+| **1.8.29** | this branch | The Lumen app is the next overlay: a session card and a Confirm control as slots, and a light that glides across the card. |
 
-The 9 Nov 2026 overlay packet is recorded in [design/overlay-view-store.md](./design/overlay-view-store.md). Shell 1.8.28 plays it as the Fish app.
+The 9 Nov 2026 overlay packet is recorded in [design/overlay-view-store.md](./design/overlay-view-store.md). Shell 1.8.28 plays it as the Fish app. Shell 1.8.29 plays the Lumen page the same way.
 
 1.8.10 through 1.8.21 are the procedural lighting passes. On 2026-11-08 Matthew directed that those passes be replaced by SVG drawings played by the state machine. The DesignCraft 0.18.0 packet was checked the same evening: the view draw list loads a cubic fill and rejects a gradient, and it has no cubic stroke. The record is `docs/design/authored-ui-packet.md`. 1.8.22 does not wire that packet. It adds the board and budget controls on the existing state machine. This is not a finished workflow.
 
@@ -71,9 +72,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.28",
+"version": "1.8.29",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "71d3d775dd522164f8b62ae0a985884838ef9a2da04a7ece6c39526f9bdefac4",
+"sha256": "c0b4b41b646908e7ecdbd7f42f23989f93a7396f5b55c4059ae6d47ea1a473a5",
 "minLauncherMajor": 1
 ```
 

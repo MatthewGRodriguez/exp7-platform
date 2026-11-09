@@ -172,6 +172,6 @@ Ash runs the full pipeline (parameters → draw → perspective → state table 
 | **2026-11-08** | Matthew authorized coordination with **Ash Tangent Residual Artist** for view UX/UI art workflow + profile image render support **[REQ]** |
 | **2026-11-08** (evening CT) | Matthew directed that 1.8.10–1.8.21 rectangle lighting be replaced by SVG drawings the state machine plays. `docs/design/svg-state-card.svg` is a fixture. Shell stays 1.8.21 until a drawing is wired in. |
 | **2026-11-08** (later, same evening) | Ash delivered the DesignCraft 0.18.0 packet. Playback of its gradients and strokes failed on the view draw list. Record: `docs/design/authored-ui-packet.md`. The lean file was not changed. This is not a finished workflow. |
-| **2026-11-09** | Ash delivered the overlay packet: a view store, slot card and button, and a fish overlay in one `layout()`. Record: `docs/design/overlay-view-store.md`. Shell 1.8.28 runs that page as the Fish app. Gradients and cubic strokes are still missing from the view path. |
+| **2026-11-09** | Ash delivered the overlay packet: a view store, slot card and button, and a fish overlay in one `layout()`. Record: `docs/design/overlay-view-store.md`. Shell 1.8.28 runs that page as the Fish app. Shell 1.8.29 runs the Lumen page (session card, Confirm, light glide) as the next app. Gradients and cubic strokes are still missing from the view path. |
 
 Messages to Ash should carry this brief (or a short pointer to it) and must not include PATs, private financial data, or software-repo write keys.
