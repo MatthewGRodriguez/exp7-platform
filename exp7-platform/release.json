@@ -1,11 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.22",
+  "version": "1.8.23",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "9c21f2111df3011d44743dd7e6a5ee67a7de5c6f648c79b9297eae499bd61707",
+  "sha256": "90fb3438aafe752c886b76f0c201e8bb05fe60a61a6edbb1fcdafd753c292dc5",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "1.8.22: Board remove, values and consuming, month and day on one atlas, debt payment highlight, month panel on every tab.",
+    "app": "1.8.23: Board button clicks reach their actions. Alternatives have a star and an x.",
     "appSha256": "4e19bdeeb76818a6a96b9cb6655d48c950d429b17d3680184231e5a67755508b",
     "budgetSha256": "115fb94328289ed9b2af7b17f394ca06d7556e7f78950533562332ea0787c0c5",
     "budgetMode": "exp7-views",
