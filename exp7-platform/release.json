@@ -1,11 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.26",
+  "version": "1.8.27",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "d8bf751432c34b938f6d36e95eb49dd3f7d2e6c347368fa5b0d7514250c1b7c2",
+  "sha256": "0bb11e96565b696d86d3ef813b81275d227757f4aebd16611a1b8931a2d833c5",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "1.8.26: Set values flips the amount sign. A resource can be removed. Star prefers an alternative and × marks it unavailable.",
+    "app": "1.8.27: The view store loads JRDL views on the shared renderer. An overlay falls through where it has no hit. basE91 keeps a low-entropy pack.",
     "appSha256": "4e19bdeeb76818a6a96b9cb6655d48c950d429b17d3680184231e5a67755508b",
     "budgetSha256": "115fb94328289ed9b2af7b17f394ca06d7556e7f78950533562332ea0787c0c5",
     "budgetMode": "exp7-views",
