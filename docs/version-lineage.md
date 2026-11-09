@@ -54,7 +54,8 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.20** | PR #45 | The cast shadow stays on the ground when the face rises. |
 | **1.8.21** | PR #46 | Shadow ids jump reserved bands, so the first draw does not stall. |
 | **1.8.22** | PR #49 | Board rows can be removed. Values and consuming sit on the left. Budget boards share one atlas and show one month, with a day filter. An expense can pay a debt and that row washes yellow. Surplus, DDI, net income, living cost, and net worth stay on every tab. |
-| **1.8.23** | this branch | Board button clicks reach their actions. Each alternative has a star for preferred and an × for restricted. |
+| **1.8.23** | PR #50 | Board button clicks reach their actions. Each alternative has a star for preferred and an × for restricted. |
+| **1.8.24** | this branch | An active button fills gold, and a restricted one fills rose. The resource name field stays with its label. |
 
 1.8.10 through 1.8.21 are the procedural lighting passes. On 2026-11-08 Matthew directed that those passes be replaced by SVG drawings played by the state machine. The DesignCraft 0.18.0 packet was checked the same evening: the view draw list loads a cubic fill and rejects a gradient, and it has no cubic stroke. The record is `docs/design/authored-ui-packet.md`. 1.8.22 does not wire that packet. It adds the board and budget controls on the existing state machine. This is not a finished workflow.
 
@@ -64,9 +65,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.23",
+"version": "1.8.24",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "90fb3438aafe752c886b76f0c201e8bb05fe60a61a6edbb1fcdafd753c292dc5",
+"sha256": "05c8e775e15ebd92f2bfe9d2baded56155b38d5ee6579ba77657e034bdcd6dd1",
 "minLauncherMajor": 1
 ```
 

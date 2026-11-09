@@ -97,7 +97,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.23. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.24. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -6556,11 +6556,16 @@ class TextField {
   // ---- hidden textarea ----
   static ta() { if (TA || typeof document === 'undefined') return TA; const t = TA = document.createElement('textarea');
     t.setAttribute('autocomplete', 'off'); t.setAttribute('autocorrect', 'off'); t.setAttribute('autocapitalize', 'off'); t.setAttribute('spellcheck', 'false'); t.setAttribute('data-jrender', 'textfield');
-    Object.assign(t.style, { position: 'fixed', left: '0px', top: '0px', width: '2px', height: '20px', opacity: '0.01', padding: '0', border: '0', margin: '0', resize: 'none', overflow: 'hidden', fontSize: '16px', zIndex: '2147483646', caretColor: 'transparent', outline: 'none', whiteSpace: 'pre', color: 'transparent', background: 'transparent' });
-    document.body.appendChild(t); const f = (n) => t.addEventListener(n, (e) => TAowner && TAowner['on_' + n](e));
+    Object.assign(t.style, { position: 'fixed', left: '-200px', top: '-200px', width: '2px', height: '20px', opacity: '0.01', padding: '0', border: '0', margin: '0', resize: 'none', overflow: 'hidden', fontSize: '16px', zIndex: '2147483646', caretColor: 'transparent', outline: 'none', whiteSpace: 'pre', color: 'transparent', background: 'transparent' });
+    document.body.appendChild(t); if (!window.__jrTfPlace) { window.__jrTfPlace = 1; const sync = () => { if (TAowner && TAowner.place) TAowner.place(); }; window.addEventListener('scroll', sync, true); window.addEventListener('resize', sync); }
+    const f = (n) => t.addEventListener(n, (e) => TAowner && TAowner['on_' + n](e));
     for (const n of ['keydown', 'input', 'compositionstart', 'compositionupdate', 'compositionend', 'copy', 'cut', 'paste', 'blur', 'focus']) f(n); return t; }
-  place() { const t = TA; if (!t || TAowner !== this) return; const e = this.r.entries.find(q => q.scene === this.s); if (!e) return; const rc = this.r.c.getBoundingClientRect(), k = this.r.cw > 0 ? rc.width / this.r.cw : 1;
-    const x = rc.left + (e.x + this.o.x + this.o.pad + this.caret[0]) * k, y = rc.top + (e.y + this.o.y + this.o.pad + this.caret[1]) * k; t.style.left = Math.round(x) + 'px'; t.style.top = Math.round(y) + 'px'; t.style.height = Math.max(16, this.lh * k) + 'px'; }
+  place() { const t = TA; if (!t || TAowner !== this) return; const e = this.r.entries.find(q => q.scene === this.s); if (!e) { t.style.left = '-200px'; t.style.top = '-200px'; return; } const rc = this.r.c.getBoundingClientRect(), k = this.r.cw > 0 ? rc.width / this.r.cw : 1;
+    let sx = 0, sy = 0; if (this.o.parent != null && this.s.scrollPos) { const sp = this.s.scrollPos(this.o.parent); if (sp) { sx = sp[0] || 0; sy = sp[1] || 0; } }
+    const x = rc.left + (e.x + this.o.x - sx + this.o.pad + this.caret[0]) * k, y = rc.top + (e.y + this.o.y - sy + this.o.pad + this.caret[1]) * k;
+    /* A caret above or below the canvas was showing up at the top of the screen. Keep it offstage until the field is in view. */
+    if (y < rc.top - 2 || x < rc.left - 2 || y > rc.bottom + 2 || x > rc.right + 2) { t.style.left = '-200px'; t.style.top = '-200px'; return; }
+    t.style.left = Math.round(x) + 'px'; t.style.top = Math.round(y) + 'px'; t.style.height = Math.max(16, this.lh * k) + 'px'; }
   syncTA() { const t = TA; if (!t || TAowner !== this || this.m.comp) return; const v = this.o.password ? '' : this.m.value; if (t.value !== v) t.value = v;
     if (!this.o.password) { const d = this.m.f < this.m.a ? 'backward' : 'forward'; try { t.setSelectionRange(this.m.start, this.m.end, d); } catch (e) { } }
     t.setAttribute('aria-label', this.o.label || this.o.placeholder || 'text field'); t.setAttribute('aria-multiline', this.o.multiline ? 'true' : 'false'); t.setAttribute('data-type', this.o.password ? 'password' : 'text'); t.style.webkitTextSecurity = this.o.password ? 'disc' : '';
@@ -9965,7 +9970,11 @@ function layout(root,width,opt){ opt=opt||{}; const ctx={bg:[255,255,255,255],fg
       if(has(n,'ja-tf')){ out.push({t:'',el:n,tf:n.getAttribute('data-tf')||'f',ph:n.getAttribute('data-ph')||'',fg:c2.fg,size:c2.size||FS,box:true,tfBox:true,
         bg:c2.boxbg||[255,255,255,255],border:c2.border||[138,150,170,255],on:false,ac:c.ac,bold:false,italic:false}); return; }
       if(n.tagName==='BUTTON'||Object.keys(BOXED).some(k=>has(n,k))){ const lines=buttonLines(n); const t=(lines.length?lines.join(' '):n.textContent.replace(/\s+/g,' ').trim()); if(has(n,'ja-item')) items++;
-        out.push({t,lines:lines.length>1?lines:null,el:n,fg:c2.fg,size:c2.size,box:true,bg:c2.boxbg||over([36,88,166,10],c.bg),border:c2.border||[138,150,170,255],on:has(n,'on')||n.getAttribute('data-sm')==='selected',ac:c.ac,bold:!!c2.bold,italic:!!c2.italic}); return; }
+        const active=has(n,'on')||n.getAttribute('data-sm')==='selected'||n.getAttribute('aria-pressed')==='true';
+        const restricted=has(n,'err')||has(n,'invalid');
+        /* Active and restricted change the face, not only the border. A 1px ring on a small star was too easy to miss. */
+        const bg=c2.boxbg||(restricted?[244,196,196,255]:active?[232,197,106,255]:over([36,88,166,10],c.bg));
+        out.push({t,lines:lines.length>1?lines:null,el:n,fg:c2.fg,size:c2.size,box:true,bg,border:restricted?[170,0,0,255]:(c2.border||[138,150,170,255]),on:active,ac:restricted?[170,0,0,255]:c.ac,bold:!!c2.bold||active,italic:!!c2.italic}); return; }
       if(has(n,'ja-item')) items++; atoms(n,c2,out); }); return out; }
   /* flow atoms into lines inside [x, x+w]; text goes to the owner's text node; boxed atoms get their own fill (hit) / border / text nodes
      uniform style → DL.textBox; mixed style (bold/italic/color) without boxes → one DL.richText (v3, no JS wrap) */
@@ -10164,7 +10173,7 @@ View.prototype.show=async function(canvas,root,W,opt){ opt=opt||{};
   const hid=this.hov&&this.hov.id; this.hov=null; this.L=L; this.byId=new Map(L.nodes.map(n=>[n.id,n])); const hn=hid&&this.byId.get(hid); if(hn&&hn.hov!=null) this.setHover(hn); /* pointer still over the same id: keep its hover */ this.r.draw(); this.ms=performance.now()-t0;
   return {ms:this.ms,mode,px:[canvas.width,canvas.height],L,VH,ops:this.patchOps,handle:this.s.h}; };
 View.prototype.wire=function(){ const s=this.s; if(!s) return; s.dragThreshold(4);
-  s.onevent=e=>{ const n=e.id!=null&&this.byId&&this.byId.get(e.id); if(!n) return;
+  s.onevent=e=>{ if(e.kind===EV.SCROLL&&this.fields&&this.fields.length){ this.fields.forEach(f=>{ try{ if(f.place) f.place(); }catch(err){} }); } const n=e.id!=null&&this.byId&&this.byId.get(e.id); if(!n) return;
     if(e.kind===EV.ENTER&&n.hov!=null){ this.setHover(n); } else if(e.kind===EV.LEAVE&&this.hov===n){ this.setHover(null); }
     else if(e.kind===EV.CLICK&&n.act&&this.onact){ this.onact(n.el,n.act,n,modsOf(e),e); }
     else if((e.kind===EV.DRAGSTART||e.kind===EV.DRAG||e.kind===EV.DRAGEND)&&this.ondrag){ this.ondrag(e.kind===EV.DRAGSTART?'start':e.kind===EV.DRAGEND?'end':'move',n,modsOf(e),e); }
@@ -11802,7 +11811,9 @@ function attachFormFields(V){ /* pull live values before tear-down so a re-layou
   /* Focus only the remembered field; clicking a field focuses synchronously inside TextField.ev (user gesture).
      Auto-focus after async queue is best-effort (Safari may ignore outside the gesture). */
   const focusKey=wantFocus&&V.tf[wantFocus]?wantFocus:Object.keys(V.tf)[0];
-  if(focusKey&&V.tf[focusKey]) try{ V.tf[focusKey].focus(); guardTextFieldPointer(); }catch(e){} }
+  /* Keep the focused field on screen with its label. Do not pin it to y=0. */
+  if(focusKey&&V.view&&V.view.s&&V.view.L){ const n=(V.view.L.nodes||[]).find(q=>q.tf===focusKey&&q.hit); if(n){ const y=n.hit[1], h=n.hit[3]||28, VH=V.view.L.VH||0, H=V.view.L.H||0; if(VH>0&&H>VH){ const sp=V.view.s.scrollPos(JRViews.GID)||[0,0]; if(y<sp[1]+12||y+h>sp[1]+VH-12){ const next=Math.max(0, Math.min(H-VH, y-72)); V.view.s.scroll(JRViews.GID, sp[0]||0, next); } } } }
+  if(focusKey&&V.tf[focusKey]) try{ V.tf[focusKey].focus(); guardTextFieldPointer(); if(V.tf[focusKey].place) V.tf[focusKey].place(); }catch(e){} }
 
 function mkTf(doc,f,ph){ const el=doc.createElement('div'); el.className='ja-tf'; el.setAttribute('data-tf',f); el.setAttribute('data-ph',ph||f); el.setAttribute('style','min-height:28px;min-width:180px'); return el; }
 
@@ -12175,22 +12186,23 @@ function boardDoc(V,d){ /* remove Trip calendar button/text; resources; alts; fo
     const paying=!!((it.values||{}).payTo);
     if(paying){ row.classList.add('ja-payto'); row.setAttribute('data-payto','1'); }
     const vals=d.ownerDocument.createElement('span'); vals.className='ja-vals'; vals.textContent=budgetValueText(it); row.insertBefore(vals, chip);
-    const eat=d.ownerDocument.createElement('button'); eat.type='button'; eat.className='ja-joy'; eat.setAttribute('data-jv-act','brd:consume:'+id); eat.textContent=budgetConsuming(it)?'consuming':'not consuming'; row.insertBefore(eat, chip);
+    const eatOn=budgetConsuming(it);
+    const eat=d.ownerDocument.createElement('button'); eat.type='button'; eat.className='ja-joy'+(eatOn?' on':''); eat.setAttribute('aria-pressed',eatOn?'true':'false'); eat.setAttribute('data-jv-act','brd:consume:'+id); eat.textContent=eatOn?'consuming':'not consuming'; row.insertBefore(eat, chip);
     const edit=d.ownerDocument.createElement('button'); edit.type='button'; edit.className='ja-joy'; edit.setAttribute('data-jv-act','brd:values:'+id); edit.textContent='Set values'; row.insertBefore(edit, chip);
     if(budgetBoard&&boardCompId(V)==='board_expense'){
-      const pay=d.ownerDocument.createElement('button'); pay.type='button'; pay.className='ja-joy'; pay.setAttribute('data-jv-act','brd:pay:'+id);
+      const pay=d.ownerDocument.createElement('button'); pay.type='button'; pay.className='ja-joy'+(paying?' on':''); pay.setAttribute('aria-pressed',paying?'true':'false'); pay.setAttribute('data-jv-act','brd:pay:'+id);
       const debt=paying?AW.items[String(it.values.payTo).replace(/^item:/,'')]:null;
       pay.textContent=debt?('pays '+debt.name):'pays debt'; row.appendChild(pay);
     }
     const rm=d.ownerDocument.createElement('button'); rm.type='button'; rm.className='ja-joy'; rm.setAttribute('data-jv-act','brd:remove:'+id); rm.textContent='Remove'; row.appendChild(rm);
     const open=!!(V.open&&V.open[id]);
-    const tg=d.ownerDocument.createElement('button'); tg.setAttribute('data-jv-act','alt:tog:'+id); tg.textContent=(open?'▾':'▸')+' Alternatives ('+((it.alts&&it.alts.members)||[]).length+')'; row.appendChild(tg);
+    const tg=d.ownerDocument.createElement('button'); tg.className=open?'on':''; tg.setAttribute('aria-pressed',open?'true':'false'); tg.setAttribute('data-jv-act','alt:tog:'+id); tg.textContent=(open?'▾':'▸')+' Alternatives ('+((it.alts&&it.alts.members)||[]).length+')'; row.appendChild(tg);
     const ad=d.ownerDocument.createElement('button'); ad.setAttribute('data-jv-act','alt:add:'+id); ad.textContent='+ Add alternative'; row.appendChild(ad);
     if(open&&it.alts){ (it.alts.members||[]).forEach(m=>{ const mid=String(m).replace(/^item:/,''); const o=(V.atlasW||W).items[mid]||{}; const ref='item:'+mid;
       const sp=d.ownerDocument.createElement('span'); sp.className='ja-chip'; sp.textContent=o.name||mid; row.appendChild(sp);
       const pref=(it.alts.pref===ref); const restricted=((it.alts.unavail||[]).indexOf(ref)>=0);
-      const star=d.ownerDocument.createElement('button'); star.type='button'; star.className='ja-joy'+(pref?' on':''); star.setAttribute('data-jv-act','alt:pref:'+id+'/'+mid); star.textContent=pref?'★':'☆'; row.appendChild(star);
-      const block=d.ownerDocument.createElement('button'); block.type='button'; block.className='ja-joy'+(restricted?' err':''); block.setAttribute('data-jv-act','alt:restrict:'+id+'/'+mid); block.textContent='×'; row.appendChild(block);
+      const star=d.ownerDocument.createElement('button'); star.type='button'; star.className='ja-joy'+(pref?' on':''); star.setAttribute('aria-pressed',pref?'true':'false'); star.setAttribute('data-jv-act','alt:pref:'+id+'/'+mid); star.textContent=pref?'★':'☆'; row.appendChild(star);
+      const block=d.ownerDocument.createElement('button'); block.type='button'; block.className='ja-joy'+(restricted?' err':''); block.setAttribute('aria-pressed',restricted?'true':'false'); block.setAttribute('data-jv-act','alt:restrict:'+id+'/'+mid); block.textContent='×'; row.appendChild(block);
     }); }
   });
   if(V.form&&V.form.kind==='payto'){ const wrap=d.ownerDocument.createElement('div'); wrap.className='ja-detail'; wrap.setAttribute('data-exp7-form','payto');
@@ -12212,7 +12224,9 @@ function boardDoc(V,d){ /* remove Trip calendar button/text; resources; alts; fo
       bt.setAttribute('data-jv-act','use:'+it.id); bt.className=on?'on':''; bt.textContent=(on?'✓ ':'')+it.name; wrap.appendChild(bt); }); }
     const ok=d.ownerDocument.createElement('button'); ok.setAttribute('data-jv-act','form:ok'); ok.textContent=V.form.kind==='values'?'Save':'Create'; wrap.appendChild(ok);
     const cx=d.ownerDocument.createElement('button'); cx.setAttribute('data-jv-act','form:cancel'); cx.textContent='Cancel'; wrap.appendChild(cx);
-    d.appendChild(wrap); }
+    /* Resource name sits with Add resource, not after the item list and not at the top of the screen. */
+    if(V.form.kind==='resource'&&resBox.parentNode) resBox.parentNode.insertBefore(wrap, resBox.nextSibling);
+    else d.appendChild(wrap); }
   V.boardHasTrip=/\bTrip calendar\b/i.test(d.textContent); V.boardRes=resourcesOf(V.atlasW||W).map(x=>x.name); }
 
 function hostFormAct(V,a){ const W=activeAtlas(V)||{items:{},components:{}}; if(a.startsWith('pick:')){ const id=a.slice(5); if(!V.form) return; V.form.itemId=id; const it=W.items[id]; V.note='picked '+(it&&it.name||id)+' · requires '+((it&&it.jreq)?String(it.jreq).replace(/^item:/,''):'—'); return V.sess&&V.queue(V.sess,'form'); }
@@ -13346,7 +13360,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.23",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.24",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
