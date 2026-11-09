@@ -97,7 +97,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.26. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.27. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -5973,7 +5973,7 @@ const hex = (s) => { s = s.replace('#', ''); if (s.length <= 4) s = [...s].map(c
 const b64ToBytes = (t) => { t = t.replace(/[^A-Za-z0-9+/]/g, ''); if (typeof atob === 'function') { const s = atob(t), o = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) o[i] = s.charCodeAt(i); return o; } return new Uint8Array(Buffer.from(t, 'base64')); };
 const B91 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,./:;<=>?@[]^_`{|}~"';
 const b91ToBytes = (t) => { const D = new Int16Array(256).fill(-1); for (let i = 0; i < 91; i++) D[B91.charCodeAt(i)] = i;
-  const o = new Uint8Array(Math.ceil(t.length * 0.82) + 4); let n = 0, v = -1, b = 0, k = 0;
+  const o = new Uint8Array(Math.ceil(t.length * 0.875) + 4); let n = 0, v = -1, b = 0, k = 0;
   for (let i = 0; i < t.length; i++) { const c = D[t.charCodeAt(i)]; if (c < 0) continue; if (v < 0) { v = c; continue; } v += c * 91; b |= v << k; k += (v & 8191) > 88 ? 13 : 14; do { o[n++] = b & 255; b >>>= 8; k -= 8; } while (k > 7); v = -1; }
   if (v >= 0) o[n++] = (b | v << k) & 255; return o.slice(0, n); };
 // read a <script type="text/plain" id=...> block written by embed.py (data-enc="b91" or "b64")
@@ -6196,8 +6196,13 @@ class Renderer {
   createScene(w, h) { const s = this.core.createScene(w, h, this.dpr || 1); this.gpuScene(s); return s; }
   gpuScene(s) { const r = this; s.gpu = { r, vb: null, gb: null, ub: null, bg: null, ranges: new Uint32Array(0),
     free() { for (const b of [this.vb, this.gb, this.ub]) if (b) { r.M.buf -= b.size; b.destroy(); } r.entries = r.entries.filter(e => e.scene !== s); } }; }
-  // place scenes: list of { scene, x, y, w, h } in CSS px (x, y snap to device px). Draw order = list order.
-  layout(list) { this.entries = list; for (const e of list) { e.scene.resize(e.w, e.h, this.dpr || 1); } this.request(); }
+  // place scenes: list of { scene, x, y, w, h, hit? } in CSS px (x, y snap to device px). Draw order = list order.
+  // hit 'capture' (default) is the topmost rect. hit 'fallthrough' takes the pointer only where the scene has a hit or a scroll group.
+  // A Core-only scene is attached here so sync() is not handed a null scene.gpu.
+  layout(list) { this.entries = list; for (const e of list) { if (!e.scene.gpu && e.scene.h) this.gpuScene(e.scene); e.scene.resize(e.w, e.h, this.dpr || 1); } this.request(); }
+  pick(X, Y) { for (let i = this.entries.length - 1; i >= 0; i--) { const e = this.entries[i]; if (!e.scene.h || !(X >= e.x && Y >= e.y && X < e.x + e.w && Y < e.y + e.h)) continue;
+      const lx = X - e.x, ly = Y - e.y; if ((e.hit || e.scene.hitPolicy || 'capture') === 'fallthrough' && e.scene.hit(lx, ly) === null && e.scene.scrollAt(lx, ly) === null) continue;
+      return [e.scene, lx, ly, e]; } return null; }
   sync(s) { const g = s.gpu, x = this.core.x, h = s.h, q = this.dev.queue, fl = x.jrd_flags(h), mem = x.memory.buffer;
     const vlen = x.jrd_len(h, 0);
     if (!g.vb || g.vb.size < vlen || fl & F.REALLOC) { const nb = this.buffer(g.vb, Math.max(vlen, 16), GPUBufferUsage.VERTEX); const full = nb !== g.vb || fl & F.REALLOC; g.vb = nb; if (full && vlen) q.writeBuffer(g.vb, 0, mem, x.jrd_ptr(h, 0), vlen); }
@@ -6210,17 +6215,19 @@ class Renderer {
     x.jrd_clean(h); }
   request() { if (!this.raf && typeof requestAnimationFrame === 'function') this.raf = requestAnimationFrame(() => { this.raf = 0; this.draw(); }); }
   // draw all placed scenes now (one render pass). Returns the number of draw calls.
-  draw() { if (!this.msaa || this.hidden || this.lost) return 0; for (const e of this.entries) if (e.scene.h) this.sync(e.scene);
+  draw() { if (!this.msaa || this.hidden || this.lost) return 0; for (const e of this.entries) if (e.scene.h && e.scene.gpu) this.sync(e.scene);
     this.ca.resolveTarget = this.ctx.getCurrentTexture().createView(); const enc = this.dev.createCommandEncoder(), p = enc.beginRenderPass(this.rp); let n = 0; const d = this.dpr;
-    for (const e of this.entries) { const g = e.scene.gpu; if (!e.scene.h || !g.ranges.length) continue;
+    for (const e of this.entries) { const g = e.scene.gpu; if (!e.scene.h || !g || !g.ranges.length) continue;
       const vx = Math.round(e.x * d), vy = Math.round(e.y * d), vw = Math.round(e.w * d), vh = Math.round(e.h * d);
       const cx = Math.max(0, vx), cy = Math.max(0, vy), cw = Math.min(this.c.width, vx + vw) - cx, chh = Math.min(this.c.height, vy + vh) - cy; if (cw <= 0 || chh <= 0) continue;
       p.setViewport(vx, vy, vw, vh, 0, 1); p.setScissorRect(cx, cy, cw, chh); p.setPipeline(this.pipe); p.setBindGroup(0, g.bg); p.setVertexBuffer(0, g.vb);
       for (let i = 0; i < g.ranges.length; i += 2) { p.draw(g.ranges[i + 1], 1, g.ranges[i], 0); n++; } }
     p.end(); this.dev.queue.submit([enc.finish()]); this.draws = n; this.cursorSync(); return n; }
   // cursor from the current hit state under the last pointer position (after patches, scrolls and layout changes too)
-  cursorSync() { const q = this.ptr; if (!q || !this.attached) return; const e = this.entries.find(t => t.scene === q.s && t.scene.h); let cur = '';
-    if (e) { const X = q.X - e.x, Y = q.Y - e.y; if (X >= 0 && Y >= 0 && X < e.w && Y < e.h && e.scene.hit(X, Y) !== null) cur = 'pointer'; }
+  cursorSync() { const q = this.ptr; if (!q || !this.attached) return; let cur = '', t = null;
+    if (q.cap) { const e = this.entries.find(t => t.scene === q.s && t.scene.h); if (e) { const X = q.X - e.x, Y = q.Y - e.y; if (X >= 0 && Y >= 0 && X < e.w && Y < e.h) t = [e.scene, X, Y, e]; } }
+    else t = this.pick(q.X, q.Y);
+    if (t && t[0].hit(t[1], t[2]) !== null) cur = 'pointer';
     if (this.c.style.cursor !== cur) this.c.style.cursor = cur; }
   // Keep the canvas backing store matched to its CSS box: ResizeObserver (device-pixel-content-box where supported, else
   // content box x devicePixelRatio) plus a resolution media query for DPR changes (zoom, moving to another screen). onresize(w, h, dpr)
@@ -6253,7 +6260,7 @@ class Renderer {
   // opts.touchHits: true also keeps touches that start on plain hit regions (the v2 behaviour). Any other touchAction string is set as
   // the CSS value as is (for example 'none' to keep every touch).
   attach(o = {}) { if (this.attached) return this.attached; const c = this.c, L = [], on = (n, f, op, t = c) => { t.addEventListener(n, f, op); L.push([n, f, op, t]); };
-    const at = (X, Y) => { for (let i = this.entries.length - 1; i >= 0; i--) { const e = this.entries[i]; if (e.scene.h && X >= e.x && Y >= e.y && X < e.x + e.w && Y < e.y + e.h) return [e.scene, X - e.x, Y - e.y, e]; } return null; };
+    const at = (X, Y) => this.pick(X, Y);
     const pos = (ev) => { const r = c.getBoundingClientRect(), kx = r.width > 0 && this.cw > 0 ? this.cw / r.width : 1, ky = r.height > 0 && this.chh > 0 ? this.chh / r.height : 1; return [(ev.clientX - r.left) * kx, (ev.clientY - r.top) * ky]; };
     const mods = (ev) => (ev.shiftKey ? 1 : 0) | (ev.ctrlKey ? 2 : 0) | (ev.altKey ? 4 : 0) | (ev.metaKey ? 8 : 0);
     let cap = null, capId = null, last = null; const K = { pointermove: 0, pointerdown: 1, pointerup: 2, pointercancel: 4 };
@@ -6261,7 +6268,7 @@ class Renderer {
       if (cap && k !== 1) { const e = this.entries.find(q => q.scene === cap); t = e ? [cap, X - e.x, Y - e.y, e] : null; } else t = at(X, Y);
       if (last && (!t || t[0] !== last)) last.pointer(3, 0, 0, 0); last = t ? t[0] : null; this.ptr = t ? { s: t[0], X, Y } : null;
       if (t) { t[0].vo = [t[3].x, t[3].y]; if (k === 1) { cap = t[0]; capId = ev.pointerId; try { c.setPointerCapture?.(ev.pointerId); } catch (e) { } } this.keepFocus = false; t[0].pointer(k, t[1], t[2], ev.buttons, ev.pointerId, mods(ev)); }
-      if (k === 2 || k === 4) { cap = null; capId = null; } this.cursorSync(); if (!t && c.style.cursor) c.style.cursor = ''; };
+      if (k === 2 || k === 4) { cap = null; capId = null; } if (this.ptr) this.ptr.cap = !!cap; this.cursorSync(); if (!t && c.style.cursor) c.style.cursor = ''; };
     for (const n in K) on(n, pf);
     on('lostpointercapture', (ev) => { if (cap && ev.pointerId === capId) { cap.pointer(4, 0, 0, 0, ev.pointerId, 0); cap = null; capId = null; } });
     // a text field took focus on this press: keep the browser from moving focus to the canvas on mousedown
@@ -6629,6 +6636,131 @@ root.JRender = { EV, EVNAME, NF, MOD, RS, GF, F, rgba, hex, b64ToBytes, b91ToByt
 })(typeof globalThis !== "undefined" ? globalThis : this);
 
 
+</script>
+<script data-exp7-shared="view-store">
+/* Exp7 view store (2026-11-09). JRDL v1 records on the shared Core. A number passed as a font is a slot already loaded on that Core. */
+(function (root) {
+  'use strict';
+  var MAGIC = 0x5056524a;
+  function J0(J) { J = J || root.JRender; if (!J || !J.Core) throw new Error('viewstore: JRender namespace missing'); return J; }
+  function ascii(bytes) { var s = ''; for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return s; }
+  function openPack(bytes, J) {
+    J = J0(J); var u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    var dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength), o = 0;
+    if (dv.getUint32(0, true) !== MAGIC) throw new Error('viewstore: not a JRVP pack');
+    var ver = dv.getUint32(4, true); if (ver !== 1) throw new Error('viewstore: JRVP version ' + ver);
+    var cl = dv.getUint32(8, true); o = 12; var catalog = JSON.parse(ascii(u8.subarray(o, o + cl))); o += (cl + 3) & ~3;
+    var n = dv.getUint32(o, true); o += 4; var blobs = [];
+    for (var i = 0; i < n; i++) { var len = dv.getUint32(o, true); o += 4; blobs.push(new Uint8Array(u8.subarray(o, o + len))); o += (len + 3) & ~3; }
+    return new Store(catalog, function (rec) { return blobs[rec.dl.blob]; }, J);
+  }
+  function openFolder(catalog, read, J) {
+    J = J0(J); var recs = {};
+    for (var i = 0; i < catalog.views.length; i++) { var v = catalog.views[i]; if (!v.record || typeof v.record === 'string') { var r = JSON.parse(ascii(read(v.record))); recs[v.id] = r; } }
+    var cat = JSON.parse(JSON.stringify(catalog)); cat.views = cat.views.map(function (v) { return Object.assign({}, v, { record: recs[v.id] || v.record }); });
+    return new Store(cat, function (rec) { return read(rec.dl.file); }, J);
+  }
+  function Store(catalog, dlOf, J) {
+    if (!catalog || catalog.format !== 'exp7-view-store/1') throw new Error('viewstore: unknown catalog format');
+    this.catalog = catalog; this.J = J; this.dlOf = dlOf; this.core = null; this.res = null; this.cache = {};
+    this.byId = {}; for (var i = 0; i < catalog.views.length; i++) this.byId[catalog.views[i].id] = catalog.views[i];
+  }
+  Store.prototype.list = function (role) { return this.catalog.views.filter(function (v) { return !role || v.role === role; }).map(function (v) { return v.id; }); };
+  Store.prototype.record = function (id) { var v = this.byId[id]; if (!v) throw new Error('viewstore: no view ' + id); return v.record; };
+  Store.prototype.dl = function (id) { if (!this.cache[id]) this.cache[id] = this.dlOf(this.record(id)); return this.cache[id]; };
+  Store.prototype.bindResources = function (core, fonts) {
+    var R = this.catalog.resources || {}, out = { fonts: {}, palettes: R.palettes || {} }, F = R.fonts || [];
+    for (var i = 0; i < F.length; i++) { var f = F[i], b = fonts && fonts[f.rid]; if (b == null) throw new Error('viewstore: font ' + f.rid + ' not provided');
+      var id = typeof b === 'number' ? b : core.font(b); if (id !== f.slot) throw new Error('viewstore: font ' + f.rid + ' got id ' + id + ', DL expects ' + f.slot + ' (bind resources first, in catalog order, on a fresh Core)');
+      out.fonts[f.rid] = id; }
+    this.core = core; this.res = out; return out;
+  };
+  Store.prototype.create = function (id, o) {
+    o = o || {}; var J = this.J, core = o.core || this.core, rec = this.record(id);
+    if (!core) throw new Error('viewstore: bindResources(core) before create()');
+    if (this.core && core !== this.core) throw new Error('viewstore: views must share the Core the resources were bound to');
+    var needs = (rec.resources && rec.resources.fonts) || []; for (var i = 0; i < needs.length; i++) if (!this.res || this.res.fonts[needs[i]] == null) throw new Error('viewstore: resource ' + needs[i] + ' not bound');
+    if (o.renderer && o.renderer.core !== core) throw new Error('viewstore: renderer must share the store Core (Renderer.init({ core }))');
+    var scene = core.createScene(rec.canvas.w, rec.canvas.h, o.dpr || 1);
+    scene.load(this.dl(id));
+    scene.hitPolicy = rec.hit; scene.viewId = rec.id;
+    if (o.renderer) o.renderer.gpuScene(scene);
+    return new View(this, rec, scene, o);
+  };
+  Store.prototype.layout = function (list) {
+    return list.map(function (it) { var v = it[0]; return { scene: v.scene, x: it[1], y: it[2], w: it[3] != null ? it[3] : v.record.canvas.w, h: it[4] != null ? it[4] : v.record.canvas.h, hit: v.record.hit, role: v.record.role, id: v.record.id }; });
+  };
+  Store.prototype.compose = function (renderer, list) {
+    var es = this.layout(list), seenOverlay = false;
+    for (var i = 0; i < es.length; i++) { if (!es[i].scene.gpu) throw new Error('viewstore: ' + es[i].id + ' has no scene.gpu (create it with { renderer })');
+      if (es[i].role === 'overlay') seenOverlay = true; else if (seenOverlay) throw new Error('viewstore: slot ' + es[i].id + ' placed after an overlay'); }
+    renderer.layout(es); return es;
+  };
+  function View(store, rec, scene, o) {
+    var J = store.J; this.store = store; this.record = rec; this.id = rec.id; this.role = rec.role; this.hit = rec.hit; this.scene = scene; this.states = null; this.motion = null;
+    if (rec.bind && rec.bind.length) { var vs = this.states = new J.ViewStates(scene, { states: rec.states, reduced: !!o.reduced, edgeMs: rec.edgeMs == null ? 120 : rec.edgeMs });
+      for (var i = 0; i < rec.bind.length; i++) vs.register(rec.bind[i].id, rec.bind[i]); for (var k = 0; k < rec.bind.length; k++) vs.go(rec.bind[k].id, rec.initial || 'idle', 0); }
+    if (rec.motion) { var M = MOTIONS[rec.motion.kind]; if (!M) throw new Error('viewstore: unknown motion ' + rec.motion.kind); this.motion = new M(J, scene, rec, o); }
+  }
+  View.prototype.tick = function (t) { return this.states ? this.states.tick(t) : false; };
+  View.prototype.go = function (name, t) { if (!this.states) return false; var b = this.record.bind; for (var i = 0; i < b.length; i++) this.states.go(b[i].id, name, t || 0); return true; };
+  View.prototype.setReduced = function (on) { if (this.states) this.states.setReduced(on); if (this.motion) this.motion.setReduced(on); };
+  View.prototype.bindEvents = function (cb, now) {
+    var self = this, J = this.store.J, subj = this.record.events && this.record.events.subject, clock = now || function () { return typeof performance !== 'undefined' ? performance.now() : Date.now(); };
+    this.scene.onevent = function (e) { if (subj == null || e.id !== subj || !self.states) { if (cb) cb(self, e); return; } var t = clock();
+      if (e.kind === J.EV.ENTER) self.states.pointer(subj, 'enter', t); else if (e.kind === J.EV.LEAVE) self.states.pointer(subj, 'leave', t);
+      else if (e.kind === J.EV.DOWN) self.states.pointer(subj, 'down', t); else if (e.kind === J.EV.UP) self.states.pointer(subj, 'up', t);
+      else if (e.kind === J.EV.CANCEL) self.states.go(subj, 'idle', t);
+      self.lastStateMs = clock() - t;
+      if (cb) cb(self, e); };
+    return this;
+  };
+  function mul(A, B) { return [A[0] * B[0] + A[2] * B[1], A[1] * B[0] + A[3] * B[1], A[0] * B[2] + A[2] * B[3], A[1] * B[2] + A[3] * B[3], A[0] * B[4] + A[2] * B[5] + A[4], A[1] * B[4] + A[3] * B[5] + A[5]]; }
+  function T(x, y) { return [1, 0, 0, 1, x, y]; }
+  function Rd(deg) { var a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a); return [c, s, -s, c, 0, 0]; }
+  function Sx(k) { return [k, 0, 0, 1, 0, 0]; }
+  function samp(arr, x) { var n = arr.length - 1, xc = Math.max(0, Math.min(n, x)), i = Math.floor(xc), t = xc - i; return arr[i] + (arr[Math.min(i + 1, n)] - arr[i]) * t; }
+  function sampK(keys, x, c) { var n = keys.length - 1, xc = Math.max(0, Math.min(n, x)), i = Math.floor(xc), t = xc - i; return keys[i][c] + (keys[Math.min(i + 1, n)][c] - keys[i][c]) * t; }
+  var ease = function (u) { return 0.5 - 0.5 * Math.cos(Math.PI * Math.max(0, Math.min(1, u))); };
+  function SwimTravel(J, scene, rec, o) {
+    this.J = J; this.scene = scene; this.rec = rec; this.m = rec.motion; this.parts = rec.nodes.parts;
+    this.w = rec.canvas.w; this.h = rec.canvas.h; this.mt = 0; this.last = null; this.reduced = !!o.reduced; this.userP = false; this.hiddenP = false;
+    this.patches = 0; this.apply(this.reduced ? this.stillPose() : this.poseAt(0)); this.sync();
+  }
+  SwimTravel.prototype.setRect = function (w, h) { this.w = w; this.h = h; this.apply(this.reduced ? this.stillPose() : this.poseAt(this.mt)); };
+  SwimTravel.prototype.cycleMs = function () { var t = this.m.travel; return 2 * (t.legMs + t.turnMs); };
+  SwimTravel.prototype.poseAt = function (mt) {
+    var tr = this.m.travel, L = tr.legMs, Tn = tr.turnMs, cyc = this.cycleMs(), u = ((mt % cyc) + cyc) % cyc, x0 = tr.x0 * this.w, x1 = tr.x1 * this.w, x, f, st;
+    if (u < L) { x = x0 + (x1 - x0) * ease(u / L); f = 1; st = 'swim-out'; }
+    else if (u < L + Tn) { x = x1; f = Math.cos(Math.PI * (u - L) / Tn); st = 'turn-back'; }
+    else if (u < 2 * L + Tn) { x = x1 + (x0 - x1) * ease((u - L - Tn) / L); f = -1; st = 'swim-back'; }
+    else { x = x0; f = -Math.cos(Math.PI * (u - 2 * L - Tn) / Tn); st = 'turn-out'; }
+    var y = tr.y * this.h + tr.wanderPx * Math.sin(2 * Math.PI * mt / (cyc / 2));
+    return { x: x, y: y, facing: f, phase: (mt / 1000 * this.m.cycleHz) % 1, state: st };
+  };
+  SwimTravel.prototype.stillPose = function () { var s = this.m.still; return { x: s.x * this.w, y: s.y * this.h, facing: s.facing, phase: s.phase, state: 'still' }; };
+  SwimTravel.prototype.matrices = function (p) {
+    var c = this.m.clip, fx = c.frames * p.phase, fk = sampK(c.fish, fx, 0), fy = sampK(c.fish, fx, 1), fr = sampK(c.fish, fx, 2);
+    var f = Math.abs(p.facing) < 0.02 ? (p.facing < 0 ? -0.02 : 0.02) : p.facing;
+    var W = mul(mul(mul(T(p.x, p.y), Sx(f)), T(fk, fy)), Rd(fr)), out = {};
+    for (var i = 0; i < this.parts.length; i++) { var q = this.parts[i], M = W;
+      if (q.track) { var a = samp(c.rotate[q.track], fx); M = mul(W, mul(mul(T(q.pivot[0], q.pivot[1]), Rd(a)), T(-q.pivot[0], -q.pivot[1]))); }
+      out[q.id] = M; }
+    return out;
+  };
+  SwimTravel.prototype.apply = function (p) { var M = this.matrices(p), P = new this.J.Patch(); for (var id in M) P.xform(+id, M[id]); this.scene.patch(P); this.pose = p; this.state = this.reduced ? 'still' : this.playing === false ? 'paused' : p.state; this.patches++; return p; };
+  SwimTravel.prototype.step = function (now) {
+    if (!this.playing) { this.last = null; return false; }
+    if (this.last != null) this.mt += Math.min(this.m.maxDtMs || 50, Math.max(0, now - this.last)); this.last = now;
+    this.apply(this.poseAt(this.mt)); return true;
+  };
+  SwimTravel.prototype.sync = function () { this.playing = !this.reduced && !this.userP && !this.hiddenP; this.last = null; this.state = this.reduced ? 'still' : !this.playing ? 'paused' : (this.pose ? this.pose.state : 'swim-out'); return this.playing; };
+  SwimTravel.prototype.pause = function (why) { if (why === 'hidden') this.hiddenP = true; else this.userP = true; return this.sync(); };
+  SwimTravel.prototype.resume = function (why) { if (why === 'hidden') this.hiddenP = false; else this.userP = false; return this.sync(); };
+  SwimTravel.prototype.setReduced = function (on) { this.reduced = !!on; this.apply(on ? this.stillPose() : this.poseAt(this.mt)); return this.sync(); };
+  var MOTIONS = { 'swim-travel': SwimTravel };
+  root.Exp7ViewStore = { MAGIC: MAGIC, openPack: openPack, openFolder: openFolder, Store: Store, View: View, MOTIONS: MOTIONS, affine: { mul: mul, T: T, R: Rd, Sx: Sx } };
+})(typeof globalThis !== 'undefined' ? globalThis : this);
 </script>
 <script data-exp7-shared="jrender-images">
 /* JRender host Image / bitmap ABI (JRDI) - real WebGPU only, shared GPUContext.
@@ -10171,8 +10303,8 @@ View.prototype.show=async function(canvas,root,W,opt){ opt=opt||{};
   canvas.style.width=W+'px'; canvas.style.height=VH+'px'; canvas.style.maxWidth=''; canvas.style.display='block';
   const dpr=Math.min(devicePixelRatio||1,3);
   let mode;
-  if(!this.s||opt.rebuild){ if(this.s){ this.s.free(); } this.r.resize(W,VH,dpr); this.s=this.r.createScene(W,VH); this.s.dragThreshold(4); this.s.load(fullDL(L,W,VH)); this.r.layout([{scene:this.s,x:0,y:0,w:W,h:VH}]); this.r.attach(); /* idempotent; cursor and touch-action handled by JRender */ this.wire(); this.loads++; mode='load'; this.patchOps=null; }
-  else { if(this.hov){ const hp=new Patch(); hp.colorItem(this.hov.id,0,this.hov.base); this.s.patch(hp); } /* restore the hovered fill so the diff starts from the drawn base state */ const keepScroll=this.s.scrollPos(GID); const {p,ops}=diff(this.L,L,W,VH); if(this.L.VH!==VH||this.L.W!==W){ this.r.resize(W,VH,dpr); this.r.layout([{scene:this.s,x:0,y:0,w:W,h:VH}]); }
+  if(!this.s||opt.rebuild){ if(this.s){ this.s.free(); } this.r.resize(W,VH,dpr); this.s=this.r.createScene(W,VH); this.s.dragThreshold(4); this.s.load(fullDL(L,W,VH)); this.placeScenes(W,VH); this.r.attach(); /* idempotent; cursor and touch-action handled by JRender */ this.wire(); this.loads++; mode='load'; this.patchOps=null; }
+  else { if(this.hov){ const hp=new Patch(); hp.colorItem(this.hov.id,0,this.hov.base); this.s.patch(hp); } /* restore the hovered fill so the diff starts from the drawn base state */ const keepScroll=this.s.scrollPos(GID); const {p,ops}=diff(this.L,L,W,VH); if(this.L.VH!==VH||this.L.W!==W){ this.r.resize(W,VH,dpr); this.placeScenes(W,VH); }
     if(ops.n) this.s.patch(p); this.s.scroll(GID,keepScroll[0],keepScroll[1]); this.patches++; this.patchOps=ops; mode='patch'; }
   const hid=this.hov&&this.hov.id; this.hov=null; this.L=L; this.byId=new Map(L.nodes.map(n=>[n.id,n])); const hn=hid&&this.byId.get(hid); if(hn&&hn.hov!=null) this.setHover(hn); /* pointer still over the same id: keep its hover */ this.r.draw(); this.ms=performance.now()-t0;
   return {ms:this.ms,mode,px:[canvas.width,canvas.height],L,VH,ops:this.patchOps,handle:this.s.h}; };
@@ -10184,6 +10316,19 @@ View.prototype.wire=function(){ const s=this.s; if(!s) return; s.dragThreshold(4
   }; };
 View.prototype.setHover=function(n){ const p=new Patch(); if(this.hov&&this.byId.get(this.hov.id)===this.hov) p.colorItem(this.hov.id,0,this.hov.base); if(n) p.colorItem(n.id,0,n.hov); /* item 0 = the fill; border/text keep their colours */ this.hov=n; this.s.patch(p); this.r.draw(); };
 View.prototype.textField=function(o){ if(!this.r||!this.s) return null; const f=this.r.textField(this.s,o); this.fields.push(f); return f; };
+/* Document scene is the slot. Stored overlays stay after it across rebuilds. layout() is not called per frame. */
+View.prototype.placeScenes=function(W,VH){ if(!this.r||!this.s) return; W=W!=null?W:(this.L&&this.L.W); VH=VH!=null?VH:(this.L&&this.L.VH);
+  const entries=[{scene:this.s,x:0,y:0,w:W,h:VH,hit:'capture',role:'slot',id:'document'}];
+  for(const v of this._overlays||[]){ const c=(v.record&&v.record.canvas)||{};
+    const w=this._overlayCover?W:(c.w||W), h=this._overlayCover?VH:(c.h||VH);
+    entries.push({scene:v.scene,x:0,y:0,w:w,h:h,hit:v.hit||'fallthrough',role:'overlay',id:v.id});
+    if(v.motion&&v.motion.setRect) v.motion.setRect(w,h); }
+  this.r.layout(entries); return entries; };
+View.prototype.setOverlays=function(views,opt){ views=views||[];
+  for(const v of views){ if(v.role==='slot') throw new Error('JRViews: slot '+(v.id||'')+' cannot cover the document');
+    if(!v.scene||!v.scene.gpu) throw new Error('JRViews: '+(v.id||'overlay')+' has no scene.gpu');
+    if(this.r&&v.scene.gpu.r&&v.scene.gpu.r!==this.r) throw new Error('JRViews: overlay '+(v.id||'')+' is on another renderer'); }
+  this._overlays=views.slice(); this._overlayCover=!!(opt&&opt.cover); if(this.r&&this.s) this.placeScenes(); return this; };
 /* test helpers: pixels and hit ids of the live (patched) scene vs a fresh full load of the same layout */
 View.prototype.verify=async function(){ const W=this.L.W, VH=this.L.VH, sp=this.s.scrollPos(GID), hv=this.hov; if(hv) this.setHover(null);
   const a=await this.r.read(); const cv=document.createElement('canvas'); cv.style.cssText='position:fixed;left:-9999px;top:0;width:'+W+'px;height:'+VH+'px'; document.body.appendChild(cv);
@@ -10216,7 +10361,7 @@ async function selfTest(){ await boot(); const out={};
   const Lr=layout(d1,220); const rb=Lr.tboxes.find(t=>t.kind==='rich'); const rLay=rb?CORE.richLayout([{text:'Plan risk: ',size:rb.size,color:0xffffffff},{text:'CRITICAL',size:rb.size,color:0xffffffff,bold:true},{text:' days and ',size:rb.size,color:0xffffffff},{text:'MODERATE',size:rb.size,color:0xffffffff,italic:true},{text:' slack use the same legend.',size:rb.size,color:0xffffffff}],{maxw:rb.maxw,lineHeight:rb.lh,font:FONT,boldFont:FONTB}):null;
   out.rich={boxes:Lr.tboxes.length,kinds:Lr.tboxes.map(t=>t.kind),hasRich:!!rb,height:rb&&rb.height,count:rb&&rb.count,lh:rb&&rb.lh,coreHeight:rLay&&rLay.height,sane:!!(rb&&rb.lh<=3&&rb.height<=rb.size*rb.lh*rb.count+2&&rb.height<80)};
   out.pipelines=GC.builds||0; out.users=GC.users; out.boldFont=FONTB; out.MOD=!!MOD; out.RS=!!RS; out.TextField=typeof TextField==='function'; return out; }
-window.JRViews={layout,View,boot,core,fullDL,diff,GID,selfTest,gc:()=>GC,font:()=>FONT,fontBold:()=>FONTB,metrics:()=>CORE?CORE.metrics(FONT):null,mem:()=>CORE?CORE.wasmBytes():0,MOD,RS,ViewStates:()=>window.JRender&&window.JRender.ViewStates,ID_BANDS:{textFieldHigh:[0x1,0x2,0x4,0x5,0x7],hostFields:0x50000000,tfXor:{group:0x40000000,content:0x20000000,caret:0x10000000}}};
+window.JRViews={layout,View,boot,core,fullDL,diff,GID,selfTest,gc:()=>GC,font:()=>FONT,fontBold:()=>FONTB,metrics:()=>CORE?CORE.metrics(FONT):null,mem:()=>CORE?CORE.wasmBytes():0,viewStore:()=>window.Exp7ViewStore,MOD,RS,ViewStates:()=>window.JRender&&window.JRender.ViewStates,ID_BANDS:{textFieldHigh:[0x1,0x2,0x4,0x5,0x7],hostFields:0x50000000,tfXor:{group:0x40000000,content:0x20000000,caret:0x10000000}}};
 })();
 
 
@@ -10227,13 +10372,19 @@ window.JRViews={layout,View,boot,core,fullDL,diff,GID,selfTest,gc:()=>GC,font:()
 const each=f=>{for(const V of Object.values(root.exp7views&&root.exp7views.JVS||{}))if(V._vs)f(V,V._vs);};
 const hidden=()=>typeof document!=='undefined'&&!!document.hidden;
 let mq=null;try{if(typeof matchMedia==='function')mq=matchMedia('(prefers-reduced-motion: reduce)');}catch(_){}
-function kick(V){if(V._motionKick)return V._motionKick();V._motionKick=()=>{if(!V._vs||V._vsRaf||V._vs.hidden||V._vs.reduced||hidden()||!V._vs.needsFrame())return;const step=()=>{V._vsRaf=0;if(!V._vs||V._vs.hidden||V._vs.reduced||hidden())return;if(V._vs.tick(performance.now())&&V.view.r)V.view.r.draw();if(V._vs.needsFrame())V._vsRaf=requestAnimationFrame(step);};V._vsRaf=requestAnimationFrame(step);};V._motionKick();}
+function overlaysOf(V){return (V.view&&V.view._overlays)||[];}
+function overlayLive(V){if(hidden())return false;for(const v of overlaysOf(V)){if(v.motion&&v.motion.playing)return true;if(v.states&&v.states.needsFrame&&v.states.needsFrame())return true;}return false;}
+function stepOverlays(V,t){let more=false;for(const v of overlaysOf(V)){if(v.tick&&v.tick(t))more=true;if(v.motion&&v.motion.step(t))more=true;}return more;}
+function syncOverlays(V){const red=!!(mq&&mq.matches),hid=hidden();for(const v of overlaysOf(V)){if(v.setReduced)v.setReduced(red);if(v.motion){if(hid)v.motion.pause('hidden');else v.motion.resume('hidden');}}}
+function eachView(f){for(const V of Object.values(root.exp7views&&root.exp7views.JVS||{}))f(V);}
+function kick(V){if(V._motionKick)return V._motionKick();V._motionKick=()=>{if(V._vsRaf||hidden())return;if(!overlayLive(V)&&(!V._vs||V._vs.hidden||V._vs.reduced||!V._vs.needsFrame()))return;const step=()=>{V._vsRaf=0;if(hidden())return;const t=performance.now();let drew=false;if(V._vs&&!V._vs.hidden&&!V._vs.reduced&&V._vs.tick(t))drew=true;if(stepOverlays(V,t))drew=true;if(drew&&V.view.r)V.view.r.draw();if((V._vs&&!V._vs.hidden&&!V._vs.reduced&&V._vs.needsFrame())||overlayLive(V))V._vsRaf=requestAnimationFrame(step);};V._vsRaf=requestAnimationFrame(step);};V._motionKick();}
 function stop(V){if(V._vsRaf&&typeof cancelAnimationFrame==='function')cancelAnimationFrame(V._vsRaf);V._vsRaf=0;if(hidden()&&V.view.r&&V.view.r.raf&&typeof cancelAnimationFrame==='function'){cancelAnimationFrame(V.view.r.raf);V.view.r.raf=0;}}
-function update(){const t=performance.now();each((V,s)=>{s.setHidden(hidden(),t);s.setReduced(!!(mq&&mq.matches));stop(V);if(!hidden()&&V._motionKick)V._motionKick();if(V.view.r&&!hidden())V.view.r.draw();});}
-if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('visibilitychange',()=>{const t=performance.now();each((V,s)=>{s.setHidden(hidden(),t);stop(V);if(!hidden()&&V._motionKick)V._motionKick();});});
+function update(){const t=performance.now();each((V,s)=>{s.setHidden(hidden(),t);s.setReduced(!!(mq&&mq.matches));stop(V);if(!hidden())kick(V);if(V.view.r&&!hidden())V.view.r.draw();});eachView(V=>syncOverlays(V));}
+if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('visibilitychange',()=>{const t=performance.now();each((V,s)=>{s.setHidden(hidden(),t);stop(V);});eachView(V=>{syncOverlays(V);if(hidden())stop(V);else kick(V);});});
 if(mq){if(typeof mq.addEventListener==='function')mq.addEventListener('change',update);else if(typeof mq.addListener==='function')mq.addListener(update);}
 const wire=Views.View.prototype.wire;Views.View.prototype.wire=function(){wire.call(this);const scene=this.s,original=scene.onevent;scene.onevent=e=>{if(scene!==this.s||!scene.h)return;if(original)original(e);const V=Object.values(root.exp7views&&root.exp7views.JVS||{}).find(v=>v.view===this);if(!V||!V._vs||!V._vs.nodes.has(e.id))return;const kind=({1:'enter',2:'leave',3:'down',4:'up',11:'cancel',12:'dragstart',13:'drag',14:'dragend'})[e.kind]||((e.code===13||e.code===32)?(e.kind===8?'down':e.kind===9?'up':null):null);if(kind){V._vs.pointer(e.id,kind,performance.now());kick(V);}};};
-const show=Views.View.prototype.show;Views.View.prototype.show=async function(...args){const result=await show.apply(this,args);if(!this._motionInput||this._motionInput.canvas!==this.c){if(this._motionInput)this._motionInput.canvas.removeEventListener('pointermove',this._motionInput.move);const canvas=this.c;const move=e=>{const V=Object.values(root.exp7views&&root.exp7views.JVS||{}).find(v=>v.view===this);if(!V||!V._vs||hidden())return;const r=canvas.getBoundingClientRect(),k=root.EXP7_MOTION_CONFIG.integration.pointerShiftPx,x=r.width?((e.clientX-r.left)/r.width-.5)*2*k:0,y=r.height?((e.clientY-r.top)/r.height-.5)*2*k:0;if(V._vs.setShift(x,y,(this.s.scrollPos(Views.GID)||[0,0])[1])&&V._motionKick)V._motionKick();};canvas.addEventListener('pointermove',move,{passive:true});this._motionInput={canvas,move};}return result;};
+const show=Views.View.prototype.show;Views.View.prototype.show=async function(...args){const result=await show.apply(this,args);if(!this._motionInput||this._motionInput.canvas!==this.c){if(this._motionInput)this._motionInput.canvas.removeEventListener('pointermove',this._motionInput.move);const canvas=this.c;const move=e=>{const V=Object.values(root.exp7views&&root.exp7views.JVS||{}).find(v=>v.view===this);if(!V||!V._vs||hidden())return;const r=canvas.getBoundingClientRect(),k=root.EXP7_MOTION_CONFIG.integration.pointerShiftPx,x=r.width?((e.clientX-r.left)/r.width-.5)*2*k:0,y=r.height?((e.clientY-r.top)/r.height-.5)*2*k:0;if(V._vs.setShift(x,y,(this.s.scrollPos(Views.GID)||[0,0])[1])&&V._motionKick)V._motionKick();};canvas.addEventListener('pointermove',move,{passive:true});this._motionInput={canvas,move};}const host=Object.values(root.exp7views&&root.exp7views.JVS||{}).find(v=>v.view===this);if(host&&this._overlays&&this._overlays.length){syncOverlays(host);kick(host);}return result;};
+const setOv=Views.View.prototype.setOverlays;Views.View.prototype.setOverlays=function(views,opt){const r=setOv.call(this,views,opt);const host=Object.values(root.exp7views&&root.exp7views.JVS||{}).find(v=>v.view===this);if(host){syncOverlays(host);kick(host);}return r;};
 root.Exp7Motion.lifecycle={hidden,optionalMatchMedia:!!mq};
 })(typeof globalThis!=='undefined'?globalThis:this);
 
@@ -11563,6 +11714,7 @@ window.x7 = window.x7 || function (t) {
     mount: mount,
     mountSurface: mountSurface,
     rendererInfo: rendererInfo,
+    viewStore: function () { return root.Exp7ViewStore || null; },
     dispose: dispose,
     disposeAll: disposeAll,
     ready: ready,
@@ -13446,7 +13598,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.26",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.27",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}

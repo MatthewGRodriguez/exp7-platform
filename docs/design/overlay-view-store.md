@@ -2,7 +2,7 @@
 
 Ash Tangent Residual Artist sent this packet at Matthew's request on 9 Nov 2026. The zip reviewed here is `artcraft-jrender-overlay-2026-11-09`. Matthew also has the page on his Mac at `/Users/user-rodri/Home/Art/artcraft-jrender-overlay-20261109/index.html`.
 
-This document is the product reading of that packet. The packet is not copied into the repository, and it is not in shell **1.8.26**. Nothing in this note is a merge, a promote, or a deploy.
+This document is the product reading of that packet. The stone, button, and fish bytes are not copied into the repository. Shell **1.8.27** carries the host and the loader. It does not embed the pack, and it does not paint the fish on Calendar, Board, or Plan.
 
 The cited `store/FORMAT.md` is not in this zip. The format below is read from `src/viewstore.js`, `tools/build_store.mjs`, `store/catalog.json`, and the `store.jrvp` bytes in the zip (66,052 bytes, magic `JRVP`, version 1, catalog 9,965 bytes).
 
@@ -42,32 +42,36 @@ Load path, in this order:
 
 Card and button display lists in this store match the earlier compose page except the button label. `DL.text` `align` is not applied on the view path (`align` 0 and 1 tessellate the same, left-anchored at `x`). The "Save changes" label is placed from a Core measure so the glyphs sit inside the face, with the 20 px content inset.
 
-## What the product does today
+## What 1.8.27 ships
 
-Shell **1.8.26** on `main` (merge of PR #52) still draws Calendar, Board, and Plan by laying out HTML through JRViews into JRender. Each mounted view has its own canvas. Those canvases share one Core and one GPU context. Account and key UI stay DOM.
+Calendar, Board, and Plan still lay out HTML through JRViews into JRender. Each mounted view has its own canvas. Those canvases share one Core and one GPU context. Account and key UI stay DOM.
 
-The shipped classic glue, in `exp7-platform-lean.html`, is still the stock host:
+The classic glue in `exp7-platform-lean.html` now matches the packet host:
 
-- `b91ToBytes` sizes its output at `0.82` bytes per character (line 5976). The packet's store pack is low-entropy. The stock decoder dropped the tail: 66,052 bytes became 66,003. Wasm and font embeds were not affected, which is why earlier pages did not hit it. The packet copy sizes the buffer at `0.875`.
-- `Renderer.layout` (line 6200) resizes scenes and does not attach GPU buffers. A bare Core scene reaches `sync()` with `scene.gpu` null. Safari reports that as `TypeError: null is not an object (evaluating 'g.vb')`.
-- `attach()` (line 6256) returns the first layout rectangle that contains the point. An overlay rectangle that covers the page takes every pointer, wheel, touch, and cursor, including where the overlay scene has no hit.
+- `b91ToBytes` sizes its output at `0.875` bytes per character. A re-encode of this zip's 66,052-byte pack round-trips. The old `0.82` factor decoded that same text to 65,458 bytes. Wasm and font embeds were already inside the old limit.
+- `Renderer.layout` attaches GPU buffers when a scene has none, then resizes. `draw` skips an entry whose `scene.gpu` is still missing.
+- `Renderer.pick` walks layout entries from the top. A `fallthrough` entry takes the point only where `scene.hit` or `scene.scrollAt` is set. `attach` uses `pick` for pointer, wheel, and touch. An uncaptured cursor uses `pick` as well. A captured pointer stays on its scene.
 
-The product does not open a JRVP pack, and it does not place an overlay scene over a slot scene.
+`Exp7ViewStore` (`data-exp7-shared="view-store"`) opens a JRVP pack or a folder, binds fonts, creates a scene, and composes. `JRViews.viewStore()` and `Exp7Views.viewStore()` return it.
 
-## How the product would load this store
+A mounted document stays the slot. `view.setOverlays(overlays, { cover: true })` places those overlay scenes after the document in the same `layout()`, at the document's size, and a later rebuild calls `placeScenes` again so the overlay is not dropped. A stored slot cannot be placed over the document. `store.compose(renderer, list)` is the other path: stored slots first, overlays last, on one renderer that shares the Core. Both refuse a scene with no GPU buffers.
 
-Keep the one Core and the one GPU context. Add the store as a loader of JRDL scenes on that Core. JRViews remains the builder for atlas documents (calendar, board, plan). The store is how authored views enter the same renderer. It is not a second renderer, and it is not a reason to turn the legacy scene runtime on.
+Passing a font **number** to `bindResources` reuses that slot. The product Core has already loaded its font as slot 0, so a catalog that expects `font/dejavu` at slot 0 is bound with `JRViews.font()` (the number), not by calling `core.font` again.
 
-When a product surface is ready to compose stored views, the sequence is the packet's sequence:
+Overlay motion rides the existing per-view frame callback. The callback is armed only while a ViewStates edge needs a frame or an overlay motion is playing. A hidden tab pauses the motion and cancels the callback. Reduced motion calls `setReduced`, which holds the still pose and does not keep the loop. No overlay means that callback is unchanged.
 
-1. Decode the pack with a basE91 buffer of `0.875` bytes per character, or embed the pack as base64. The stock `0.82` factor is the wrong decoder for this pack.
-2. Bind catalog fonts on the shared Core before `create`.
-3. `create` every view with the renderer that already owns that Core, so each scene gets GPU buffers before `layout`.
-4. `compose` slots first, overlays last, one `layout()` call. Overlay entries carry `hit: 'fallthrough'`.
-5. Run one frame callback only while a ViewStates edge is easing or an overlay motion is playing. `motion.pause('hidden')` on `visibilitychange`. Reduced motion calls `setReduced(true)`, shows the still pose, and does not keep the loop. A paused, hidden, or reduced overlay requests no frames.
+## How a product surface loads a store
+
+Keep the one Core and the one GPU context. JRViews remains the builder for atlas documents (calendar, board, plan). The store is how authored views enter the same renderer. It is not a second renderer, and it is not a reason to turn the legacy scene runtime on.
+
+1. Decode the pack with `b91ToBytes` (now `0.875` bytes per character) or pass raw JRVP bytes to `Exp7ViewStore.openPack`.
+2. Bind catalog fonts on the shared Core. Pass `JRViews.font()` for `font/dejavu` so slot 0 is reused.
+3. `create` every view with the renderer that already owns that Core (`{ renderer }`), so each scene gets GPU buffers before `layout`.
+4. For a free canvas, `store.compose(renderer, list)` with slots first and overlays last. For a mounted document, `view.setOverlays(overlays, { cover: true })`.
+5. The frame callback runs only while a ViewStates edge is easing or an overlay motion is playing. A hidden tab pauses it. Reduced motion holds the still pose. A paused, hidden, or reduced overlay requests no frames.
 6. Slot clicks stay synchronous. The packet's runtime edge is `edgeMs` 100. The shell's older click-path ceiling remains 120 ms until that table is retimed on purpose.
 
-Pointer routing has to use the packet's `pick()`: walk layout entries from the top, and continue through a `fallthrough` entry when `scene.hit` and `scene.scrollAt` are both null. Stock `attach()` is not overlay-safe. That change belongs in the JRender host the shell embeds. This note does not apply the patch.
+`pick()` walks layout entries from the top and continues through a `fallthrough` entry when `scene.hit` and `scene.scrollAt` are both null.
 
 Fallthrough on this fish is the whole scene. The fish display list has no hit regions, so a click on the painted body reaches the card or button underneath. An overlay that should receive clicks needs hit nodes where it should, and fallthrough everywhere else.
 
@@ -82,15 +86,15 @@ The stone card and stone button in this store are temporary solid fills, rounded
 | Core tests in the packet (`qa/core-overlay-tests.mjs`, Node, real wasm, stock and patched host) | 51/51, including the reproduced stock routing bug and the reproduced basE91 truncation | [CLAIM] from the packet's `qa/core-overlay-results.json`. Not re-run in this repo. |
 | Browser behaviour on Ash's box (headless Chrome, SwiftShader) | 13/13 behaviour checks. Device lost on the first JRender `queue.submit`, including on the earlier compose page. A clear-only page survived. | [CLAIM] from `qa/browser-overlay-results.json`. |
 | JRVP header in this zip | 66,052 bytes, version 1, three views, roles and hit policies as in the table above | [MEAS] read here from `store.jrvp`. |
-| Shipped glue | `0.82` basE91 factor, `layout` without `gpuScene`, `attach` takes the first overlapping rect | [MEAS] in `exp7-platform-lean.html` on `main` at shell 1.8.26. |
+| Shipped glue in 1.8.27 | `0.875` basE91 keeps a re-encode of the 66,052-byte pack; `0.82` yields 65,458 bytes. `pick` returns the card through empty overlay space and through a fish body with no hit. A second `placeScenes` still has the document slot and the overlay. | [MEAS] on the shell source, Node, no WebGPU device. |
 | Matthew, Safari on his Mac, this zip | GPU path came up. The fish painted over the card and the button. Clicks reached the card and button through empty overlay space and through the fish body. The recentered "Save changes" label is the one in this zip. | [USER-HW] stated in the 9 Nov 2026 handoff. Not re-run here. |
 | Frame time, accessibility, large-data performance, a product frame of Calendar/Board/Plan with an overlay | Open | [OPEN] |
 
 Schematic PNGs in the packet are Pillow stills. They are not JRender frames.
 
-## Still open before a product change
+## Still open before the packet's art is on a product canvas
 
-- Land the host patch in the JRender the shell embeds: `pick()`, `layout()` attaching GPU buffers, `draw()` skipping a scene with no buffers, basE91 at `0.875`. Wasm and JRDL stay as they are. The patch is packet-local (`jrender/jrender-overlay-host.patch`, 87 lines). The shared `jrender-exp7` tree was not modified.
-- A draw-list linear gradient, a radial gradient with stop alpha and an affine, and a cubic stroke. Then replace the temporary card, button, and fish constructions. Until then the records' `paint.gaps` stay the inventory.
+- The host patch is in the shell. The shared `jrender-exp7` tree was not modified. Wasm and JRDL are unchanged.
+- A draw-list linear gradient, a radial gradient with stop alpha and an affine, and a cubic stroke. Then replace the temporary card, button, and fish constructions. Until then the records' `paint.gaps` stay the inventory. The pack is not embedded in the shell.
 - Decide which product surface composes stored scenes on one canvas, and which surfaces stay JRViews documents on the shared Core. Budget boards and the calendar are documents. A stored card is a face, not a replacement for the atlas.
 - Mac frame timing, contrast on the real canvas, and reduced-motion and hidden-tab behaviour on the product shell, separate from the packet page.

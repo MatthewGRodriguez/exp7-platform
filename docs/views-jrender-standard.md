@@ -112,7 +112,7 @@ Apps (Exp7 demo, Budget, standalone, future):
 4. Exp7 demo tab strip into scene (optional). **[OPEN]**  
 5. Keep two-file release discipline; docs-only PRs remain an authorized exception. **[REQ]**  
 6. **Artist art pass + profile image ABI** — coordinate with Ash; integrate wasm/host bump when delivered. **[OPEN]** — [artist-coordination-brief.md](./artist-coordination-brief.md)
-7. **View store, slot and overlay composition** — JRDL records in one `layout()`, overlays after slots, fallthrough hits. Documented from the 9 Nov 2026 packet. Not loaded by shell 1.8.26. **[OPEN]** — [design/overlay-view-store.md](./design/overlay-view-store.md)
+7. **View store, slot and overlay composition** — Shell 1.8.27 loads JRDL records and can place overlays after a document slot, with fallthrough hits. The 9 Nov pack is not embedded, and gradients and cubic strokes are still missing. **[OPEN]** — [design/overlay-view-store.md](./design/overlay-view-store.md)
 
 ---
 

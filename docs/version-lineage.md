@@ -58,8 +58,9 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.24** | PR #51 | An active button fills gold, and a restricted one fills rose. The resource name field stays with its label. |
 | **1.8.25** | PR #52 | Text typed in the resource name field is drawn inside that field. |
 | **1.8.26** | PR #52 | Set values flips a positive amount to a negative one. A resource can be removed. The star prefers an alternative, and × makes it unavailable. |
+| **1.8.27** | this branch | The view store loads JRDL views on the shared renderer. An overlay falls through where it has no hit. basE91 keeps a low-entropy pack. |
 
-The 9 Nov 2026 overlay packet is recorded in [design/overlay-view-store.md](./design/overlay-view-store.md). It does not change this shell.
+The 9 Nov 2026 overlay packet is recorded in [design/overlay-view-store.md](./design/overlay-view-store.md). Shell 1.8.27 has the host and the loader. The pack is not in the shell.
 
 1.8.10 through 1.8.21 are the procedural lighting passes. On 2026-11-08 Matthew directed that those passes be replaced by SVG drawings played by the state machine. The DesignCraft 0.18.0 packet was checked the same evening: the view draw list loads a cubic fill and rejects a gradient, and it has no cubic stroke. The record is `docs/design/authored-ui-packet.md`. 1.8.22 does not wire that packet. It adds the board and budget controls on the existing state machine. This is not a finished workflow.
 
@@ -69,9 +70,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.26",
+"version": "1.8.27",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "d8bf751432c34b938f6d36e95eb49dd3f7d2e6c347368fa5b0d7514250c1b7c2",
+"sha256": "0bb11e96565b696d86d3ef813b81275d227757f4aebd16611a1b8931a2d833c5",
 "minLauncherMajor": 1
 ```
 
