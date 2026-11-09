@@ -61,7 +61,7 @@ A flat solid of the surface, or a filled ring, is what the draw list can show to
 
 ## Overlay packet (2026-11-09)
 
-A later packet composes three stored JRDL views in one `Renderer.layout()`: stone card and stone button as slots, then a fish as an overlay. The review and the load plan are in [overlay-view-store.md](./overlay-view-store.md). Shell 1.8.27 has the host and the loader. The pack itself is not embedded.
+A later packet composes three stored JRDL views in one `Renderer.layout()`: stone card and stone button as slots, then a fish as an overlay. The review and the load plan are in [overlay-view-store.md](./overlay-view-store.md). Shell 1.8.28 plays that page as the Fish app. The paints are still the temporary stand-ins.
 
 The overlay packet does not close the draw-list gaps below. Card and button fills in the store are still temporary solids. The fish keeps curve fills, paints its gradients as stepped solid bands, and paints its strokes as filled outlines. `DL.text` align is still ignored, so the button label is placed from a Core measure.
 
