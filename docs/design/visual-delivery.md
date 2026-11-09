@@ -4,7 +4,7 @@
 
 Shells 1.8.10 through 1.8.21 put the state table, a sampled shadow, a face lip, a soft top, a dark glass body, a ground-shadow node, and short pose eases into the lean file. Matthew's read of that work is that a lot was added and the picture barely changed. The design he wants is the one Ash Tangent Residual Artist already used: paint the light and the shadow in an SVG animation, and let the state machine switch the drawings. The rectangle passes stay in 1.8.21 until a drawn pose replaces them. They are not the next thing to extend.
 
-The trial sheet is `docs/design/svg-state-card.svg`. The ask to Ash, the pose list, and which drawing apps were available on this machine are in `docs/artist-coordination-brief.md`. The lean shell is still 1.8.21. This page does not claim the SVG is on screen in the product.
+`docs/design/svg-state-card.svg` is a fixture. The DesignCraft packet and the draw-list test against it are in `docs/design/authored-ui-packet.md`. Cubic fills load. Gradients and cubic strokes do not. The lean shell is still 1.8.21. No product frame changed.
 
 ## Apps picker and icon flicker (1.8.11)
 

@@ -34,9 +34,9 @@ JRender stays the only product renderer. There is no second CSS renderer beside 
 
 ### Drawing apps
 
-The pipeline names Affinity for the drawing and Moho Pro for the animation, then Blender for the one light, then Moho again. The 2026-10-30 rule was to drive those apps from the command line and not open them. Matthew is asking to open the drawing apps, so the SVG is drawn and the blur and the soft edge are in the file.
+Affinity is the historic name for the draw step. The packet Ash delivered on 2026-11-08 was authored in **DesignCraft 0.18.0**, exported through **Inkscape 1.4-beta2**, with one **Blender 5.2.3** light study. Moho was not used on that packet. PhotoCraft was not part of it. The full contract, the Inkscape mask repair, and the draw-list playback test are in [design/authored-ui-packet.md](./design/authored-ui-packet.md).
 
-This cloud machine has Chrome and Python. It does not have Affinity, Moho, Blender, or Inkscape, and the package index here has no Inkscape or librsvg package. The trial file [docs/design/svg-state-card.svg](./design/svg-state-card.svg) is layered SVG (a Gaussian-blurred contact shadow, a top light, a lip, and a pose edge per state) and was opened in headless Chrome. The sheet shows all eight poses. A `data-sm` attribute on the root shows one pose and hides the sheet. It is not Moho output, not a Blender render, and it is not wired into the lean shell. Affinity and Moho on Matthew's Mac are the apps for the real set.
+`docs/design/svg-state-card.svg` is an earlier integration fixture. It is not the DesignCraft packet, and it is not on the product canvas.
 
 ---
 
@@ -44,7 +44,7 @@ This cloud machine has Chrome and Python. It does not have Affinity, Moho, Blend
 
 | Role | Owns |
 |------|------|
-| **Ash (Artist)** | JRender (wasm + host ABI), art/motion pipeline (Affinity → Moho → Blender → Moho → web/JRender emission), view visual language, **profile/image rendering capability**, state tables / lighting / parallax quality bar |
+| **Ash (Artist)** | JRender (wasm + host ABI), art/motion pipeline, view visual language, **profile/image rendering capability**, state tables / lighting / parallax quality bar. Historic draw app: Affinity. The 2026-11-08 UI packet was authored in DesignCraft 0.18.0. |
 | **Exp7 Platform (this repo)** | Shell, Exp7Views host (`exp7-views@1`), atlas/proposal circuits, Budget IDB, packing lean release, DOM PAT overlays |
 | **Matthew** | Acceptance on Mac Safari **[USER-HW]**; opens/closes Artist contact |
 
@@ -149,7 +149,7 @@ Ash runs the full pipeline (parameters → draw → perspective → state table 
 1. Full **quality-gates** text cut off in the 2026-10-30 Artist report — re-obtain. **[OPEN]**  
 2. Whether the **storage/codec update** after `atlas/1` landed — confirm before Exp7 storage changes. **[OPEN]**  
 3. Image ABI shape (DL node vs external atlas vs GPU texture handle; CORS; memory caps).  
-4. Playback of the drawn SVG inside the one JRender view. Matthew's answer on the art is settled: the pixels of light and shadow are drawings, and the state machine picks the pose. `ja-*` HTML can stay the layout source for text, hits, and forms. The open piece is how a pose SVG is shown by the existing renderer (image, tessellated paths, or another emission Ash already has) without a second paint engine and without another stack of shadow rectangles.  
+4. Playback inside the one draw-list renderer. The pixels of light and shadow are the DesignCraft layers, and the state machine picks the pose. `ja-*` HTML stays the layout source for text, hits, and forms. Measured gap, in `docs/design/authored-ui-packet.md`: a cubic fill loads; a linear or radial gradient with stop alpha does not; a cubic stroke does not (a fill of the ring path paints the interior). Do not rasterize the card through the avatar image store, and do not stack a flat solid on the 1.8.21 rectangles. The legacy `jr_ptr(4)` gradient shader is not the view path.  
 5. WASI 0.3 host — still unfinished; shipped path remains wasm32 + thin JS. Do not block UX on WASI unless Matthew asks.
 
 ---
@@ -170,6 +170,7 @@ Ash runs the full pipeline (parameters → draw → perspective → state table 
 |------|--------|
 | Before 2026-11-08 | Artist contact **not** authorized |
 | **2026-11-08** | Matthew authorized coordination with **Ash Tangent Residual Artist** for view UX/UI art workflow + profile image render support **[REQ]** |
-| **2026-11-08** (evening CT) | Matthew directed that 1.8.10–1.8.21 rectangle lighting be replaced by SVG drawings the state machine plays, and that the drawing apps be used for that art. Trial sheet: `docs/design/svg-state-card.svg`. Shell stays 1.8.21 until a drawing is wired in. |
+| **2026-11-08** (evening CT) | Matthew directed that 1.8.10–1.8.21 rectangle lighting be replaced by SVG drawings the state machine plays. `docs/design/svg-state-card.svg` is a fixture. Shell stays 1.8.21 until a drawing is wired in. |
+| **2026-11-08** (later, same evening) | Ash delivered the DesignCraft 0.18.0 packet. Playback of its gradients and strokes failed on the view draw list. Record: `docs/design/authored-ui-packet.md`. The lean file was not changed. This is not a finished workflow. |
 
 Messages to Ash should carry this brief (or a short pointer to it) and must not include PATs, private financial data, or software-repo write keys.
