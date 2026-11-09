@@ -1,11 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.25",
+  "version": "1.8.26",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "d19b89a0c23b6232a8062f134f07d74bdd9e7cffd815ca0827654b602ad3a070",
+  "sha256": "d8bf751432c34b938f6d36e95eb49dd3f7d2e6c347368fa5b0d7514250c1b7c2",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "1.8.25: Typed text stays inside the resource name field. Active buttons fill gold.",
+    "app": "1.8.26: Set values flips the amount sign. A resource can be removed. Star prefers an alternative and × marks it unavailable.",
     "appSha256": "4e19bdeeb76818a6a96b9cb6655d48c950d429b17d3680184231e5a67755508b",
     "budgetSha256": "115fb94328289ed9b2af7b17f394ca06d7556e7f78950533562332ea0787c0c5",
     "budgetMode": "exp7-views",
