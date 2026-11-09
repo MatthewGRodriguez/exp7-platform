@@ -34,7 +34,7 @@ JRender stays the only product renderer. There is no second CSS renderer beside 
 
 ### Drawing apps
 
-Affinity is the historic name for the draw step. The packet Ash delivered on 2026-11-08 was authored in **DesignCraft 0.18.0**, exported through **Inkscape 1.4-beta2**, with one **Blender 5.2.3** light study. Moho was not used on that packet. PhotoCraft was not part of it. The full contract, the Inkscape mask repair, and the draw-list playback test are in [design/authored-ui-packet.md](./design/authored-ui-packet.md).
+Affinity is the historic name for the draw step. The packet Ash delivered on 2026-11-08 was authored in **DesignCraft 0.18.0**, exported through **Inkscape 1.4-beta2**, with one **Blender 5.2.3** light study. Moho was not used on that packet. PhotoCraft was not part of it. The full contract, the Inkscape mask repair, and the draw-list playback test are in [design/authored-ui-packet.md](./design/authored-ui-packet.md). The 9 Nov 2026 overlay packet (view store, slot views, fish overlay) is reviewed in [design/overlay-view-store.md](./design/overlay-view-store.md). It is not loaded by the shell.
 
 `docs/design/svg-state-card.svg` is an earlier integration fixture. It is not the DesignCraft packet, and it is not on the product canvas.
 
@@ -172,5 +172,6 @@ Ash runs the full pipeline (parameters → draw → perspective → state table 
 | **2026-11-08** | Matthew authorized coordination with **Ash Tangent Residual Artist** for view UX/UI art workflow + profile image render support **[REQ]** |
 | **2026-11-08** (evening CT) | Matthew directed that 1.8.10–1.8.21 rectangle lighting be replaced by SVG drawings the state machine plays. `docs/design/svg-state-card.svg` is a fixture. Shell stays 1.8.21 until a drawing is wired in. |
 | **2026-11-08** (later, same evening) | Ash delivered the DesignCraft 0.18.0 packet. Playback of its gradients and strokes failed on the view draw list. Record: `docs/design/authored-ui-packet.md`. The lean file was not changed. This is not a finished workflow. |
+| **2026-11-09** | Ash delivered the overlay packet: a view store, slot card and button, and a fish overlay in one `layout()`. Record: `docs/design/overlay-view-store.md`. The shell was not changed. Gradients and cubic strokes are still missing from the view path. |
 
 Messages to Ash should carry this brief (or a short pointer to it) and must not include PATs, private financial data, or software-repo write keys.

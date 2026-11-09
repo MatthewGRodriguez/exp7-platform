@@ -112,12 +112,14 @@ Apps (Exp7 demo, Budget, standalone, future):
 4. Exp7 demo tab strip into scene (optional). **[OPEN]**  
 5. Keep two-file release discipline; docs-only PRs remain an authorized exception. **[REQ]**  
 6. **Artist art pass + profile image ABI** — coordinate with Ash; integrate wasm/host bump when delivered. **[OPEN]** — [artist-coordination-brief.md](./artist-coordination-brief.md)
+7. **View store, slot and overlay composition** — JRDL records in one `layout()`, overlays after slots, fallthrough hits. Documented from the 9 Nov 2026 packet. Not loaded by shell 1.8.26. **[OPEN]** — [design/overlay-view-store.md](./design/overlay-view-store.md)
 
 ---
 
 ## Related docs
 
-- [artist-coordination-brief.md](./artist-coordination-brief.md) — Ash handoff: views inventory, invariants, profile image gap  
+- [artist-coordination-brief.md](./artist-coordination-brief.md) — Ash handoff: views inventory, invariants, profile image gap
+- [design/overlay-view-store.md](./design/overlay-view-store.md) — 2026-11-09 view store and overlay composition (plan; not shipped)  
 - [platform-chrome-jrender.md](./platform-chrome-jrender.md) — chrome / parallax / Budget tabs implementation  
 - [architecture.md](./architecture.md) — layers, mount model, sync honesty  
 - [vocabulary.md](./vocabulary.md) — calHtml / boardHtml / Atlas / direct mount  

@@ -59,6 +59,12 @@ The other shader in the same wasm, `jr_ptr(4)` (3,339 bytes), evaluates linear a
 
 A flat solid of the surface, or a filled ring, is what the draw list can show today. Shipping either one would drop the material and would sit under or instead of the 1.8.21 rectangles. Neither was written into the shell. The procedural rectangles were not extended.
 
+## Overlay packet (2026-11-09)
+
+A later packet composes three stored JRDL views in one `Renderer.layout()`: stone card and stone button as slots, then a fish as an overlay. The review and the load plan are in [overlay-view-store.md](./overlay-view-store.md). That page is not in the shell.
+
+The overlay packet does not close the draw-list gaps below. Card and button fills in the store are still temporary solids. The fish keeps curve fills, paints its gradients as stepped solid bands, and paints its strokes as filled outlines. `DL.text` align is still ignored, so the button label is placed from a Core measure.
+
 ## Still open
 
 - A draw-list paint for linear and radial gradients with stop alpha and an affine, in the one view shader.
