@@ -57,6 +57,7 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.23** | PR #50 | Board button clicks reach their actions. Each alternative has a star for preferred and an × for restricted. |
 | **1.8.24** | this branch | An active button fills gold, and a restricted one fills rose. The resource name field stays with its label. |
 | **1.8.25** | this branch | Text typed in the resource name field is drawn inside that field. |
+| **1.8.26** | this branch | Set values flips a positive amount to a negative one. A resource can be removed. The star prefers an alternative, and × makes it unavailable. |
 
 1.8.10 through 1.8.21 are the procedural lighting passes. On 2026-11-08 Matthew directed that those passes be replaced by SVG drawings played by the state machine. The DesignCraft 0.18.0 packet was checked the same evening: the view draw list loads a cubic fill and rejects a gradient, and it has no cubic stroke. The record is `docs/design/authored-ui-packet.md`. 1.8.22 does not wire that packet. It adds the board and budget controls on the existing state machine. This is not a finished workflow.
 
@@ -66,9 +67,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.25",
+"version": "1.8.26",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "d19b89a0c23b6232a8062f134f07d74bdd9e7cffd815ca0827654b602ad3a070",
+"sha256": "d8bf751432c34b938f6d36e95eb49dd3f7d2e6c347368fa5b0d7514250c1b7c2",
 "minLauncherMajor": 1
 ```
 

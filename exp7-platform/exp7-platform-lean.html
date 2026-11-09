@@ -97,7 +97,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.25. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.26. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -11689,7 +11689,7 @@ function setView(id,w,root,cb,ro){ const box=$(id); if(!box) return;
         if(typeof window.__budgetChromeAct==='function'&&a.startsWith('budget:')) window.__budgetChromeAct(a);
         else if(typeof window.__platformChromeAct==='function'&&a.startsWith('plat:')) window.__platformChromeAct(a);
         return; }
-      if(a.startsWith('cal:')||a==='form:ok'||a==='form:cancel'||a.startsWith('pick:')||a.startsWith('use:')||a.startsWith('res:')||a.startsWith('alt:')||a.startsWith('brd:')){
+      if(a.startsWith('cal:')||a==='form:ok'||a==='form:cancel'||a==='form:sign'||a.startsWith('pick:')||a.startsWith('use:')||a.startsWith('res:')||a.startsWith('alt:')||a.startsWith('brd:')){
       if(a.startsWith('cal:')) hostCalAct(V,a); else if(a.startsWith('use:')||a.startsWith('res:')||a.startsWith('alt:')||a.startsWith('brd:')) hostBoardAct(V,a); else hostFormAct(V,a); return; }
       planAct(V,a); return; }
     if(act==='reqrow'){ const it=el.getAttribute('data-dep-item'), AW=activeAtlas(V)||{}, x=(AW.items||{})[String(it).replace(/^item:/,'')]; V.sel=it; V.note='selected '+it+(x?' ('+x.name+', jreq '+(x.jreq||'none')+')':''); if(V.cb) V.cb(V); return; }
@@ -12136,21 +12136,78 @@ function budgetItemOnView(it, month, day){
   const occ=E.occurrences(it, month)||[];
   return day?occ.indexOf(day)>=0:occ.length>0;
 }
-function budgetConsuming(it){
+function memberRef(m){ const s=String(m==null?'':m); if(!s) return ''; return s.indexOf(':')>=0?s:('item:'+s); }
+function ensureAlts(it){
+  if(!it.alts||typeof it.alts!=='object'||Array.isArray(it.alts)) it.alts={members:[],pref:null,unavail:[],method:'best'};
+  if(!Array.isArray(it.alts.members)) it.alts.members=it.alts.members?[it.alts.members]:[];
+  if(!Array.isArray(it.alts.unavail)) it.alts.unavail=it.alts.unavail?[it.alts.unavail]:[];
+  it.state=it.state&&typeof it.state==='object'&&!Array.isArray(it.state)?it.state:{};
+  if(!Object.prototype.hasOwnProperty.call(it.state,'userPick')) it.state.userPick=null;
+  return it.alts;
+}
+/* Ops are built from the item as it is now. ref/add/remove are what the proposal checker accepts for these paths.
+   A set of null on a string pref is rejected, which is why the star used to do nothing. */
+function preferOps(id, it, mid){
+  const A=it.alts, ref=memberRef(mid); if(!A||!ref) return null;
+  const on=A.pref!=null&&memberRef(A.pref)===ref, next=on?null:ref;
+  const ops=[{path:'items/'+id+'/alts/pref',op:'ref',value:next}];
+  if(next&&Array.isArray(A.unavail)&&A.unavail.some(function(x){ return memberRef(x)===ref; }))
+    ops.push({path:'items/'+id+'/alts/unavail',op:'remove',value:ref});
+  if(!it.state||typeof it.state!=='object') ops.push({path:'items/'+id+'/state',op:'add',value:{userPick:next}});
+  else { const hasUp=Object.prototype.hasOwnProperty.call(it.state,'userPick');
+    ops.push({path:'items/'+id+'/state/userPick',op:hasUp?'ref':'add',value:next}); }
+  return {next:next, ref:ref, on:on, ops:ops};
+}
+function restrictOps(id, it, mid){
+  const A=it.alts, ref=memberRef(mid); if(!A||!ref) return null;
+  const un=Array.isArray(A.unavail)?A.unavail:[];
+  const on=un.some(function(x){ return memberRef(x)===ref; });
+  const ops=[];
+  if(!Array.isArray(A.unavail)) ops.push({path:'items/'+id+'/alts/unavail',op:'set',value:on?[]:[ref]});
+  else ops.push({path:'items/'+id+'/alts/unavail',op:on?'remove':'add',value:ref});
+  if(!on&&A.pref!=null&&memberRef(A.pref)===ref) ops.push({path:'items/'+id+'/alts/pref',op:'ref',value:null});
+  if(!on&&it.state&&Object.prototype.hasOwnProperty.call(it.state,'userPick')&&it.state.userPick!=null&&memberRef(it.state.userPick)===ref)
+    ops.push({path:'items/'+id+'/state/userPick',op:'ref',value:null});
+  return {on:on, ref:ref, unavailable:!on, ops:ops};
+}
+function applyAltOps(it, kind, mid){
+  const A=ensureAlts(it), ref=memberRef(mid); if(!ref) return;
+  if(kind==='pref'){
+    const on=A.pref!=null&&memberRef(A.pref)===ref, next=on?null:ref;
+    A.pref=next;
+    if(next) A.unavail=A.unavail.filter(function(x){ return memberRef(x)!==ref; });
+    it.state.userPick=next;
+  } else {
+    const on=A.unavail.some(function(x){ return memberRef(x)===ref; });
+    if(on) A.unavail=A.unavail.filter(function(x){ return memberRef(x)!==ref; });
+    else {
+      A.unavail=A.unavail.concat([ref]);
+      if(A.pref!=null&&memberRef(A.pref)===ref) A.pref=null;
+      if(it.state.userPick!=null&&memberRef(it.state.userPick)===ref) it.state.userPick=null;
+    }
+  }
+}
+function negateAmount(raw){
+  const s=String(raw==null?'':raw).trim(); if(!s) return '0';
+  const n=Number(s);
+  if(!isFinite(n)) return s.charAt(0)==='-'?s.slice(1):('-'+s);
+  return String(Object.is(n,-0)?0:-n);
+}
+function budgetAmount(it){
   const v=(it&&it.values)||{};
-  if(v.consume===false||v.flow==='in') return false;
-  if(v.consume===true||v.flow==='out'||v.type==='expense') return true;
-  return false;
+  const raw=v.amount!=null&&v.amount!==''?v.amount:(v.cost!=null&&v.cost!==''?v.cost:0);
+  const n=Number(raw); return isFinite(n)?n:0;
 }
 function budgetValueText(it){
   const v=(it&&it.values)||{}; const parts=[];
+  const neg=budgetAmount(it)<0;
   ['date','repeat','amount','cost','hours'].forEach(function(k){
     if(v[k]==null||v[k]==='') return;
     let bit=k+' '+v[k];
-    if(k==='amount'||k==='cost') bit+=' · '+(budgetConsuming(it)?'consuming':'not consuming');
+    if(k==='amount'||k==='cost') bit+=' · '+(neg?'consuming':'not consuming');
     parts.push(bit);
   });
-  if(!parts.length) parts.push('amount — · '+(budgetConsuming(it)?'consuming':'not consuming'));
+  if(!parts.length) parts.push('amount — · not consuming');
   return parts.join(' · ');
 }
 function budgetFactsInner(w){
@@ -12179,7 +12236,10 @@ function boardDoc(V,d){ /* remove Trip calendar button/text; resources; alts; fo
   }
   const resBox=d.ownerDocument.createElement('div'); resBox.className='ja-section'; resBox.setAttribute('data-exp7','resources');
   const rh=d.ownerDocument.createElement('b'); rh.textContent='Resources'; resBox.appendChild(rh);
-  resourcesOf(AW).forEach(it=>{ const row=d.ownerDocument.createElement('div'); row.className='ja-srow'; row.textContent=it.name+' · '+(it.values.stock!=null?it.values.stock:'')+(it.values.unit||''); resBox.appendChild(row); });
+  resourcesOf(AW).forEach(it=>{ const row=d.ownerDocument.createElement('div'); row.className='ja-srow';
+    const lab=d.ownerDocument.createElement('span'); lab.textContent=it.name+' · '+(it.values.stock!=null?it.values.stock:'')+(it.values.unit||''); row.appendChild(lab);
+    const rm=d.ownerDocument.createElement('button'); rm.type='button'; rm.className='ja-joy'; rm.setAttribute('data-jv-act','res:remove:'+it.id); rm.textContent='Remove'; row.appendChild(rm);
+    resBox.appendChild(row); });
   const addR=d.ownerDocument.createElement('button'); addR.setAttribute('data-jv-act','res:add'); addR.textContent='+ Add resource'; resBox.appendChild(addR);
   if(bar&&bar.parentNode) bar.parentNode.insertBefore(resBox,bar.nextSibling); else d.insertBefore(resBox,d.firstChild);
   const budgetBoard=/^board_(expense|income|debt|asset)$/.test(boardCompId(V)||'');
@@ -12190,8 +12250,6 @@ function boardDoc(V,d){ /* remove Trip calendar button/text; resources; alts; fo
     const paying=!!((it.values||{}).payTo);
     if(paying){ row.classList.add('ja-payto'); row.setAttribute('data-payto','1'); }
     const vals=d.ownerDocument.createElement('span'); vals.className='ja-vals'; vals.textContent=budgetValueText(it); row.insertBefore(vals, chip);
-    const eatOn=budgetConsuming(it);
-    const eat=d.ownerDocument.createElement('button'); eat.type='button'; eat.className='ja-joy'+(eatOn?' on':''); eat.setAttribute('aria-pressed',eatOn?'true':'false'); eat.setAttribute('data-jv-act','brd:consume:'+id); eat.textContent=eatOn?'consuming':'not consuming'; row.insertBefore(eat, chip);
     const edit=d.ownerDocument.createElement('button'); edit.type='button'; edit.className='ja-joy'; edit.setAttribute('data-jv-act','brd:values:'+id); edit.textContent='Set values'; row.insertBefore(edit, chip);
     if(budgetBoard&&boardCompId(V)==='board_expense'){
       const pay=d.ownerDocument.createElement('button'); pay.type='button'; pay.className='ja-joy'+(paying?' on':''); pay.setAttribute('aria-pressed',paying?'true':'false'); pay.setAttribute('data-jv-act','brd:pay:'+id);
@@ -12204,9 +12262,10 @@ function boardDoc(V,d){ /* remove Trip calendar button/text; resources; alts; fo
     const ad=d.ownerDocument.createElement('button'); ad.setAttribute('data-jv-act','alt:add:'+id); ad.textContent='+ Add alternative'; row.appendChild(ad);
     if(open&&it.alts){ (it.alts.members||[]).forEach(m=>{ const mid=String(m).replace(/^item:/,''); const o=(V.atlasW||W).items[mid]||{}; const ref='item:'+mid;
       const sp=d.ownerDocument.createElement('span'); sp.className='ja-chip'; sp.textContent=o.name||mid; row.appendChild(sp);
-      const pref=(it.alts.pref===ref); const restricted=((it.alts.unavail||[]).indexOf(ref)>=0);
-      const star=d.ownerDocument.createElement('button'); star.type='button'; star.className='ja-joy'+(pref?' on':''); star.setAttribute('aria-pressed',pref?'true':'false'); star.setAttribute('data-jv-act','alt:pref:'+id+'/'+mid); star.textContent=pref?'★':'☆'; row.appendChild(star);
-      const block=d.ownerDocument.createElement('button'); block.type='button'; block.className='ja-joy'+(restricted?' err':''); block.setAttribute('aria-pressed',restricted?'true':'false'); block.setAttribute('data-jv-act','alt:restrict:'+id+'/'+mid); block.textContent='×'; row.appendChild(block);
+      const pref=it.alts.pref!=null&&memberRef(it.alts.pref)===ref; const restricted=(it.alts.unavail||[]).some(function(x){ return memberRef(x)===ref; });
+      sp.textContent=(pref?'★ ':'')+(o.name||mid)+(restricted?' · unavailable':''); if(restricted) sp.classList.add('ja-dim');
+      const star=d.ownerDocument.createElement('button'); star.type='button'; star.className='ja-joy'+(pref?' on':''); star.style.minWidth='36px'; star.style.minHeight='28px'; star.setAttribute('aria-pressed',pref?'true':'false'); star.setAttribute('data-jv-act','alt:pref:'+id+'/'+mid); star.textContent=pref?'★':'☆'; row.appendChild(star);
+      const block=d.ownerDocument.createElement('button'); block.type='button'; block.className='ja-joy'+(restricted?' err':''); block.style.minWidth='36px'; block.style.minHeight='28px'; block.setAttribute('aria-pressed',restricted?'true':'false'); block.setAttribute('data-jv-act','alt:restrict:'+id+'/'+mid); block.textContent='×'; row.appendChild(block);
     }); }
   });
   if(V.form&&V.form.kind==='payto'){ const wrap=d.ownerDocument.createElement('div'); wrap.className='ja-detail'; wrap.setAttribute('data-exp7-form','payto');
@@ -12223,7 +12282,10 @@ function boardDoc(V,d){ /* remove Trip calendar button/text; resources; alts; fo
     const fields=V.form.kind==='resource'?[['name','Name'],['unit','Unit'],['stock','Stock']]:V.form.kind==='values'?[['date','Date'],['repeat','Repeat'],['amount','Amount']]:(money?[['name','Name'],['date','Date'],['repeat','Repeat'],['amount','Amount']]:[['name','Name'],['uses','Resources used (comma ids)'],['jreq','Requirement (item id)'],['comfort','Comfort'],['fun','Fun'],['cost','Cost'],['hours','Hours']]);
     fields.forEach(([f,lab])=>{ const row=d.ownerDocument.createElement('div'); row.className='ja-brow';
       const sp=d.ownerDocument.createElement('span'); sp.textContent=lab+': '; row.appendChild(sp);
-      row.appendChild(mkTf(d.ownerDocument,f,lab)); wrap.appendChild(row); });
+      row.appendChild(mkTf(d.ownerDocument,f,lab));
+      if(V.form.kind==='values'&&f==='amount'){ const n=Number(V.form.amount); const neg=isFinite(n)&&n<0;
+        const eat=d.ownerDocument.createElement('button'); eat.type='button'; eat.className='ja-joy'+(neg?' on':''); eat.setAttribute('aria-pressed',neg?'true':'false'); eat.setAttribute('data-jv-act','form:sign'); eat.textContent=neg?'consuming':'not consuming'; row.appendChild(eat); }
+      wrap.appendChild(row); });
     if(V.form.kind!=='resource'&&V.form.kind!=='values'&&!money){ resourcesOf(V.atlasW||W).forEach(it=>{ const bt=d.ownerDocument.createElement('button'); const on=(V.form.usesIds||{})[it.id];
       bt.setAttribute('data-jv-act','use:'+it.id); bt.className=on?'on':''; bt.textContent=(on?'✓ ':'')+it.name; wrap.appendChild(bt); }); }
     const ok=d.ownerDocument.createElement('button'); ok.setAttribute('data-jv-act','form:ok'); ok.textContent=V.form.kind==='values'?'Save':'Create'; wrap.appendChild(ok);
@@ -12233,7 +12295,17 @@ function boardDoc(V,d){ /* remove Trip calendar button/text; resources; alts; fo
     else d.appendChild(wrap); }
   V.boardHasTrip=/\bTrip calendar\b/i.test(d.textContent); V.boardRes=resourcesOf(V.atlasW||W).map(x=>x.name); }
 
-function hostFormAct(V,a){ const W=activeAtlas(V)||{items:{},components:{}}; if(a.startsWith('pick:')){ const id=a.slice(5); if(!V.form) return; V.form.itemId=id; const it=W.items[id]; V.note='picked '+(it&&it.name||id)+' · requires '+((it&&it.jreq)?String(it.jreq).replace(/^item:/,''):'—'); return V.sess&&V.queue(V.sess,'form'); }
+function hostFormAct(V,a){ const W=activeAtlas(V)||{items:{},components:{}};
+  if(a==='form:sign'){ if(!V.form||V.form.kind!=='values'||!V.form.item) return;
+    let raw=V.form.amount; if(V.tf&&V.tf.amount){ try{ const v=V.tf.amount.value; if(v!=null) raw=v; }catch(e){} }
+    const next=negateAmount(raw); const id=V.form.item, it=W.items[id];
+    if(!it){ V.note='missing item'; return V.sess&&V.queue(V.sess,'form'); }
+    const n=+next; const has=it.values&&it.values.amount!=null;
+    V.form.amount=next; V.note=(n<0?'consuming ':'not consuming ')+id;
+    const ent=submitViews([{path:'items/'+id+'/values/amount',op:has?'set':'add',value:isFinite(n)?n:0}],'board:sign',V);
+    if(!ent||(ent.r&&ent.r.ok===false)){ it.values=it.values||{}; it.values.amount=isFinite(n)?n:0; if(V.sess) V.queue(V.sess,'form'); }
+    return ent; }
+  if(a.startsWith('pick:')){ const id=a.slice(5); if(!V.form) return; V.form.itemId=id; const it=W.items[id]; V.note='picked '+(it&&it.name||id)+' · requires '+((it&&it.jreq)?String(it.jreq).replace(/^item:/,''):'—'); return V.sess&&V.queue(V.sess,'form'); }
   if(a==='form:cancel'){ clearFormFields(V); V.form=null; V.formFocus=null; V.note='form cancelled'; return V.sess&&V.queue(V.sess,'form'); }
   if(a==='form:ok'){ /* pull live TextField values (keep non-empty form values if field still empty) */ if(V.tf) Object.keys(V.tf).forEach(f=>{ try{ const v=V.tf[f].value; if(v!=null&&String(v).length) V.form[f]=v; }catch(e){} });
     const F=V.form||{};     if(F.kind==='resource'){ const id=uniqItemId(F.name||'resource',V); const name=(F.name||'').trim()||('Resource '+id);
@@ -12360,10 +12432,6 @@ function hostBoardAct(V,a){
     if(W.meta&&W.meta.budget) ops.push({path:'items/'+id,op:'drop'});
     Object.keys(W.items||{}).forEach(function(oid){ const v=(W.items[oid].values||{}); if(String(v.payTo||'').replace(/^item:/,'')===id) ops.push({path:'items/'+oid+'/values/payTo',op:'set',value:''}); });
     V.note='removed '+id; return submitViews(ops,'board:remove',V); }
-  if(a.startsWith('brd:consume:')){ const id=a.slice(12); const it=W.items[id]; if(!it) return;
-    const next=!budgetConsuming(it); const hasF=it.values&&it.values.flow!=null; const hasC=it.values&&it.values.consume!=null;
-    const ops=[{path:'items/'+id+'/values/flow',op:hasF?'set':'add',value:next?'out':'in'},{path:'items/'+id+'/values/consume',op:hasC?'set':'add',value:next}];
-    V.note=(next?'consuming ':'not consuming ')+id; return submitViews(ops,'board:consume',V); }
   if(a.startsWith('brd:values:')){ const id=a.slice(11); const it=W.items[id]||{}; const v=it.values||{};
     V.form={kind:'values',item:id,date:v.date||'',repeat:v.repeat||'',amount:v.amount==null?'':String(v.amount)}; V.formFocus='amount'; return V.sess&&V.queue(V.sess,'form'); }
   if(a.startsWith('brd:pay:')){ const id=a.slice(8); V.form={kind:'payto',item:id}; V.note='choose the debt this expense pays'; return V.sess&&V.queue(V.sess,'form'); }
@@ -12374,16 +12442,30 @@ function hostBoardAct(V,a){
     const has=it.values&&it.values.payTo!=null; const ops=has?[{path:'items/'+id+'/values/payTo',op:'set',value:''}]:[];
     clearFormFields(V); V.form=null; V.note='not a debt payment'; return submitViews(ops,'board:payclear',V); }
   if(a==='res:add'){ V.form={kind:'resource',name:'',unit:'',stock:''}; V.formFocus='name'; return V.sess&&V.queue(V.sess,'form'); }
-  if(a.startsWith('alt:pref:')){ const pair=a.slice(9).split('/'); const id=pair[0], mid=pair[1]; const it=W.items[id]; if(!it||!it.alts||!mid) return;
-    const ref='item:'+mid; const next=it.alts.pref===ref?null:ref; const ops=[{path:'items/'+id+'/alts/pref',op:it.alts.pref!==undefined?'set':'add',value:next}];
-    if(next&&Array.isArray(it.alts.unavail)&&it.alts.unavail.indexOf(ref)>=0) ops.push({path:'items/'+id+'/alts/unavail',op:'remove',value:ref});
-    V.open=V.open||{}; V.open[id]=true; V.note=next?('preferred '+mid):('cleared preference '+mid); return submitViews(ops,'board:pref',V); }
-  if(a.startsWith('alt:restrict:')){ const pair=a.slice(13).split('/'); const id=pair[0], mid=pair[1]; const it=W.items[id]; if(!it||!it.alts||!mid) return;
-    const ref='item:'+mid; const un=Array.isArray(it.alts.unavail)?it.alts.unavail:[]; const on=un.indexOf(ref)>=0; const ops=[];
-    if(!Array.isArray(it.alts.unavail)) ops.push({path:'items/'+id+'/alts/unavail',op:'set',value:on?[]:[ref]});
-    else ops.push({path:'items/'+id+'/alts/unavail',op:on?'remove':'add',value:ref});
-    if(!on&&it.alts.pref===ref) ops.push({path:'items/'+id+'/alts/pref',op:'set',value:null});
-    V.open=V.open||{}; V.open[id]=true; V.note=on?('cleared restriction '+mid):('restricted '+mid); return submitViews(ops,'board:restrict',V); }
+  if(a.startsWith('res:remove:')){ const id=a.slice(11); if(!id||!W.items[id]) return;
+    const ref='item:'+id;
+    const ops=[{path:'components/resources/items',op:'remove',value:ref}];
+    Object.keys(W.items).forEach(function(oid){ if(oid===id) return; const uses=W.items[oid]&&W.items[oid].values&&W.items[oid].values.uses; if(Array.isArray(uses)&&uses.some(function(x){ return memberRef(x)===ref; })) ops.push({path:'items/'+oid+'/values/uses',op:'remove',value:ref}); });
+    const comp=W.components&&W.components.resources;
+    if(comp){ const raw=comp.items; const L=Array.isArray(raw)?raw:(raw?[raw]:[]); comp.items=L.filter(function(x){ return memberRef(x)!==ref; }); }
+    Object.keys(W.items).forEach(function(oid){ if(oid===id) return; const uses=W.items[oid]&&W.items[oid].values&&W.items[oid].values.uses; if(Array.isArray(uses)) W.items[oid].values.uses=uses.filter(function(x){ return memberRef(x)!==ref; }); });
+    const name=W.items[id].name||id; delete W.items[id];
+    V.note='removed resource '+name;
+    return submitViews(ops,'board:res-remove',V); }
+  if(a.startsWith('alt:pref:')){ const pair=a.slice(9).split('/'); const id=pair[0], mid=pair[1]; const it=W.items[id]; if(!it||!mid) return;
+    if(!it.alts) ensureAlts(it);
+    const r=preferOps(id, it, mid); if(!r) return; V.open=V.open||{}; V.open[id]=true;
+    V.note=r.next?('preferred '+mid):('cleared preference '+mid);
+    const ent=submitViews(r.ops,'board:pref',V);
+    if(!ent||(ent.r&&ent.r.ok===false)){ applyAltOps(it, 'pref', mid); if(V.sess) V.queue(V.sess,'alt'); }
+    return ent; }
+  if(a.startsWith('alt:restrict:')){ const pair=a.slice(13).split('/'); const id=pair[0], mid=pair[1]; const it=W.items[id]; if(!it||!mid) return;
+    if(!it.alts) ensureAlts(it);
+    const r=restrictOps(id, it, mid); if(!r) return; V.open=V.open||{}; V.open[id]=true;
+    V.note=r.unavailable?('unavailable '+mid):('available '+mid);
+    const ent=submitViews(r.ops,'board:restrict',V);
+    if(!ent||(ent.r&&ent.r.ok===false)){ applyAltOps(it, 'restrict', mid); if(V.sess) V.queue(V.sess,'alt'); }
+    return ent; }
   if(a.startsWith('alt:tog:')){ const id=a.slice(8); V.open=V.open||{}; V.open[id]=!V.open[id]; V.note=(V.open[id]?'opened':'closed')+' alternatives of '+id; return V.sess&&V.queue(V.sess,'alt'); }
   if(a.startsWith('alt:add:')){ const id=a.slice(8); V.form={kind:'alt',parent:id,name:'',jreq:'',comfort:'',fun:'',cost:'',hours:'',usesIds:{}}; V.formFocus='name'; return V.sess&&V.queue(V.sess,'form'); }
   if(a.startsWith('use:')){ const id=a.slice(4); V.form=V.form||{}; V.form.usesIds=V.form.usesIds||{}; V.form.usesIds[id]=!V.form.usesIds[id]; return V.sess&&V.queue(V.sess,'form'); }
@@ -13364,7 +13446,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.25",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.26",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
