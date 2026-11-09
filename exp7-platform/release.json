@@ -1,11 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.28",
+  "version": "1.8.29",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "71d3d775dd522164f8b62ae0a985884838ef9a2da04a7ece6c39526f9bdefac4",
+  "sha256": "c0b4b41b646908e7ecdbd7f42f23989f93a7396f5b55c4059ae6d47ea1a473a5",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "1.8.28: The Fish app is the overlay demo. The card and button are slots, and the fish swims over them.",
+    "app": "1.8.29: The Lumen app is the next overlay. The session card and Confirm are slots, and a light glides across the card.",
     "appSha256": "4e19bdeeb76818a6a96b9cb6655d48c950d429b17d3680184231e5a67755508b",
     "budgetSha256": "115fb94328289ed9b2af7b17f394ca06d7556e7f78950533562332ea0787c0c5",
     "budgetMode": "exp7-views",

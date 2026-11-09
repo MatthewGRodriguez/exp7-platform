@@ -112,14 +112,14 @@ Apps (Exp7 demo, Budget, standalone, future):
 4. Exp7 demo tab strip into scene (optional). **[OPEN]**  
 5. Keep two-file release discipline; docs-only PRs remain an authorized exception. **[REQ]**  
 6. **Artist art pass + profile image ABI** — coordinate with Ash; integrate wasm/host bump when delivered. **[OPEN]** — [artist-coordination-brief.md](./artist-coordination-brief.md)
-7. **View store, slot and overlay composition** — Shell 1.8.28 ships the Fish app: stored card and button slots, fish overlay, fallthrough hits. Gradients and cubic strokes are still missing. **[OPEN]** — [design/overlay-view-store.md](./design/overlay-view-store.md)
+7. **View store, slot and overlay composition** — Shell 1.8.28 ships the Fish app. Shell 1.8.29 ships the Lumen app: session card and Confirm slots, light overlay, fallthrough hits. Gradients and cubic strokes are still missing. **[OPEN]** — [design/overlay-view-store.md](./design/overlay-view-store.md)
 
 ---
 
 ## Related docs
 
 - [artist-coordination-brief.md](./artist-coordination-brief.md) — Ash handoff: views inventory, invariants, profile image gap
-- [design/overlay-view-store.md](./design/overlay-view-store.md) — 2026-11-09 view store and overlay composition (plan; not shipped)  
+- [design/overlay-view-store.md](./design/overlay-view-store.md) — 2026-11-09 view store and overlay composition (Fish in 1.8.28, Lumen in 1.8.29)  
 - [platform-chrome-jrender.md](./platform-chrome-jrender.md) — chrome / parallax / Budget tabs implementation  
 - [architecture.md](./architecture.md) — layers, mount model, sync honesty  
 - [vocabulary.md](./vocabulary.md) — calHtml / boardHtml / Atlas / direct mount  

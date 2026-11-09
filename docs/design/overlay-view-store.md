@@ -2,7 +2,7 @@
 
 Ash Tangent Residual Artist sent this packet at Matthew's request on 9 Nov 2026. The zip reviewed here is `artcraft-jrender-overlay-2026-11-09`. Matthew also has the page on his Mac at `/Users/user-rodri/Home/Art/artcraft-jrender-overlay-20261109/index.html`.
 
-This document is the product reading of that packet. Shell **1.8.27** carries the host and the loader. Shell **1.8.28** adds a Fish app that is this demo: the stone card and stone button as slots, and the fish as the overlay, on one renderer. Calendar, Board, and Plan are unchanged. The card, button, and fish paints are still the temporary solids from the packet.
+This document is the product reading of that packet. Shell **1.8.27** carries the host and the loader. Shell **1.8.28** adds a Fish app that is this demo: the stone card and stone button as slots, and the fish as the overlay, on one renderer. Shell **1.8.29** adds a Lumen app from the later page: a session card and a Confirm control as slots, and a light glide as the overlay, on that same renderer. Calendar, Board, and Plan are unchanged. The card, button, and fish paints are still the temporary solids from the packet. The Lumen faces are stepped solid bands of the authored lighting.
 
 The cited `store/FORMAT.md` is not in this zip. The format below is read from `src/viewstore.js`, `tools/build_store.mjs`, `store/catalog.json`, and the `store.jrvp` bytes in the zip (66,052 bytes, magic `JRVP`, version 1, catalog 9,965 bytes).
 
@@ -95,6 +95,7 @@ Schematic PNGs in the packet are Pillow stills. They are not JRender frames.
 ## Still open before the packet's art is on a product canvas
 
 - The host patch is in the shell. The shared `jrender-exp7` tree was not modified. Wasm and JRDL are unchanged.
+- Shell 1.8.29 plays the Lumen page as an app. The page is 820×400. `exp7.lumen-card` sits at 24, 52 (480×280, capture). `exp7.lumen-confirm` sits at 530, 120 (260×140, capture). `exp7.lumen-glide` is drawn last at 24, 52 (480×280, fallthrough). The glide moves by one node affine. Lit states cross-fade shadow levels with `Patch` and scale the face about the principal point. Confirm selects the session. U undoes that. P pauses the glide. O removes it. Keys 1–7 set idle, hover, pressed, selected, disabled, focus, and invalid. A hidden tab and reduced motion stop the travel. The first state patch is synchronous. Gradients are still stepped solids.
 - A draw-list linear gradient, a radial gradient with stop alpha and an affine, and a cubic stroke. Then replace the temporary card, button, and fish constructions. Until then the records' `paint.gaps` stay the inventory. The Fish app plays those stand-ins so the composition can be checked.
 - Decide which product surface composes stored scenes on one canvas, and which surfaces stay JRViews documents on the shared Core. Budget boards and the calendar are documents. A stored card is a face, not a replacement for the atlas.
 - Mac frame timing, contrast on the real canvas, and reduced-motion and hidden-tab behaviour on the product shell, separate from the packet page.
