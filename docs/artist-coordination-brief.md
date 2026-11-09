@@ -14,7 +14,7 @@ Matthew looked at shells 1.8.10 through 1.8.21 and said a lot was added and litt
 
 The design is the one Ash already runs. An SVG drawing carries the light, the soft shadow, the glass, and the lip. The state machine only chooses which drawing is on screen. Hover, press, focus, selected, dragging, drop-pending, and invalid are drawings (or the same drawing with opacity and scale keyed from the state table). The engine does not invent a new shadow out of rectangles. Click-path motion stays at most 120 ms, and the click itself is not delayed. Nothing loops while the pointer is still. Reduced motion shows the resting drawing.
 
-`exp7-platform-lean.html` stays at 1.8.21, including the ground-shadow nodes and the id jump that stopped the first draw from stalling, until a drawn pose replaces a procedural node. When a drawing replaces a node, remove that node in the same change so the two do not stack. Do not add another rectangle-lighting pass.
+The rectangle lighting from 1.8.21, including the ground-shadow nodes and the id jump that stopped the first draw from stalling, stays until a drawn pose replaces a procedural node. When a drawing replaces a node, remove that node in the same change so the two do not stack. Do not add another rectangle-lighting pass. 1.8.22 does not do that replacement. It adds board and budget controls on the same state machine.
 
 | Pose | What the drawing shows |
 |---|---|

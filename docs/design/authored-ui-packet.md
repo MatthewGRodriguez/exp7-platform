@@ -1,6 +1,6 @@
 # Authored UI packet (2026-11-08, evening CT)
 
-This is not a completed art workflow, and it is not a change to the lean shell. The shell on main is still **1.8.21**. The DesignCraft packet is art input. It is not copied into this repository: the zip includes native masters, a Blender file, research imports, and PNG proofs, and the research imports must not be deployed. `hero-preview.png` is a comparison target. It is not a raster background for the product.
+This is not a completed art workflow. The packet was measured against shell **1.8.21**. Shell **1.8.22** adds board and budget controls and does not play this packet. The DesignCraft packet is art input. It is not copied into this repository: the zip includes native masters, a Blender file, research imports, and PNG proofs, and the research imports must not be deployed. `hero-preview.png` is a comparison target. It is not a raster background for the product.
 
 `docs/design/svg-state-card.svg` remains an integration fixture from the earlier note. It is not this packet, and a Chrome filter on that fixture is not draw-list playback.
 

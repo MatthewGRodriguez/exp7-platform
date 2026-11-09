@@ -71,7 +71,7 @@ Acts are routed through `window.__platformChromeAct`:
 1. Runtime builds view HTML (`calHtml` / `boardHtml` / `depsHtml`).  
 2. `hostDoc` strips `header.ja-top`, rewrites visible “exp6” → “Exp7”, applies cal/board host polish.  
 3. If Plan: `planDoc` **removes every child except `.ja-deps`**.  
-4. **`budgetChromeDoc` runs last** — inserts `[data-exp7=budget-chrome]` with Cal / Board / Plan (`data-jv-act=budget:tab:*`) and, when `__budgetUi.tab === 'brd'`, type buttons (`budget:board:*`).
+4. **`budgetChromeDoc` runs last** — inserts `[data-exp7=budget-facts]` on every tab (month, day, surplus, DDI, net income, living cost, net worth), then `[data-exp7=budget-chrome]` with Cal / Board / Plan (`data-jv-act=budget:tab:*`) and, when `__budgetUi.tab === 'brd'`, type buttons (`budget:board:*`).
 
 Only atlases with `meta.budget` get this chrome (Budget’s own IDB atlas). Exp7 demo trip atlas does not.
 
@@ -81,6 +81,8 @@ Only atlases with `meta.budget` get this chrome (Budget’s own IDB atlas). Exp7
 
 - `budget:tab:cal|brd|plan` → `showTab` + redraw views so hostDoc chrome highlights update  
 - `budget:board:expense|income|debt|asset` → Board tab + type pane + redraw  
+- `budget:month:-1|1|0` → one shared month on the calendar and every board, then redraw. The atlas is not copied.  
+- `budget:day:-1|1|0` → board rows for that day, or the whole month when the day is cleared. Unscheduled rows stay on the month view and hide when a day is selected.  
 
 Host `onact` for `jv` also routes `budget:` / `plat:` before cal/board/plan acts.
 

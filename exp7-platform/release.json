@@ -1,13 +1,13 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.21",
+  "version": "1.8.22",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "8a767838f1af3f5ceb1f5b96faaa5711348957ad4b54381eec4055457dca1136",
+  "sha256": "9c21f2111df3011d44743dd7e6a5ee67a7de5c6f648c79b9297eae499bd61707",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "1.8.21: Shadow ids jump reserved bands so the first draw does not stall.",
+    "app": "1.8.22: Board remove, values and consuming, month and day on one atlas, debt payment highlight, month panel on every tab.",
     "appSha256": "4e19bdeeb76818a6a96b9cb6655d48c950d429b17d3680184231e5a67755508b",
-    "budgetSha256": "673372b101ea5342552ec16a2e5d3820e322411031c52d808b68c35c3d494c67",
+    "budgetSha256": "115fb94328289ed9b2af7b17f394ca06d7556e7f78950533562332ea0787c0c5",
     "budgetMode": "exp7-views",
     "viewsModuleId": "exp7-views@1",
     "viewsSourcesAggregateSha256": "96b954d9e411a69f7a3b47f7e3d87d3e021e72dee06a28776326afd52ab9790d",

@@ -4,7 +4,7 @@
 
 Shells 1.8.10 through 1.8.21 put the state table, a sampled shadow, a face lip, a soft top, a dark glass body, a ground-shadow node, and short pose eases into the lean file. Matthew's read of that work is that a lot was added and the picture barely changed. The design he wants is the one Ash Tangent Residual Artist already used: paint the light and the shadow in an SVG animation, and let the state machine switch the drawings. The rectangle passes stay in 1.8.21 until a drawn pose replaces them. They are not the next thing to extend.
 
-`docs/design/svg-state-card.svg` is a fixture. The DesignCraft packet and the draw-list test against it are in `docs/design/authored-ui-packet.md`. Cubic fills load. Gradients and cubic strokes do not. The lean shell is still 1.8.21. No product frame changed.
+`docs/design/svg-state-card.svg` is a fixture. The DesignCraft packet and the draw-list test against it are in `docs/design/authored-ui-packet.md`. Cubic fills load. Gradients and cubic strokes do not. 1.8.22 does not play those drawings. It adds board and budget controls: remove, values and consuming on the left, one month across the combined atlas, a day filter, a debt-payment button with a yellow row wash, and the month panel on every tab. The wash is the existing state machine, state `payto`, not a new shadow and not a DesignCraft gradient.
 
 ## Apps picker and icon flicker (1.8.11)
 
