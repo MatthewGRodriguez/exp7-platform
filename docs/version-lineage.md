@@ -56,8 +56,10 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.22** | PR #49 | Board rows can be removed. Values and consuming sit on the left. Budget boards share one atlas and show one month, with a day filter. An expense can pay a debt and that row washes yellow. Surplus, DDI, net income, living cost, and net worth stay on every tab. |
 | **1.8.23** | PR #50 | Board button clicks reach their actions. Each alternative has a star for preferred and an × for restricted. |
 | **1.8.24** | PR #51 | An active button fills gold, and a restricted one fills rose. The resource name field stays with its label. |
-| **1.8.25** | this branch | Text typed in the resource name field is drawn inside that field. |
-| **1.8.26** | this branch | Set values flips a positive amount to a negative one. A resource can be removed. The star prefers an alternative, and × makes it unavailable. |
+| **1.8.25** | PR #52 | Text typed in the resource name field is drawn inside that field. |
+| **1.8.26** | PR #52 | Set values flips a positive amount to a negative one. A resource can be removed. The star prefers an alternative, and × makes it unavailable. |
+
+The 9 Nov 2026 overlay packet is recorded in [design/overlay-view-store.md](./design/overlay-view-store.md). It does not change this shell.
 
 1.8.10 through 1.8.21 are the procedural lighting passes. On 2026-11-08 Matthew directed that those passes be replaced by SVG drawings played by the state machine. The DesignCraft 0.18.0 packet was checked the same evening: the view draw list loads a cubic fill and rejects a gradient, and it has no cubic stroke. The record is `docs/design/authored-ui-packet.md`. 1.8.22 does not wire that packet. It adds the board and budget controls on the existing state machine. This is not a finished workflow.
 

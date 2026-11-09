@@ -43,6 +43,7 @@ Every substantive claim should carry an evidence class (see [EVIDENCE.md](./EVID
 | [views-jrender-standard.md](./views-jrender-standard.md) | **Direction:** universal views, one JRender everywhere |
 | [platform-chrome-jrender.md](./platform-chrome-jrender.md) | **Implementation:** bar / apps / Budget tabs on JRViews + Exp7Slabs (1.8.3) |
 | [artist-coordination-brief.md](./artist-coordination-brief.md) | **Ash handoff:** authorized art workflow + profile image render (2026-11-08) |
+| [design/overlay-view-store.md](./design/overlay-view-store.md) | **2026-11-09 packet:** view store, slot and overlay composition (not in the shell) |
 | [decisions.md](./decisions.md) | Accepted / rejected / shipped decisions |
 | [version-lineage.md](./version-lineage.md) | Demo lean history + platform release lineage through 1.8.3 |
 | [distribution-launcher.md](./distribution-launcher.md) | Software vs data repos, launcher gate, handoff |
