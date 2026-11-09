@@ -97,7 +97,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.24. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.25. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -6544,19 +6544,23 @@ class TextField {
     if (cx - this.sx > iw - 2) this.sx = cx - iw + 2; if (cx - this.sx < 0) this.sx = Math.max(0, cx - 8); if (!o.multiline && this.sx > 0) { const tw = lay.L[0].adv[lay.L[0].adv.length - 1] || 0; this.sx = Math.min(this.sx, Math.max(0, tw - iw + 2)); }
     if (cy + this.lh - this.sy > ih) this.sy = cy + this.lh - ih; if (cy - this.sy < 0) this.sy = cy; if (!o.multiline) this.sy = Math.max(0, (this.lh - ih) / 2) * 0 - Math.max(0, (ih - this.lh) / 2);
     const sx = this.sx, sy = this.sy, p = new Patch(); this.caret = [cx - sx, cy - sy];
-    p.replace(this.cid, (q) => { const s = Math.min(v.a, v.f), e = Math.max(v.a, v.f);
+    /* Glyphs share the frame that draws the border. A content node at the group origin was painting the typed name at the top of the screen. */
+    const ox = o.x + o.pad, oy = o.y + o.pad;
+    p.replace(this.id, (q) => {
+      q.rrect(o.x, o.y, o.w, o.h, o.radius, o.bg).border(o.x, o.y, o.w, o.h, o.radius, this.focused ? 2 : 1, this.focused ? o.focusBorder : o.border).hit(o.x, o.y, o.w, o.h);
+      const s = Math.min(v.a, v.f), e = Math.max(v.a, v.f);
       if (s !== e) lay.L.forEach((ln, k) => { if (e < ln.s || s > ln.e) return; const x0 = this.pos(lay, Math.max(s, ln.s))[0], x1 = s <= ln.e && e > ln.e ? (ln.adv[ln.adv.length - 1] || 0) + 4 : this.pos(lay, Math.min(e, ln.e))[0];
-        if (x1 > x0) q.rect(x0 - sx, k * this.lh - sy, x1 - x0, this.lh, o.selColor); });
-      if (!v.text && o.placeholder) q.text(-sx, this.asc - sy + (this.lh - o.size * 1.25) / 2, o.size, o.placeholderColor, o.font, o.placeholder);
-      lay.L.forEach((ln, k) => { if (ln.text) q.text(-sx, k * this.lh + this.asc + (this.lh - o.size) / 2 * 0.5 - sy, o.size, o.color, o.font, ln.text); });
-      if (v.ul) { const a = this.pos(lay, v.ul[0]), b = this.pos(lay, v.ul[1]); if (b[0] > a[0]) q.rect(a[0] - sx, a[1] + this.lh - 2 - sy, b[0] - a[0], 1.5, o.color); } });
-    p.replace(this.kid, (q) => q.rect(cx - sx, cy - sy + 1, Math.max(1, 1.5), this.lh - 2, o.caretColor), NF.HIDDEN * !(this.focused && this.vis && v.a === v.f));
-    p.replace(this.id, (q) => q.rrect(o.x, o.y, o.w, o.h, o.radius, o.bg).border(o.x, o.y, o.w, o.h, o.radius, this.focused ? 2 : 1, this.focused ? o.focusBorder : o.border).hit(o.x, o.y, o.w, o.h), NF.HIT | NF.DRAG);
+        if (x1 > x0) q.rect(ox + x0 - sx, oy + k * this.lh - sy, x1 - x0, this.lh, o.selColor); });
+      if (!v.text && o.placeholder) q.text(ox - sx, oy + this.asc - sy + (this.lh - o.size * 1.25) / 2, o.size, o.placeholderColor, o.font, o.placeholder, { maxw: iw });
+      lay.L.forEach((ln, k) => { if (ln.text) q.text(ox - sx, oy + k * this.lh + this.asc + (this.lh - o.size) / 2 * 0.5 - sy, o.size, o.color, o.font, ln.text, { maxw: iw }); });
+      if (v.ul) { const a = this.pos(lay, v.ul[0]), b = this.pos(lay, v.ul[1]); if (b[0] > a[0]) q.rect(ox + a[0] - sx, oy + a[1] + this.lh - 2 - sy, b[0] - a[0], 1.5, o.color); }
+      if (this.focused && this.vis && v.a === v.f) q.rect(ox + cx - sx, oy + cy - sy + 1, Math.max(1, 1.5), this.lh - 2, o.caretColor);
+    }, NF.HIT | NF.DRAG);
     this.s.patch(p); this.r.request(); this.place(); }
   // ---- hidden textarea ----
   static ta() { if (TA || typeof document === 'undefined') return TA; const t = TA = document.createElement('textarea');
     t.setAttribute('autocomplete', 'off'); t.setAttribute('autocorrect', 'off'); t.setAttribute('autocapitalize', 'off'); t.setAttribute('spellcheck', 'false'); t.setAttribute('data-jrender', 'textfield');
-    Object.assign(t.style, { position: 'fixed', left: '-200px', top: '-200px', width: '2px', height: '20px', opacity: '0.01', padding: '0', border: '0', margin: '0', resize: 'none', overflow: 'hidden', fontSize: '16px', zIndex: '2147483646', caretColor: 'transparent', outline: 'none', whiteSpace: 'pre', color: 'transparent', background: 'transparent' });
+    Object.assign(t.style, { position: 'fixed', left: '-200px', top: '-200px', width: '2px', height: '20px', opacity: '0.01', padding: '0', border: '0', margin: '0', resize: 'none', overflow: 'hidden', fontSize: '16px', zIndex: '2147483646', caretColor: 'transparent', outline: 'none', whiteSpace: 'pre', color: 'transparent', webkitTextFillColor: 'transparent', background: 'transparent' });
     document.body.appendChild(t); if (!window.__jrTfPlace) { window.__jrTfPlace = 1; const sync = () => { if (TAowner && TAowner.place) TAowner.place(); }; window.addEventListener('scroll', sync, true); window.addEventListener('resize', sync); }
     const f = (n) => t.addEventListener(n, (e) => TAowner && TAowner['on_' + n](e));
     for (const n of ['keydown', 'input', 'compositionstart', 'compositionupdate', 'compositionend', 'copy', 'cut', 'paste', 'blur', 'focus']) f(n); return t; }
@@ -6579,7 +6583,7 @@ class TextField {
   blink(on) { clearInterval(this.bt); this.bt = 0; this.vis = true; if (!on || reduced()) return; const tick = () => { if (typeof document !== 'undefined' && document.hidden) { if (!this.vis) { this.vis = true; this.caretOnly(); } return; } this.vis = !this.vis; this.caretOnly(); };
     this.bt = setInterval(tick, 530); }
   wake() { this.vis = true; if (this.focused) this.blink(true); }
-  caretOnly() { const v = this.m.view(); this.s.patch(new Patch().flags(this.kid, this.focused && this.vis && v.a === v.f ? 0 : NF.HIDDEN)); this.r.request(); }
+  caretOnly() { this.render(); }
   after(input = true) { this.wake(); this.syncTA(); this.render(); if (input && this.o.oninput) this.o.oninput(this.m.value); }
   // ---- scene events (frame node) ----
   ev(e) { if (e.id !== this.id) return; const lx = e.x - this.o.x - this.o.pad + this.sx, ly = e.y - this.o.y - this.o.pad + this.sy;
@@ -9950,7 +9954,7 @@ function layout(root,width,opt){ opt=opt||{}; const ctx={bg:[255,255,255,255],fg
     if(el.hasAttribute&&el.hasAttribute('data-jv-act')) k=el.tagName+'[jv='+el.getAttribute('data-jv-act')+']';
     if(!k){ let i=0, s=el; while((s=s.previousElementSibling)) if(s.tagName===el.tagName) i++; k=el.tagName+i; }
     let full=p+'/'+k; if(KEY._seen&&KEY._seen.has(full)){ let j=2; while(KEY._seen.has(full+'#'+j)) j++; full+='#'+j; } (KEY._seen=KEY._seen||new Set()).add(full); KEY.set(el,full); return full; }
-  function nd(k,el,act){ let n=NM.get(k); if(n) return n; let id=fnv(k)||1; const reserved=b=>b===0x1||b===0x2||b===0x4||b===0x5; /* TextField / glue id bands — jump whole nibble, never scan 256M ids */
+  function nd(k,el,act){ let n=NM.get(k); if(n) return n; let id=fnv(k)||1; const reserved=b=>b===0x1||b===0x2||b===0x4||b===0x5||b===0x7; /* TextField frame 0x5, group 0x1, content 0x7, caret 0x4 — jump the whole nibble */
     while(used.has(id)||id===0xffffffff||reserved(id>>>28)){ if(id===0xffffffff||reserved(id>>>28)) id=((id&0xf0000000)+0x10000000)>>>0||1; else id=(id+1)>>>0||1; } used.add(id);
     n={key:k,id,flags:0,items:[],hit:null,el:el||null,act:act||null}; NM.set(k,n); nodes.push(n); return n; }
   const R=(n,x,y,w,h,r,c)=>{ if(w>0&&h>0) n.items.push(r>0?['rrect',x,y,w,h,Math.min(r,w/2,h/2),U(c)]:['rect',x,y,w,h,U(c)]); };
@@ -10212,7 +10216,7 @@ async function selfTest(){ await boot(); const out={};
   const Lr=layout(d1,220); const rb=Lr.tboxes.find(t=>t.kind==='rich'); const rLay=rb?CORE.richLayout([{text:'Plan risk: ',size:rb.size,color:0xffffffff},{text:'CRITICAL',size:rb.size,color:0xffffffff,bold:true},{text:' days and ',size:rb.size,color:0xffffffff},{text:'MODERATE',size:rb.size,color:0xffffffff,italic:true},{text:' slack use the same legend.',size:rb.size,color:0xffffffff}],{maxw:rb.maxw,lineHeight:rb.lh,font:FONT,boldFont:FONTB}):null;
   out.rich={boxes:Lr.tboxes.length,kinds:Lr.tboxes.map(t=>t.kind),hasRich:!!rb,height:rb&&rb.height,count:rb&&rb.count,lh:rb&&rb.lh,coreHeight:rLay&&rLay.height,sane:!!(rb&&rb.lh<=3&&rb.height<=rb.size*rb.lh*rb.count+2&&rb.height<80)};
   out.pipelines=GC.builds||0; out.users=GC.users; out.boldFont=FONTB; out.MOD=!!MOD; out.RS=!!RS; out.TextField=typeof TextField==='function'; return out; }
-window.JRViews={layout,View,boot,core,fullDL,diff,GID,selfTest,gc:()=>GC,font:()=>FONT,fontBold:()=>FONTB,metrics:()=>CORE?CORE.metrics(FONT):null,mem:()=>CORE?CORE.wasmBytes():0,MOD,RS,ViewStates:()=>window.JRender&&window.JRender.ViewStates,ID_BANDS:{textFieldHigh:[0x1,0x2,0x4,0x5],hostFields:0x50000000,tfXor:{group:0x40000000,content:0x20000000,caret:0x10000000}}};
+window.JRViews={layout,View,boot,core,fullDL,diff,GID,selfTest,gc:()=>GC,font:()=>FONT,fontBold:()=>FONTB,metrics:()=>CORE?CORE.metrics(FONT):null,mem:()=>CORE?CORE.wasmBytes():0,MOD,RS,ViewStates:()=>window.JRender&&window.JRender.ViewStates,ID_BANDS:{textFieldHigh:[0x1,0x2,0x4,0x5,0x7],hostFields:0x50000000,tfXor:{group:0x40000000,content:0x20000000,caret:0x10000000}}};
 })();
 
 
@@ -10757,7 +10761,7 @@ window.x7 = window.x7 || function (t) {
     var id = (owner + 0x01000003) >>> 0;
     var used = {};
     for (var i = 0; i < nodes.length; i++) used[nodes[i].id] = 1;
-    function reserved(band) { return band === 0x1 || band === 0x2 || band === 0x4 || band === 0x5 || band === 0x6; }
+    function reserved(band) { return band === 0x1 || band === 0x2 || band === 0x4 || band === 0x5 || band === 0x6 || band === 0x7; }
     /* A reserved band is 256 million ids. Stepping one id at a time stalls the first draw. Jump the whole band, the same way layout allocates node ids. */
     var guard = 0;
     while ((used[id] || id === 0xffffffff || reserved(id >>> 28)) && guard < 64) {
@@ -13360,7 +13364,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.24",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.25",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
