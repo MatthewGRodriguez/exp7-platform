@@ -54,7 +54,7 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.20** | PR #45 | The cast shadow stays on the ground when the face rises. |
 | **1.8.21** | PR #46 | Shadow ids jump reserved bands, so the first draw does not stall. |
 
-1.8.10 through 1.8.21 are the procedural lighting passes. On 2026-11-08 Matthew directed that those passes be replaced by SVG drawings played by the state machine. The note and the trial sheet are in `docs/artist-coordination-brief.md` and `docs/design/svg-state-card.svg`. The shell version stays 1.8.21 until a drawing is actually wired in.
+1.8.10 through 1.8.21 are the procedural lighting passes. On 2026-11-08 Matthew directed that those passes be replaced by SVG drawings played by the state machine. The DesignCraft 0.18.0 packet was checked the same evening: the view draw list loads a cubic fill and rejects a gradient, and it has no cubic stroke. The record is `docs/design/authored-ui-packet.md`. The shell version stays 1.8.21 until a drawing is actually wired in. This is not a finished workflow.
 
 ### Current manifest (verbatim) [MEAS]
 

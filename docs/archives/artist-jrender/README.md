@@ -1,7 +1,7 @@
 # Artist coordination, animation workflow & JRender (historical archive)
 
 **Not** a complete/latest Lore snapshot. **Not** a CSS animation prescription for shipped Exp7 WebGPU views.  
-**Contact status (2026-11-08):** Matthew **authorized** coordination with **Ash Tangent Residual Artist** for a full view UX/UI art workflow + profile image render support. The same day he directed that the lean file's rectangle lighting be replaced by SVG drawings the state machine plays. Living handoff: [`../../artist-coordination-brief.md`](../../artist-coordination-brief.md). This archive remains historical provenance only.
+**Contact status (2026-11-08):** Matthew **authorized** coordination with **Ash Tangent Residual Artist** for a full view UX/UI art workflow + profile image render support. The same day he directed that rectangle lighting be replaced by SVG the state machine plays. The DesignCraft packet and the draw-list gap are in [`../../design/authored-ui-packet.md`](../../design/authored-ui-packet.md). Living handoff: [`../../artist-coordination-brief.md`](../../artist-coordination-brief.md). This archive remains historical provenance only. Affinity in the files below is the historic draw app, not the author of that packet.
 
 | Item | Count |
 |------|------:|
