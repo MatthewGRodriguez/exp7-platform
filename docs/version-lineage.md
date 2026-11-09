@@ -55,7 +55,7 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.21** | PR #46 | Shadow ids jump reserved bands, so the first draw does not stall. |
 | **1.8.22** | PR #49 | Board rows can be removed. Values and consuming sit on the left. Budget boards share one atlas and show one month, with a day filter. An expense can pay a debt and that row washes yellow. Surplus, DDI, net income, living cost, and net worth stay on every tab. |
 | **1.8.23** | PR #50 | Board button clicks reach their actions. Each alternative has a star for preferred and an × for restricted. |
-| **1.8.24** | this branch | An active button fills gold, and a restricted one fills rose. The resource name field stays with its label. |
+| **1.8.24** | PR #51 | An active button fills gold, and a restricted one fills rose. The resource name field stays with its label. |
 | **1.8.25** | this branch | Text typed in the resource name field is drawn inside that field. |
 | **1.8.26** | this branch | Set values flips a positive amount to a negative one. A resource can be removed. The star prefers an alternative, and × makes it unavailable. |
 
