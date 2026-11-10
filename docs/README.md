@@ -7,13 +7,13 @@
 
 | Field | Value |
 |-------|--------|
-| Checked | 2026-11-10 (docs pass after 1.8.40 merge) |
+| Checked | 2026-11-10 (docs pass after 1.8.44 merge) |
 | Branch | `main` |
-| Commit | `7cc864d174d1ed99c32afb3762841dc3353db289` |
-| Manifest version | **1.8.40** |
+| Commit | `26cc811718e40124ec05d8db4bb40d893e5dafbb` |
+| Manifest version | **1.8.44** |
 | Payload | `exp7-platform/exp7-platform-lean.html` |
-| Manifest SHA-256 | `3fa1cb09fa3b32f5c5b80c47de1bb9c6e6fedb6044c904fe6cfcc63fc92f7ccb` (matches file bytes) |
-| Lean bytes | **2 620 472** |
+| Manifest SHA-256 | `8c4b76efeffae5e462ba6c3bf529849df1aba1bf1ce37ee8cfae8d998fdc1008` (matches file bytes) |
+| Lean bytes | **2 139 385** |
 | Views module | `exp7-views@1` |
 | Chrome | JRViews bar + apps; Budget tabs in-scene; account/key DOM — see [platform-chrome-jrender.md](./platform-chrome-jrender.md) |
 | Open PRs | Re-check with `gh pr list` |

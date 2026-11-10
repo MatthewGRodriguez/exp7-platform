@@ -62,7 +62,20 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.28** | PR #55 | The Fish app is the overlay demo: card and button slots, with the fish swimming over them. |
 | **1.8.29** | PR #56 | The Lumen app is the next overlay: a session card and a Confirm control as slots, and a light that glides across the card. |
 | **1.8.30** | PR #57 | A Board row is an item category. Its items are listed under it, one per line, each with its values and a Set values button. The category name is a text box, the list folds behind an arrow, and the row shows the selected item. New item asks for a name, a requirement and the resources used. The demo Board saves its changes through the demo checker. |
-| **1.8.31** | this branch | A Board value shows as the value with its unit and no name: usd reads `$1,200`, hours read `4 h`. Consuming values are red and the rest are green. An item's star, unavailable and Remove buttons sit on their own line under it. Item lists start hidden, and Add alternative is always on the row. The Budget month and day buttons are one date button. It opens a mini calendar over the view, and the view always shows that date's whole month. Parallax runs on Budget again: a category name box no longer holds its Board at rest, the figures bar is a slab, and a Board type that is not shown does not animate. |
+| **1.8.31** | PR #58 | A Board value shows as the value with its unit and no name: usd reads `$1,200`, hours read `4 h`. Consuming values are red and the rest are green. An item's star, unavailable and Remove buttons sit on their own line under it. Item lists start hidden, and Add alternative is always on the row. The Budget month and day buttons are one date button. It opens a mini calendar over the view, and the view always shows that date's whole month. Parallax runs on Budget again: a category name box no longer holds its Board at rest, the figures bar is a slab, and a Board type that is not shown does not animate. |
+| **1.8.32** | PR #62 | The Path inspector renders only the touched paths plus a preview. |
+| **1.8.33** | PR #63 | Ranking with JFEngine instead of `Best()` ([ranking-jfengine.md](./ranking-jfengine.md)). |
+| **1.8.34** | PR #64 | The old `Best()` ranking code is removed. |
+| **1.8.35** | PR #65 | Board scroll and layout scale with what is on screen. |
+| **1.8.36** | PR #66 | Parallax holds still while scrolling. |
+| **1.8.37** | PR #67 | JRender indexed draw-list core and frame budget. |
+| **1.8.38** | PR #68 | Calendar selection counter follows the selection. |
+| **1.8.39** | PR #71 | Views are vector models (options, skin, tokens); the HTML view builders are gone ([views-vector-model.md](./views-vector-model.md)). |
+| **1.8.40** | PR #72 | JRender wasm through wasm-opt. |
+| **1.8.41** | PR #74 | Renderer fixes from Ash's review (budgeted work, off-canvas viewport). |
+| **1.8.42** | PR #75 | Gradient paints and stroked paths ([jrender-paint-stroke.md](./jrender-paint-stroke.md)). |
+| **1.8.43** | PR #77 | Fixes from Ash's review of 1.8.42 (gradient hover, bold gradient text, per-placement uniforms, long field names). |
+| **1.8.44** | PR #78 | Budget is the default app; the Fish and Lumen apps are removed. |
 
 The 9 Nov 2026 overlay packet is recorded in [design/overlay-view-store.md](./design/overlay-view-store.md). Shell 1.8.28 plays it as the Fish app. Shell 1.8.29 plays the Lumen page the same way.
 

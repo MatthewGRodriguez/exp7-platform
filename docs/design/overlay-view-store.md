@@ -1,5 +1,7 @@
 # Overlay composition and the Exp7 view store (2026-11-09)
 
+> **Status (1.8.44):** the Fish and Lumen apps and their view packs (`jr-views`, `jr-views-lumen`) were removed from the shell; Budget is the default app. The `view-store` script (this overlay system) is still shipped. The gaps listed at the end (gradients, cubic strokes) were closed in 1.8.42 ([../jrender-paint-stroke.md](../jrender-paint-stroke.md)).
+
 Ash Tangent Residual Artist sent this packet at Matthew's request on 9 Nov 2026. The zip reviewed here is `artcraft-jrender-overlay-2026-11-09`. Matthew also has the page on his Mac at `/Users/user-rodri/Home/Art/artcraft-jrender-overlay-20261109/index.html`.
 
 This document is the product reading of that packet. Shell **1.8.27** carries the host and the loader. Shell **1.8.28** adds a Fish app that is this demo: the stone card and stone button as slots, and the fish as the overlay, on one renderer. Shell **1.8.29** adds a Lumen app from the later page: a session card and a Confirm control as slots, and a light glide as the overlay, on that same renderer. Calendar, Board, and Plan are unchanged. The card, button, and fish paints are still the temporary solids from the packet. The Lumen faces are stepped solid bands of the authored lighting.
