@@ -1,8 +1,14 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
 <title>Exp7 Platform</title>
 <style>
-:root{--bar-h:44px;--ink:#1a1d23;--muted:#5b6573;--line:#dde2ec;--bg:#fff}
+:root{
+  /* Safe area: device insets (notch, Dynamic Island, home indicator) and an allowance for rounded window / screen corners,
+     which report no inset (macOS windows, iPad). The bar keeps its 44 px row and grows by the top inset. */
+  --corner-x:12px;--corner-top:4px;--corner-b:10px;
+  --sa-t:max(env(safe-area-inset-top,0px),var(--corner-top));--sa-b:max(env(safe-area-inset-bottom,0px),var(--corner-b));
+  --sa-l:max(env(safe-area-inset-left,0px),var(--corner-x));--sa-r:max(env(safe-area-inset-right,0px),var(--corner-x));
+  --bar-row:44px;--bar-h:calc(var(--bar-row) + var(--sa-t));--ink:#1a1d23;--muted:#5b6573;--line:#dde2ec;--bg:#fff}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif}
 button{font:inherit;padding:.4rem .75rem;margin:.15rem 0;cursor:pointer}
@@ -11,8 +17,8 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 .ok{color:#0a6b0a}.bad{color:#a00}.na{color:var(--muted)}.row{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin:.4rem 0}
 #members{padding-left:1.1rem}#members li{margin:.2rem 0}
 /* Reserved top platform bar — not a floating overlay over app content */
-#topChrome{position:fixed;top:0;left:0;right:0;z-index:40;display:flex;align-items:center;gap:8px;height:var(--bar-h);padding:0 8px;background:#fff;border-bottom:1px solid var(--line);box-sizing:border-box}
-#jrChromeHost{display:none;position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+#topChrome{position:fixed;top:0;left:0;right:0;z-index:40;display:flex;align-items:center;gap:8px;height:calc(var(--bar-row) + var(--sa-t));padding:var(--sa-t) calc(8px + var(--sa-r)) 0 calc(8px + var(--sa-l));background:#fff;border-bottom:1px solid var(--line);box-sizing:border-box}
+#jrChromeHost{display:none;position:absolute;top:var(--sa-t);left:var(--sa-l);right:var(--sa-r);bottom:0;pointer-events:none;z-index:0;overflow:hidden}
 #jrChromeHost canvas{display:block;width:100%;height:100%;touch-action:none}
 /* When PlatformChromeJR paints: canvas is both paint + hit target (avoids DOM/JR layout offset).
  * DOM buttons stay for keyboard/a11y but do not receive pointer hits. */
@@ -25,7 +31,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 /* Handoff control stays clickable above the JR bar canvas when content is blank. */
 #btnDebug{margin-left:auto;position:relative;z-index:6;min-height:32px;padding:0 8px;font-size:12px;background:#fff;border:1px solid #246;color:#123;border-radius:8px}
 #topChrome.jr-on #btnDebug{opacity:1;pointer-events:auto;z-index:6}
-#exp7DbgPanel{position:fixed;top:calc(var(--bar-h) + 8px);left:8px;right:8px;z-index:80;background:#fff;color:#1a1d23;border:1px solid #246;border-radius:10px;padding:10px;max-height:70vh;display:flex;flex-direction:column;gap:8px;box-shadow:0 8px 28px rgba(20,30,50,.18)}
+#exp7DbgPanel{position:fixed;top:calc(var(--bar-h) + 8px);left:calc(8px + var(--sa-l));right:calc(8px + var(--sa-r));z-index:80;background:#fff;color:#1a1d23;border:1px solid #246;border-radius:10px;padding:10px;max-height:70vh;display:flex;flex-direction:column;gap:8px;box-shadow:0 8px 28px rgba(20,30,50,.18)}
 #exp7DbgPanel[hidden]{display:none!important}
 #exp7DbgPanel textarea{width:100%;height:42vh;font:12px/1.35 ui-monospace,monospace;color:#1a1d23;background:#f6f7f9}
 #btnBack{background:#fff;border:1px solid var(--line);border-radius:8px;min-width:36px;min-height:36px;width:36px;height:36px;padding:0;margin:0;display:inline-flex;align-items:center;justify-content:center;font-size:1.25rem;line-height:1;flex-shrink:0}
@@ -56,8 +62,8 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
   color:var(--muted)!important;background:#eef1f6;
 }
 #topChrome #btnAvatar > #avatarFallback.is-on{display:flex!important}
-#appsOverlay{position:fixed;top:var(--bar-h);left:0;right:0;bottom:0;z-index:40;background:#f6f7f9;padding:12px 16px 24px;overflow:auto;transform:translateZ(0);isolation:isolate}
-#jrAppsHost{display:none;position:absolute;inset:0;padding:12px 16px 24px;box-sizing:border-box;z-index:1}
+#appsOverlay{position:fixed;top:var(--bar-h);left:var(--sa-l);right:var(--sa-r);bottom:0;z-index:40;background:#f6f7f9;padding:12px 16px calc(24px + var(--sa-b));overflow:auto;transform:translateZ(0);isolation:isolate}
+#jrAppsHost{display:none;position:absolute;inset:0;padding:12px 16px calc(24px + var(--sa-b));box-sizing:border-box;z-index:1}
 #jrAppsHost canvas{display:block;width:100%;height:100%;touch-action:none}
 /* Opaque plate stays under the JR canvas. Transparent overlay let Budget WebGPU show through Back. */
 #appsOverlay.jr-on{background:#f6f7f9;padding:0}
@@ -68,11 +74,11 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 #appButtons{display:flex;flex-wrap:wrap;gap:10px}
 #appButtons button.appPick{min-width:9rem;min-height:4.5rem;padding:1rem;border:1px solid var(--line);border-radius:10px;background:#fff;text-align:left;font-size:1rem}
 #appButtons button.appPick[aria-current="true"]{outline:2px solid #246}
-#accountMenu{position:fixed;top:calc(var(--bar-h) + 4px);left:8px;z-index:50;width:min(26rem,calc(100vw - 16px));max-height:calc(100vh - var(--bar-h) - 16px);overflow:auto;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;box-shadow:0 8px 28px rgba(20,30,50,.12)}
+#accountMenu{position:fixed;top:calc(var(--bar-h) + 4px);left:calc(8px + var(--sa-l));z-index:50;width:min(26rem,calc(100vw - 16px - var(--sa-l) - var(--sa-r)));max-height:calc(100vh - var(--bar-h) - 16px);overflow:auto;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;box-shadow:0 8px 28px rgba(20,30,50,.12)}
 #accountMenu[hidden],#appsOverlay[hidden]{display:none!important}
 #accountScrim{position:fixed;top:var(--bar-h);left:0;right:0;bottom:0;z-index:45;background:transparent}
 /* App content begins strictly below reserved bar */
-#appShell{position:fixed;top:var(--bar-h);left:0;right:0;bottom:0;padding:0;overflow:auto;isolation:isolate}
+#appShell{position:fixed;top:var(--bar-h);left:var(--sa-l);right:var(--sa-r);bottom:var(--sa-b);padding:0;overflow:auto;isolation:isolate}
 /* Keep WebGPU canvases laid out (Safari drops swapchain / marks renderer.hidden under display:none). */
 .appSlot{position:absolute;inset:0;min-height:100%;height:100%;overflow:auto;z-index:0}
 .appSlot.is-active{z-index:1;opacity:1;pointer-events:auto;visibility:visible}
@@ -97,7 +103,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.44. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.45. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -12189,7 +12195,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.44",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.45",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
