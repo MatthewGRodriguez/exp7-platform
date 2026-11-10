@@ -1,12 +1,12 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.32",
+  "version": "1.8.33",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "1bde199dac510f2574de3852d3bfee0fdd56f50fdba87182294826013cc35392",
+  "sha256": "bf1fb7a7b4d5905c2deb69e16a50da4c044852e399b2f62fb63ea32b284ad06d",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "1.8.32: The Path inspector on the Atlas, Proposal console and Two writers tabs lists the paths the last proposal touched plus a 20-path preview; the full match list is built only while you search it (up to 200), and the Paths tab still lists everything. Opening those tabs no longer lays out all 1,192 rows. 1.8.31: Board values show as the value with its unit, red when consuming and green when not. An item's other buttons sit on a line under it, and item lists start hidden. The Budget date is one button that opens a mini calendar over the view. Board rows move with the pointer again.",
-    "appSha256": "6e9879d7a611657b8057ba6b3c56b5363ea647dc5cfae39df016c16aa93fe66b",
+    "app": "1.8.33: Exp7 ranks alternatives with JFEngine (Lore jeditor r29) instead of Exp6 JGroup.Best()/SimulatedBest(): each group scores as one batch (jfactor terms through the Exp6 kernel via JFEngine) and ranks by score, highest first, ties in list order, giving the same order as Best() on every shipped group. jfactor() now uses the real Exp6 kernel (method 2). 1.8.32: The Path inspector on the Atlas, Proposal console and Two writers tabs lists the paths the last proposal touched plus a 20-path preview; the full match list is built only while you search it (up to 200), and the Paths tab still lists everything. Opening those tabs no longer lays out all 1,192 rows. 1.8.31: Board values show as the value with its unit, red when consuming and green when not. An item's other buttons sit on a line under it, and item lists start hidden. The Budget date is one button that opens a mini calendar over the view. Board rows move with the pointer again.",
+    "appSha256": "c9435111d10f73271043619b67440d0e7537577d91bd0cb1120c8b58b6900f96",
     "budgetSha256": "9c2ac0884996be3cc117915caba6a829a1b439103c1d0db6ea1a7c913bc04433",
     "budgetMode": "exp7-views",
     "viewsModuleId": "exp7-views@1",
