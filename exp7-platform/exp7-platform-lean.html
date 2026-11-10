@@ -76,6 +76,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 #appButtons button.appPick[aria-current="true"]{outline:2px solid #246}
 #accountMenu{position:fixed;top:calc(var(--bar-h) + 4px);left:calc(8px + var(--sa-l));z-index:50;width:min(26rem,calc(100vw - 16px - var(--sa-l) - var(--sa-r)));max-height:calc(100vh - var(--bar-h) - 16px);overflow:auto;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;box-shadow:0 8px 28px rgba(20,30,50,.12)}
 #accountMenu[hidden],#appsOverlay[hidden]{display:none!important}
+#vault{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:10px 0}#vault legend{font-weight:600;padding:0 4px}#vault input{width:100%;box-sizing:border-box}
 #accountScrim{position:fixed;top:var(--bar-h);left:0;right:0;bottom:0;z-index:45;background:transparent}
 /* App content begins strictly below reserved bar */
 #appShell{position:fixed;top:var(--bar-h);left:var(--sa-l);right:var(--sa-r);bottom:var(--sa-b);padding:0;overflow:auto;isolation:isolate}
@@ -103,7 +104,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.46. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.47. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -146,13 +147,19 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 <label class="na" for="shareOut">Share / invite (no secrets)</label>
 <textarea id="shareOut" readonly rows="3"></textarea>
 <p id="shareStat" class="na" aria-live="polite"></p>
+<fieldset id="vault"><legend>Budget data (encrypted)</legend>
+<p class="na">Saved to your data repo, sealed with a passphrase. The passphrase is not your GitHub key; it is never stored. Without it the file cannot be opened.</p>
+<input type="password" id="vaultPass" autocomplete="new-password" spellcheck="false" placeholder="Passphrase (8+ characters)">
+<p class="row"><button type="button" id="vaultSave">Save to repo</button> <button type="button" id="vaultLoad">Load from repo</button></p>
+<p id="vaultStat" class="na" aria-live="polite"></p>
+</fieldset>
 <button type="button" id="clr">Sign out</button>
 </div>
 <p id="offinfo" class="na"></p>
 <div id="profiles" aria-label="Saved accounts (no keys)"></div>
 <p id="pkginfo" class="na"></p>
 <details><summary>Software package updates</summary>
-<p class="na">Optional local .html package trial for Exp7 only. Never writes personal data repos. Budget persists separately in this browser.</p>
+<p class="na">Optional local .html package trial for Exp7 only. Never writes personal data repos. Budget persists in this browser; Budget data (encrypted) above saves it to your data repo.</p>
 <p><label>Package (.html): <input type="file" id="pkgfile" accept=".html,text/html"></label><br>
 <label>Release manifest (optional .json): <input type="file" id="pkgman" accept=".json,application/json"></label><br>
 <label>Expected SHA-256 (optional): <input type="text" id="pkgsha" autocomplete="off" spellcheck="false"></label></p>
@@ -10699,7 +10706,8 @@ function budgetFigures(w, month){
   }
   let income=0, living=0, debtPay=0, assets=0, debts=0, assetN=0, debtN=0;
   list('income').forEach(function(r){ const a=monthAmt(rec(r)); if(isFinite(a)) income+=a; });
-  list('expense').forEach(function(r){ const it=rec(r); const a=monthAmt(it); if(!isFinite(a)) return; if(it&&it.values&&it.values.payTo) debtPay+=a; else living+=a; });
+  /* Spending is stored negative. Living cost and debt payments are what was spent, so a refund (positive) lowers them. */
+  list('expense').forEach(function(r){ const it=rec(r); const a=monthAmt(it); if(!isFinite(a)) return; if(it&&it.values&&it.values.payTo) debtPay-=a; else living-=a; });
   list('asset').forEach(function(r){ const a=Number(rec(r)&&rec(r).values&&rec(r).values.amount); if(isFinite(a)){ assets+=a; assetN++; } });
   list('debt').forEach(function(r){ const a=Number(rec(r)&&rec(r).values&&rec(r).values.amount); if(isFinite(a)){ debts+=a; debtN++; } });
   return {month:month, surplus:income-living-debtPay, ddi:income>0?debtPay/income:null, netIncome:income, living:living, debtPay:debtPay, netWorth:(assetN||debtN)?assets-debts:null};
@@ -12271,6 +12279,55 @@ async function putWrite(L,wc,path,text,label){
  if(w.ok)return{state:meta.ok?"updated":"created"};
  if(w.status===0||w.status>=500)return{state:"unknown"};
  return{state:"error",detail:{status:w.status,reason:w.cat}}}
+
+/* Budget data in the personal data repo, sealed (1.8.47). The repo is public, so the atlas is encrypted in this browser:
+   AES-GCM 256, key from the passphrase by PBKDF2-SHA-256 (600,000 rounds), random salt and iv per save, header bound as AAD.
+   The GitHub key stays in this shell; Budget never sees it. The passphrase lives only in the input until the action ends. */
+const VAULT_PATH="exp7-app-v1/budget/atlas.sealed.json",VAULT_FMT="exp7-sealed/1",VAULT_ITER=600000,BUDGET_DB="budget-app-v1";
+const u8b64=u=>{let s="";for(let i=0;i<u.length;i+=32768)s+=String.fromCharCode.apply(null,u.subarray(i,i+32768));return btoa(s)};
+const b64u8=b=>Uint8Array.from(atob(b),c=>c.charCodeAt(0));
+async function vaultKey(pass,salt,iter){const base=await crypto.subtle.importKey("raw",new TextEncoder().encode(pass),"PBKDF2",false,["deriveKey"]);
+ return crypto.subtle.deriveKey({name:"PBKDF2",hash:"SHA-256",salt,iterations:iter},base,{name:"AES-GCM",length:256},false,["encrypt","decrypt"])}
+function vaultAad(h){return new TextEncoder().encode([h.format,h.app,h.kdf.name,h.kdf.hash,h.kdf.iterations,h.kdf.salt,h.cipher.name,h.cipher.iv].join("|"))}
+async function vaultSeal(text,pass,app){const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+ const h={format:VAULT_FMT,app,kdf:{name:"PBKDF2",hash:"SHA-256",iterations:VAULT_ITER,salt:u8b64(salt)},cipher:{name:"AES-GCM",iv:u8b64(iv)}};
+ const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv,additionalData:vaultAad(h)},await vaultKey(pass,salt,VAULT_ITER),new TextEncoder().encode(text));
+ return JSON.stringify(Object.assign(h,{ct:u8b64(new Uint8Array(ct))}))}
+async function vaultOpen(sealed,pass){let h;try{h=JSON.parse(sealed)}catch{throw new Error("not a sealed file")}
+ if(!h||h.format!==VAULT_FMT||!h.kdf||h.kdf.name!=="PBKDF2"||h.kdf.hash!=="SHA-256"||!(h.kdf.iterations>=100000)||!h.cipher||h.cipher.name!=="AES-GCM")throw new Error("not a sealed file this version reads");
+ let pt;try{pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64u8(h.cipher.iv),additionalData:vaultAad(h)},await vaultKey(pass,b64u8(h.kdf.salt),h.kdf.iterations),b64u8(h.ct))}
+ catch{throw new Error("wrong passphrase, or the file was changed")}
+ return{app:h.app,text:new TextDecoder().decode(pt)}}
+function budgetDb(){return new Promise((res,rej)=>{const q=indexedDB.open(BUDGET_DB,1);q.onupgradeneeded=()=>{if(!q.result.objectStoreNames.contains("kv"))q.result.createObjectStore("kv")};q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+async function budgetKv(op,k,v){const d=await budgetDb();return new Promise((res,rej)=>{const t=d.transaction("kv",op==="get"?"readonly":"readwrite"),st=t.objectStore("kv");let r;const q=op==="get"?st.get(k):st.put(v,k);q.onsuccess=()=>r=q.result;t.oncomplete=()=>{d.close();res(r)};t.onerror=()=>{d.close();rej(t.error)}})}
+function vaultMsg(t,bad){const e=$("vaultStat");if(e){e.textContent=t;e.className=bad?"bad":"na"}}
+function vaultPass(){const i=$("vaultPass"),p=i?i.value:"";if(p.length<8){vaultMsg("Passphrase must be at least 8 characters.",true);return null}return p}
+function vaultLease(){const L=S.cfg;if(!L||!L.tok){vaultMsg("Sign in and finish the data repo check first.",true);return null}return L}
+async function vaultSave(){const L=vaultLease();if(!L)return;const pass=vaultPass();if(!pass)return;
+ try{vaultMsg("Saving Budget…");if(window.budget&&typeof window.budget.persist==="function"){try{await window.budget.persist()}catch(e){}}
+  const st=await budgetKv("get","atlasState");const atlas=st&&st.atlas;
+  if(!atlas||atlas.format!=="jeditor-atlas"||!atlas.meta||!atlas.meta.budget){vaultMsg("No Budget data in this browser to save.",true);return}
+  vaultMsg("Encrypting…");const sealed=await vaultSeal(JSON.stringify({format:"exp7-budget-backup/1",savedAt:new Date().toISOString(),shell:SHELL_VERSION,atlas}),pass,"budget");
+  const wc=S.wctrl=new AbortController();vaultMsg("Writing to "+L.owner+"/"+L.repo+"…");
+  const r=await putWrite(L,wc,VAULT_PATH,sealed,"budget data (sealed)");
+  if(r.state==="created"||r.state==="updated"){vaultMsg("Saved encrypted to "+L.owner+"/"+L.repo+"/"+VAULT_PATH+" ("+Math.round(sealed.length/1024)+" KB, "+Object.keys(atlas.items||{}).length+" items).");rec("vault_save","pass",{state:r.state,bytes:sealed.length})}
+  else{vaultMsg("Not saved: "+r.state+(r.detail?" ("+r.detail.status+")":""),true);rec("vault_save","fail",r)}}
+ catch(e){vaultMsg("Not saved: "+String(e&&e.message||e),true);rec("vault_save","fail",String(e&&e.message||e))}
+ finally{const i=$("vaultPass");if(i)i.value=""}}
+async function vaultLoad(){const L=vaultLease();if(!L)return;const pass=vaultPass();if(!pass)return;
+ try{vaultMsg("Reading "+L.owner+"/"+L.repo+"…");const r=await gh("/repos/"+L.owner+"/"+L.repo+"/contents/"+VAULT_PATH+"?ref="+encodeURIComponent(L.branch),{tok:L.tok,raw:true});
+  if(r.status===404){vaultMsg("No saved Budget data in "+L.owner+"/"+L.repo+" yet.",true);return}
+  if(!r.ok){vaultMsg("Could not read it ("+r.status+").",true);return}
+  vaultMsg("Decrypting…");const o=await vaultOpen(r.data,pass);let b;try{b=JSON.parse(o.text)}catch{b=null}
+  const atlas=b&&b.format==="exp7-budget-backup/1"&&b.atlas;
+  if(o.app!=="budget"||!atlas||atlas.format!=="jeditor-atlas"||!atlas.meta||!atlas.meta.budget){vaultMsg("That file is not Budget data.",true);return}
+  const prev=await budgetKv("get","atlasState");if(prev)await budgetKv("put","atlasState.beforeLoad",prev);
+  await budgetKv("put","atlasState",{atlas,at:Date.now(),source:"vault",savedAt:b.savedAt||null});
+  if(UI.mountedAppId==="budget"){clearSlot("budget");await mountAppFresh("budget")}
+  vaultMsg("Loaded Budget data saved "+(b.savedAt||"earlier")+" ("+Object.keys(atlas.items||{}).length+" items). The previous browser copy is kept.");rec("vault_load","pass",{items:Object.keys(atlas.items||{}).length})}
+ catch(e){vaultMsg("Not loaded: "+String(e&&e.message||e),true);rec("vault_load","fail",String(e&&e.message||e))}
+ finally{const i=$("vaultPass");if(i)i.value=""}}
+window.__exp7Vault={seal:vaultSeal,open:vaultOpen,path:VAULT_PATH};
 async function putCreate(L,wc,path,text,label){
  const P="/repos/"+L.owner+"/"+L.repo+"/contents/"+path;
  const pre=await gh(P+"?ref="+encodeURIComponent(L.branch),{tok:L.tok,signal:wc.signal,raw:true});
@@ -12566,7 +12623,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.46",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.47",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
@@ -12777,7 +12834,7 @@ window.__platformChromeAct=function(a){
  if(a==="plat:avatar"){$("btnAvatar").click();return}
  if(a&&a.indexOf("plat:app:")===0){const id=a.slice(9);hideAppsOverlay();openApp(id,{fromPicker:true});return}
 };
-$("btnAdd").onclick=lock(addUser);$("btnShare").onclick=lock(shareInvite);
+$("btnAdd").onclick=lock(addUser);$("btnShare").onclick=lock(shareInvite);$("vaultSave").onclick=lock(vaultSave);$("vaultLoad").onclick=lock(vaultLoad);
 $("imp").onclick=lock(importPkg);$("act").onclick=lock(activateTrial);$("keep").onclick=lock(keep);$("rev").onclick=lock(async()=>{await revert("user");await pkgStatus()});
 
 (async()=>{try{
