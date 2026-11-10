@@ -9,7 +9,7 @@
 <p id="ret" class="na" hidden></p>
 <p id="st" aria-live="polite"></p>
 <p id="off"></p>
-<details><summary>About</summary><p class="na">Use a fine-grained key for your own <b>personal data repo</b> only. The key stays in this tab's memory and is never stored or reported. The platform is downloaded from the software repo MatthewGRodriguez/exp7-platform (read-only, no key sent), pinned to a commit, checked against its SHA-256, and kept for offline use.</p></details>
+<details><summary>About</summary><p class="na">Use a fine-grained key for your own <b>personal data repo</b>. A key with wider access (for example one that can create that repo) also works; the platform never writes the software repo. The key stays in this tab's memory and is never stored or reported. The platform is downloaded from the software repo MatthewGRodriguez/exp7-platform (read-only, no key sent), pinned to a commit, checked against its SHA-256, and kept for offline use.</p></details>
 </main><script>
 window.addEventListener("error",function(){var s=document.getElementById("st");if(s&&document.getElementById("gate"))s.textContent="Launcher error — reload the page."});
 (function(){"use strict";
@@ -31,8 +31,10 @@ async function cached(){for(const w of["current","previous"]){const m=await kv("
 function launch(text,meta,key){const hand=key?{type:"exp7-launcher-handoff",key,release:meta.sha256}:null;key=null;document.open();document.write(text);document.close();if(hand){window.postMessage(hand,location.origin==="null"||location.protocol==="file:"?"*":location.origin);hand.key=null}}
 async function validate(){if(busy)return;const k=$("tok").value.trim();if(!k)return;if(!/^\S{20,}$/.test(k)){$("st").textContent="That doesn't look like a complete key yet.";return}busy=true;$("tok").value="";$("st").textContent="Checking key (read-only)…";
  try{const u=await gh("/user",{key:k});if(!u.ok){$("st").textContent=u.status===401?"Key not accepted. Paste again.":u.status===0?"Could not reach GitHub.":"Key check failed ("+u.status+").";return showOffline()}
- if(SRC.owner){const s=await gh("/repos/"+SRC.owner+"/"+SRC.repo,{key:k});if(s.ok&&s.data&&s.data.permissions&&(s.data.permissions.push||s.data.permissions.admin)){$("st").textContent="This key can write to the software repo. Use a key limited to your personal data repo.";return}}
- clearPend();$("ret").hidden=true;$("st").textContent="Signed in as "+u.data.login+". Getting the platform…";const r=await fetchRelease();
+ // A key that can also write the software repo is allowed (one that can create the data repo usually can). The platform is read
+ // from the software repo without the key, pinned to a commit and checked against release.json's SHA-256, so the key never writes it.
+ let wide="";if(SRC.owner){const s=await gh("/repos/"+SRC.owner+"/"+SRC.repo,{key:k});if(s.ok&&s.data&&s.data.permissions&&(s.data.permissions.push||s.data.permissions.admin))wide=" (this key can also write the software repo; Exp7 never uses it there)"}
+ clearPend();$("ret").hidden=true;$("st").textContent="Signed in as "+u.data.login+wide+". Getting the platform…";const r=await fetchRelease();
  if(r.err){const c=await cached();if(c&&r.net)return launch(c.text,c.meta,k);$("st").className="bad";$("st").textContent=r.err==="not-configured"?"Software host not configured in this build.":"Platform unavailable: "+r.err+(c?" (a cached version is available below)":"");return showOffline()}
  const text=await kv("get","pkg:"+r.meta.sha256);if(!await okBytes(text,r.meta.sha256)){$("st").textContent="Cached platform failed its checksum.";return}launch(text,r.meta,k)}
  finally{busy=false}}
