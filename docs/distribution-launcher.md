@@ -20,7 +20,7 @@ Release format: `exp7-platform-release/1` with `version`, `file`, `sha256`, `min
 - Cache in IndexedDB: current + previous; offline last-working fallback.  
 - On success: gate disappears; platform fills the window.  
 - **Key handoff:** in-memory same-window `postMessage`; platform accepts once, only if `e.source === window`, within ~15 s.  
-- **Refuse** a key that can write the software repo.
+- **Allow** a key that can also write the software repo, with a note in the status line (since launcher change 2026-11-10; it used to refuse one). A key that can create the data repo usually has that access. The launcher reads the platform without the key, pinned to a commit and checked against `release.json`, so the key is never used on the software repo.
 
 ## Register flow (historical fix on Grok Bot box) [MOCK / OPEN]
 
