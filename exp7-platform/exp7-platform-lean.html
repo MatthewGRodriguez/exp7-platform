@@ -97,7 +97,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.40. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.41. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -10518,7 +10518,7 @@ class Renderer {
       this.M.buf += nb.size - g.vb.size; g.vb.destroy(); g.vb = nb; this.pk(); if (fl & F.VERTS) dirty(); }
     else if (fl & F.VERTS) dirty();
     if (!g.gb || fl & F.GROUPS) { const n = x.jrd_len(h, 1), nb = this.buffer(g.gb, n, GPUBufferUsage.STORAGE); if (nb !== g.gb) g.bg = null; g.gb = nb; q.writeBuffer(g.gb, 0, mem, x.jrd_ptr(h, 1), n); }
-    if (!g.ub || fl & F.UNI) { const nb = this.buffer(g.ub, 32, GPUBufferUsage.UNIFORM); if (nb !== g.ub) g.bg = null; g.ub = nb; q.writeBuffer(g.ub, 0, mem, x.jrd_ptr(h, 2), 32); }
+    if (!g.ub || fl & F.UNI) { const nb = this.buffer(g.ub, 32, GPUBufferUsage.UNIFORM); if (nb !== g.ub) g.bg = null; g.ub = nb; q.writeBuffer(g.ub, 0, mem, x.jrd_ptr(h, 2), 32); g.u0 = new Float32Array(mem, x.jrd_ptr(h, 2), 8).slice(); g.mapped = 0; }
     if (fl & (F.RANGES | F.REALLOC) || !g.ranges.length) g.ranges = new Uint32Array(mem, x.jrd_ptr(h, 3), x.jrd_len(h, 3) >> 2).slice();
     g.bg ||= this.dev.createBindGroup({ layout: this.bgl, entries: [{ binding: 0, resource: { buffer: g.ub } }, { binding: 1, resource: { buffer: g.gb } }] });
     x.jrd_clean(h); }
@@ -10529,9 +10529,19 @@ class Renderer {
     for (const e of this.entries) { const g = e.scene.gpu; if (!e.scene.h || !g || !g.ranges.length) continue;
       const vx = Math.round(e.x * d), vy = Math.round(e.y * d), vw = Math.round(e.w * d), vh = Math.round(e.h * d);
       const cx = Math.max(0, vx), cy = Math.max(0, vy), cw = Math.min(this.c.width, vx + vw) - cx, chh = Math.min(this.c.height, vy + vh) - cy; if (cw <= 0 || chh <= 0) continue;
-      p.setViewport(vx, vy, vw, vh, 0, 1); p.setScissorRect(cx, cy, cw, chh); p.setPipeline(this.pipe); p.setBindGroup(0, g.bg); p.setVertexBuffer(0, g.vb);
+      this.place(p, g, vx, vy, vw, vh); p.setScissorRect(cx, cy, cw, chh); p.setPipeline(this.pipe); p.setBindGroup(0, g.bg); p.setVertexBuffer(0, g.vb);
       for (let i = 0; i < g.ranges.length; i += 2) { p.draw(g.ranges[i + 1], 1, g.ranges[i], 0); n++; } }
-    p.end(); this.dev.queue.submit([enc.finish()]); this.draws = n; this.cursorSync(); if (more) this.request(); return n; }
+    const life = []; if (this.overlay) n += this.overlay(p, d, life) || 0; /* extra layers (jrender-images) draw in the same pass */
+    p.end(); this.dev.queue.submit([enc.finish()]); for (const b of life) { try { b.destroy(); } catch (_) {} }
+    this.draws = n; this.cursorSync(); if (more) this.request(); return n; }
+  // A WebGPU viewport must lie inside the attachment. A scene inside the canvas uses its own rect, as the core's uniform expects.
+  // A scene that reaches past an edge uses the whole canvas instead, with the uniform remapped by the same affine change
+  // (NDC' = NDC*vw/W + (vw + 2vx)/W - 1, and likewise for y), so each scene px lands on the same device px with no stretch.
+  place(p, g, vx, vy, vw, vh) { const W = this.c.width, H = this.c.height, q = this.dev.queue;
+    if (vx >= 0 && vy >= 0 && vx + vw <= W && vy + vh <= H) { if (g.mapped) { q.writeBuffer(g.ub, 0, g.u0); g.mapped = 0; } p.setViewport(vx, vy, vw, vh, 0, 1); return; }
+    const u = g.u0.slice(), kx = vw / W, ky = vh / H;
+    u[0] = g.u0[0] * kx; u[2] = g.u0[2] * kx + (vw + 2 * vx) / W - 1; u[1] = g.u0[1] * ky; u[3] = g.u0[3] * ky + 1 - (2 * vy + vh) / H;
+    q.writeBuffer(g.ub, 0, u); g.mapped = 1; p.setViewport(0, 0, W, H, 0, 1); }
   // cursor from the current hit state under the last pointer position (after patches, scrolls and layout changes too)
   cursorSync() { const q = this.ptr; if (!q || !this.attached) return; let cur = '', t = null;
     if (q.cap) { const e = this.entries.find(t => t.scene === q.s && t.scene.h); if (e) { const X = q.X - e.x, Y = q.Y - e.y; if (X >= 0 && Y >= 0 && X < e.w && Y < e.h) t = [e.scene, X, Y, e]; } }
@@ -11707,7 +11717,7 @@ root.JRender = { EV, EVNAME, NF, MOD, RS, GF, F, rgba, hex, b64ToBytes, b91ToByt
     var cx = Math.max(0, vx), cy = Math.max(0, vy);
     var cw = Math.min(r.c.width, vx + vw) - cx, chh = Math.min(r.c.height, vy + vh) - cy;
     if (cw <= 0 || chh <= 0) return 0;
-    pass.setViewport(vx, vy, vw, vh, 0, 1);
+    pass.setViewport(0, 0, r.c.width, r.c.height, 0, 1); /* the image shader maps against the whole canvas (u.vp), offset by the scene (u.scene) */
     pass.setScissorRect(cx, cy, cw, chh);
     pass.setPipeline(store.pipe);
     pass.setVertexBuffer(0, vb);
@@ -11731,29 +11741,9 @@ root.JRender = { EV, EVNAME, NF, MOD, RS, GF, F, rgba, hex, b64ToBytes, b91ToByt
     if (!renderer || renderer._imageStore) return renderer;
     renderer._imageStore = store;
     renderer.images = new ImageLayer(renderer);
-    renderer.draw = function () {
-      if (!this.msaa || this.hidden || this.lost) return 0;
-      for (var e of this.entries) if (e.scene.h) this.sync(e.scene);
-      this.ca.resolveTarget = this.ctx.getCurrentTexture().createView();
-      var enc = this.dev.createCommandEncoder(), p = enc.beginRenderPass(this.rp);
-      var n = 0, d = this.dpr;
-      for (var e2 of this.entries) {
-        var g = e2.scene.gpu;
-        if (!e2.scene.h || !g.ranges.length) continue;
-        var vx = Math.round(e2.x * d), vy = Math.round(e2.y * d), vw = Math.round(e2.w * d), vh = Math.round(e2.h * d);
-        var cx = Math.max(0, vx), cy = Math.max(0, vy), cw = Math.min(this.c.width, vx + vw) - cx, chh = Math.min(this.c.height, vy + vh) - cy;
-        if (cw <= 0 || chh <= 0) continue;
-        p.setViewport(vx, vy, vw, vh, 0, 1); p.setScissorRect(cx, cy, cw, chh); p.setPipeline(this.pipe); p.setBindGroup(0, g.bg); p.setVertexBuffer(0, g.vb);
-        for (var i = 0; i < g.ranges.length; i += 2) { p.draw(g.ranges[i + 1], 1, g.ranges[i], 0); n++; }
-      }
-      var lifetime = [];
-      if (this.images) n += this.images.draw(p, d, lifetime) || 0;
-      p.end(); this.dev.queue.submit([enc.finish()]);
-      for (var bi = 0; bi < lifetime.length; bi++) {
-        try { lifetime[bi].destroy(); } catch (_) {}
-      }
-      this.draws = n; this.cursorSync(); return n;
-    };
+    /* Images draw through the base renderer's overlay hook, inside its pass. The base draw() keeps its budgeted work()
+       and follow-up request(); replacing draw() here used to drop them and strand off-screen work. */
+    renderer.overlay = function (p, d, life) { return this.images ? (this.images.draw(p, d, life) || 0) : 0; };
     var prevRecover = renderer.recover && renderer.recover.bind(renderer);
     if (renderer.recover) {
       renderer.recover = async function () {
@@ -16330,7 +16320,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.40",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.41",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
