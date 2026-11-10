@@ -97,7 +97,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.37. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.38. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -14725,7 +14725,10 @@ function paintCalDayChrome(V){ if(!V||!V.doc) return; const CS=calSelOf(V); cons
     if(CS.selected[k]){ const mark=V.doc.ownerDocument.createElement('span'); mark.setAttribute('data-chrome','sel');
       mark.setAttribute('style','color:#2458a6;font-size:11px;font-weight:700'); mark.textContent=' ✓'; el.appendChild(mark); }
   });
-  V.calSelCount=sortedDays(CS.selected).length; }
+  V.calSelCount=sortedDays(CS.selected).length;
+  /* 1.8.38: the toolbar tip follows the selection on the selection-only path too (it said "0 day(s) selected"). */
+  const tip=V.doc.querySelector('i[data-calsel-tip]'); if(tip) tip.textContent=calSelTip(V.calSelCount); }
+function calSelTip(n){ return ' '+n+' day(s) selected · click · drag range · Shift+click range · Ctrl+click add'; }
 
 function calDoc(V,d){ /* strip Board/Plan switch + subs; inject selection UX; paint plan-risk */
   d.querySelectorAll('.ja-switch').forEach(x=>x.remove());
@@ -14768,7 +14771,7 @@ function calDoc(V,d){ /* strip Board/Plan switch + subs; inject selection UX; pa
   bar.appendChild(mk('cal:add','Add step on selection'));
   bar.appendChild(mk('cal:remove','Remove selected steps'));
   bar.appendChild(mk('cal:span','Span item across selection'));
-  const tip=d.ownerDocument.createElement('i'); tip.textContent=' '+n+' day(s) selected · click · drag range · Shift+click range · Ctrl+click add'; tip.className='ja-dim'; bar.appendChild(tip);
+  const tip=d.ownerDocument.createElement('i'); tip.textContent=calSelTip(n); tip.className='ja-dim'; tip.setAttribute('data-calsel-tip','1'); bar.appendChild(tip);
   if(nav&&nav.parentNode) nav.parentNode.insertBefore(bar,nav.nextSibling); else d.insertBefore(bar,d.firstChild);
   /* form panel ABOVE the grid (was appended at end → below the fold / looked like a no-op) */
   let formWrap=null;
@@ -16341,7 +16344,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.37",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.38",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
