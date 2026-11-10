@@ -1,13 +1,13 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.30",
+  "version": "1.8.31",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "6d2e6c6bca1b8b2dc357cc39306d757d667f7db20efe7f83ea1d1702424d46e0",
+  "sha256": "4308d9607060a0e32d5978a7cc8b321006d2d9d6ae1eb8e5babb6da94926a603",
   "minLauncherMajor": 1,
   "contains": {
-    "app": "1.8.30: A Board row is an item category with its items listed under it. The name is a text box, the list folds, and each item has its own values. The demo Board saves its changes.",
+    "app": "1.8.31: Board values show as the value with its unit, red when consuming and green when not. An item's other buttons sit on a line under it, and item lists start hidden. The Budget date is one button that opens a mini calendar over the view. Board rows move with the pointer again.",
     "appSha256": "4e19bdeeb76818a6a96b9cb6655d48c950d429b17d3680184231e5a67755508b",
-    "budgetSha256": "115fb94328289ed9b2af7b17f394ca06d7556e7f78950533562332ea0787c0c5",
+    "budgetSha256": "9c2ac0884996be3cc117915caba6a829a1b439103c1d0db6ea1a7c913bc04433",
     "budgetMode": "exp7-views",
     "viewsModuleId": "exp7-views@1",
     "viewsSourcesAggregateSha256": "96b954d9e411a69f7a3b47f7e3d87d3e021e72dee06a28776326afd52ab9790d",
