@@ -28,7 +28,7 @@ Handoff reports the 7 055 B launcher had an invalid nested Register control 
 
 - Deliverable path cited: `/workspace/deliver/exp7-launcher-register-fix/` (Grok Bot box index only).  
 - Size/SHA cited in handoff; mocks 31/31 against 1.2 / 1.3 candidates **[MOCK]**.  
-- **Not verified in a real browser [OPEN]**.  
+- **Real browser, partial [MEAS 2026-11-09]:** gate, short-key and invalid-key messages checked in Chromium on Matthew’s Mac ([mac-test-2026-11-09.md](./mac-test-2026-11-09.md)). Sign-in, cache, handoff, offline fallback, write-key refusal and the Register→Back flow still **[OPEN]**; Safari **[USER-HW][OPEN]**.  
 - **In this repo since PR #59 (merged 2026-11-10):** [`launcher/exp7-launcher.html`](../launcher/exp7-launcher.html), **8,351 B**, SHA-256 `5bbe061d67a1dca9926f9f72aef261d57d0dc55db81db20b2ab9c7be89a15cc8` **[MEAS]**. Size and SHA prefix match the Register-fix deliverable above, so this is that file. Edit the launcher there; it is not part of `release.json`.
 
 ## Public fetch spot-check [MEAS 2026-11-08]

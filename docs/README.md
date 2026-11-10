@@ -48,6 +48,7 @@ Every substantive claim should carry an evidence class (see [EVIDENCE.md](./EVID
 | [version-lineage.md](./version-lineage.md) | Demo lean history + platform release lineage through 1.8.3 |
 | [distribution-launcher.md](./distribution-launcher.md) | Software vs data repos, launcher gate, handoff |
 | [testing-provenance.md](./testing-provenance.md) | What was tested where; Mac vs box vs mock limits |
+| [mac-test-2026-11-09.md](./mac-test-2026-11-09.md) | 1.8.31 on Matthew’s Mac (Chromium in the Claude app): WebGPU, hits, parallax, frame time, launcher gate |
 | [known-issues-acceptance.md](./known-issues-acceptance.md) | Recurring failures and acceptance criteria |
 | [requirements-vs-main.md](./requirements-vs-main.md) | **Gap table:** [REQ] vs verified **1.8.3** `main` |
 | [lore-migration-pending.md](./lore-migration-pending.md) | Lore **158 + 41 redacted**; ranking_ui; Artist/JRender; gaps |
