@@ -60,7 +60,8 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.26** | PR #52 | Set values flips a positive amount to a negative one. A resource can be removed. The star prefers an alternative, and × makes it unavailable. |
 | **1.8.27** | PR #54 | The view store loads JRDL views on the shared renderer. An overlay falls through where it has no hit. basE91 keeps a low-entropy pack. |
 | **1.8.28** | PR #55 | The Fish app is the overlay demo: card and button slots, with the fish swimming over them. |
-| **1.8.29** | this branch | The Lumen app is the next overlay: a session card and a Confirm control as slots, and a light that glides across the card. |
+| **1.8.29** | PR #56 | The Lumen app is the next overlay: a session card and a Confirm control as slots, and a light that glides across the card. |
+| **1.8.30** | this branch | A Board row is an item category. Its items are listed under it, one per line, each with its values and a Set values button. The category name is a text box, the list folds behind an arrow, and the row shows the selected item. New item asks for a name, a requirement and the resources used. The demo Board saves its changes through the demo checker. |
 
 The 9 Nov 2026 overlay packet is recorded in [design/overlay-view-store.md](./design/overlay-view-store.md). Shell 1.8.28 plays it as the Fish app. Shell 1.8.29 plays the Lumen page the same way.
 
@@ -72,9 +73,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.29",
+"version": "1.8.30",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "c0b4b41b646908e7ecdbd7f42f23989f93a7396f5b55c4059ae6d47ea1a473a5",
+"sha256": "6d2e6c6bca1b8b2dc357cc39306d757d667f7db20efe7f83ea1d1702424d46e0",
 "minLauncherMajor": 1
 ```
 
