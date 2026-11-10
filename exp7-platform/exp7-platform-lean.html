@@ -104,7 +104,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.47. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.48. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -130,12 +130,13 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 <section id="keyArea" aria-label="Enter GitHub key">
 <label for="tok"><b>GitHub key</b></label>
 <input type="password" id="tok" autocomplete="off" spellcheck="false" placeholder="Paste key, checks start automatically">
-<p class="row"><a id="reg" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">Register (create a key)</a></p>
+<p class="row"><a id="reg" href="https://github.com/settings/personal-access-tokens/new?name=Exp7%20data&amp;description=Exp7%20personal%20data%20repo&amp;expires_in=30&amp;contents=write&amp;administration=write" target="_blank" rel="noopener noreferrer">Register (create a key)</a></p>
 <p id="kstat" aria-live="polite"></p>
 </section>
 <div id="after" hidden>
 <p class="ok" id="who"></p>
 <p id="tstat" aria-live="polite"></p>
+<p class="row"><button type="button" id="btnCreateRepo" hidden>Create data repo</button></p>
 <p id="syncstat" class="na" aria-live="polite">Sync idle.</p>
 <label class="na">Data repo <input type="text" id="tgt" value="exp7-app-data" autocomplete="off" spellcheck="false" title="Your public personal data repo name"></label>
 <div class="row">
@@ -12251,6 +12252,21 @@ const CTL=()=>[...document.querySelectorAll("button,input,textarea:not([readonly
 function lock(f){return async()=>{if(busy)return;busy=true;CTL().forEach(b=>b.disabled=true);try{await f()}catch(e){rec("internal","fail",String(e&&e.message||e))}finally{busy=false;CTL().forEach(b=>b.disabled=false);await renderUI()}}}
 
 function invalidate(){S.cfg=null;setSyncStatus("Not ready.")}
+
+/* Create the personal data repo (1.8.48). Public, as the data repo check requires; Budget data is sealed before it is written.
+   Fine-grained keys need Administration write on all repositories to create one; GitHub names what is missing in a header. */
+async function createDataRepo(){const t=S.token,login=S.login,repo=$("tgt").value.trim()||"exp7-app-data";
+ if(!t||!login){$("tstat").textContent="Sign in first.";return}if(!RN.test(repo)){$("tstat").textContent="That repo name is not allowed.";return}
+ $("tstat").textContent="Creating "+login+"/"+repo+"…";let res,body=null,need="";
+ try{res=await fetch(API+"/user/repos",{method:"POST",headers:{"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28","Authorization":"Bearer "+t,"Content-Type":"application/json"},
+  body:JSON.stringify({name:repo,description:"Exp7 personal data. Budget data is sealed (encrypted) before it is written here.",private:false,auto_init:true,has_issues:false,has_wiki:false,has_projects:false}),
+  redirect:"error",cache:"no-store",credentials:"omit",referrerPolicy:"no-referrer"});need=res.headers.get("x-accepted-github-permissions")||"";try{body=await res.json()}catch{}}
+ catch(e){$("tstat").textContent="Could not reach GitHub.";return rec("repo_create","fail","network")}
+ if(S.token!==t)return;
+ if(res.status===201){rec("repo_create","pass",{repo});$("tstat").textContent="Created "+login+"/"+repo+". Checking it…";const cb=$("btnCreateRepo");if(cb)cb.hidden=true;/* validate() skips while a locked action runs; re-check once the lock is released. */setTimeout(validate,50);return}
+ if(res.status===422){rec("repo_create","fail",{status:422});$("tstat").textContent=login+"/"+repo+" already exists but this key cannot see it. Give the key access to that repo, or pick another name.";return}
+ if(res.status===403||res.status===404){rec("repo_create","fail",{status:res.status,need});$("tstat").textContent="This key cannot create repos"+(need?" (GitHub asks for: "+need+")":"")+". Make a key with Repository access: All repositories, and Administration plus Contents: Read and write (Register pre-fills them), or create the repo on GitHub.";return}
+ rec("repo_create","fail",{status:res.status});$("tstat").textContent="Repo not created ("+res.status+(body&&body.message?": "+body.message:"")+")."}
 async function validate(){if(busy)return;invalidate();if(ctrl)ctrl.abort();const c=ctrl=new AbortController();const my=++gen,stale=()=>my!==gen||c.signal.aborted;
  const t=$("tok").value.trim()||S.token||"",repo=$("tgt").value.trim()||"exp7-app-data";
  if(t&&!/^\S{20,}$/.test(t)){$("kstat").textContent="That doesn't look like a complete key yet.";return}
@@ -12262,7 +12278,8 @@ async function validate(){if(busy)return;invalidate();if(ctrl)ctrl.abort();const
  setAvatar(S.avatarUrl,login);rec("key_check","pass",{signedIn:true});
  $("keyArea").hidden=true;$("after").hidden=false;$("kstat").textContent="";$("who").textContent="Signed in as "+login+".";$("tstat").textContent="Checking data repo…";
  const r=await gh("/repos/"+login+"/"+repo,{tok:t,signal:c.signal});if(stale()||r.aborted||S.token!==t)return;
- if(!r.ok){$("tstat").textContent="Repo not found. Create public "+login+"/"+repo+" on GitHub (this page never creates repos).";return rec("target_check","fail",{status:r.status})}
+ if(!r.ok){if(r.status===404){$("tstat").textContent="No repo "+login+"/"+repo+" that this key can see.";const cb=$("btnCreateRepo");if(cb){cb.textContent="Create public "+login+"/"+repo;cb.hidden=false}}else $("tstat").textContent="Could not check "+login+"/"+repo+" ("+r.status+").";return rec("target_check","fail",{status:r.status})}
+ {const cb=$("btnCreateRepo");if(cb)cb.hidden=true}
  if(!(r.data.owner&&r.data.owner.login===login)||r.data.private){$("tstat").textContent="Repo must be yours and public.";return rec("target_check","fail","not own public repo")}
  const src={owner:login,repo:r.data.name,branch:r.data.default_branch};const res=await enterScope(src,true);if(stale()||S.token!==t)return;
  if(res&&res.ok){S.cfg=Object.freeze({gen:my,tok:t,...src});$("tstat").textContent="Ready. Proposal-op sync to "+login+"/"+src.repo+".";rec("target_check","pass",{public:true});startAutoSync();await rememberAppForUser(UI.mountedAppId||DEFAULT_APP_ID)}
@@ -12623,7 +12640,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.47",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.48",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
@@ -12834,7 +12851,7 @@ window.__platformChromeAct=function(a){
  if(a==="plat:avatar"){$("btnAvatar").click();return}
  if(a&&a.indexOf("plat:app:")===0){const id=a.slice(9);hideAppsOverlay();openApp(id,{fromPicker:true});return}
 };
-$("btnAdd").onclick=lock(addUser);$("btnShare").onclick=lock(shareInvite);$("vaultSave").onclick=lock(vaultSave);$("vaultLoad").onclick=lock(vaultLoad);
+$("btnCreateRepo").onclick=lock(createDataRepo);$("btnAdd").onclick=lock(addUser);$("btnShare").onclick=lock(shareInvite);$("vaultSave").onclick=lock(vaultSave);$("vaultLoad").onclick=lock(vaultLoad);
 $("imp").onclick=lock(importPkg);$("act").onclick=lock(activateTrial);$("keep").onclick=lock(keep);$("rev").onclick=lock(async()=>{await revert("user");await pkgStatus()});
 
 (async()=>{try{

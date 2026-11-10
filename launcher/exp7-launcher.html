@@ -42,7 +42,7 @@ async function showOffline(){const c=await cached();$("off").textContent="";if(!
 function sched(ms){clearTimeout(deb);deb=setTimeout(validate,ms)}
 $("tok").addEventListener("input",()=>sched(900));$("tok").addEventListener("paste",()=>sched(150));$("tok").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sched(0)}});
 // Register = original Atlas sync setup: same-tab navigation to GitHub's prefilled fine-grained key page; Back returns here to paste.
-const PAT="https://github.com/settings/personal-access-tokens/new?name=Atlas%20sync&description=Static%20page%20access&expires_in=30&contents=write",PEND="exp7LauncherSignInPending";
+const PAT="https://github.com/settings/personal-access-tokens/new?name=Exp7%20data&description=Exp7%20personal%20data%20repo&expires_in=30&contents=write&administration=write",PEND="exp7LauncherSignInPending";
 function register(){try{sessionStorage.setItem(PEND,JSON.stringify({at:Date.now(),kind:"token"}))}catch{}$("st").className="";$("st").textContent="Opening GitHub's key page in this tab… Create the key, then press Back and paste it here.";try{location.assign(PAT)}catch(e){$("st").className="bad";$("st").textContent="Could not open GitHub ("+(e&&e.name||"error")+"). Open github.com → Settings → Developer settings → Fine-grained tokens."}}
 function returned(){let p=null;try{p=JSON.parse(sessionStorage.getItem(PEND)||"null")}catch{}if(!p)return;$("ret").hidden=false;$("ret").textContent="Back from GitHub: paste the key you created into the box above.";$("tok").focus()}
 function clearPend(){try{sessionStorage.removeItem(PEND)}catch{}}
