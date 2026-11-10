@@ -104,7 +104,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.48. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.49. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -11102,8 +11102,21 @@ function planCells(A,id,pins,wiPick){ const it=A.items[id]; if(!it) return ['—
     else { sel=(runIt?runIt.name:bestName)+' (Exp7 Best())'; }
   } else sel=it.name+' (no alternatives)';
   const has=['jcomfort','jfun','jthrift'].some(k=>typeof st[k]==='number');
-  const joy=has?'Comfort '+sg(st.jcomfort)+' · Fun '+sg(st.jfun)+' · Thrift '+sg(st.jthrift)+(st.tired?' · after '+st.tired+' h travel':''):'not computed';
+  const joy=has?'Comfort '+sg(st.jcomfort)+' · Fun '+sg(st.jfun)+' · Thrift '+sg(st.jthrift)+(st.tired?' · after '+st.tired+' h travel':''):stepEffect(A,it);
   return [sel,joy]; }
+/* A step without joy state shows what it runs on: the selected item's money (amount, how often, from when) and value score. */
+function stepEffect(A,it){ let run=it;
+  if(it.alts){ const st=it.state||{}, B=bestRank(A,it.id), r=(st.userPick)||(st.pick||st.simPick)||(it.alts.pref)||(B.pick&&B.pick.pick); const x=r&&A.items[String(r).slice(5)]; if(x) run=x; }
+  const v=Object.assign({},(it.values||{}),(run!==it?run.values:{})||{}), out=[];
+  const amt=v.amount==null||v.amount===''?NaN:+v.amount;
+  if(isFinite(amt)&&amt!==0){ const rep=v.repeat||'once', n=Array.isArray(v.on)?v.on.length:0;
+    const how=rep==='once'?' once':rep==='dates'?(n>1?' × '+n+' dates':' once'):rep==='monthly'||rep==='monthdays'||rep==='daily'||rep==='weekdays'||rep==='weekly'?'/mo':'';
+    const when=v.date?(String(v.date)>budgetTodayKey()?' from '+v.date:' since '+v.date):'';
+    out.push((amt<0?'spend ':'income ')+budgetMoney(Math.abs(amt))+how+when); }
+  else if(v.date) out.push('$0'+(String(v.date)>budgetTodayKey()?' from '+v.date:''));
+  if(v.value!=null&&v.value!==''&&isFinite(+v.value)) out.push('value '+(+v.value));
+  if(it.jreq){ const q=A.items[String(it.jreq).slice(5)]; if(q) out.push('needs '+q.name); }
+  return out.length?out.join(' · '):'no money or score set'; }
 /* what-if: clone the live atlas, pin the clicked alternative as userPick on the clone, run the REAL runtime.js session on it
    (eval.js passes: pickAlts + formula nodes; depsHtml), read its atlas + plan, dispose it. The live atlas W is never written. */
 async function planAct(V,a){ if(!a) return; const S=V.sess;
@@ -12640,7 +12653,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.48",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.49",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
