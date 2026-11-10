@@ -1,6 +1,6 @@
 # Views: atlas → vector model → JRender (1.8.37–1.8.39)
 
-**Status:** 1.8.37 shipped on `main` (PR #67). 1.8.38 (PR #68) and 1.8.39 (PR #69) are **open release PRs** at the time of writing — re-check `main` before relying on them. [REQ 2026-11-10]
+**Status:** shipped on `main`: 1.8.37 (PR #67), 1.8.38 (PR #68), 1.8.39 (PR #71, carrying the change reviewed in #69) and 1.8.40 (PR #72, wasm-opt). [REQ 2026-11-10]
 
 ## Pipeline (1.8.39)
 
@@ -53,11 +53,11 @@ JRender branch `dl-index` (b9423a3, Ash's repo, `runtime/DL-INDEX.md`): a per-gr
 Built-in browser on Matthew's Mac (WebGPU):
 - GPU parity (`Exp7Slabs.verify`): Calendar, Board, Plan and both replicas — 0 px / 0 hit differences.
 - Waking the Board's lazy rename fields changes 0 pixels (resting fields draw their value).
-- Calendar, Board, Plan and Budget chrome interactions covered in PR #69; action draws 2.7–16.6 ms; no page errors.
+- Calendar, Board, Plan and Budget chrome interactions covered in PR #69 / #71; action draws 2.7–16.6 ms; no page errors.
 
 ## Open
 - **[OPEN]** JRender `dl-index` is not merged into JRender `main`; it needs Ash's review.
-- **[OPEN]** The shipped 1.8.37 wasm (289,561 B) was built without `wasm-opt`; the previous one was 208,675 B. Rebuild with binaryen installed (`brew install binaryen`, then `tools/build_dl_index.sh`) to shrink it.
+- **Done (1.8.40)** The `dl-index` wasm is now built with `wasm-opt`: 289,561 → 256,009 B (`916004a5…`), same exports and imports, GPU parity 0 px / 0 hit on every view. [USER-HW]
 - **[OPEN]** With live rename fields awake, `verify` reports hit differences (the field owns its hit box; the field-less reference doesn't). Pixels match.
 
 ## Related
