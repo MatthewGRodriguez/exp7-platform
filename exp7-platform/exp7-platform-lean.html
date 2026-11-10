@@ -104,7 +104,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.49. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.50. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -5683,7 +5683,13 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
   /** days of `month` an item occupies (start date + recurrence, each occurrence lasting values.days days) */
   function dimOf(d) { return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); }
   function onList(v) { return String(v == null ? '' : v).split(/[ ,]+/).filter(Boolean); }
-  function occurrences(it, month) { var v = (it && it.values) || {}, s = pdate(v.date); if (!s) return []; var rep = v.repeat || 'once', dur = Math.max(1, Math.floor(+v.days || 1)), out = {},
+  /* values.then: a second phase that takes over on its own date (a category's selected alternative starting later than the
+     category's own schedule). The first phase runs up to the day before. */
+  function phases(v) { var T = v && v.then && pdate(v.then.date); if (!T) return null; var cut = new Date(T.getFullYear(), T.getMonth(), T.getDate() - 1), U = pdate(v.until);
+    var first = Object.assign({}, v, { until: ymd(U && U < cut ? U : cut) }); delete first.then; return [first, v.then]; }
+  function occurrences(it, month) { var v = (it && it.values) || {}, ph = phases(v);
+    if (ph) { var seen = {}; ph.forEach(function (pv) { occurrences({ values: pv }, month).forEach(function (d) { seen[d] = 1; }); }); return Object.keys(seen).sort(); }
+    var s = pdate(v.date); if (!s) return []; var rep = v.repeat || 'once', dur = Math.max(1, Math.floor(+v.days || 1)), out = {},
       ON = onList(v.on).map(Number).filter(isFinite), DS = onList(v.on), U = pdate(v.until);
     monthDays(month).forEach(function (ds) { var d = pdate(ds); for (var k = 0; k < dur; k++) { var st = new Date(d.getFullYear(), d.getMonth(), d.getDate() - k); if (st < s) continue;
         if (U && st > U) continue;
@@ -5701,7 +5707,9 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
     return out; }
   /** M19 (ADR 0095): money-free amounts per day. values.amount per month, values.charge each|last|first|per (default each = amount split
    *  evenly over the month's occurrences), values.flow in|out (sign) */
-  function charges(it, month) { var v = (it && it.values) || {}, fin = v.until && v.lastAmount != null && String(v.until).slice(0, 7) === month, a = num(fin ? v.lastAmount : v.amount);
+  function charges(it, month) { var v0 = (it && it.values) || {}, ph = phases(v0);
+    if (ph) { var sum = {}; ph.forEach(function (pv) { var c = charges({ values: pv }, month); Object.keys(c).forEach(function (d) { sum[d] = (sum[d] || 0) + c[d]; }); }); return sum; }
+    var v = v0, fin = v.until && v.lastAmount != null && String(v.until).slice(0, 7) === month, a = num(fin ? v.lastAmount : v.amount);
     /* final-payment month: lastAmount is charged on the month's schedule even after the until day (legacy rule, ADR 0098) */
     /* values.pay (day-of-month list) = charge days separate from presence (e.g. paid on 1,15 for work done on weekdays) */
     var cv = v.pay ? Object.assign({}, v, { repeat: 'monthdays', on: v.pay }) : v, occ = occurrences({ values: fin ? Object.assign({}, cv, { until: month + '-31' }) : cv }, month), out = {}; if (!a || !occ.length) return out;
@@ -10395,7 +10403,7 @@ function setView(id,w,root,cb,ro,mopt){ const box=$(id); if(!box) return;
     if((a==='act:sort'||a==='act:filter')&&isBoardRoot(V)){
       const cid=vm.comp||boardCompId(V), AW=activeAtlas(V); if(!AW||!AW.components||!AW.components[cid]) return;
       const c=AW.components[cid]; c.state=c.state||{}; c.view=c.view||{};
-      if(a==='act:sort'){ const cur=c.state.sort||c.view.sort||'name'; c.state.sort=cur==='name'?'date':'name'; V.note='sort: '+c.state.sort; }
+      if(a==='act:sort'){ const cur=c.state.sort||c.view.sort||'name'; c.state.sort=cur==='name'?'date':cur==='date'?'category':'name'; V.note='sort: '+c.state.sort; }
       else { const F=['all','unscheduled','scheduled']; const cur=c.state.filter||c.view.filter||'all'; c.state.filter=F[(F.indexOf(cur)+1)%3]; V.note='show: '+c.state.filter; }
       return submitViews([
         {path:'components/'+cid+'/state/sort',op:'set',value:c.state.sort||c.view.sort||'name'},
@@ -10750,6 +10758,9 @@ function selectedRef(w,id){
   CAT_SEL.set(it,{sig:sig,ref:ref}); return ref;
 }
 function catOverlay(base,sel){ const v=Object.assign({},base||{}), sv=(sel&&sel.values)||{};
+  /* Handoff: the category's own schedule (today's actual) runs until the selected item's later start, then the item's. */
+  if(v.date&&sv.date&&String(sv.date)>String(v.date)&&(v.amount!=null&&v.amount!=='')){ const t={}; CAT_KEYS.forEach(k=>{ if(sv[k]!=null&&sv[k]!=='') t[k]=sv[k]; });
+    if(t.amount==null) t.amount=0; v.then=t; v.thenName=sel.name||sel.id||''; return v; }
   CAT_KEYS.forEach(k=>{ if(sv[k]!=null&&sv[k]!=='') v[k]=sv[k]; }); return v; }
 function effItem(w,id){ const it=w&&w.items&&w.items[id]; if(!it) return it; const ref=selectedRef(w,id), sel=ref&&w.items[ref.slice(5)]; if(!sel) return it;
   return Object.assign({},it,{values:catOverlay(it.values,sel)}); }
@@ -11106,7 +11117,7 @@ function planCells(A,id,pins,wiPick){ const it=A.items[id]; if(!it) return ['—
   return [sel,joy]; }
 /* A step without joy state shows what it runs on: the selected item's money (amount, how often, from when) and value score. */
 function stepEffect(A,it){ let run=it;
-  if(it.alts){ const st=it.state||{}, B=bestRank(A,it.id), r=(st.userPick)||(st.pick||st.simPick)||(it.alts.pref)||(B.pick&&B.pick.pick); const x=r&&A.items[String(r).slice(5)]; if(x) run=x; }
+  if(it.alts&&!((effItem(A,it.id)||{}).values||{}).then){ const st=it.state||{}, B=bestRank(A,it.id), r=(st.userPick)||(st.pick||st.simPick)||(it.alts.pref)||(B.pick&&B.pick.pick); const x=r&&A.items[String(r).slice(5)]; if(x) run=x; }
   const v=Object.assign({},(it.values||{}),(run!==it?run.values:{})||{}), out=[];
   const amt=v.amount==null||v.amount===''?NaN:+v.amount;
   if(isFinite(amt)&&amt!==0){ const rep=v.repeat||'once', n=Array.isArray(v.on)?v.on.length:0;
@@ -11115,6 +11126,7 @@ function stepEffect(A,it){ let run=it;
     out.push((amt<0?'spend ':'income ')+budgetMoney(Math.abs(amt))+how+when); }
   else if(v.date) out.push('$0'+(String(v.date)>budgetTodayKey()?' from '+v.date:''));
   if(v.value!=null&&v.value!==''&&isFinite(+v.value)) out.push('value '+(+v.value));
+  { const ev=(effItem(A,it.id)||{}).values||{}; if(ev.then){ const a1=+ev.then.amount||0; out.push('→ '+(ev.thenName||'plan')+' '+(a1?(a1<0?'spend ':'income ')+budgetMoney(Math.abs(a1)):'$0')+' from '+ev.then.date); } }
   if(it.jreq){ const q=A.items[String(it.jreq).slice(5)]; if(q) out.push('needs '+q.name); }
   return out.length?out.join(' · '):'no money or score set'; }
 /* what-if: clone the live atlas, pin the clicked alternative as userPick on the clone, run the REAL runtime.js session on it
@@ -11249,7 +11261,8 @@ function calFormVM(V,AW){ const X=VMx(), F=V.form, picks=boardPickList(AW), it=F
 /* ---- Board (an item category per row; the root board of the view) ---- */
 function boardRows(A,c){ const M=window.JAtlasModel, st=c.state||{}, cv=c.view||{}, sort=st.sort||cv.sort||'name', fil=st.filter||cv.filter||'all';
   const L=(c.items||[]).filter(r=>{ const it=M.get(A,r), d=it&&(it.values||{}).date; return fil==='all'||(fil==='scheduled'?!!d:!d); });
-  L.sort((a,b)=>{ const x=M.get(A,a)||{}, y=M.get(A,b)||{}, k=sort==='date'?(o=>(o.values||{}).date||'9999'):(o=>String(o.name||'').toLowerCase()); return k(x)<k(y)?-1:k(x)>k(y)?1:0; });
+  const ord=o=>{ const v=o.values||{}; return (v.categoryOrder!=null?String(1e6+(+v.categoryOrder)):'9999999')+'|'+String(v.category||'~').toLowerCase()+'|'+(v.lineOrder!=null?String(1e6+(+v.lineOrder)):String(o.name||'').toLowerCase()); };
+  L.sort((a,b)=>{ const x=M.get(A,a)||{}, y=M.get(A,b)||{}, k=sort==='date'?(o=>(o.values||{}).date||'9999'):sort==='category'?ord:(o=>String(o.name||'').toLowerCase()); return k(x)<k(y)?-1:k(x)>k(y)?1:0; });
   return {L,sort,fil}; }
 function valueText(w,it,owner){ const parts=budgetValueParts(w,it,owner), neg=valueConsuming(it); return {text:parts.length?parts.join(' · '):'no values',color:parts.length?(neg?VALUE_INK.consuming:VALUE_INK.kept):null,consuming:neg,empty:!parts.length}; }
 function boardVM(V,A,c,O){ const X=VMx(), M=window.JAtlasModel, o=O.board, AW=activeAtlas(V)||A, cid=c.id, Q=boardRows(A,c), bid=boardCompId(V);
@@ -11264,8 +11277,14 @@ function boardVM(V,A,c,O){ const X=VMx(), M=window.JAtlasModel, o=O.board, AW=ac
     kids.push(X.col('resources',[X.text('h','Resources','h')].concat(res.map(it=>X.row('r:'+it.id,[X.text('n',it.name+' · '+(it.values.stock!=null?unitLabel(it.values.stock,it.values.unit):(it.values.unit||''))),X.btn('rm','Remove','res:remove:'+it.id)]))).concat([X.btn('add','+ Add resource','res:add')]),{role:'section',slab:'inner'}));
     if(F&&F.kind==='resource') kids.push(boardFormVM(V,AW,F)); }
   const budgetBoard=/^board_(expense|income|debt|asset)$/.test(bid||''), viewMonth=budgetBoard?budgetMonthKey():'', hc=k=>X.has(o.category,k), hi=k=>X.has(o.item,k);
+  /* sort 'category': a header per values.category with that section's money this month */
+  const E7=window.JAtlasEval, secMoney={}, secOf=id=>String(((AW.items[id]||{}).values||{}).category||'Other');
+  if(Q.sort==='category'&&E7) Q.L.forEach(r=>{ const id=String(r).replace(/^item:/,''), e=effItem(AW,id); if(!e) return; const ch=(e.values||{}).date?E7.charges(e,viewMonth||budgetMonthKey()):{}; let a=0; Object.keys(ch).forEach(d=>{ a+=+ch[d]||0; }); secMoney[secOf(id)]=(secMoney[secOf(id)]||0)+a; });
+  let lastSec=null;
   Q.L.forEach(r=>{ const id=(M.parse(r)||{}).id||String(r).replace(/^item:/,''), it=AW.items[id]; if(!it) return; if(((it.values||{}).kind)==='resource') return;
     if(owners['item:'+id]&&owners['item:'+id]!==id) return;
+    if(Q.sort==='category'&&secOf(id)!==lastSec){ lastSec=secOf(id); const m=secMoney[lastSec]||0;
+      kids.push(X.row('sec:'+lastSec,[X.text('h',lastSec,'h'),X.text('t',(bid==='board_income'?'':'this month ')+(m<0?'−':'')+budgetMoney(Math.abs(m)),'small')],{role:'section'})); }
     const mem=catMembers(it).map(x=>x.slice(5)).filter(mid=>AW.items[mid]);
     if(budgetBoard&&![effItem(AW,id)].concat(mem.map(mid=>AW.items[mid])).some(x=>budgetItemOnView(x,viewMonth,''))) return;
     const own=catHasValues(it), selRef=selectedRef(AW,id), selId=selRef?selRef.slice(5):null, paying=!!((it.values||{}).payTo), open=!!(V.open&&V.open[id]), self=own&&!mem.length, count=mem.length+(self?1:0);
@@ -11275,6 +11294,8 @@ function boardVM(V,A,c,O){ const X=VMx(), M=window.JAtlasModel, o=O.board, AW=ac
     if(budgetBoard&&bid==='board_expense'&&hc('pay')){ const debt=paying?AW.items[String(it.values.payTo).replace(/^item:/,'')]:null; line.push(X.btn('pay',debt?('pays '+debt.name):'pays debt','brd:pay:'+id,{on:paying})); }
     if(hc('addAlt')) line.push(X.btn('add','+ Add alternative','alt:add:'+id));
     rk.push(X.row('list',line));
+    { const ev=(effItem(AW,id)||{}).values||{}; if(ev.then){ const a0=+ev.amount||0, a1=+ev.then.amount||0;
+        rk.push(X.text('plan','★ today '+(a0<0?'−':'')+budgetMoney(Math.abs(a0))+' · plan '+(ev.thenName||'')+' '+(a1<0?'−':'')+budgetMoney(Math.abs(a1))+' (from '+ev.then.date+')','small',{color:'#2f5f8a'})); } }
     if(open){ const lines=[];
       if(own){ const vt=valueText(AW,it,it); lines.push(X.row('own',[self?X.chip('nm',it.name||id,{on:true}):X.text('nm','Shared by every item:','muted'),X.text('v',vt.text,'small',{color:vt.color}),hi('values')&&X.btn('set','Set values','brd:values:'+id)])); }
       mem.forEach(mid=>{ const m=AW.items[mid], ref='item:'+mid, pref=it.alts.pref!=null&&memberRef(it.alts.pref)===ref, restricted=[].concat(it.alts.unavail||[]).some(x=>memberRef(x)===ref), sel=selId===mid, vt=valueText(AW,m,it);
@@ -12653,7 +12674,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.49",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.50",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
