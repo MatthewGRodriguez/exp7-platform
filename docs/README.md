@@ -7,13 +7,13 @@
 
 | Field | Value |
 |-------|--------|
-| Checked | 2026-11-08 (docs pass after 1.8.3 merge) |
+| Checked | 2026-11-10 (docs pass after 1.8.37 merge) |
 | Branch | `main` |
-| Commit | `d8f6ccdc171b49385e0a738e7451714741f5dd99` |
-| Manifest version | **1.8.3** |
+| Commit | `b0c9de0f97ee06ff128f35a2a757933ab1c29377` |
+| Manifest version | **1.8.37** |
 | Payload | `exp7-platform/exp7-platform-lean.html` |
-| Manifest SHA-256 | `2033acab6ed923098b4ab37b52581a7490cb0da5b77ef05016593ff9015d6c98` (matches file bytes) |
-| Lean bytes | **1 868 344** |
+| Manifest SHA-256 | `62ed6a6e2ca7b0055b895c17c5f4282e03d67d080894d7e42fc1910ccdb894f5` (matches file bytes) |
+| Lean bytes | **2 672 980** |
 | Views module | `exp7-views@1` |
 | Chrome | JRViews bar + apps; Budget tabs in-scene; account/key DOM — see [platform-chrome-jrender.md](./platform-chrome-jrender.md) |
 | Open PRs | Re-check with `gh pr list` |
@@ -40,6 +40,8 @@ Every substantive claim should carry an evidence class (see [EVIDENCE.md](./EVID
 | [foundations.md](./foundations.md) | Living-core, JFactor, Lore VCS, Atlas, outside-process connection |
 | [vocabulary.md](./vocabulary.md) | Joy vs money, Atlas, Board shares, platform / JR chrome terms |
 | [architecture.md](./architecture.md) | Platform shell, apps, mount model, sync boundary, JRender |
+| [views-vector-model.md](./views-vector-model.md) | **1.8.37–1.8.39:** atlas → vector model → JRender; options, skin, tokens; motion; JRender dl-index |
+| [ranking-jfengine.md](./ranking-jfengine.md) | **1.8.33–1.8.34:** JFEngine ranking replaces `Best()`; JFactor kernel |
 | [views-jrender-standard.md](./views-jrender-standard.md) | **Direction:** universal views, one JRender everywhere |
 | [platform-chrome-jrender.md](./platform-chrome-jrender.md) | **Implementation:** bar / apps / Budget tabs on JRViews + Exp7Slabs (1.8.3) |
 | [artist-coordination-brief.md](./artist-coordination-brief.md) | **Ash handoff:** authorized art workflow + profile image render (2026-11-08) |
