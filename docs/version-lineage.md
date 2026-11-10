@@ -61,7 +61,8 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.27** | PR #54 | The view store loads JRDL views on the shared renderer. An overlay falls through where it has no hit. basE91 keeps a low-entropy pack. |
 | **1.8.28** | PR #55 | The Fish app is the overlay demo: card and button slots, with the fish swimming over them. |
 | **1.8.29** | PR #56 | The Lumen app is the next overlay: a session card and a Confirm control as slots, and a light that glides across the card. |
-| **1.8.30** | this branch | A Board row is an item category. Its items are listed under it, one per line, each with its values and a Set values button. The category name is a text box, the list folds behind an arrow, and the row shows the selected item. New item asks for a name, a requirement and the resources used. The demo Board saves its changes through the demo checker. |
+| **1.8.30** | PR #57 | A Board row is an item category. Its items are listed under it, one per line, each with its values and a Set values button. The category name is a text box, the list folds behind an arrow, and the row shows the selected item. New item asks for a name, a requirement and the resources used. The demo Board saves its changes through the demo checker. |
+| **1.8.31** | this branch | A Board value shows as the value with its unit and no name: usd reads `$1,200`, hours read `4 h`. Consuming values are red and the rest are green. An item's star, unavailable and Remove buttons sit on their own line under it. Item lists start hidden, and Add alternative is always on the row. The Budget month and day buttons are one date button. It opens a mini calendar over the view, and the view always shows that date's whole month. Parallax runs on Budget again: a category name box no longer holds its Board at rest, the figures bar is a slab, and a Board type that is not shown does not animate. |
 
 The 9 Nov 2026 overlay packet is recorded in [design/overlay-view-store.md](./design/overlay-view-store.md). Shell 1.8.28 plays it as the Fish app. Shell 1.8.29 plays the Lumen page the same way.
 
@@ -73,9 +74,9 @@ Shipped `main` tip at docs check for 1.8.3: `d8f6ccdc171b49385e0a738e7451714741f
 **1.8.4** updates lean + `release.json` on this branch; Mac LIVE-GPU acceptance **[USER-HW][OPEN]**.
 
 ```json
-"version": "1.8.30",
+"version": "1.8.31",
 "file": "exp7-platform/exp7-platform-lean.html",
-"sha256": "6d2e6c6bca1b8b2dc357cc39306d757d667f7db20efe7f83ea1d1702424d46e0",
+"sha256": "4308d9607060a0e32d5978a7cc8b321006d2d9d6ae1eb8e5babb6da94926a603",
 "minLauncherMajor": 1
 ```
 
