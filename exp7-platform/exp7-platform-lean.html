@@ -97,7 +97,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.34. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.35. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -14963,6 +14963,9 @@ root.Exp7Motion.lifecycle={hidden,optionalMatchMedia:!!mq};
 window.EXP7_SLAB_CONFIG={"source":"Original PX2b pointer/scroll geometry + original PX2 ring-only ambient, persistent GPU-native nodes avoid DOM-animation restart pathology","front":{"outer":0.9676,"inner":-0.7697},"ring":{"outer":0.6421,"inner":0.9035},"shades":{"outer":["#ffffff0d","#64748bda","#64748bec","#64748bda"],"inner":["#ffffff0a","#64748b43","#64748b62","#64748b43"]},"ambient":{"enabled":true,"periodMs":69000,"source":"10_px2/px2.css pxRo/pxRi exact emitted keyframes, linear interpolation","keys":{"outer":[[0,0,0],[0.0278,0.11,0.161],[0.0556,0.206,0.278],[0.0833,0.278,0.321],[0.11109999999999999,0.316,0.278],[0.1389,0.316,0.161],[0.16670000000000001,0.278,0],[0.19440000000000002,0.206,-0.161],[0.22219999999999998,0.11,-0.278],[0.25,0,-0.321],[0.2778,-0.11,-0.278],[0.3056,-0.206,-0.161],[0.3333,-0.278,0],[0.3611,-0.316,0.161],[0.3889,-0.316,0.278],[0.4167,-0.278,0.321],[0.44439999999999996,-0.206,0.278],[0.4722,-0.11,0.161],[0.5,0,0],[0.5278,0.11,-0.161],[0.5556,0.206,-0.278],[0.5832999999999999,0.278,-0.321],[0.6111,0.316,-0.278],[0.6389,0.316,-0.161],[0.6667000000000001,0.278,0],[0.6944,0.206,0.161],[0.7222,0.11,0.278],[0.75,0,0.321],[0.7778,-0.11,0.278],[0.8056,-0.206,0.161],[0.8332999999999999,-0.278,0],[0.8611,-0.316,-0.161],[0.8889,-0.316,-0.278],[0.9167000000000001,-0.278,-0.321],[0.9444,-0.206,-0.278],[0.9722,-0.11,-0.161],[1,0,0]],"inner":[[0,0,0],[0.0278,0.155,0.226],[0.0556,0.29,0.391],[0.0833,0.391,0.452],[0.11109999999999999,0.445,0.391],[0.1389,0.445,0.226],[0.16670000000000001,0.391,0],[0.19440000000000002,0.29,-0.226],[0.22219999999999998,0.155,-0.391],[0.25,0,-0.452],[0.2778,-0.155,-0.391],[0.3056,-0.29,-0.226],[0.3333,-0.391,0],[0.3611,-0.445,0.226],[0.3889,-0.445,0.391],[0.4167,-0.391,0.452],[0.44439999999999996,-0.29,0.391],[0.4722,-0.155,0.226],[0.5,0,0],[0.5278,0.155,-0.226],[0.5556,0.29,-0.391],[0.5832999999999999,0.391,-0.452],[0.6111,0.445,-0.391],[0.6389,0.445,-0.226],[0.6667000000000001,0.391,0],[0.6944,0.29,0.226],[0.7222,0.155,0.391],[0.75,0,0.452],[0.7778,-0.155,0.391],[0.8056,-0.29,0.226],[0.8332999999999999,-0.391,0],[0.8611,-0.445,-0.226],[0.8889,-0.445,-0.391],[0.9167000000000001,-0.391,-0.452],[0.9444,-0.29,-0.391],[0.9722,-0.155,-0.226],[1,0,0]]}},"scroll":{"k":0.012,"decayMs":260,"discardJump":400,"stop":0.004},"mapping":{"outer":".ja-comp existing rounded panel node","inner":".ja-deps,.ja-section,.ja-brow,.ja-prow,.ja-detail,.ja-rails existing rounded-box nodes; text descendants inherit closest real slab","exclude":"calendar day keys are not independent slabs; buttons inherit closest slab; entire view at rest during visible forms; no invented platter/tiger geometry","logicalInner":"Existing .ja-cal/.ja-plan containers: union of actual native drawn bounds, original card1 radius10; native side geometry only, no new fill. Calendar keys/buttons ride their real containing glass; no individual day slabs."},"camera":{"focalMm":85,"distancePx":2099.1,"cameraShiftPx":60,"exaggeration":15.64,"pivotHeight":3.7,"textMaxPx":1},"policy":{"backdrop":"fixed","fronts":"pointer/scroll only, never ambient","sides":"ring-only ambient from original PX2; native scene frames only while visible/active","drag":"freeze view vector; no block sides invented","reduced":"identity transforms, no sides/loops/parallax"}};
 /* Original PX2/PX2b geometry mapped onto existing native Exp7 surfaces. No DOM drawing. */
 (function(root){'use strict';const J=root.JRender,V=root.JRViews,C=root.EXP7_SLAB_CONFIG;if(!J||!V)return;const all=new Set(),I=()=>[1,0,0,1,0,0],cl=x=>Math.max(-1,Math.min(1,x)),clock=()=>performance.now();let mq=null;try{if(typeof matchMedia==='function')mq=matchMedia('(prefers-reduced-motion: reduce)');}catch(_){}const reduced=()=>!!(mq&&mq.matches),D=root.Exp7Slabs={version:13,config:C,controllers:all,frames:0,patches:0,ringReplaces:0,frontNodesPatched:0,errors:[]};
+/* 1.8.35: front parallax offsets move in 1/8 CSS px steps (a quarter device px at 2x), so momentum frames that do not
+   change the drawn position do not re-upload every row's vertices. */
+function q8(v){return Math.round(v*8)/8;}
 function phase(kind,t){const k=C.ambient.keys[kind],u=((t%C.ambient.periodMs)+C.ambient.periodMs)%C.ambient.periodMs/C.ambient.periodMs;let i=1;while(i<k.length-1&&k[i][0]<u)i++;const a=k[i-1],b=k[i],f=(u-a[0])/(b[0]-a[0]);return[a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f];}
 function contour(b){const[x,y,w,h,r0]=b,r=Math.max(0,Math.min(r0,w/2,h/2)),o=[];if(!r)return[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];for(const[cx,cy,start]of[[x+w-r,y+r,-90],[x+w-r,y+h-r,0],[x+r,y+h-r,90],[x+r,y+r,180]])for(let i=0;i<=6;i++){const a=(start+i*15)*Math.PI/180;o.push([cx+r*Math.cos(a),cy+r*Math.sin(a)]);}return o;}
 function sides(q,b,dx,dy,cols){const P=contour(b);for(let i=0;i<P.length;i++){const a=P[i],z=P[(i+1)%P.length],nx=z[1]-a[1],ny=a[0]-z[0];if(nx*dx+ny*dy<=1e-10)continue;const k=Math.abs(nx)>Math.abs(ny)?(nx>0?1:3):(ny>0?2:0);q.path([['M',a[0],a[1]],['L',z[0],z[1]],['L',z[0]+dx,z[1]+dy],['L',a[0]+dx,a[1]+dy],['Z']],J.hex(cols[k]));}}
@@ -14972,12 +14975,14 @@ class Slabs{constructor(view){this.view=view;this.nodes=new Map();this.slabs=[];
  /* A form holds the view at rest. A field that lives in a row (data-tf-rest) holds it only while it has focus, and rides its row otherwise. */
  editing(){const f=this.view.fields;return!!(f&&f.some(x=>x&&x.focused));}
  active(){return this.visible()&&!reduced()&&!this.form&&!this.editing()&&!this.detached;}
- adopt(id,owner){const z=this.nodes.get(owner);if(!z||this.detached)return;this.nodes.set(id,z);this.fieldIds.add(id);this.lastFront=null;this.ask();}
- release(id){if(this.fieldIds.delete(id)){this.nodes.delete(id);this.base.delete(id);}}
+ adopt(id,owner){const z=this.nodes.get(owner);if(!z||this.detached)return;this.nodes.set(id,z);this.fieldIds.add(id);this.lastFront=null;z.fk=null;if(this.byZ){const a=this.byZ.get(z);if(a)a.push(id);else this.byZ.set(z,[id]);}this.ask();}
+ release(id){if(this.fieldIds.delete(id)){const z=this.nodes.get(id);this.nodes.delete(id);this.base.delete(id);const a=z&&this.byZ&&this.byZ.get(z);if(a){const k=a.indexOf(id);if(k>=0)a.splice(k,1);}}}
+ /* 1.8.35: the content band (scroll y minus one screen to one screen past the bottom) whose slabs move this frame. */
+ band(){const L=this.view.L,s=this.scene;if(!L||!(L.VH>0)||!s||typeof s.scrollPos!=='function')return null;const sy=+s.scrollPos(V.GID)[1]||0;return[sy-L.VH,sy+2*L.VH];}
  sync(t=clock()){const off=!this.active()||this.drag;if(off!==this.paused){if(off)this.pauseAt=t;else this.offset+=Math.max(0,t-this.pauseAt);this.paused=off;}if(off&&this.raf){cancelAnimationFrame(this.raf);this.raf=0;}return!off;}
  ask(){if(this.verifying||!this.sync()||this.raf||!this.slabs.length)return;this.raf=requestAnimationFrame(t=>{this.raf=0;if(!this.sync(t))return;this.tick(t);this.view.r.draw();if(this.v||C.ambient.enabled&&!this.drag)this.ask();});}
  detach(){this.detached=true;this.sync();if(this.raf)cancelAnimationFrame(this.raf);this.raf=0;if(!this.scene)return;const p=new J.Patch();for(const id of this.ids)p.remove(id);for(const[id]of this.nodes)p.xform(id,this.base.get(id)||I());if(this.ids.size||this.nodes.size)this.raw(p);this.scene.patch=this.original;if(this.scene.onevent===this.event)this.scene.onevent=this.beforeEvent;this.nodes.clear();this.fieldIds.clear();this.slabs=[];this.base.clear();this.ids.clear();this.paintedEnabled=false;}
- bind(){this.detached=false;this.lastFront=null;const view=this.view,s=view.s;if(!s||!view.L)return;this.scene=s;this.original=s.patch;this.raw=p=>this.original.call(s,p);this.form=!!view.L.nodes.find(n=>n.tf&&!(n.el&&n.el.hasAttribute&&n.el.hasAttribute('data-tf-rest')));const used=new Set(view.L.nodes.map(n=>n.id)),byEl=new Map();
+ bind(){this.detached=false;this.lastFront=null;this.byZ=null;const view=this.view,s=view.s;if(!s||!view.L)return;this.scene=s;this.original=s.patch;this.raw=p=>this.original.call(s,p);this.form=!!view.L.nodes.find(n=>n.tf&&!(n.el&&n.el.hasAttribute&&n.el.hasAttribute('data-tf-rest')));const used=new Set(view.L.nodes.map(n=>n.id)),byEl=new Map();
  for(const n of view.L.nodes){if(!n.el)continue;const first=n.items.find(i=>i[0]==='rrect'||i[0]==='rect');if(!first)continue;/* Chrome: the 44px bar is the outer slab (header moves together, avatar photo uses the same factor). Each Apps card is its own inner slab so it moves against the header. */
 let kind=n.el.matches('.ja-comp,[data-plat="bar"],[data-plat="apps"]')?'outer':n.el.matches('.ja-deps,.ja-section,.ja-brow,.ja-prow,.ja-detail,.ja-rails,.ja-joy[data-jv-act^="plat:app:"]')?'inner':null;if(!kind||byEl.has(n.el))continue;const b=[first[1],first[2],first[3],first[4],first[0]==='rrect'?first[5]:0];let h=2166136261;for(const ch of 'px2-side:'+n.key)h=Math.imul(h^ch.charCodeAt(0),16777619)>>>0;let id=(0x60000000|(h&0x0fffffff))>>>0;while(used.has(id))id=(id+1)>>>0;used.add(id);this.ids.add(id);const z={id,owner:n.id,el:n.el,kind,b};byEl.set(n.el,z);this.slabs.push(z);}
  /* Existing logical month/plan containers have no separate fill node. Map their real drawn bounds to the original inner-glass part, sides only; no background fill or replacement geometry. */
@@ -14985,12 +14990,12 @@ let kind=n.el.matches('.ja-comp,[data-plat="bar"],[data-plat="apps"]')?'outer':n
  for(const n of view.L.nodes){let el=n.el;while(el&&!byEl.has(el))el=el.parentElement;if(el)this.nodes.set(n.id,byEl.get(el));}
  for(const n of view.L.nodes){if(n.uxGroundFor){const z=this.nodes.get(n.uxGroundFor);if(z)this.nodes.set(n.id,z);}}
  const init=new J.Patch();for(const z of this.slabs)init.insert(z.owner,q=>q.node(z.id,0));if(this.slabs.length)this.raw(init);
- s.patch=p=>{const b=(p instanceof Uint8Array?p:p.bytes()).slice(),u=new Uint32Array(b.buffer,b.byteOffset,b.byteLength/4),f=new Float32Array(b.buffer,b.byteOffset,b.byteLength/4);for(let i=2;i<u.length;){const op=u[i]>>>24,n=u[i]&0xffffff;if(i+n>=u.length)throw Error('Malformed patch during parallax composition');if(op===0x24&&this.nodes.has(u[i+1])){this.base.set(u[i+1],Array.from(f.slice(i+2,i+8)));const z=this.nodes.get(u[i+1]),k=this.active()?C.front[z.kind]:0;f[i+6]+=this.xy[0]*k;f[i+7]+=this.xy[1]*k;}i+=n+1;}D.patches++;return this.raw(b);};
+ s.patch=p=>{const b=(p instanceof Uint8Array?p:p.bytes()).slice(),u=new Uint32Array(b.buffer,b.byteOffset,b.byteLength/4),f=new Float32Array(b.buffer,b.byteOffset,b.byteLength/4);for(let i=2;i<u.length;){const op=u[i]>>>24,n=u[i]&0xffffff;if(i+n>=u.length)throw Error('Malformed patch during parallax composition');if(op===0x24&&this.nodes.has(u[i+1])){this.base.set(u[i+1],Array.from(f.slice(i+2,i+8)));const z=this.nodes.get(u[i+1]),k=this.active()?C.front[z.kind]:0;f[i+6]+=q8(this.xy[0]*k);f[i+7]+=q8(this.xy[1]*k);}i+=n+1;}D.patches++;return this.raw(b);};
  const one=s.onevent;this.beforeEvent=one;s.onevent=this.event=e=>{if(e.kind===12){this.drag=true;this.sync();}if(one)one(e);if(e.kind===14||e.kind===11){this.drag=false;this.sync();this.last=clock();this.ask();}if(e.kind===6){const now=s.scrollPos(V.GID)[1],dy=now-this.prevScroll;this.prevScroll=now;this.scroll(dy);}};
  this.prevScroll=s.scrollPos(V.GID)[1];this.sync();this.tick(clock());this.ask();}
  setView(x,y){if(this.verifying||this.drag||this.form||this.editing()||reduced())return false;this.xy=[cl(x),cl(y)];this.ask();return true;}
- scroll(dy){if(this.drag||this.form||Math.abs(dy)>C.scroll.discardJump)return;this.v=cl(this.v+dy*C.scroll.k);this.ask();}
- tick(t=clock()){if(!this.scene)return false;const enabled=this.active();if(!enabled&&!this.paintedEnabled)return false;this.paintedEnabled=enabled;const xy=enabled?this.xy:[0,0],dt=Math.min(100,Math.max(0,t-this.last));this.last=t;if(enabled&&this.v&&!this.drag){this.xy[1]=cl(this.pointerY+this.v);this.v*=Math.exp(-dt/C.scroll.decayMs);if(Math.abs(this.v)<C.scroll.stop){this.v=0;this.xy[1]=this.pointerY||0;}}const p=new J.Patch(),frontKey=(enabled?'on:':'off:')+xy.join(',');if(frontKey!==this.lastFront){this.lastFront=frontKey;for(const[id,z]of this.nodes){const m=(this.base.get(id)||I()).slice(),k=enabled?C.front[z.kind]:0;m[4]+=xy[0]*k;m[5]+=xy[1]*k;p.xform(id,m);D.frontNodesPatched++;}}for(const z of this.slabs){const k=C.ring[z.kind],a=enabled&&C.ambient.enabled?phase(z.kind,(this.paused?this.pauseAt:t)-this.offset):[0,0],dx=xy[0]*k+a[0],dy=xy[1]*k+a[1],f=enabled?C.front[z.kind]:0;p.replace(z.id,q=>{if(enabled)sides(q,z.b,dx,dy,C.shades[z.kind]);},0).xform(z.id,[1,0,0,1,xy[0]*f,xy[1]*f]);D.ringReplaces++;}if(this.nodes.size||this.slabs.length)this.raw(p);D.frames++;return true;}
+ scroll(dy){if(this.drag||this.form)return;if(Math.abs(dy)>C.scroll.discardJump){this.ask();return;}this.v=cl(this.v+dy*C.scroll.k);this.ask();}
+ tick(t=clock()){if(!this.scene)return false;const enabled=this.active();if(!enabled&&!this.paintedEnabled)return false;this.paintedEnabled=enabled;const xy=enabled?this.xy:[0,0],dt=Math.min(100,Math.max(0,t-this.last));this.last=t;if(enabled&&this.v&&!this.drag){this.xy[1]=cl(this.pointerY+this.v);this.v*=Math.exp(-dt/C.scroll.decayMs);if(Math.abs(this.v)<C.scroll.stop){this.v=0;this.xy[1]=this.pointerY||0;}}const p=new J.Patch(),band=this.band(),fo=kind=>{const k=enabled?C.front[kind]:0;return[q8(xy[0]*k),q8(xy[1]*k)];},FO={outer:fo('outer'),inner:fo('inner')},frontKey=(enabled?'on:':'off:')+FO.outer.join(',')+'|'+FO.inner.join(',');this.lastFront=frontKey;if(!this.byZ){this.byZ=new Map();for(const[id,z]of this.nodes){let a=this.byZ.get(z);if(!a)this.byZ.set(z,a=[]);a.push(id);}}D.slabsCulled=0;for(const z of this.slabs){if(band&&!(z.b[1]<band[1]&&z.b[1]+z.b[3]>band[0])){D.slabsCulled++;continue;}const zk=frontKey+':'+z.kind;if(z.fk!==zk){z.fk=zk;const o=FO[z.kind]||fo(z.kind);for(const id of this.byZ.get(z)||[]){const m=(this.base.get(id)||I()).slice();m[4]+=o[0];m[5]+=o[1];p.xform(id,m);D.frontNodesPatched++;}}const k=C.ring[z.kind],a=enabled&&C.ambient.enabled?phase(z.kind,(this.paused?this.pauseAt:t)-this.offset):[0,0],dx=xy[0]*k+a[0],dy=xy[1]*k+a[1],f=enabled?C.front[z.kind]:0;p.replace(z.id,q=>{if(enabled)sides(q,z.b,dx,dy,C.shades[z.kind]);},0).xform(z.id,[1,0,0,1,xy[0]*f,xy[1]*f]);D.ringReplaces++;}if(this.nodes.size||this.slabs.length)this.raw(p);D.frames++;return true;}
  snapshot(){return{slabs:this.slabs.map(z=>({id:z.id,owner:z.owner,kind:z.kind,b:z.b})),nodes:this.nodes.size,formsLocked:this.form,active:this.active(),view:this.xy.slice(),ambient:C.ambient.enabled,paused:this.paused};}}
 const show=V.View.prototype.show;V.View.prototype.show=async function(...args){let ctl=this._slabs;if(ctl)ctl.detach();const out=await show.apply(this,args);if(!ctl)ctl=this._slabs=new Slabs(this);ctl.bind();return out;};
 const clearFields=V.View.prototype.clearFields;V.View.prototype.clearFields=function(){const ctl=this._slabs;if(ctl)for(const f of this.fields||[])ctl.release(f.id);return clearFields.call(this);};
@@ -15231,6 +15236,27 @@ window.x7 = window.x7 || function (t) {
     if (el.classList.contains('ja-brow') || el.classList.contains('ja-prow') || el.classList.contains('ja-section')) return 2;
     return 0;
   }
+  /* 1.8.35: y-sorted index of the rects roomBelow considers. Same predicate and arithmetic as roomBelow.
+     refresh(n) re-reads one node's rects after the layout loop has finished with it. Entries whose y is not a
+     finite number go to a side list that every query scans, as the old full scan would have. */
+  function roomIndex(nodes) {
+    var sorted = [], odd = [], byNode = new Map();
+    function qual(it) { return (it[0] === 'rect' || it[0] === 'rrect') && !(it[3] < 12 || it[4] < 8); }
+    function lower(y) { var lo = 0, hi = sorted.length; while (lo < hi) { var mid = (lo + hi) >> 1; if (sorted[mid].y < y) lo = mid + 1; else hi = mid; } return lo; }
+    function entriesOf(o) { var out = []; if (!o.items) return out; for (var j = 0; j < o.items.length; j++) { var it = o.items[j]; if (qual(it)) out.push({ y: it[2], x: it[1], w: it[3], node: o }); } return out; }
+    function add(e) { if (typeof e.y === 'number' && isFinite(e.y)) sorted.splice(lower(e.y + 0) + 0, 0, e); else odd.push(e); }
+    function remove(e) { if (typeof e.y === 'number' && isFinite(e.y)) { for (var k = lower(e.y); k < sorted.length && sorted[k].y === e.y; k++) if (sorted[k] === e) { sorted.splice(k, 1); return; } } else { var q = odd.indexOf(e); if (q >= 0) odd.splice(q, 1); } }
+    for (var i = 0; i < nodes.length; i++) { var es = entriesOf(nodes[i]); byNode.set(nodes[i], es); for (var a = 0; a < es.length; a++) { if (typeof es[a].y === 'number' && isFinite(es[a].y)) sorted.push(es[a]); else odd.push(es[a]); } }
+    sorted.sort(function (p, q) { return p.y - q.y; });
+    function same(a, b) { if (a.length !== b.length) return false; for (var k = 0; k < a.length; k++) if (!(a[k].y === b[k].y || (a[k].y !== a[k].y && b[k].y !== b[k].y)) || a[k].x !== b[k].x || a[k].w !== b[k].w) return false; return true; }
+    return {
+      refresh: function (o) { var old = byNode.get(o) || [], now = entriesOf(o); if (same(old, now)) return; for (var a = 0; a < old.length; a++) remove(old[a]); for (var b = 0; b < now.length; b++) add(now[b]); byNode.set(o, now); },
+      room: function (n, fx, fw, bottom) {
+        var room = 8, e, overlap;
+        for (var k = lower(bottom - 0.5); k < sorted.length && sorted[k].y < bottom + 8; k++) { e = sorted[k]; if (e.node === n) continue; overlap = Math.min(e.x + e.w, fx + fw) - Math.max(e.x, fx); if (overlap < 8) continue; room = Math.min(room, e.y - bottom); }
+        for (var m = 0; m < odd.length; m++) { e = odd[m]; if (e.node === n) continue; if (e.y < bottom - 0.5) continue; overlap = Math.min(e.x + e.w, fx + fw) - Math.max(e.x, fx); if (overlap < 8) continue; room = Math.min(room, e.y - bottom); }
+        if (!(room > 0)) return 0; return Math.floor(room + 1e-6); } };
+  }
   function roomBelow(nodes, n, fx, fw, bottom) {
     var room = 8;
     for (var i = 0; i < nodes.length; i++) {
@@ -15296,6 +15322,7 @@ window.x7 = window.x7 || function (t) {
     var geoTouched = 0;
     var lifted = 0;
     var contacts = 0;
+    var RB = roomIndex(L.nodes);
     for (var i = 0; i < L.nodes.length; i++) {
       var n = L.nodes[i];
       if (!n.el) continue;
@@ -15422,7 +15449,7 @@ window.x7 = window.x7 || function (t) {
           var rise = liftPx(n.el, st);
           var phys = physicalLift(n.el, st);
           var origBottom = fy + fh;
-          var room = roomBelow(L.nodes, n, fx, fw, origBottom);
+          var room = RB.room(n, fx, fw, origBottom);
           var cap = shadowGap(n.el);
           var gap = cap ? Math.min(cap, room) : (rise > 0 ? room : 0);
           if (rise) {
@@ -15457,16 +15484,21 @@ window.x7 = window.x7 || function (t) {
           break;
         }
       }
+      RB.refresh(n);
     }
     /* The cast shadow is its own node, painted behind the face. A live lift moves the face and leaves the shadow on the ground. */
+    /* 1.8.35: ids are allocated back to front with one growing used-set (same ids as one groundId call per owner
+       over the growing node list); the list is then rebuilt once, each ground node just before its owner. */
+    var usedIds = {}, gnodes = new Map();
+    for (var ui = 0; ui < L.nodes.length; ui++) usedIds[L.nodes[ui].id] = 1;
     for (var gi = L.nodes.length - 1; gi >= 0; gi--) {
       var owner = L.nodes[gi];
       if (!owner.uxGroundItems || !owner.uxGroundItems.length) continue;
-      var gid = groundId(L.nodes, owner.id);
-      var gnode = { key: (owner.key || 'n') + '/ground', id: gid, flags: 0, items: owner.uxGroundItems, hit: null, el: null, act: null, uxGroundFor: owner.id };
+      var gid = groundIdIn(usedIds, owner.id); usedIds[gid] = 1;
+      gnodes.set(owner, { key: (owner.key || 'n') + '/ground', id: gid, flags: 0, items: owner.uxGroundItems, hit: null, el: null, act: null, uxGroundFor: owner.id });
       owner.uxGround = gid;
-      L.nodes.splice(gi, 0, gnode);
     }
+    if (gnodes.size) { var withGround = []; for (var wi = 0; wi < L.nodes.length; wi++) { var gn = gnodes.get(L.nodes[wi]); if (gn) withGround.push(gn); withGround.push(L.nodes[wi]); } L.nodes.length = 0; Array.prototype.push.apply(L.nodes, withGround); }
     L.uxStates = true;
     L.uxLight = 'penumbra-0.79-0.93-elev50';
     L.uxPenumbraClipped = L._penClip || 0;
@@ -15484,9 +15516,12 @@ window.x7 = window.x7 || function (t) {
   };
 
   function groundId(nodes, owner) {
-    var id = (owner + 0x01000003) >>> 0;
     var used = {};
     for (var i = 0; i < nodes.length; i++) used[nodes[i].id] = 1;
+    return groundIdIn(used, owner);
+  }
+  function groundIdIn(used, owner) {
+    var id = (owner + 0x01000003) >>> 0;
     function reserved(band) { return band === 0x1 || band === 0x2 || band === 0x4 || band === 0x5 || band === 0x6 || band === 0x7; }
     /* A reserved band is 256 million ids. Stepping one id at a time stalls the first draw. Jump the whole band, the same way layout allocates node ids. */
     var guard = 0;
@@ -16526,7 +16561,17 @@ function planRisk(w){
     'Calendar day risk and Plan step risk share this map; both update live on plan/calendar edits']}; }
 function riskOf(w){ return planRisk(w||W); }
 
-function clearFormFields(V){ if(V&&V.view){ V._tfTear=1; try{ V.view.clearFields(); } finally{ V._tfTear=0; } } V.tf={}; }
+function clearFormFields(V){ if(V&&V._tfOff){ try{ V._tfOff(); }catch(e){} V._tfOff=null; } if(V) V._tfLazy=null; if(V&&V.view){ V._tfTear=1; try{ V.view.clearFields(); } finally{ V._tfTear=0; } } V.tf={}; }
+/* 1.8.35: category-name fields exist only for Board rows near the viewport. lazy = rows sorted by y; band = one screen above to two below. */
+function tfBand(V,extra){ const L=V.view&&V.view.L, s=V.view&&V.view.s; if(!L||!(L.VH>0)||!s) return null; const sy=+(s.scrollPos(JRViews.GID)||[0,0])[1]||0, e=extra||0; return [sy-L.VH*(1+e), sy+L.VH*(2+e)]; }
+function syncLazyFields(V){ const Z=V&&V._tfLazy; if(!Z||!V.view) return; const band=tfBand(V,0), keep=tfBand(V,2); if(!band) return;
+  let lo=0, hi=Z.rows.length; while(lo<hi){ const mid=(lo+hi)>>1; if(Z.rows[mid].y+Z.rows[mid].h<band[0]) lo=mid+1; else hi=mid; }
+  for(let k=lo;k<Z.rows.length&&Z.rows[k].y<band[1];k++){ const row=Z.rows[k]; if(!V.tf[row.f]) Z.make(row.n); }
+  for(const f of Object.keys(V.tf)){ const row=Z.byF[f]; const tf=V.tf[f]; if(!row||!tf||tf.focused||V.formFocus===f) continue;
+    if(row.y+row.h>=keep[0]&&row.y<keep[1]) continue;
+    try{ if(Z.slabs&&Z.slabs.release) Z.slabs.release(tf.id); }catch(e){}
+    V._tfTear=1; try{ tf.remove(); }catch(e){} finally{ V._tfTear=0; }
+    const fl=V.view.fields||[], at=fl.indexOf(tf); if(at>=0) fl.splice(at,1); delete V.tf[f]; } }
 /* Library TextField owns Safari-safe opacity/z-index (jrender-exp7 v4). Host only keeps pointer-events off when blurred
    so canvas buttons under the shared textarea still receive hits (Create / Place). */
 function guardTextFieldPointer(){ try{ const t=document.querySelector('textarea[data-jrender="textfield"]'); if(!t) return;
@@ -16542,7 +16587,7 @@ function attachFormFields(V){ /* pull live values before tear-down so a re-layou
   let i=0; V.tf=V.tf||{};
   /* A popover is the last thing drawn. Fields go in under it. */
   const popNode=V.view.L.nodes.find(n=>n.pop), slabs=V.view._slabs, wake=()=>{ try{ if(window.Exp7Slabs&&window.Exp7Slabs.notify) window.Exp7Slabs.notify(); }catch(e){} };
-  V.view.L.nodes.forEach(n=>{ if(!n.tf||!n.hit) return; const f=n.tf; const [x,y,w,h]=n.hit;
+  const make=n=>{ if(!n.tf||!n.hit) return; const f=n.tf; const [x,y,w,h]=n.hit;
     /* ren:<id> is a category name on its Board row. It keeps what is typed across redraws and renames on Enter or when focus leaves. */
     const ren=f.indexOf('ren:')===0?f.slice(4):null; if(!ren&&!V.form) return;
     const cur=ren?((V.ren&&V.ren[ren]!=null)?V.ren[ren]:((AW.items[ren]||{}).name||'')):(V.form[f]!=null?V.form[f]:'');
@@ -16553,7 +16598,14 @@ function attachFormFields(V){ /* pull live values before tear-down so a re-layou
       onsubmit:ren?(()=>commitRename(V,ren)):(()=>hostFormAct(V,'form:ok')),
       onfocus:()=>{ V.formFocus=f; if(ren) wake(); }, onblur:()=>{ if(ren&&!V._tfTear){ commitRename(V,ren); wake(); } /* form fields keep formFocus for re-attach */ }});
     if(tf&&ren&&slabs&&slabs.adopt) slabs.adopt(tf.id,n.id);
-    V.tf[f]=tf; });
+    V.tf[f]=tf; };
+  /* Form fields: all of them. Category names: only rows near the viewport (and the one that had focus); the rest on scroll. */
+  const lazyRows=[], byF={};
+  V.view.L.nodes.forEach(n=>{ if(!n.tf||!n.hit) return; if(n.tf.indexOf('ren:')!==0||n.tf===wantFocus){ make(n); return; }
+    const row={n,f:n.tf,y:+n.hit[1]||0,h:+n.hit[3]||0}; lazyRows.push(row); byF[n.tf]=row; });
+  if(lazyRows.length){ lazyRows.sort((a,b)=>a.y-b.y); V._tfLazy={rows:lazyRows,byF,make,slabs};
+    try{ V._tfOff=V.view.s.on(e=>{ if(e&&e.kind===JRender.EV.SCROLL) syncLazyFields(V); }); }catch(e){}
+    syncLazyFields(V); }
   guardTextFieldPointer();
   /* Focus only the remembered field; clicking a field focuses synchronously inside TextField.ev (user gesture).
      Auto-focus after async queue is best-effort (Safari may ignore outside the gesture). */
@@ -18378,7 +18430,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.34",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.35",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
