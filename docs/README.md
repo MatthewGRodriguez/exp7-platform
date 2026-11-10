@@ -41,6 +41,7 @@ Every substantive claim should carry an evidence class (see [EVIDENCE.md](./EVID
 | [vocabulary.md](./vocabulary.md) | Joy vs money, Atlas, Board shares, platform / JR chrome terms |
 | [architecture.md](./architecture.md) | Platform shell, apps, mount model, sync boundary, JRender |
 | [views-vector-model.md](./views-vector-model.md) | **1.8.37–1.8.40:** atlas → vector model → JRender; options, skin, tokens; motion; JRender dl-index |
+| [jrender-paint-stroke.md](./jrender-paint-stroke.md) | **1.8.42:** JRender gradient paints and stroked paths: wire format, rendering, JS and Exp7VM API |
 | [ranking-jfengine.md](./ranking-jfengine.md) | **1.8.33–1.8.34:** JFEngine ranking replaces `Best()`; JFactor kernel |
 | [views-jrender-standard.md](./views-jrender-standard.md) | **Direction:** universal views, one JRender everywhere |
 | [platform-chrome-jrender.md](./platform-chrome-jrender.md) | **Implementation:** bar / apps / Budget tabs on JRViews + Exp7Slabs (1.8.3) |

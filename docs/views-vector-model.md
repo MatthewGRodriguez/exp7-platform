@@ -56,7 +56,7 @@ Built-in browser on Matthew's Mac (WebGPU):
 - Calendar, Board, Plan and Budget chrome interactions covered in PR #69 / #71; action draws 2.7–16.6 ms; no page errors.
 
 ## Open
-- **[OPEN]** JRender `dl-index` is not merged into JRender `main`; it needs Ash's review.
+- **[OPEN]** JRender `dl-index` (now `58e98cb`: indexed core, frame budget, gradients and strokes) is not merged into JRender `main` and has no remote; it needs Ash's review. Renderer fixes from Ash's 1.8.40 review shipped in 1.8.41; gradients and strokes in 1.8.42 ([jrender-paint-stroke.md](./jrender-paint-stroke.md)).
 - **Done (1.8.40)** The `dl-index` wasm is now built with `wasm-opt`: 289,561 → 256,009 B (`916004a5…`), same exports and imports, GPU parity 0 px / 0 hit on every view. [USER-HW]
 - **[OPEN]** With live rename fields awake, `verify` reports hit differences (the field owns its hit box; the field-less reference doesn't). Pixels match.
 
