@@ -97,7 +97,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.29. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.30. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -14316,7 +14316,7 @@ function buttonLines(n){ const lines=[]; let buf='';
   }); })(n);
   flush(); return lines; }
 const BLOCK=/^(div|section|header|h1|h2|h3|p|table|tbody|thead|tr|ul|ol|li|details|summary|footer|nav)$/i;
-const ROW=['ja-top','ja-calnav','ja-bar','ja-calsel','ja-alts','ja-brow','ja-prow','ja-switch','ja-legend','ja-step'];
+const ROW=['ja-top','ja-calnav','ja-bar','ja-calsel','ja-alts','ja-brow','ja-prow','ja-switch','ja-legend','ja-step','ja-line'];
 const BOXED={'ja-joy':1,'ja-alt':1,'ja-sw':1,'ja-lg':1,'ja-chip':1,'ja-tog':1};
 const has=(el,c)=>el.classList&&el.classList.contains(c);
 /* what the real runtime.js click handler acts on (document click listener, runtime.js line 287) + proposition rows (demo-local select) */
@@ -14325,7 +14325,7 @@ function actOf(el){ if(el.nodeType!==1) return null; if(el.hasAttribute('disable
   if(el.hasAttribute('data-ja-act')) return 'act:'+el.getAttribute('data-ja-act'); if(el.hasAttribute('data-alt')) return 'alt';
   if(has(el,'ja-day')&&el.hasAttribute('data-day')) return 'day'; if(has(el,'ja-item')&&el.hasAttribute('data-item')) return 'item';
   if(el.tagName==='TR'&&el.hasAttribute('data-dep-item')) return 'reqrow'; return null; }
-const KEYATTR=['data-item','data-day','data-dep-item','data-row','data-alt','data-plan-item','data-step-joy','data-comp','data-tf'];
+const KEYATTR=['data-item','data-day','data-dep-item','data-row','data-alt','data-plan-item','data-step-joy','data-comp','data-tf','data-cat','data-member'];
 function fnv(s){ let h=0x811c9dc5; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return h; }
 /* layout: returns {nodes:[{key,id,flags,items,hit,el,act}], H, items, rows, glyphs} */
 function layout(root,width,opt){ opt=opt||{}; const ctx={bg:[255,255,255,255],fg:[28,35,51,255],ac:[117,81,15,255]}; let items=0, rows=0, glyphs=0;
@@ -14417,7 +14417,8 @@ function layout(root,width,opt){ opt=opt||{}; const ctx={bg:[255,255,255,255],fg
     if(has(el,'ja-cal')) h=grid(el,x,y,w,inner,7);
     else if(el.tagName==='TABLE') h=table(el,x,y,w,inner);
     else if(has(el,'ja-tf')){ h=Math.max(28,minH); }
-    else if(ROW.some(q=>has(el,q))) h=flow(atoms(el,inner,[]),x+pad,y+pad,w-2*pad,inner,false,el)+2*pad;
+    /* An item category is a Board row that stacks lines: name and Remove, the list toggle, then one line per item. */
+    else if(ROW.some(q=>has(el,q))&&!has(el,'ja-cat')) h=flow(atoms(el,inner,[]),x+pad,y+pad,w-2*pad,inner,false,el)+2*pad;
     else h=children(el,x+pad,y+pad,w-2*pad,inner,has(el,'ja-day'))+2*pad;
     h=Math.max(h,minH); let fill=bgc||c.bg; if(fn){ R(fn,x,y,w,h,rad,fill); if(act){ fn.flags=NF.HIT|(act==='day'?NF.DRAG:0); fn.hit=[x,y,w,h]; fn.base=U(fill);
         /* day hover: stronger blue wash so pointer feedback is obvious on risk fills */
@@ -16022,11 +16023,14 @@ function proposeOps(V, ops, proc, src){
   const id=V&&V.id; const hook=window.__exp7ViewsPropose&&id&&window.__exp7ViewsPropose[id];
   if(typeof hook==='function') return hook(ops, proc, src);
   if(typeof submit==='function') return submit(ops, proc||'ui:views', src);
+  /* The demo consumer keeps submit inside its own scope and exports it as exp7.submit; use it only for views of its live atlas. */
+  const X=window.exp7; if(X&&typeof X.submit==='function'&&typeof X.W==='function'){ let live=null; try{ live=X.W(); }catch(e){} if(live&&live===activeAtlas(V)) return X.submit(ops, proc||'ui:views', src); }
   return null;
 }
 /* live runtime.js session on a snapshot */
 function startRuntime(w,root,carry,onHtml,pins){ const s=JSON.parse(JSON.stringify(w)); s.root=root; if(s.clock) s.clock.on=false;
   if(pins) Object.keys(pins).forEach(k=>{ const it=s.items[k]; if(it&&it.alts&&pins[k]){ it.state=it.state||{}; if(!it.state.userPick) it.state.userPick=pins[k]; } });
+  projectCategories(s,w);
   if(carry) Object.keys(carry).forEach(c=>{ if(s.components&&s.components[c]) s.components[c].state=JSON.parse(JSON.stringify(carry[c])); });
   const S={s,html:'',renders:0,errs:[],L:{},dead:false,settled:false,clicks:0}; let quiet=null, first; const timers=[]; S.ready=new Promise(r=>first=r);
   const fire=()=>{ if(S.dead) return; if(!S.settled){ S.settled=true; first(S); } else onHtml(S); };
@@ -16069,11 +16073,15 @@ function setView(id,w,root,cb,ro){ const box=$(id); if(!box) return;
   if(V.sess) V.sess.dispose();
   const fail=e=>{ V.err=String(e&&e.message||e)+(e&&e.code?' [code '+e.code+']':''); V.code=e&&e.code||null; cv.style.display='none'; const pe=box.querySelector('.jrerr')||box.appendChild(Object.assign(document.createElement('div'),{className:'jrerr bad'})); pe.setAttribute('role','alert'); pe.setAttribute('data-jr-state','error'); pe.textContent='JRender view not drawn: '+V.err; try{ if(window.__exp7Dbg) window.__exp7Dbg.push('view-fail',{id:id,err:V.err}); }catch(_){} if(V.cb) V.cb(V); };
   V.queue=(S,why)=>{ V.chain=V.chain.then(async()=>{ if(isCalRoot(V)&&(await calStateOnlyAsync(V,why))) return; return draw(S,why); }).catch(fail); return V.chain; };
-  const draw=async(S,why)=>{ if(V.sess!==S) return; const d=new DOMParser().parseFromString('<div id="app">'+S.html+'</div>','text/html').getElementById('app');
+  const draw=async(S,why)=>{ if(V.sess!==S) return;
+    /* A rename that commits on blur remounts the views. A click that lands before the new session settles waits for it, so no empty frame is drawn. */
+    if(!S.settled){ await S.ready; if(V.sess!==S) return; }
+    const d=new DOMParser().parseFromString('<div id="app">'+S.html+'</div>','text/html').getElementById('app');
     hostDoc(d,V); if(V.plan) planDoc(V,d,S.J&&S.J.atlas||S.s);
     /* After planDoc: it strips non-deps children, so Budget chrome must be re-attached last. */
     budgetChromeDoc(V,d);
-    const r=await V.view.show(cv,d,V.w,{rebuild:why==="reveal"}); if(V.sess!==S) return; if(V.form) attachFormFields(V); const J=S.J||{}, L=r.L, sum=d.querySelector('.ja-deps-sum'); V.html=S.html; V.doc=d; V.lastMode=r.mode; if(isCalRoot(V)) bindCalViewStates(V);
+    let r; V._tfTear=1; try{ r=await V.view.show(cv,d,V.w,{rebuild:why==="reveal"}); } finally{ V._tfTear=0; }
+    if(V.sess!==S) return; if(V.form||isBoardRoot(V)) attachFormFields(V); const J=S.J||{}, L=r.L, sum=d.querySelector('.ja-deps-sum'); V.html=S.html; V.doc=d; V.lastMode=r.mode; if(isCalRoot(V)) bindCalViewStates(V);
     Object.assign(V,{n:V.n+1,err:'',code:null,tboxes:L.tboxes.length,tlines:L.tboxes.reduce((s,t)=>s+t.count,0),tbl:L.tboxes,notdef:L.notdef,why,items:L.items,rows:L.rows,glyphs:L.glyphs,nodes:L.nodes.length,hits:L.hits,H:L.H,VH:r.VH,ms:r.ms,px:r.px,handle:r.handle,loads:V.view.loads,patches:V.view.patches,lastOps:r.mode==='patch'?r.ops:V.lastOps,mode:r.mode,rev,
       passes:J.passes,backend:J.backend,engine:J.engine,rerrs:S.errs.concat((J.last&&J.last.errors)||[]).map(String),conflicts:(J.conflicts||[]).length,cycles:(J.cycles||[]).length,deps:sum?sum.textContent:null,
       secs:[].map.call(d.querySelectorAll('.ja-section'),x=>x.dataset.rule+':'+x.dataset.n),days:d.querySelectorAll('.ja-day').length,
@@ -16091,12 +16099,12 @@ function setView(id,w,root,cb,ro){ const box=$(id); if(!box) return;
         if(typeof window.__budgetChromeAct==='function'&&a.startsWith('budget:')) window.__budgetChromeAct(a);
         else if(typeof window.__platformChromeAct==='function'&&a.startsWith('plat:')) window.__platformChromeAct(a);
         return; }
-      if(a.startsWith('cal:')||a==='form:ok'||a==='form:cancel'||a==='form:sign'||a.startsWith('pick:')||a.startsWith('use:')||a.startsWith('res:')||a.startsWith('alt:')||a.startsWith('brd:')){
+      if(a.startsWith('cal:')||a.startsWith('form:')||a.startsWith('pick:')||a.startsWith('use:')||a.startsWith('res:')||a.startsWith('alt:')||a.startsWith('brd:')){
       if(a.startsWith('cal:')) hostCalAct(V,a); else if(a.startsWith('use:')||a.startsWith('res:')||a.startsWith('alt:')||a.startsWith('brd:')) hostBoardAct(V,a); else hostFormAct(V,a); return; }
       planAct(V,a); return; }
     if(act==='reqrow'){ const it=el.getAttribute('data-dep-item'), AW=activeAtlas(V)||{}, x=(AW.items||{})[String(it).replace(/^item:/,'')]; V.sel=it; V.note='selected '+it+(x?' ('+x.name+', jreq '+(x.jreq||'none')+')':''); if(V.cb) V.cb(V); return; }
     if(act==='day'&&isCalRoot(V)){ hostDayClick(V,el.getAttribute('data-day'),mods||{}); return; }
-    if(act==='act:new'&&isBoardRoot(V)){ V.form={kind:'newitem',name:'',jreq:'',comfort:'',fun:'',cost:'',hours:'',usesIds:{}}; V.formFocus='name'; return V.queue(S,'form'); }
+    if(act==='act:new'&&isBoardRoot(V)){ V.form={kind:'newitem',name:'',jreq:'',reqOpen:false,usesIds:{}}; V.formFocus='name'; return V.queue(S,'form'); }
     /* Host-drive Board sort/filter on *this* app’s atlas (universal view behavior; data stays per-app). */
     if((act==='act:sort'||act==='act:filter')&&isBoardRoot(V)){
       const cid=el.getAttribute('data-comp')||boardCompId(V), AW=activeAtlas(V); if(!AW||!AW.components||!AW.components[cid]) return;
@@ -16139,6 +16147,7 @@ function planRisk(w){
      MODERATE if hr<hm OR fixed within ±3 days; LOW else. Path health GOOD/MARGINAL/BAD same palette.
      Plan feeds: dated reqs/calendar steps = fixed events; selected alt cost (Best()/userPick) → outflow;
      jreq slack (dayDiff), broken/conflict/cycle flags, resource stock pressure, what-if alt scores. */
+  w=effAtlas(w);
   const ht=RISK_HT, CC=RISK_COL;
   const cal=(w.components&&(w.components[(w.meta&&w.meta.calId)||'trip_calendar']||w.components.trip_calendar))||{}, req=(w.components&&(w.components[(w.meta&&w.meta.planId)||'reqs']||w.components.reqs))||{};
   const ids=new Set([...(cal.items||[]),...(req.items||[])].map(r=>String(r).replace(/^item:/,'')));
@@ -16193,7 +16202,7 @@ function planRisk(w){
     'Calendar day risk and Plan step risk share this map; both update live on plan/calendar edits']}; }
 function riskOf(w){ return planRisk(w||W); }
 
-function clearFormFields(V){ if(V&&V.view) V.view.clearFields(); V.tf={}; }
+function clearFormFields(V){ if(V&&V.view){ V._tfTear=1; try{ V.view.clearFields(); } finally{ V._tfTear=0; } } V.tf={}; }
 /* Library TextField owns Safari-safe opacity/z-index (jrender-exp7 v4). Host only keeps pointer-events off when blurred
    so canvas buttons under the shared textarea still receive hits (Create / Place). */
 function guardTextFieldPointer(){ try{ const t=document.querySelector('textarea[data-jrender="textfield"]'); if(!t) return;
@@ -16202,21 +16211,27 @@ function guardTextFieldPointer(){ try{ const t=document.querySelector('textarea[
 }catch(e){} }
 function blurTextFields(V){ try{ if(V&&V.tf) Object.keys(V.tf).forEach(k=>{ try{ V.tf[k].blur&&V.tf[k].blur(); }catch(e){} }); const t=document.querySelector('textarea[data-jrender="textfield"]'); if(t){ t.blur(); t.style.pointerEvents='none'; } }catch(e){} }
 function attachFormFields(V){ /* pull live values before tear-down so a re-layout mid-edit (use: chips, etc.) keeps what was typed */
-  if(V&&V.tf&&V.form) Object.keys(V.tf).forEach(f=>{ try{ const v=V.tf[f]&&V.tf[f].value; if(v!=null) V.form[f]=v; }catch(e){} });
-  const wantFocus=V&&V.formFocus; clearFormFields(V); if(!V||!V.form||!V.view||!V.view.L||!V.view.r) return;
+  if(V&&V.tf&&V.form) Object.keys(V.tf).forEach(f=>{ if(f.indexOf('ren:')===0) return; try{ const v=V.tf[f]&&V.tf[f].value; if(v!=null) V.form[f]=v; }catch(e){} });
+  const wantFocus=V&&V.formFocus; clearFormFields(V); if(!V||!V.view||!V.view.L||!V.view.r) return;
   const font=JRViews.font(); const rgba=window.JRender.rgba; const fg=rgba(28,35,51), bg=rgba(255,255,255), bd=rgba(138,150,170), fb=rgba(36,88,166);
+  const AW=activeAtlas(V)||{items:{}};
   let i=0; V.tf=V.tf||{};
   V.view.L.nodes.forEach(n=>{ if(!n.tf||!n.hit) return; const f=n.tf; const [x,y,w,h]=n.hit;
+    /* ren:<id> is a category name on its Board row. It keeps what is typed across redraws and renames on Enter or when focus leaves. */
+    const ren=f.indexOf('ren:')===0?f.slice(4):null; if(!ren&&!V.form) return;
+    const cur=ren?((V.ren&&V.ren[ren]!=null)?V.ren[ren]:((AW.items[ren]||{}).name||'')):(V.form[f]!=null?V.form[f]:'');
     const id=(0x50000000+(i++) )>>>0; /* keep away from TextField derived id XOR bands */
     const tf=V.view.textField({id,parent:JRViews.GID,x,y,w:Math.max(120,w),h:Math.max(28,h),font,size:13,color:fg,bg,border:bd,focusBorder:fb,caretColor:fg,placeholderColor:rgba(73,85,106),selColor:rgba(36,88,166,55),
-      value:(V.form[f]!=null?String(V.form[f]):''),placeholder:n.el&&n.el.getAttribute('data-ph')||f,label:f,
-      oninput:v=>{ V.form[f]=v; }, onsubmit:()=>hostFormAct(V,'form:ok'),
-      onfocus:()=>{ V.formFocus=f; }, onblur:()=>{ /* keep formFocus for re-attach */ }});
+      value:String(cur),placeholder:n.el&&n.el.getAttribute('data-ph')||f,label:ren?'Item category name':f,
+      oninput:ren?(v=>{ (V.ren=V.ren||{})[ren]=v; }):(v=>{ if(V.form) V.form[f]=v; }),
+      onsubmit:ren?(()=>commitRename(V,ren)):(()=>hostFormAct(V,'form:ok')),
+      onfocus:()=>{ V.formFocus=f; }, onblur:()=>{ if(ren&&!V._tfTear) commitRename(V,ren); /* form fields keep formFocus for re-attach */ }});
     V.tf[f]=tf; });
   guardTextFieldPointer();
   /* Focus only the remembered field; clicking a field focuses synchronously inside TextField.ev (user gesture).
      Auto-focus after async queue is best-effort (Safari may ignore outside the gesture). */
-  const focusKey=wantFocus&&V.tf[wantFocus]?wantFocus:Object.keys(V.tf)[0];
+  /* A category name never takes focus by itself. Only a form's first field does. */
+  const focusKey=wantFocus&&V.tf[wantFocus]?wantFocus:(V.form?(Object.keys(V.tf).find(k=>k.indexOf('ren:')!==0)||null):null);
   /* Keep the focused field on screen with its label. Do not pin it to y=0. */
   if(focusKey&&V.view&&V.view.s&&V.view.L){ const n=(V.view.L.nodes||[]).find(q=>q.tf===focusKey&&q.hit); if(n){ const y=n.hit[1], h=n.hit[3]||28, VH=V.view.L.VH||0, H=V.view.L.H||0; if(VH>0&&H>VH){ const sp=V.view.s.scrollPos(JRViews.GID)||[0,0]; if(y<sp[1]+12||y+h>sp[1]+VH-12){ const next=Math.max(0, Math.min(H-VH, y-72)); V.view.s.scroll(JRViews.GID, sp[0]||0, next); } } } }
   if(focusKey&&V.tf[focusKey]) try{ V.tf[focusKey].focus(); guardTextFieldPointer(); if(V.tf[focusKey].place) V.tf[focusKey].place(); }catch(e){} }
@@ -16247,8 +16262,11 @@ function boardIdForRef(AW,ref,fallbackBid){
   if(!t&&window.Exp7Views&&typeof window.Exp7Views.budgetBoardId==='function'&&fallbackBid){
     const m=/^board_(expense|income|debt|asset)$/.exec(fallbackBid); if(m) t=m[1];
   }
-  if(window.Exp7Views&&typeof window.Exp7Views.budgetBoardId==='function')
-    return window.Exp7Views.budgetBoardId(t||'expense');
+  /* Type boards belong to Budget atlases; any other atlas keeps its own board. */
+  if(window.Exp7Views&&typeof window.Exp7Views.budgetBoardId==='function'){
+    const b=window.Exp7Views.budgetBoardId(t||'expense');
+    if(b&&((AW.meta&&(AW.meta.budget||AW.meta.budgetBoards))||(AW.components&&AW.components[b]))) return b;
+  }
   return fallbackBid||((AW.meta&&AW.meta.boardId)||null);
 }
 function ensureMemOp(ops,path,op,value){
@@ -16296,6 +16314,15 @@ function syncCalPlanOps(ops,V){
       ensureMemOp(ops,planP,'remove',r);
     }
   });
+  /* A category sits on the calendar on its selected item's date. A date on the category or on an item under it puts the category there. */
+  const owners=catOwners(AW), touched={};
+  ops.forEach(o=>{ const m=/^items\/([^/]+)\/(values\/date|alts(\/.*)?|state\/userPick)$/.exec(String(o.path||'')); if(!m) return; const r='item:'+m[1]; touched[owners[r]?('item:'+owners[r]):r]=1; });
+  const calNow=((AW.components&&AW.components[cid])||{}).items||[];
+  Object.keys(touched).forEach(r=>{ if(rem[r]||calNow.indexOf(r)>=0) return; const id=r.slice(5), it=AW.items&&AW.items[id]; if(!it) return;
+    const onBoard=boardPaths.some(bp=>{ const c=AW.components&&AW.components[bp.replace(/^components\/|\/items$/g,'')]; return !!(c&&Array.isArray(c.items)&&c.items.indexOf(r)>=0); });
+    if(!onBoard) return;
+    const dated=[id].concat(catMembers(it).map(x=>x.slice(5))).some(x=>{ const o=ops.find(q=>q.path==='items/'+x+'/values/date'); if(o) return !!o.value; const xi=AW.items[x]; return !!(xi&&xi.values&&xi.values.date); });
+    if(dated) ensureMemOp(ops,calP,'add',r); });
   return ops; }
 function submitViews(ops,src,V){ const synced=syncCalPlanOps(ops.map(o=>Object.assign({},o)),V); return proposeOps(V||{id:src},synced,'ui:views',src); }
 function mkItemRecord(id,name,extra){ return {id,name,values:Object.assign({},extra&&extra.values||{}),factors:{},state:{},alts:extra&&extra.alts||null,jreq:extra&&extra.jreq||null,blueprint:null}; }
@@ -16312,9 +16339,9 @@ function eachBoardRef(w,fn){
   boards.forEach(bid=>{ if(!bid||seenPath[bid]) return; seenPath[bid]=1;
     (((w.components&&w.components[bid])||{}).items||[]).forEach(r=>fn(r,bid)); });
 }
-function boardPickList(w){ w=w||W; const out=[]; const seen={};
+function boardPickList(w){ w=w||W; const out=[]; const seen={}; const owners=catOwners(w);
   eachBoardRef(w,r=>{ const id=String(r).replace(/^item:/,''); if(seen[id]) return; const it=w.items[id]; if(!it) return;
-    if(((it.values||{}).kind)==='resource') return; seen[id]=1;
+    if(((it.values||{}).kind)==='resource') return; if(owners['item:'+id]&&owners['item:'+id]!==id) return; seen[id]=1;
     out.push({id,name:it.name||id,jreq:it.jreq||null,alts:((it.alts&&it.alts.members)||[]).map(m=>{ const aid=m.slice(5), a=w.items[aid]; return {id:aid,name:(a&&a.name)||aid}; })});
   }); return out; }
 function boardItemsNonRes(w){ const raw=((w.components.resources||{}).items); const R=new Set(Array.isArray(raw)?raw:(typeof raw==='string'&&raw?[raw]:[]));
@@ -16324,7 +16351,7 @@ function boardItemsNonRes(w){ const raw=((w.components.resources||{}).items); co
 
 function calNavOf(V){ if(!V.calNav) V.calNav={level:'month', day:null, year:null, saved:{scroll:0, selected:null, anchor:null, month:null}}; return V.calNav; }
 function calMonthOf(V){ const AW=activeAtlas(V)||{}; const cal=AW.components[calCompId(V)]||{}; return (cal.view&&cal.view.month)||'2027-04'; }
-function itemsOnDay(w,day,V){ const cid=(V&&calCompId(V))||(w.meta&&w.meta.calId)||'trip_calendar'; const cal=w.components[cid]||w.components.trip_calendar||{}; const out=[];
+function itemsOnDay(w,day,V){ w=effAtlas(w); const cid=(V&&calCompId(V))||(w.meta&&w.meta.calId)||'trip_calendar'; const cal=w.components[cid]||w.components.trip_calendar||{}; const out=[];
   (cal.items||[]).forEach(r=>{ const id=r.slice(5), it=w.items[id]; if(!it) return; const v=it.values||{}, start=v.date; if(!start) return;
     const dur=Math.max(1, Number(v.days)||1); const cover=daysBetween(start, (()=>{ const ds=daysBetween(start,'2099-12-31'); return ds[Math.min(dur,ds.length)-1]; })()).slice(0,dur);
     if(cover.indexOf(day)>=0) out.push({id,name:it.name,r,start,days:dur,jreq:it.jreq}); }); return out; }
@@ -16463,7 +16490,7 @@ function calDoc(V,d){ /* strip Board/Plan switch + subs; inject selection UX; pa
     picks.forEach(P=>{ const row=d.ownerDocument.createElement('div'); row.className='ja-brow';
       const bt=d.ownerDocument.createElement('button'); bt.setAttribute('data-jv-act','pick:'+P.id); bt.className=(V.form.itemId===P.id)?'on':'';
       const jr=P.jreq?String(P.jreq).replace(/^item:/,''):'—';
-      bt.textContent=((V.form.itemId===P.id)?'✓ ':'')+P.name+' · requires '+jr+(P.alts.length?' · '+P.alts.length+' alt(s)':'');
+      bt.textContent=((V.form.itemId===P.id)?'✓ ':'')+P.name+' · requires '+jr+(P.alts.length?' · '+P.alts.length+' item(s)':'');
       row.appendChild(bt); formWrap.appendChild(row); });
     const reqRow=d.ownerDocument.createElement('div'); reqRow.className='ja-brow';
     const it=V.form.itemId&&(V.atlasW||W).items[V.form.itemId]; const jrLab=it&&it.jreq?String(it.jreq).replace(/^item:/,''):'—';
@@ -16473,7 +16500,7 @@ function calDoc(V,d){ /* strip Board/Plan switch + subs; inject selection UX; pa
     if(bar.parentNode) bar.parentNode.insertBefore(formWrap,bar.nextSibling); else d.insertBefore(formWrap,d.firstChild); }
   /* multi-day spans already on the calendar → mark covered days */
   const spanCover=Object.create(null);
-  ((((V.atlasW||W).components||{})[calCompId(V)]||{}).items||[]).forEach(r=>{ const it=(V.atlasW||W).items[String(r).replace(/^item:/,'')]; if(!it) return;
+  ((((V.atlasW||W).components||{})[calCompId(V)]||{}).items||[]).forEach(r=>{ const it=effItem(V.atlasW||W,String(r).replace(/^item:/,'')); if(!it) return;
     const v=it.values||{}, start=v.date; const dur=Math.max(1, Number(v.days)||1); if(!start||dur<2) return;
     const end=daysBetween(start,start).length? (()=>{ const ds=daysBetween(start,'2099-12-31'); return ds[Math.min(dur,ds.length)-1]; })():start;
     daysBetween(start,end).slice(0,dur).forEach(k=>{ spanCover[k]=it.name||r; }); });
@@ -16513,7 +16540,8 @@ function budgetMoney(n){ if(n==null||!isFinite(+n)) return '—'; const sign=+n<
 function budgetFigures(w, month){
   const E=window.JAtlasEval; const ids=(w&&w.meta&&w.meta.boardIds)||{};
   function list(type){ const c=w&&w.components&&w.components[ids[type]||('board_'+type)]; return (c&&c.items)||[]; }
-  function rec(ref){ return (w&&w.items&&w.items[String(ref).replace(/^item:/,'')])||null; }
+  /* A category counts through its selected item. */
+  function rec(ref){ return effItem(w,String(ref).replace(/^item:/,''))||null; }
   function monthAmt(it){
     if(!it) return NaN;
     const v=it.values||{};
@@ -16539,6 +16567,57 @@ function budgetItemOnView(it, month, day){
   return day?occ.indexOf(day)>=0:occ.length>0;
 }
 function memberRef(m){ const s=String(m==null?'':m); if(!s) return ''; return s.indexOf(':')>=0?s:('item:'+s); }
+/* Item categories. A Board row is a category and its alternatives are the items under it. Each item holds its own values.
+   A category runs on its selected item: the user's pick when set, else Best, else the first available item.
+   The schedule and amount that item sets replace the category's own for the calendar, the plan and the money figures. */
+const CAT_KEYS=['date','repeat','days','on','until','amount','lastAmount','charge','pay'];
+const CAT_SEL=new WeakMap();
+function catMembers(it){ const m=it&&it.alts&&it.alts.members; return (Array.isArray(m)?m:(m?[m]:[])).map(memberRef).filter(Boolean); }
+function catHasValues(it){ const v=(it&&it.values)||{}; return ['date','repeat','amount','cost','hours'].some(k=>v[k]!=null&&v[k]!==''); }
+function catOwners(w){ const out={}; if(!w||!w.items) return out;
+  eachBoardRef(w,r=>{ const id=String(r).replace(/^item:/,''); catMembers(w.items[id]).forEach(m=>{ if(m!=='item:'+id&&!out[m]) out[m]=id; }); });
+  return out; }
+function selectedRef(w,id){
+  const it=w&&w.items&&w.items[id]; const mem=catMembers(it); if(!mem.length) return null;
+  const A=it.alts, st=(it.state&&typeof it.state==='object')?it.state:{};
+  const un=[].concat(A.unavail||[]).map(memberRef);
+  const sig=(w.rev||0)+'|'+mem.join(',')+'|'+un.join(',')+'|'+(A.pref||'')+'|'+(st.userPick||'')+'|'+(typeof window.bestRank==='function'?1:0);
+  const hit=CAT_SEL.get(it); if(hit&&hit.sig===sig) return hit.ref;
+  const avail=mem.filter(m=>w.items[m.slice(5)]&&un.indexOf(m)<0);
+  const has=x=>{ const r=x?memberRef(x):''; return r&&avail.indexOf(r)>=0?r:null; };
+  let ref=null;
+  if(avail.length){
+    ref=has(st.userPick);
+    if(!ref){ try{ const B=bestRank(w,id); ref=has(B&&B.pick&&B.pick.pick); }catch(e){} }
+    if(!ref) ref=has(A.pref)||has(st.pick)||has(st.simPick)||avail[0];
+  }
+  CAT_SEL.set(it,{sig:sig,ref:ref}); return ref;
+}
+function catOverlay(base,sel){ const v=Object.assign({},base||{}), sv=(sel&&sel.values)||{};
+  CAT_KEYS.forEach(k=>{ if(sv[k]!=null&&sv[k]!=='') v[k]=sv[k]; }); return v; }
+function effItem(w,id){ const it=w&&w.items&&w.items[id]; if(!it) return it; const ref=selectedRef(w,id), sel=ref&&w.items[ref.slice(5)]; if(!sel) return it;
+  return Object.assign({},it,{values:catOverlay(it.values,sel)}); }
+function effAtlas(w){ if(!w||!w.items) return w; let items=null;
+  Object.keys(w.items).forEach(id=>{ const it=w.items[id]; if(!it||!it.alts) return; const e=effItem(w,id); if(e!==it){ items=items||Object.assign({},w.items); items[id]=e; } });
+  return items?Object.assign({},w,{items:items}):w; }
+/* s is the session's own copy of w. */
+function projectCategories(s,w){ if(!s||!s.items||!w||!w.items) return;
+  Object.keys(w.items).forEach(id=>{ const it=s.items[id]; if(!it||!it.alts) return; const ref=selectedRef(w,id), sel=ref&&s.items[ref.slice(5)]; if(sel) it.values=catOverlay(it.values,sel); }); }
+/* A calendar placement dates the selected item when that item carries its own date. Otherwise the date is the category's, shared by every item. */
+function dateTargetId(w,id){ const ref=selectedRef(w,id), sel=ref&&w.items[ref.slice(5)]; return sel&&sel.values&&sel.values.date!=null&&sel.values.date!==''?ref.slice(5):id; }
+function itemInUse(w,ref,except){ const C=(w&&w.components)||{};
+  if(Object.keys(C).some(k=>{ const L=C[k]&&C[k].items; return Array.isArray(L)?L.indexOf(ref)>=0:L===ref; })) return true;
+  return Object.keys((w&&w.items)||{}).some(k=>k!==except&&catMembers(w.items[k]).indexOf(ref)>=0); }
+function commitRename(V,id){ const AW=activeAtlas(V)||{items:{}}; const it=AW.items[id]; const raw=V.ren?V.ren[id]:null;
+  if(V.ren) delete V.ren[id]; if(V.formFocus==='ren:'+id) V.formFocus=null;
+  if(!it||raw==null) return null;
+  const name=String(raw).replace(/\s+/g,' ').trim();
+  /* An empty name is not a rename. The row goes back to the name it has. */
+  if(!name||name===it.name){ if(V.sess&&String(raw)!==String(it.name||'')) V.queue(V.sess,'rename'); return null; }
+  V.note='renamed '+id+' to '+name;
+  const ent=submitViews([{path:'items/'+id+'/name',op:'set',value:name}],'board:rename',V);
+  if(!ent||(ent.r&&ent.r.ok===false)){ it.name=name; if(V.sess) V.queue(V.sess,'rename'); }
+  return ent; }
 function ensureAlts(it){
   if(!it.alts||typeof it.alts!=='object'||Array.isArray(it.alts)) it.alts={members:[],pref:null,unavail:[],method:'best'};
   if(!Array.isArray(it.alts.members)) it.alts.members=it.alts.members?[it.alts.members]:[];
@@ -16646,29 +16725,52 @@ function boardDoc(V,d){ /* remove Trip calendar button/text; resources; alts; fo
   if(bar&&bar.parentNode) bar.parentNode.insertBefore(resBox,bar.nextSibling); else d.insertBefore(resBox,d.firstChild);
   const budgetBoard=/^board_(expense|income|debt|asset)$/.test(boardCompId(V)||'');
   const viewMonth=budgetBoard?budgetMonthKey():''; const viewDay=budgetBoard?((window.__budgetUi||{}).day||''):'';
-  d.querySelectorAll('.ja-brow').forEach(row=>{ const chip=row.querySelector('.ja-item[data-item]'); if(!chip) return; const id=chip.getAttribute('data-item'); const it=(V.atlasW||W).items[id]; if(!it) return;
+  const doc=d.ownerDocument;
+  const mk=(tag,cls,txt)=>{ const e=doc.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; };
+  const btn=(act,txt,cls)=>{ const b=mk('button',cls==null?'ja-joy':cls,txt); b.type='button'; b.setAttribute('data-jv-act',act); return b; };
+  const small=b=>{ b.style.minWidth='36px'; b.style.minHeight='28px'; return b; };
+  /* Each Board row is an item category. Line one is its name, typed in place, and Remove. Line two opens or hides its items and names the selected one.
+     Every item under it has its own line with its values and Set values. Add alternative shows only while the list is open. */
+  const owners=catOwners(AW), catEl={};
+  d.querySelectorAll('.ja-brow').forEach(row=>{ const chip=row.querySelector('.ja-item[data-item]'); if(!chip) return; const id=chip.getAttribute('data-item'); const it=AW.items[id]; if(!it) return;
     if(((it.values||{}).kind)==='resource') return;
-    if(budgetBoard&&!budgetItemOnView(it, viewMonth, viewDay)){ row.remove(); return; }
+    /* An item under a category is listed there, not as a row of its own. */
+    if(owners['item:'+id]&&owners['item:'+id]!==id){ row.remove(); return; }
+    const mem=catMembers(it).map(r=>r.slice(5)).filter(mid=>AW.items[mid]);
+    if(budgetBoard&&![effItem(AW,id)].concat(mem.map(mid=>AW.items[mid])).some(x=>budgetItemOnView(x, viewMonth, viewDay))){ row.remove(); return; }
+    const own=catHasValues(it), selRef=selectedRef(AW,id), selId=selRef?selRef.slice(5):null;
     const paying=!!((it.values||{}).payTo);
+    while(row.firstChild) row.removeChild(row.firstChild);
+    row.classList.add('ja-cat'); row.setAttribute('data-cat',id); catEl[id]=row;
     if(paying){ row.classList.add('ja-payto'); row.setAttribute('data-payto','1'); }
-    const vals=d.ownerDocument.createElement('span'); vals.className='ja-vals'; vals.textContent=budgetValueText(it); row.insertBefore(vals, chip);
-    const edit=d.ownerDocument.createElement('button'); edit.type='button'; edit.className='ja-joy'; edit.setAttribute('data-jv-act','brd:values:'+id); edit.textContent='Set values'; row.insertBefore(edit, chip);
+    const head=mk('div','ja-line'); head.appendChild(mkTf(doc,'ren:'+id,'Item category name')); head.appendChild(btn('brd:remove:'+id,'Remove')); row.appendChild(head);
+    /* A category kept from before this layout holds its own values. With no items under it, it lists as its one item. */
+    const open=!(V.open&&V.open[id]===false), self=own&&!mem.length, count=mem.length+(self?1:0);
+    const list=mk('div','ja-line');
+    const tg=btn('alt:tog:'+id,(open?'▾':'▸')+' Items ('+count+')'); tg.setAttribute('aria-expanded',open?'true':'false'); list.appendChild(tg);
+    list.appendChild(mk('span','ja-picked',' Selected: '+(selId?(AW.items[selId].name||selId):(self?(it.name||id):'none'))+' '));
     if(budgetBoard&&boardCompId(V)==='board_expense'){
-      const pay=d.ownerDocument.createElement('button'); pay.type='button'; pay.className='ja-joy'+(paying?' on':''); pay.setAttribute('aria-pressed',paying?'true':'false'); pay.setAttribute('data-jv-act','brd:pay:'+id);
       const debt=paying?AW.items[String(it.values.payTo).replace(/^item:/,'')]:null;
-      pay.textContent=debt?('pays '+debt.name):'pays debt'; row.appendChild(pay);
+      const pay=btn('brd:pay:'+id,debt?('pays '+debt.name):'pays debt','ja-joy'+(paying?' on':'')); pay.setAttribute('aria-pressed',paying?'true':'false'); list.appendChild(pay);
     }
-    const rm=d.ownerDocument.createElement('button'); rm.type='button'; rm.className='ja-joy'; rm.setAttribute('data-jv-act','brd:remove:'+id); rm.textContent='Remove'; row.appendChild(rm);
-    const open=!!(V.open&&V.open[id]);
-    const tg=d.ownerDocument.createElement('button'); tg.className=open?'on':''; tg.setAttribute('aria-pressed',open?'true':'false'); tg.setAttribute('data-jv-act','alt:tog:'+id); tg.textContent=(open?'▾':'▸')+' Alternatives ('+((it.alts&&it.alts.members)||[]).length+')'; row.appendChild(tg);
-    const ad=d.ownerDocument.createElement('button'); ad.setAttribute('data-jv-act','alt:add:'+id); ad.textContent='+ Add alternative'; row.appendChild(ad);
-    if(open&&it.alts){ (it.alts.members||[]).forEach(m=>{ const mid=String(m).replace(/^item:/,''); const o=(V.atlasW||W).items[mid]||{}; const ref='item:'+mid;
-      const sp=d.ownerDocument.createElement('span'); sp.className='ja-chip'; sp.textContent=o.name||mid; row.appendChild(sp);
-      const pref=it.alts.pref!=null&&memberRef(it.alts.pref)===ref; const restricted=(it.alts.unavail||[]).some(function(x){ return memberRef(x)===ref; });
-      sp.textContent=(pref?'★ ':'')+(o.name||mid)+(restricted?' · unavailable':''); if(restricted) sp.classList.add('ja-dim');
-      const star=d.ownerDocument.createElement('button'); star.type='button'; star.className='ja-joy'+(pref?' on':''); star.style.minWidth='36px'; star.style.minHeight='28px'; star.setAttribute('aria-pressed',pref?'true':'false'); star.setAttribute('data-jv-act','alt:pref:'+id+'/'+mid); star.textContent=pref?'★':'☆'; row.appendChild(star);
-      const block=d.ownerDocument.createElement('button'); block.type='button'; block.className='ja-joy'+(restricted?' err':''); block.style.minWidth='36px'; block.style.minHeight='28px'; block.setAttribute('aria-pressed',restricted?'true':'false'); block.setAttribute('data-jv-act','alt:restrict:'+id+'/'+mid); block.textContent='×'; row.appendChild(block);
-    }); }
+    if(open) list.appendChild(btn('alt:add:'+id,'+ Add alternative'));
+    row.appendChild(list);
+    if(!open) return;
+    if(own){ const ln=mk('div','ja-line'); ln.setAttribute('data-member',id);
+      if(self){ const nm=mk('span','ja-chip on',it.name||id); nm.setAttribute('data-sm','selected'); ln.appendChild(nm); }
+      else ln.appendChild(mk('span','ja-dim','Shared by every item:'));
+      ln.appendChild(mk('span','ja-vals',' '+budgetValueText(it)+' ')); ln.appendChild(btn('brd:values:'+id,'Set values')); row.appendChild(ln); }
+    mem.forEach(mid=>{ const o=AW.items[mid], ref='item:'+mid;
+      const pref=it.alts.pref!=null&&memberRef(it.alts.pref)===ref; const restricted=[].concat(it.alts.unavail||[]).some(function(x){ return memberRef(x)===ref; }); const sel=selId===mid;
+      const ln=mk('div','ja-line'); ln.setAttribute('data-member',mid);
+      const nm=mk('span','ja-chip'+(sel?' on':'')+(restricted?' ja-dim':''),(o.name||mid)+(restricted?' · unavailable':'')); if(sel) nm.setAttribute('data-sm','selected'); ln.appendChild(nm);
+      ln.appendChild(mk('span','ja-vals',' '+budgetValueText(o)+' '));
+      ln.appendChild(btn('brd:values:'+mid,'Set values'));
+      const star=small(btn('alt:pref:'+id+'/'+mid,pref?'★':'☆','ja-joy'+(pref?' on':''))); star.setAttribute('aria-pressed',pref?'true':'false'); ln.appendChild(star);
+      const block=small(btn('alt:restrict:'+id+'/'+mid,'×','ja-joy'+(restricted?' err':''))); block.setAttribute('aria-pressed',restricted?'true':'false'); ln.appendChild(block);
+      ln.appendChild(btn('alt:remove:'+id+'/'+mid,'Remove'));
+      row.appendChild(ln); });
+    if(!count) row.appendChild(mk('div','ja-line ja-dim','No items yet. Add an alternative, then set its values.'));
   });
   if(V.form&&V.form.kind==='payto'){ const wrap=d.ownerDocument.createElement('div'); wrap.className='ja-detail'; wrap.setAttribute('data-exp7-form','payto');
     const title=d.ownerDocument.createElement('b'); title.textContent='Pays which debt'; wrap.appendChild(title);
@@ -16678,22 +16780,35 @@ function boardDoc(V,d){ /* remove Trip calendar button/text; resources; alts; fo
     const clear=d.ownerDocument.createElement('button'); clear.type='button'; clear.className='ja-joy'; clear.setAttribute('data-jv-act','brd:payclear:'+V.form.item); clear.textContent='Not a debt payment'; wrap.appendChild(clear);
     const cx=d.ownerDocument.createElement('button'); cx.setAttribute('data-jv-act','form:cancel'); cx.textContent='Cancel'; wrap.appendChild(cx);
     d.appendChild(wrap); }
-  else if(V.form&&V.form.kind){ const wrap=d.ownerDocument.createElement('div'); wrap.className='ja-detail'; wrap.setAttribute('data-exp7-form',V.form.kind);
-    const titles={newitem:'New item',resource:'Add resource',alt:'Add alternative',values:'Set values'}; const title=d.ownerDocument.createElement('b'); title.textContent=titles[V.form.kind]||'Form'; wrap.appendChild(title);
-    const money=budgetBoard&&(V.form.kind==='newitem'||V.form.kind==='values');
-    const fields=V.form.kind==='resource'?[['name','Name'],['unit','Unit'],['stock','Stock']]:V.form.kind==='values'?[['date','Date'],['repeat','Repeat'],['amount','Amount']]:(money?[['name','Name'],['date','Date'],['repeat','Repeat'],['amount','Amount']]:[['name','Name'],['uses','Resources used (comma ids)'],['jreq','Requirement (item id)'],['comfort','Comfort'],['fun','Fun'],['cost','Cost'],['hours','Hours']]);
-    fields.forEach(([f,lab])=>{ const row=d.ownerDocument.createElement('div'); row.className='ja-brow';
-      const sp=d.ownerDocument.createElement('span'); sp.textContent=lab+': '; row.appendChild(sp);
-      row.appendChild(mkTf(d.ownerDocument,f,lab));
-      if(V.form.kind==='values'&&f==='amount'){ const n=Number(V.form.amount); const neg=isFinite(n)&&n<0;
-        const eat=d.ownerDocument.createElement('button'); eat.type='button'; eat.className='ja-joy'+(neg?' on':''); eat.setAttribute('aria-pressed',neg?'true':'false'); eat.setAttribute('data-jv-act','form:sign'); eat.textContent=neg?'consuming':'not consuming'; row.appendChild(eat); }
+  else if(V.form&&V.form.kind){ const F=V.form; const wrap=mk('div','ja-detail'); wrap.setAttribute('data-exp7-form',F.kind);
+    const subj=F.kind==='alt'?AW.items[F.parent]:F.kind==='values'?AW.items[F.item]:null;
+    const titles={newitem:'New item',resource:'Add resource',alt:'Add alternative',values:'Set values'};
+    wrap.appendChild(mk('b',null,(titles[F.kind]||'Form')+(subj?' · '+(subj.name||subj.id):'')));
+    /* A new item is a category: its name, what it requires, and the resources it uses. Values belong to the items under it. */
+    const fields=F.kind==='resource'?[['name','Name'],['unit','Unit'],['stock','Stock']]:F.kind==='values'?[['date','Date'],['repeat','Repeat'],['amount','Amount']]:F.kind==='newitem'?[['name','Item category name']]:[['name','Name']];
+    fields.forEach(([f,lab])=>{ const row=mk('div','ja-brow');
+      row.appendChild(mk('span',null,lab+': '));
+      row.appendChild(mkTf(doc,f,lab));
+      if(F.kind==='values'&&f==='amount'){ const n=Number(F.amount); const neg=isFinite(n)&&n<0;
+        const eat=btn('form:sign',neg?'consuming':'not consuming','ja-joy'+(neg?' on':'')); eat.setAttribute('aria-pressed',neg?'true':'false'); row.appendChild(eat); }
       wrap.appendChild(row); });
-    if(V.form.kind!=='resource'&&V.form.kind!=='values'&&!money){ resourcesOf(V.atlasW||W).forEach(it=>{ const bt=d.ownerDocument.createElement('button'); const on=(V.form.usesIds||{})[it.id];
-      bt.setAttribute('data-jv-act','use:'+it.id); bt.className=on?'on':''; bt.textContent=(on?'✓ ':'')+it.name; wrap.appendChild(bt); }); }
-    const ok=d.ownerDocument.createElement('button'); ok.setAttribute('data-jv-act','form:ok'); ok.textContent=V.form.kind==='values'?'Save':'Create'; wrap.appendChild(ok);
-    const cx=d.ownerDocument.createElement('button'); cx.setAttribute('data-jv-act','form:cancel'); cx.textContent='Cancel'; wrap.appendChild(cx);
-    /* Resource name sits with Add resource, not after the item list and not at the top of the screen. */
-    if(V.form.kind==='resource'&&resBox.parentNode) resBox.parentNode.insertBefore(wrap, resBox.nextSibling);
+    if(F.kind==='newitem'){
+      const cur=F.jreq?AW.items[F.jreq]:null;
+      const rq=mk('div','ja-brow'); rq.appendChild(mk('span',null,'Requirement: '));
+      const dd=btn('form:req',(cur?(cur.name||F.jreq):'None')+' '+(F.reqOpen?'▴':'▾')); dd.setAttribute('aria-expanded',F.reqOpen?'true':'false'); rq.appendChild(dd);
+      if(F.reqOpen){ rq.appendChild(btn('form:reqpick:','None','ja-joy'+(cur?'':' on')));
+        boardPickList(AW).forEach(function(P){ rq.appendChild(btn('form:reqpick:'+P.id,P.name,'ja-joy'+(cur&&F.jreq===P.id?' on':''))); }); }
+      wrap.appendChild(rq);
+      const us=mk('div','ja-brow'); us.appendChild(mk('span',null,'Resources used: '));
+      const res=resourcesOf(AW); if(!res.length) us.appendChild(mk('span','ja-dim','none yet'));
+      res.forEach(function(r){ const on=!!(F.usesIds||{})[r.id]; const b=btn('use:'+r.id,(on?'✓ ':'')+r.name,'ja-joy'+(on?' on':'')); b.setAttribute('aria-pressed',on?'true':'false'); us.appendChild(b); });
+      wrap.appendChild(us); }
+    wrap.appendChild(btn('form:ok',F.kind==='values'?'Save':'Create',''));
+    wrap.appendChild(btn('form:cancel','Cancel',''));
+    /* Resource name sits with Add resource. An item's form sits under its category. A new category's form is after the list. */
+    const host=F.kind==='alt'?catEl[F.parent]:F.kind==='values'?catEl[owners['item:'+F.item]||F.item]:null;
+    if(F.kind==='resource'&&resBox.parentNode) resBox.parentNode.insertBefore(wrap, resBox.nextSibling);
+    else if(host&&host.parentNode) host.parentNode.insertBefore(wrap, host.nextSibling);
     else d.appendChild(wrap); }
   V.boardHasTrip=/\bTrip calendar\b/i.test(d.textContent); V.boardRes=resourcesOf(V.atlasW||W).map(x=>x.name); }
 
@@ -16709,7 +16824,11 @@ function hostFormAct(V,a){ const W=activeAtlas(V)||{items:{},components:{}};
     return ent; }
   if(a.startsWith('pick:')){ const id=a.slice(5); if(!V.form) return; V.form.itemId=id; const it=W.items[id]; V.note='picked '+(it&&it.name||id)+' · requires '+((it&&it.jreq)?String(it.jreq).replace(/^item:/,''):'—'); return V.sess&&V.queue(V.sess,'form'); }
   if(a==='form:cancel'){ clearFormFields(V); V.form=null; V.formFocus=null; V.note='form cancelled'; return V.sess&&V.queue(V.sess,'form'); }
-  if(a==='form:ok'){ /* pull live TextField values (keep non-empty form values if field still empty) */ if(V.tf) Object.keys(V.tf).forEach(f=>{ try{ const v=V.tf[f].value; if(v!=null&&String(v).length) V.form[f]=v; }catch(e){} });
+  /* Requirement is a dropdown of the other item categories. */
+  if(a==='form:req'){ if(!V.form) return; V.form.reqOpen=!V.form.reqOpen; return V.sess&&V.queue(V.sess,'form'); }
+  if(a.startsWith('form:reqpick:')){ if(!V.form) return; const rid=a.slice(13); V.form.jreq=rid&&W.items[rid]?rid:''; V.form.reqOpen=false;
+    V.note='requires '+(V.form.jreq?(W.items[V.form.jreq].name||V.form.jreq):'nothing'); return V.sess&&V.queue(V.sess,'form'); }
+  if(a==='form:ok'){ if(!V.form) return; /* pull live TextField values (keep non-empty form values if field still empty) */ if(V.tf) Object.keys(V.tf).forEach(f=>{ if(f.indexOf('ren:')===0) return; try{ const v=V.tf[f].value; if(v!=null&&String(v).length) V.form[f]=v; }catch(e){} });
     const F=V.form||{};     if(F.kind==='resource'){ const id=uniqItemId(F.name||'resource',V); const name=(F.name||'').trim()||('Resource '+id);
       /* Ensure resources membership array exists on live atlas before propose (Budget blank had none). */
       if(W.components&&!W.components.resources){ W.components.resources={id:'resources',name:'Resources',view:{layout:'board',title:'Resources',item:{show:[]},states:{}},items:[],blueprints:[],state:{},sub:[]}; }
@@ -16723,31 +16842,36 @@ function hostFormAct(V,a){ const W=activeAtlas(V)||{items:{},components:{}};
       if(F.repeat!=null&&String(F.repeat).trim()) setv('repeat', String(F.repeat).trim());
       if(F.amount!=null&&String(F.amount).trim()!=='') setv('amount', +F.amount);
       clearFormFields(V); V.form=null; V.note='values saved'; submitViews(ops,'board:values',V); return; }
-    if(F.kind==='newitem'||F.kind==='alt'){ const id=uniqItemId(F.name||'item',V); const name=(F.name||'').trim()||('Item '+id);
-      const uses=Object.keys(F.usesIds||{}).filter(k=>F.usesIds[k]).map(k=>'item:'+k);
-      const vals={}; if(F.comfort!==''&&F.comfort!=null) vals.comfort=+F.comfort; if(F.fun!==''&&F.fun!=null) vals.fun=+F.fun;
-      if(F.cost!==''&&F.cost!=null) vals.cost=+F.cost; if(F.hours!==''&&F.hours!=null) vals.hours=+F.hours; if(uses.length) vals.uses=uses;
-      if(F.date) vals.date=String(F.date).trim(); if(F.repeat) vals.repeat=String(F.repeat).trim(); if(F.amount!==''&&F.amount!=null) vals.amount=+F.amount;
+    if(F.kind==='newitem'){ const id=uniqItemId(F.name||'item',V); const name=(F.name||'').trim()||('Item '+id);
+      const uses=Object.keys(F.usesIds||{}).filter(k=>F.usesIds[k]&&W.items[k]).map(k=>'item:'+k);
+      const vals={}; if(uses.length) vals.uses=uses;
       /* Budget multi-board: stamp finance type from the mounted board id. */
       const _bid=boardCompId(V); const bm=/^board_(expense|income|debt|asset)$/.exec(_bid||''); if(bm&&vals.type==null) vals.type=bm[1];
       if(bm&&vals.flow==null) vals.flow=bm[1]==='income'?'in':'out';
       if(bm&&vals.consume==null) vals.consume=bm[1]==='expense';
-      const jreq=(F.jreq||'').trim(); const jref=jreq?(jreq.indexOf('item:')===0?jreq:'item:'+jreq):null;
+      const jid=String(F.jreq||'').replace(/^item:/,''); const jref=jid&&W.items[jid]?'item:'+jid:null;
       const rec=mkItemRecord(id,name,{values:vals,jreq:jref});
       const ops=[{path:'items/'+id,op:'add',value:rec},{path:'components/'+_bid+'/items',op:'add',value:'item:'+id}];
-      if(F.kind==='alt'&&F.parent){ const p=W.items[F.parent]; if(p){ if(!p.alts) ops.push({path:'items/'+F.parent+'/alts',op:'set',value:{members:['item:'+id],pref:null,unavail:[],method:'best'}});
-          else ops.push({path:'items/'+F.parent+'/alts/members',op:'add',value:'item:'+id}); }
-        V.open=V.open||{}; V.open[F.parent]=true; }
-      clearFormFields(V); V.form=null; V.note=(F.kind==='alt'?'added alternative ':'added item ')+name; submitViews(ops,'board:'+F.kind,V); return; }
+      clearFormFields(V); V.form=null; V.formFocus=null; V.note='added item category '+name; submitViews(ops,'board:newitem',V); return; }
+    /* An alternative is an item under its category. It is not a Board row of its own. */
+    if(F.kind==='alt'){ const p=F.parent&&W.items[F.parent]; if(!p){ V.note='missing item category'; return V.sess&&V.queue(V.sess,'form'); }
+      const id=uniqItemId(F.name||'item',V); const name=(F.name||'').trim()||('Item '+id); const ref='item:'+id;
+      const ops=[{path:'items/'+id,op:'add',value:mkItemRecord(id,name,{})}];
+      if(p.alts&&Array.isArray(p.alts.members)) ops.push({path:'items/'+F.parent+'/alts/members',op:'add',value:ref});
+      else { const A=(p.alts&&typeof p.alts==='object'&&!Array.isArray(p.alts))?p.alts:{};
+        ops.push({path:'items/'+F.parent+'/alts',op:Object.prototype.hasOwnProperty.call(p,'alts')?'set':'add',value:{members:[ref],pref:A.pref||null,unavail:Array.isArray(A.unavail)?A.unavail:[],method:A.method||'best'}}); }
+      V.open=V.open||{}; V.open[F.parent]=true;
+      clearFormFields(V); V.form=null; V.formFocus=null; V.note='added item '+name; submitViews(ops,'board:alt',V); return; }
     if(F.kind==='caladd'||F.kind==='span'){ const CS=calSelOf(V); let days=sortedDays(CS.selected); if(!days.length){ V.note='select days first'; return V.sess&&V.queue(V.sess,'form'); }
       const id=F.itemId; const it=id&&W.items[id]; if(!it){ V.note='pick a Board item first'; return V.sess&&V.queue(V.sess,'form'); }
       if(CS.repeatAllYears){ const exp=expandYears(CS.selected); days=sortedDays(exp); }
       const start=days[0], end=days[days.length-1]; const dur=daysBetween(start,end).length;
       const ref='item:'+id; const ops=[];
       /* place the existing Board item on the selection; requirement stays the item's own jreq */
-      const hasDate=it.values&&it.values.date!=null; ops.push({path:'items/'+id+'/values/date',op:hasDate?'set':'add',value:start});
-      if(F.kind==='span'||dur>1){ const hasD=it.values&&it.values.days!=null; ops.push({path:'items/'+id+'/values/days',op:hasD?'set':'add',value:dur}); }
-      else if(it.values&&it.values.days!=null) ops.push({path:'items/'+id+'/values/days',op:'set',value:1});
+      const tid=dateTargetId(W,id), tit=W.items[tid]||it;
+      const hasDate=tit.values&&tit.values.date!=null; ops.push({path:'items/'+tid+'/values/date',op:hasDate?'set':'add',value:start});
+      if(F.kind==='span'||dur>1){ const hasD=tit.values&&tit.values.days!=null; ops.push({path:'items/'+tid+'/values/days',op:hasD?'set':'add',value:dur}); }
+      else if(tit.values&&tit.values.days!=null) ops.push({path:'items/'+tid+'/values/days',op:'set',value:1});
       const _cid=calCompId(V), _bid=boardCompId(V), _pid=planCompId(V);
       const cal=(W.components[_cid]||{}).items||[]; if(cal.indexOf(ref)<0) ops.push({path:'components/'+_cid+'/items',op:'add',value:ref});
       const brd=(W.components[_bid]||{}).items||[]; if(brd.indexOf(ref)<0) ops.push({path:'components/'+_bid+'/items',op:'add',value:ref});
@@ -16781,7 +16905,7 @@ function hostCalAct(V,a){ V._dragJust=false; V.drag=null; const W=activeAtlas(V)
     V.note=(a==='cal:span'?'span':'add')+' form open — pick a Board item, then Place'; return S&&V.queue(S,'form'); }
   if(a==='cal:remove'){ const days=new Set(sortedDays(CS.selected)); if(!days.size){ V.note='select days first, then Remove'; return S&&V.queue(S,'sel'); }
     const ops=[]; const seen={}; const _cid=calCompId(V), _pid=planCompId(V); const cal=(W.components[_cid]||{}).items||[];
-    cal.forEach(r=>{ const id=r.slice(5), it=W.items[id]; if(!it||seen[r]) return; const v=it.values||{}, start=v.date; if(!start) return;
+    cal.forEach(r=>{ const id=r.slice(5), it=effItem(W,id); if(!it||seen[r]) return; const v=it.values||{}, start=v.date; if(!start) return;
       const dur=Math.max(1, Number(v.days)||1); const cover=daysBetween(start, (()=>{ const ds=daysBetween(start,'2099-12-31'); return ds[Math.min(dur,ds.length)-1]; })()).slice(0,dur);
       if(!cover.some(k=>days.has(k))) return; seen[r]=1;
       ops.push({path:'components/'+_cid+'/items',op:'remove',value:r});
@@ -16831,8 +16955,11 @@ function hostBoardAct(V,a){
   const W=activeAtlas(V)||{items:{},components:{}};
   if(a.startsWith('brd:remove:')){ const id=a.slice(11); const bid=boardCompId(V); const ref='item:'+id;
     const ops=[{path:'components/'+bid+'/items',op:'remove',value:ref}];
-    if(W.meta&&W.meta.budget) ops.push({path:'items/'+id,op:'drop'});
+    if(W.meta&&W.meta.budget){ ops.push({path:'items/'+id,op:'drop'});
+      /* The items under a removed category go with it, unless something else still lists them. */
+      catMembers(W.items[id]).forEach(function(m){ if(m!==ref&&W.items[m.slice(5)]&&!itemInUse(W,m,id)) ops.push({path:'items/'+m.slice(5),op:'drop'}); }); }
     Object.keys(W.items||{}).forEach(function(oid){ const v=(W.items[oid].values||{}); if(String(v.payTo||'').replace(/^item:/,'')===id) ops.push({path:'items/'+oid+'/values/payTo',op:'set',value:''}); });
+    if(V.ren) delete V.ren[id];
     V.note='removed '+id; return submitViews(ops,'board:remove',V); }
   if(a.startsWith('brd:values:')){ const id=a.slice(11); const it=W.items[id]||{}; const v=it.values||{};
     V.form={kind:'values',item:id,date:v.date||'',repeat:v.repeat||'',amount:v.amount==null?'':String(v.amount)}; V.formFocus='amount'; return V.sess&&V.queue(V.sess,'form'); }
@@ -16868,8 +16995,27 @@ function hostBoardAct(V,a){
     const ent=submitViews(r.ops,'board:restrict',V);
     if(!ent||(ent.r&&ent.r.ok===false)){ applyAltOps(it, 'restrict', mid); if(V.sess) V.queue(V.sess,'alt'); }
     return ent; }
-  if(a.startsWith('alt:tog:')){ const id=a.slice(8); V.open=V.open||{}; V.open[id]=!V.open[id]; V.note=(V.open[id]?'opened':'closed')+' alternatives of '+id; return V.sess&&V.queue(V.sess,'alt'); }
-  if(a.startsWith('alt:add:')){ const id=a.slice(8); V.form={kind:'alt',parent:id,name:'',jreq:'',comfort:'',fun:'',cost:'',hours:'',usesIds:{}}; V.formFocus='name'; return V.sess&&V.queue(V.sess,'form'); }
+  /* The list is open until its arrow hides it. */
+  if(a.startsWith('alt:tog:')){ const id=a.slice(8); V.open=V.open||{}; V.open[id]=V.open[id]===false; V.note=(V.open[id]?'opened':'hid')+' items of '+id; return V.sess&&V.queue(V.sess,'alt'); }
+  if(a.startsWith('alt:add:')){ const id=a.slice(8); V.open=V.open||{}; V.open[id]=true; V.form={kind:'alt',parent:id,name:''}; V.formFocus='name'; return V.sess&&V.queue(V.sess,'form'); }
+  if(a.startsWith('alt:remove:')){ const pair=a.slice(11).split('/'); const id=pair[0], mid=pair[1]; const it=W.items[id]; if(!it||!mid||!it.alts) return;
+    const A=it.alts, ref=memberRef(mid), same=function(x){ return memberRef(x)===ref; }; const ops=[];
+    if(Array.isArray(A.members)&&A.members.some(same)) ops.push({path:'items/'+id+'/alts/members',op:'remove',value:A.members.find(same)});
+    if(Array.isArray(A.unavail)&&A.unavail.some(same)) ops.push({path:'items/'+id+'/alts/unavail',op:'remove',value:A.unavail.find(same)});
+    if(A.pref!=null&&same(A.pref)) ops.push({path:'items/'+id+'/alts/pref',op:'ref',value:null});
+    if(it.state&&it.state.userPick!=null&&same(it.state.userPick)) ops.push({path:'items/'+id+'/state/userPick',op:'ref',value:null});
+    if(W.meta&&W.meta.budget&&W.items[mid]&&!itemInUse(W,ref,id)) ops.push({path:'items/'+mid,op:'drop'});
+    if(!ops.length) return;
+    V.open=V.open||{}; V.open[id]=true; V.note='removed item '+((W.items[mid]||{}).name||mid);
+    if(V.form&&V.form.item===mid){ clearFormFields(V); V.form=null; V.formFocus=null; }
+    const ent=submitViews(ops,'board:alt-remove',V);
+    if(!ent||(ent.r&&ent.r.ok===false)){
+      if(Array.isArray(A.members)) A.members=A.members.filter(function(x){ return !same(x); });
+      if(Array.isArray(A.unavail)) A.unavail=A.unavail.filter(function(x){ return !same(x); });
+      if(A.pref!=null&&same(A.pref)) A.pref=null;
+      if(it.state&&it.state.userPick!=null&&same(it.state.userPick)) it.state.userPick=null;
+      if(V.sess) V.queue(V.sess,'alt'); }
+    return ent; }
   if(a.startsWith('use:')){ const id=a.slice(4); V.form=V.form||{}; V.form.usesIds=V.form.usesIds||{}; V.form.usesIds[id]=!V.form.usesIds[id]; return V.sess&&V.queue(V.sess,'form'); }
 }
 
@@ -17851,7 +17997,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.29",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.30",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
