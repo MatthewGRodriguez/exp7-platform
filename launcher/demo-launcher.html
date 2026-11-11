@@ -1,0 +1,60 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">
+<title>Exp7 Demo</title>
+<style>body{font:16px system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 1rem;line-height:1.45;color:#1c2333}button{font:inherit;padding:.4rem .8rem;margin:.2rem}input{font:inherit;width:100%;box-sizing:border-box;padding:.4rem}.na{color:#555}.bad{color:#a00}</style></head>
+<body><main id="gate">
+<h1>Exp7 Demo</h1>
+<label for="tok"><b>GitHub key</b></label>
+<input type="password" id="tok" autocomplete="off" spellcheck="false" placeholder="Paste key, checks start automatically">
+<button type="button" id="reg">Register (create a key)</button>
+<p id="ret" class="na" hidden></p>
+<p id="st" aria-live="polite"></p>
+<p id="off"></p>
+<details><summary>About</summary><p class="na">This launcher opens Exp7 Demo only; other apps cannot be reached from it. Use a fine-grained key for your own <b>personal data repo</b>. A key with wider access (for example one that can create that repo) also works; the platform never writes the software repo. The key stays in this tab's memory and is never stored or reported. The platform is downloaded from the software repo MatthewGRodriguez/exp7-platform (read-only, no key sent), pinned to a commit, checked against its SHA-256, and kept for offline use.</p></details>
+</main><script>
+window.addEventListener("error",function(){var s=document.getElementById("st");if(s&&document.getElementById("gate"))s.textContent="Launcher error — reload the page."});
+(function(){"use strict";
+const APP="exp7",APP_NAME="Exp7 Demo",MIN=[1,8,60];
+const API="https://api.github.com",SRC=Object.freeze({"owner": "MatthewGRodriguez", "repo": "exp7-platform", "ref": "main", "path": "exp7-platform/release.json"}),$=id=>document.getElementById(id);let busy=false,deb=null;
+function idb(){return new Promise((res,rej)=>{const q=indexedDB.open("exp7-launcher",1);q.onupgradeneeded=()=>q.result.createObjectStore("kv");q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+async function kv(op,k,v){const d=await idb();return new Promise((res,rej)=>{const t=d.transaction("kv",op==="get"?"readonly":"readwrite"),s=t.objectStore("kv");let r;const q=op==="get"?s.get(k):s.put(v,k);q.onsuccess=()=>r=q.result;t.oncomplete=()=>{d.close();res(r)};t.onerror=()=>{d.close();rej(t.error)}})}
+async function sha256(t){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t));return Array.from(new Uint8Array(b),x=>x.toString(16).padStart(2,"0")).join("")}
+async function gh(path,opt){opt=opt||{};const h={Accept:opt.raw?"application/vnd.github.raw+json":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"};if(opt.key)h.Authorization="Bearer "+opt.key;let r;try{r=await fetch(API+path,{headers:h,redirect:"error",cache:"no-store",credentials:"omit",referrerPolicy:"no-referrer"})}catch{return{ok:false,status:0}}const t=await r.text();let d=null;try{d=opt.raw?t:JSON.parse(t)}catch{}return{ok:r.ok,status:r.status,data:d}}
+function badManifest(m){return!m||m.format!=="exp7-platform-release/1"||!/^\d+\.\d+\.\d+$/.test(m.version||"")||!/^[0-9a-f]{64}$/.test(m.sha256||"")||!/^[A-Za-z0-9._\/-]{1,200}\.html$/.test(m.file||"")||m.file.includes("..")||!(+m.minLauncherMajor<=1)}
+async function okBytes(t,sha){return typeof t==="string"&&/<!doctype html|<html/i.test(t.slice(0,4096))&&await sha256(t)===sha}
+// public, unauthenticated, commit-pinned release read (the key is never sent here)
+async function fetchRelease(){if(!SRC.owner)return{err:"not-configured"};const base="/repos/"+SRC.owner+"/"+SRC.repo;
+ const c=await gh(base+"/commits/"+encodeURIComponent(SRC.ref));if(!c.ok)return{err:c.status===0?"offline":"release repo unavailable ("+c.status+")",net:c.status===0};const commit=c.data&&c.data.sha;if(!/^[0-9a-f]{40}$/.test(commit||""))return{err:"bad commit"};
+ const mr=await gh(base+"/contents/"+SRC.path+"?ref="+commit,{raw:true});if(!mr.ok)return{err:"release.json not published yet ("+mr.status+")"};let m;try{m=JSON.parse(mr.data)}catch{return{err:"release.json invalid"}}if(badManifest(m))return{err:"release.json invalid"};
+ const cur=await kv("get","current").catch(()=>null);if(cur&&cur.sha256===m.sha256&&await okBytes(await kv("get","pkg:"+m.sha256),m.sha256))return{meta:cur};
+ const fr=await gh(base+"/contents/"+m.file+"?ref="+commit,{raw:true});if(!fr.ok)return{err:"platform file missing ("+fr.status+")"};if(!await okBytes(fr.data,m.sha256))return{err:"platform checksum mismatch — not installed"};
+ const meta={version:m.version,sha256:m.sha256,commit,source:SRC.owner+"/"+SRC.repo,at:new Date().toISOString()};await kv("put","pkg:"+m.sha256,fr.data);if(cur&&cur.sha256!==m.sha256)await kv("put","previous",cur);await kv("put","current",meta);return{meta}}
+async function cached(){for(const w of["current","previous"]){const m=await kv("get",w).catch(()=>null);if(m){const t=await kv("get","pkg:"+m.sha256).catch(()=>null);if(await okBytes(t,m.sha256))return{meta:m,text:t}}}return null}
+function tooOld(v){const p=String(v||"").split(".").map(Number);for(let i=0;i<3;i++){if((p[i]||0)>MIN[i])return false;if((p[i]||0)<MIN[i])return true}return false}
+function refuse(msg){document.open();document.write('<!doctype html><meta charset="utf-8"><title>'+APP_NAME+'</title><body style="font:16px system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 1rem"><h1>'+APP_NAME+'</h1><p id="refused">'+msg+'</p></body>');document.close()}
+// One app only: the platform is told before it starts, must be new enough to honour it, and must confirm it. Otherwise nothing stays open.
+function launch(text,meta,key){if(tooOld(meta.version)){key=null;$("st").className="bad";$("st").textContent="This launcher opens "+APP_NAME+" only. Platform "+meta.version+" cannot be limited to one app (1.8.60 or later can). Nothing was opened.";return}
+ try{window.__exp7LaunchAck=null;window.__exp7Launch=Object.freeze({app:APP,only:true})}catch(e){}
+ const hand=key?{type:"exp7-launcher-handoff",key,release:meta.sha256}:null;key=null;document.open();document.write(text);document.close();
+ if(window.__exp7LaunchAck!==APP){if(hand)hand.key=null;let n=0;const t=setInterval(()=>{if(window.__exp7LaunchAck===APP){clearInterval(t);return}if(++n>=30){clearInterval(t);refuse("The platform did not confirm that it is limited to "+APP_NAME+", so it was closed. Reload this page to try again.")}},100);return}
+ if(hand){window.postMessage(hand,location.origin==="null"||location.protocol==="file:"?"*":location.origin);hand.key=null}}
+async function validate(){if(busy)return;const k=$("tok").value.trim();if(!k)return;if(!/^\S{20,}$/.test(k)){$("st").textContent="That doesn't look like a complete key yet.";return}busy=true;$("tok").value="";$("st").textContent="Checking key (read-only)…";
+ try{const u=await gh("/user",{key:k});if(!u.ok){$("st").textContent=u.status===401?"Key not accepted. Paste again.":u.status===0?"Could not reach GitHub.":"Key check failed ("+u.status+").";return showOffline()}
+ // A key that can also write the software repo is allowed (one that can create the data repo usually can). The platform is read
+ // from the software repo without the key, pinned to a commit and checked against release.json's SHA-256, so the key never writes it.
+ let wide="";if(SRC.owner){const s=await gh("/repos/"+SRC.owner+"/"+SRC.repo,{key:k});if(s.ok&&s.data&&s.data.permissions&&(s.data.permissions.push||s.data.permissions.admin))wide=" (this key can also write the software repo; Exp7 never uses it there)"}
+ clearPend();$("ret").hidden=true;$("st").textContent="Signed in as "+u.data.login+wide+". Getting the platform…";const r=await fetchRelease();
+ if(r.err){const c=await cached();if(c&&r.net)return launch(c.text,c.meta,k);$("st").className="bad";$("st").textContent=r.err==="not-configured"?"Software host not configured in this build.":"Platform unavailable: "+r.err+(c?" (a cached version is available below)":"");return showOffline()}
+ const text=await kv("get","pkg:"+r.meta.sha256);if(!await okBytes(text,r.meta.sha256)){$("st").textContent="Cached platform failed its checksum.";return}launch(text,r.meta,k)}
+ finally{busy=false}}
+async function showOffline(){const c=await cached();$("off").textContent="";if(!c)return;const b=document.createElement("button");b.textContent="Open last working platform "+c.meta.version+" offline (no key)";b.onclick=()=>launch(c.text,c.meta,null);$("off").append(b)}
+function sched(ms){clearTimeout(deb);deb=setTimeout(validate,ms)}
+$("tok").addEventListener("input",()=>sched(900));$("tok").addEventListener("paste",()=>sched(150));$("tok").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sched(0)}});
+// Register = original Atlas sync setup: same-tab navigation to GitHub's prefilled fine-grained key page; Back returns here to paste.
+const PAT="https://github.com/settings/personal-access-tokens/new?name=Exp7%20data&description=Exp7%20personal%20data%20repo&expires_in=30&contents=write&administration=write",PEND="exp7LauncherSignInPending";
+function register(){try{sessionStorage.setItem(PEND,JSON.stringify({at:Date.now(),kind:"token"}))}catch{}$("st").className="";$("st").textContent="Opening GitHub's key page in this tab… Create the key, then press Back and paste it here.";try{location.assign(PAT)}catch(e){$("st").className="bad";$("st").textContent="Could not open GitHub ("+(e&&e.name||"error")+"). Open github.com → Settings → Developer settings → Fine-grained tokens."}}
+function returned(){let p=null;try{p=JSON.parse(sessionStorage.getItem(PEND)||"null")}catch{}if(!p)return;$("ret").hidden=false;$("ret").textContent="Back from GitHub: paste the key you created into the box above.";$("tok").focus()}
+function clearPend(){try{sessionStorage.removeItem(PEND)}catch{}}
+$("reg").addEventListener("click",register);addEventListener("pageshow",e=>{if(e.persisted)returned()});
+if(!SRC.owner)$("st").textContent="Software host not configured in this build.";returned();showOffline();
+})();
+</script></body></html>

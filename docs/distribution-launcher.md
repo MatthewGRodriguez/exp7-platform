@@ -22,6 +22,21 @@ Release format: `exp7-platform-release/1` with `version`, `file`, `sha256`, `min
 - **Key handoff:** in-memory same-window `postMessage`; platform accepts once, only if `e.source === window`, within ~15 s.  
 - **Allow** a key that can also write the software repo, with a note in the status line (since launcher change 2026-11-10; it used to refuse one). A key that can create the data repo usually has that access. The launcher reads the platform without the key, pinned to a commit and checked against `release.json`, so the key is never used on the software repo.
 
+## Launcher variants (branch `budget-direction`, 1.8.60; not merged) [REQ 2026-11-11]
+
+| File | Opens | Other apps reachable |
+|---|---|---|
+| `launcher/exp7-launcher.html` | Last app, with the app picker and Back to it | Yes. Unchanged. |
+| `launcher/budget-launcher.html` | Budget | No |
+| `launcher/demo-launcher.html` | Demo | No |
+
+- The dedicated launchers are generated from the universal launcher and differ only in the title, an About line, and the launch step.
+- A dedicated launcher sets `window.__exp7Launch = {app, only: true}` before it writes the platform. It refuses a platform older than 1.8.60, which could not honour the limit, and closes the page if the platform does not acknowledge it (`window.__exp7LaunchAck`).
+- The platform applies the limit where apps mount, so it holds for navigation routes and not only for visible buttons: the picker, the saved last app, app routes and direct mounts are refused and recorded as `app_boundary`.
+- Back still works inside the app (Budget: day, month, Home) and stops there.
+- Checked with the real launcher files and platform in a cloud browser; the release read from GitHub was a test double **[MOCK]**. Fetching the real release, and Safari, are **[OPEN]**.
+- These are two new files outside the two-file release rule. See [budget-direction.md](./budget-direction.md).
+
 ## Register flow (historical fix on Grok Bot box) [MOCK / OPEN]
 
 Handoff reports the 7 055 B launcher had an invalid nested Register control (`button` inside `a`, no handler). A fix restored Atlas-sync-style **same-tab** navigation to GitHub fine-grained PAT creation, with a non-secret pending flag in sessionStorage and focus return on Back.
