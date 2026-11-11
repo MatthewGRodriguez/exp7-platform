@@ -10513,12 +10513,14 @@ function budgetRiskHT(w){ return Object.assign({ hc:500, hm:1500, big:200 }, (w&
 function budgetDayRisk(w,HT){ const E=window.JAtlasEval, ids=(w.meta&&w.meta.boardIds)||{}, out={};
   const list=t=>{ const c=w.components&&w.components[ids[t]||('board_'+t)]; return (c&&c.items)||[]; }, rec=r=>effItem(w,String(r).replace(/^item:/,''));
   const onBoard={}; ['expense','income','debt','asset'].forEach(t=>list(t).forEach(r=>{ onBoard[r]=1; }));
-  const plan=(w.components[(w.meta&&w.meta.planId)||'reqs']||{}).items||[], planOnly=plan.filter(r=>!onBoard[r]);
+  /* a blocked plan step (values.planBlocked: its requirements can never be met) moves no money */
+  const blocked=r=>!!(((w.items[String(r).replace(/^item:/,'')]||{}).values||{}).planBlocked);
+  const plan=((w.components[(w.meta&&w.meta.planId)||'reqs']||{}).items||[]).filter(r=>!blocked(r)), planOnly=plan.filter(r=>!onBoard[r]);
   /* opening cash, as the workbook's Cash-after start: checking minus credit-card balances (paid in full monthly) */
   let chk=0, card=0; list('asset').forEach(r=>{ const it=rec(r); if(it&&/checking/i.test(it.name||'')) chk+=+((it.values||{}).amount)||0; });
   list('debt').forEach(r=>{ const it=rec(r), v=(it&&it.values)||{}; if(/credit card/i.test((it&&it.name||'')+' '+(v.creditor||'')+' '+(v.purpose||''))) card+=+v.amount||0; });
   const first=budgetTodayKey().slice(0,7), cal=w.components[(w.meta&&w.meta.calId)||'budget']||{}, cm=(cal.view&&cal.view.month)||first;
-  const lastM=budgetShiftMonth(cm>first?cm:first,1), months=[]; for(let m=first;m<=lastM&&months.length<40;m=budgetShiftMonth(m,1)) months.push(m);
+  const lastM=budgetShiftMonth(cm>first?cm:first,2), months=[]; for(let m=first;m<=lastM&&months.length<40;m=budgetShiftMonth(m,1)) months.push(m);
   let prev=chk-card; const flat=[];
   months.forEach(m=>{ const F=budgetFigures(w,m), days=E.monthDays(m), inc={}, fix={}; let fixSum=0, extraIn=0, extraOut=0;
     const put=(d,q)=>{ (fix[d]=fix[d]||[]).push(q); fixSum+=q.amt; };
