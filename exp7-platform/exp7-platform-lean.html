@@ -104,7 +104,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.57. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.58. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -10624,7 +10624,7 @@ function planRisk(w){
     'Step CRITICAL also if broken/conflict jreq or every alt BAD; MODERATE if weakest pick or slack<1 day',
     'Calendar day risk and Plan step risk share this map; both update live on plan/calendar edits']}; }
 /* 1.8.53: Budget day risk = the workbook's cash-criticality calendar (ranking_ui rdCalStrip), from the atlas's own money. */
-function budgetRiskHT(w){ return Object.assign({ hc:500, hm:1500, big:200 }, (w&&w.meta&&w.meta.riskHT)||{}); }
+function budgetRiskHT(w){ return Object.assign({ hc:500, hm:1500, big:200, delay:3 }, (w&&w.meta&&w.meta.riskHT)||{}); }
 function budgetDayRisk(w,HT){ const E=window.JAtlasEval, ids=(w.meta&&w.meta.boardIds)||{}, out={};
   const list=t=>{ const c=w.components&&w.components[ids[t]||('board_'+t)]; return (c&&c.items)||[]; }, rec=r=>effItem(w,String(r).replace(/^item:/,''));
   const onBoard={}; ['expense','income','debt','asset'].forEach(t=>list(t).forEach(r=>{ onBoard[r]=1; }));
@@ -10642,17 +10642,18 @@ function budgetDayRisk(w,HT){ const E=window.JAtlasEval, ids=(w.meta&&w.meta.boa
     list('income').forEach(r=>{ const ch=E.charges(rec(r)||{},m); Object.keys(ch).forEach(d=>{ inc[d]=(inc[d]||0)+(+ch[d]||0); }); });
     /* fixed on its day: a one-off of $200+ or the rent; other recurring bills are spread like the workbook does */
     const pinned=it=>{ const v=(it&&it.values)||{}, rp=String(v.repeat||'once'); return rp==='once'||rp==='dates'||/housing|rent/i.test(String(v.category||'')+' '+String(it&&it.name||'')); };
-    list('expense').forEach(r=>{ const it=rec(r), ch=E.charges(it||{},m); Object.keys(ch).forEach(d=>{ const a=+ch[d]||0; if(Math.abs(a)>=HT.big&&pinned(it)) put(d,{amt:a,lab:(it.name||r)+' '+budgetMoney(a),fixed:true}); }); });
+    list('expense').forEach(r=>{ const it=rec(r), ch=E.charges(it||{},m); Object.keys(ch).forEach(d=>{ const a=+ch[d]||0; if(a&&((Math.abs(a)>=HT.big&&pinned(it))||((it.values||{}).charge==='per'))) put(d,{amt:a,lab:(it.name||r)+' '+budgetMoney(a),fixed:true}); }); });
     planOnly.forEach(r=>{ const it=rec(r); if(!it) return; const v=it.values||{}, ch=E.charges(it,m), sg=(v.flow==='in'||v.type==='income')?1:-1;
       Object.keys(ch).forEach(d=>{ const a=sg*Math.abs(+ch[d]||0); if(!a) return; if(a>0){ inc[d]=(inc[d]||0)+a; extraIn+=a; } else if(-a>=HT.big&&pinned(it)){ put(d,{amt:a,lab:(it.name||r)+' '+budgetMoney(a),fixed:true}); extraOut-=a; } else extraOut-=a; }); });
     /* a plan step that starts this month: the category hands off to its selected item on that day */
     plan.forEach(r=>{ const it=rec(r), v=(it&&it.values)||{}, d=v.then&&!v.then.delta&&v.then.date; if(d&&String(d).slice(0,7)===m) put(String(d).slice(0,10),{amt:0,lab:(it.name||r)+' → '+(v.thenName||'plan')+' starts',fixed:true}); });
     /* everything else spread evenly: board spending (living + debt payments) and small plan-only spending, less the fixed events */
     const daily=(F.living+F.debtPay+extraOut+fixSum)/days.length; let b=prev;
-    days.forEach(d=>{ const pi=inc[d]||0; b+=pi-daily; (fix[d]||[]).forEach(q=>{ b+=q.amt; }); flat.push({k:d,b,evs:fix[d]||[],pay:pi>0}); });
+    days.forEach(d=>{ const pi=inc[d]||0; b+=pi-daily; (fix[d]||[]).forEach(q=>{ b+=q.amt; }); flat.push({k:d,b,evs:fix[d]||[],pay:pi>0,inc:pi}); });
     prev=b; });
   for(let i=flat.length-1, run=Infinity; i>=0; i--){ const D=flat[i], nx=flat[i+1]; if(!nx||nx.pay) run=Infinity; run=Math.min(run,D.b); D.hr=run;
     let j=i+1; while(flat[j]&&!flat[j].pay) j++; D.nextPay=flat[j]?flat[j].k:'—'; }
+  if(window.BudgetFlows&&window.BudgetFlows.resilience) return window.BudgetFlows.resilience(w,HT,flat);
   flat.forEach((D,i)=>{ const near=[]; for(let t=Math.max(0,i-3); t<=Math.min(flat.length-1,i+3); t++) flat[t].evs.forEach(q=>{ near.push(q.lab+' '+flat[t].k.slice(5)); });
     const today=D.evs.filter(q=>Math.abs(q.amt)>=HT.big||q.amt===0).length;
     const c=(D.hr<HT.hc||today)?'C':(D.hr<HT.hm||near.length)?'M':'L';
@@ -11418,7 +11419,7 @@ function calVM(V,A,c,O){ const X=VMx(), M=window.JAtlasModel, E=window.JAtlasEva
     const ms=[]; for(let m=1;m<=12;m++){ const mo=y+'-'+(m<10?'0':'')+m; ms.push(X.btn('m'+m,BUDGET_MONTHS[m-1].slice(0,3)+' '+y,'cal:goto:'+mo,{minW:104,on:mo===cur})); }
     kids.push(X.row('months',ms,{gap:8})); V.calSelCount=sortedDays(CS.selected).length; V.vmInfo.detail=false; return card(kids); }
   if(Nav.level==='day'&&Nav.day){ const day=Nav.day, its=itemsOnDay(AW,day,V), rk=R.days[day];
-    kids.push(X.row('bar',[X.btn('back','← Back to month','cal:back'),X.text('t','Day '+day+(rk?' · '+rk.c+' '+RISK_COL[rk.c][1]:''),'h')]));
+    kids.push(X.row('bar',[X.btn('back','← Back to month','cal:back'),X.text('t','Day '+day+(rk?' · '+((AW.meta&&AW.meta.budget&&window.BudgetFlows&&window.BudgetFlows.resLabel)?window.BudgetFlows.resLabel(rk.c):rk.c+' '+RISK_COL[rk.c][1]):''),'h')]));
     if(AW.meta&&AW.meta.budget&&window.BudgetFlows) kids.push(X.col('detail',window.BudgetFlows.dayVM(V,AW,day),{role:'detail',slab:'inner',enter:true,bar:rk?RISK_COL[rk.c][0]:null,gap:8}));
     else kids.push(X.col('detail',its.length?its.map((it,i)=>X.text('it'+i,it.name+(it.days>1?' · '+it.days+'d from '+it.start:'')+(it.jreq?' · requires '+String(it.jreq).replace(/^item:/,''):''))):[X.text('empty','No steps on this day.','muted')],{role:'detail',slab:'inner',enter:true,bar:rk?RISK_COL[rk.c][0]:null}));
     V.calSelCount=1; V.vmInfo.detail=true; return card(kids); }
@@ -11447,10 +11448,11 @@ function calVM(V,A,c,O){ const X=VMx(), M=window.JAtlasModel, E=window.JAtlasEva
       return {at:tm, text:(tm?tm.replace(/^0(\d)/,'$1')+' ':'')+it.name, chip:true, tone:v.type==='routine'?'routine':(v.flow==='in'||v.type==='income')?'in':(v.payTo||v.type==='debt')?'debt':'out'}; })
       .filter(Boolean).sort((p,q)=>p.at<q.at?-1:p.at>q.at?1:0).forEach(L=>lines.push(L));
     V.vmInfo.days++; if(by[d]&&by[d].length) V.vmInfo.dayItems[d]=(by[d]||[]).map(r=>(M.get(A,r)||{}).name||r);
-    cells.push({t:'day',k:d,day:d,num:+d.slice(8),lines,count:(by[d]||[]).length,risk:rk?rk.c:null,badge:rk?rk.c:null,badgeInk:rk?RISK_TEXT[rk.c]:null,sel,drag,anchor:CS.anchor===d,span:!!spanCover[d],today:d===today,
-      state:name,anim:st&&st.anim||null,title:rk?d+' · '+RISK_COL[rk.c][1]+' · '+rk.why:d,styleName:ds[d]||null}); });
+    cells.push({t:'day',k:d,day:d,num:+d.slice(8),lines,count:(by[d]||[]).length,risk:rk?rk.c:null,badge:rk?((A.meta&&A.meta.budget&&window.BudgetFlows&&window.BudgetFlows.resLetter)?window.BudgetFlows.resLetter(rk.c):rk.c):null,badgeInk:rk?RISK_TEXT[rk.c]:null,sel,drag,anchor:CS.anchor===d,span:!!spanCover[d],today:d===today,
+      state:name,anim:st&&st.anim||null,title:rk?d+' · '+((A.meta&&A.meta.budget&&window.BudgetFlows&&window.BudgetFlows.resLabel)?window.BudgetFlows.resLabel(rk.c):RISK_COL[rk.c][1])+' · '+rk.why:d,styleName:ds[d]||null}); });
   kids.push({t:'grid',k:'grid',cols:7,gap:5,cellH:80,kids:cells});
-  if(o.legend) kids.push(X.row('legend',R.legend.map(L=>X.text(L.k,L.k+' '+L.label,'small',{color:RISK_TEXT[L.k],bold:true})),{gap:14}));
+  if(o.legend&&A.meta&&A.meta.budget&&window.BudgetFlows&&window.BudgetFlows.resLabel){ kids.push(X.row('legend',['L','M','C'].map(k=>X.text(k,window.BudgetFlows.resLetter(k)+'  '+window.BudgetFlows.resLabel(k),'small',{color:RISK_TEXT[k],bold:true})),{gap:14})); kids.push(X.text('legendnote',window.BudgetFlows.RES_NOTE,'muted')); }
+  else if(o.legend) kids.push(X.row('legend',R.legend.map(L=>X.text(L.k,L.k+' '+L.label,'small',{color:RISK_TEXT[L.k],bold:true})),{gap:14}));
   V.calSelCount=n; V.calHasSwitch=false; V.calTabs=[]; V.hasOldModeText=false; V.hasCalHelp=false;
   if(V._restoreScroll!=null){ const sy=V._restoreScroll; V._restoreScroll=null; setTimeout(()=>{ try{ if(V.view&&V.view.s){ V.view.s.scroll(JRViews.GID,0,sy); V.view.r&&V.view.r.draw(); } }catch(e){} },0); }
   return card(kids); }
@@ -11592,7 +11594,8 @@ function planVM(V,A,c,O){ const X=VMx(), o=O.plan, AW=activeAtlas(V)||A, D=depsR
   const cellOf=(R,live,k,i)=>k==='risk'?null:k==='seq'?R.seq:k==='step'?R.step:k==='when'?R.when:k==='req'?R.req:k==='sel'?live[0]:k==='joy'?live[1]:k==='nb'?R.nb:k==='btn'?R.btn:k[0]==='x'?R.extra[+k.slice(1)]:'';
   const rows=D.rows.map((R,i)=>{ if(R.broken) return {k:'b:'+R.id,cells:[{text:'broken reference '+R.id,color:'#a40000'}]};
     const rid=R.id, rk=RR.steps[rid]; if(rk) V.riskSteps[rid]=rk.c; const live=planCells(A,rid,V.pins), rec={id:rid,sel:live[0],joy:live[1],changed:[]};
-    let cells=cols.map(cl=>cl.k==='risk'?{text:rk?rk.c:'L',color:rk?RISK_TEXT[rk.c]:RISK_TEXT.L,bold:true}:{text:cellOf(R,live,cl.k)});
+    const rl=(AW.meta&&AW.meta.budget&&window.BudgetFlows&&window.BudgetFlows.resLetter)?window.BudgetFlows.resLetter:(x=>x);
+    let cells=cols.map(cl=>cl.k==='risk'?{text:rl(rk?rk.c:'L'),color:rk?RISK_TEXT[rk.c]:RISK_TEXT.L,bold:true}:{text:cellOf(R,live,cl.k)});
     if(W2&&si>=0&&i>=si){ const R2=D2.rows.find(x=>x.id===rid)||R, wc=planCells(W2,rid,null,rid===V.wi.step);
       cells=cells.map((cell,ci)=>{ const k=cols[ci].k; if(k==='risk') return cell; const nt=cellOf(R2,wc,k); if(nt!=null&&String(nt)!==String(cell.text)){ rec.changed.push(cols[ci].label||k); return {text:'* '+nt+' (was: '+cell.text+')',color:'#75510f'}; } return cell; });
       rec.wsel=wc[0]; rec.wjoy=wc[1]; rec.whatif=true; }
@@ -11911,6 +11914,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   var OUTCOME = { done: 'happened as planned', changed: 'cost was different', skipped: 'did not happen' };
   /* the full Calendar's day view: every entry of the day with its time and that day's amount, and the two things one does to it */
   function dayVM(V, w, day) { var X = VM(), its = itemsOnDay(w, day, V), F = V.form, kids = [];
+    if (typeof resilienceVM === 'function') resilienceVM(V, w, day).forEach(function (k) { kids.push(k); });
     var rows = its.map(function (it) { return entryOn(w, it.id, day); }).sort(function (a, b) { var x = fmtTime(a.values, a.ex), y = fmtTime(b.values, b.ex); x = x === 'All day' ? '' : x; y = y === 'All day' ? '' : y; return x < y ? -1 : x > y ? 1 : 0; });
     /* an occurrence recorded as not happening stays listed for the day it was planned on */
     Object.keys(w.items || {}).forEach(function (id) { if (rows.some(function (r) { return r.id === id; })) return; var cal = ((w.components[(w.meta && w.meta.calId) || 'budget'] || {}).items) || []; if (cal.indexOf('item:' + id) < 0) return;
@@ -12201,6 +12205,63 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   /* Home's inline choice of an alternative starts a proposal; it does not change the plan */
   function chooseFromHome(w, cat, ref) { var p = ensureProp(w, cat, ref, 'chosen', true); if (p) OPEN_PROP = p.id; return !!p; }
 
+/* ---- D. Day resilience: colours worked out from the plan, with the reason ----
+   Three set disruptions are tried on every day, automatically (there is nothing to configure or run):
+     1. an unexpected cost on that day (meta.riskHT.hc, default $500; a larger one, hm, default $1,500, tells green from yellow);
+     2. the next pay arriving late (meta.riskHT.delay days, default 3);
+     3. an item in use that day being unavailable, when something depends on it (another step requires it, or it is a requirement of the choice in use).
+   Room to recover is only what the plan already holds: cash before the next pay, and alternatives that are viable that day
+   (available, not blocked, already started, and affordable from that cash). An alternative that fails any of these is not counted.
+   Green: every disruption is absorbed. Yellow: one bites, and there is room to recover. Red: one bites and there is not.
+   This is a test of three stated disruptions against the entered plan. It is not a forecast and not a guarantee. */
+  var RES_LETTER = { C: 'R', M: 'Y', L: 'G' }, RES_LABEL = { C: 'Red: little or no flexibility', M: 'Yellow: room to recover', L: 'Green: holds up' };
+  function resLetter(c) { return RES_LETTER[c] || c; }
+  function resLabel(c) { return RES_LABEL[c] || c; }
+  var RES_NOTE = 'Each day is tested against an unexpected cost, late pay and an unavailable item. This is not a guarantee.';
+  function inUseOn(w, cid, day) { var H = handoffOf(w, cid); if (H) return String(day) < String(H.date) ? H.prev : H.sel; var r = selectedRef(w, cid); return r ? bare(r) : null; }
+  function occAmt(it) { var a = +((it && it.values) || {}).amount; return isFinite(a) ? Math.abs(a) : 0; }
+  /* other choices of a category that could really be used on this day */
+  function viableOn(w, cid, day, room) { var c = w.items[cid]; if (!c || !c.alts) return []; var un = [].concat(c.alts.unavail || []).map(memberRef), use = inUseOn(w, cid, day), base = occAmt(w.items[use]), out = [];
+    catMembers(c).forEach(function (m) { var id = bare(m), a = w.items[id]; if (!a || id === use || un.indexOf(m) >= 0) return; var v = a.values || {}; if (v.planBlocked) return; if (v.date && String(v.date) > String(day)) return;
+      var extra = occAmt(a) - base; if (extra > Math.max(0, room)) return; out.push({ id: id, name: a.name, extra: extra }); });
+    return out.sort(function (x, y) { return x.extra - y.extra; }); }
+  function resilience(w, HT, flat) { var E = EVL(), out = {}, cost = +HT.hc > 0 ? +HT.hc : 500, large = Math.max(cost, +HT.hm > 0 ? +HT.hm : 1500), delay = Math.max(1, Math.floor(+HT.delay || 3));
+    var cal = ((w.components[(w.meta && w.meta.calId) || 'budget'] || {}).items) || [], by = {}, months = {}; flat.forEach(function (D) { months[D.k.slice(0, 7)] = 1; });
+    cal.forEach(function (r) { var id = bare(r), raw = w.items[id], it = effItem(w, id); if (!raw || !it || !(it.values || {}).date || (raw.values || {}).planBlocked) return;
+      Object.keys(months).forEach(function (m) { var ch = E.charges(it, m); E.occurrences(it, m).forEach(function (d) { (by[d] = by[d] || []).push({ id: id, amt: ch[d] == null ? 0 : Math.abs(+ch[d]) }); }); }); });
+    var need = {}; Object.keys(w.items).forEach(function (id) { var it = w.items[id]; if (!it || !it.jreq || (it.values || {}).planBlocked) return; var j = bare(it.jreq); if (w.items[j]) (need[j] = need[j] || []).push(it.name); });
+    /* money that alternatives already in the plan would free between two days */
+    function savings(i, j) { var s = 0; for (var t = i; t < j && t < flat.length; t++) (by[flat[t].k] || []).forEach(function (e) { if (!(w.items[e.id] || {}).alts) return; var V = viableOn(w, e.id, flat[t].k, Infinity); if (V.length && V[0].extra < 0) s += -V[0].extra; }); return s; }
+    flat.forEach(function (D, i) { var lvl = 0, R = [], j = i; while (j < flat.length && !(flat[j].pay && j > i)) j++; var nextPay = j < flat.length ? flat[j].k : null, hr = D.hr, room = savings(i, j), M = BR.money;
+      var until = nextPay ? 'before the next pay (' + nextPay + ')' : 'in the months checked';
+      if (hr >= large) R.push('An unexpected cost of ' + M(large) + ' fits: the lowest balance ' + until + ' is ' + M(hr) + '.');
+      else if (hr >= cost) { lvl = Math.max(lvl, 1); R.push('An unexpected cost of ' + M(cost) + ' fits, one of ' + M(large) + ' would not: the lowest balance ' + until + ' is ' + M(hr) + '.'); }
+      else if (hr + room >= cost) { lvl = Math.max(lvl, 1); R.push('An unexpected cost of ' + M(cost) + ' would leave cash ' + M(cost - hr) + ' short ' + until + '. Cheaper alternatives already in the plan free ' + M(room) + '.'); }
+      else { lvl = 2; R.push('An unexpected cost of ' + M(cost) + ' would leave cash ' + M(cost - hr) + ' short ' + until + (room > 0 ? '. Cheaper alternatives free only ' + M(room) + '.' : ', and no alternative frees money before then.')); }
+      /* the pay due on or after this day arrives late */
+      var p = i; while (p < flat.length && !flat[p].pay) p++;
+      if (p < flat.length) { var low = Infinity; for (var t = p; t < Math.min(flat.length, p + delay); t++) low = Math.min(low, flat[t].b - flat[p].inc); var room2 = savings(i, Math.min(flat.length, p + delay));
+        if (low < 0 && low + room2 >= 0) { lvl = Math.max(lvl, 1); R.push('If the pay due ' + flat[p].k + ' came ' + delay + ' days late, cash would be ' + M(-low) + ' short. Cheaper alternatives already in the plan free ' + M(room2) + '.'); }
+        else if (low < 0) { lvl = 2; R.push('If the pay due ' + flat[p].k + ' came ' + delay + ' days late, cash would be ' + M(-low) + ' short' + (room2 > 0 ? '. Cheaper alternatives free only ' + M(room2) + '.' : ', and no alternative frees money.')); }
+        else R.push('The pay due ' + flat[p].k + ' can come ' + delay + ' days late: cash stays at ' + M(low) + ' or more.'); }
+      else R.push('No pay is scheduled from this day on in the months checked.');
+      /* an item in use today that something depends on */
+      (by[D.k] || []).forEach(function (e) { var raw = w.items[e.id], v = raw.values || {}, deps = need[e.id] || [], isReq = v.forAlt && reqActivity(w, raw).active, pos = Math.max(0, hr);
+        if (raw.alts) { var use = w.items[inUseOn(w, e.id, D.k)] || {}, rq = reqsOf(w, use.id || '').length; if (!deps.length && !rq) return; var V = viableOn(w, e.id, D.k, pos);
+          if (V.length) { lvl = Math.max(lvl, 1); R.push('If ' + use.name + ' were unavailable, ' + raw.name + ' can use ' + V[0].name + (V[0].extra > 0 ? ' for ' + M(V[0].extra) + ' more' : '') + '.'); }
+          else if (deps.length) { lvl = 2; R.push(raw.name + ' is needed by ' + deps.join(', ') + ' and has no alternative that can be used this day.'); }
+          return; }
+        if (isReq) { var x = w.items[bare(v.forAlt)] || {}, cid = ownerOf(w, bare(v.forAlt)), V2 = cid ? viableOn(w, cid, D.k, pos) : [];
+          if (V2.length) { lvl = Math.max(lvl, 1); R.push('If ' + raw.name + ' were unavailable, ' + x.name + ' could not be used; ' + w.items[cid].name + ' can use ' + V2[0].name + (V2[0].extra > 0 ? ' for ' + M(V2[0].extra) + ' more' : '') + '.'); }
+          else { lvl = 2; R.push(raw.name + ' is required by ' + x.name + ', which has no alternative that can be used this day.'); }
+          return; }
+        if (deps.length) { lvl = 2; R.push(raw.name + ' is needed by ' + deps.join(', ') + ' and has no alternative.'); } });
+      var c = ['L', 'M', 'C'][lvl]; out[D.k] = { c: c, hr: hr, b: D.b, reasons: R, why: R.join(' ') }; });
+    return out; }
+  /* the day view says why the day has its colour */
+  function resilienceVM(V, w, day) { var X = VM(), rk = (riskOf(w).days || {})[day]; if (!rk || !rk.reasons) return [];
+    var out = [X.text('res:h', resLabel(rk.c), 'body', { bold: true, color: (root.RISK_TEXT || {})[rk.c] })]; rk.reasons.forEach(function (t, i) { out.push(X.text('res:' + i, t, 'small')); }); out.push(X.text('res:n', RES_NOTE, 'muted')); return out; }
+
   var ROUTES = [];
   function route(prefix, fn) { ROUTES.push([prefix, fn]); }
   if (typeof finAct === 'function') route('fin:', finAct);
@@ -12213,7 +12274,8 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   var api = { handles: handles, act: act, submitForm: submitForm, finFormVM: finFormVM, rowExtras: rowExtras, isCashAsset: isCashAsset, calRepeatVM: calRepeatVM, calRepeatPick: calRepeatPick, repeatValues: repeatValues, firstMonthday: firstMonthday, startLinks: startLinks, dayVM: dayVM, compareVM: compareVM, entryOn: entryOn, occOps: occOps, applyOpsTo: applyOpsTo,
     eff: typeof eff === 'function' ? eff : null, effHas: typeof effHas === 'function' ? effHas : null, planList: typeof planList === 'function' ? planList : null, planInfo: typeof planInfo === 'function' ? planInfo : null, selLabel: typeof selLabel === 'function' ? selLabel : null,
     altPanelVM: typeof altPanelVM === 'function' ? altPanelVM : null, planAltsVM: typeof planAltsVM === 'function' ? planAltsVM : null, planTopVM: typeof planTopVM === 'function' ? planTopVM : null, chooseFromHome: typeof chooseFromHome === 'function' ? chooseFromHome : null,
-    proposals: typeof props === 'function' ? props : null, unresolved: typeof unresolved === 'function' ? unresolved : null, reqsOf: typeof reqsOf === 'function' ? reqsOf : null, afterAtlas: typeof afterAtlas === 'function' ? afterAtlas : null, handoffOf: typeof handoffOf === 'function' ? handoffOf : null };
+    proposals: typeof props === 'function' ? props : null, unresolved: typeof unresolved === 'function' ? unresolved : null, reqsOf: typeof reqsOf === 'function' ? reqsOf : null, afterAtlas: typeof afterAtlas === 'function' ? afterAtlas : null, handoffOf: typeof handoffOf === 'function' ? handoffOf : null,
+    resilience: typeof resilience === 'function' ? resilience : null, resLabel: typeof resLabel === 'function' ? resLabel : null, resLetter: typeof resLetter === 'function' ? resLetter : null, RES_NOTE: typeof RES_NOTE === 'string' ? RES_NOTE : '' };
   root.BudgetFlows = api;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -13479,7 +13541,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.57",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.58",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
