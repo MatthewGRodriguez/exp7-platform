@@ -104,7 +104,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.51. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.52. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -9602,11 +9602,27 @@ window.x7 = window.x7 || function (t) {
       textItem(n, ix, y + pad + 11, FS - 1, c.today ? T.accent : T.ink, num, 0, true);
       if (c.badge) { var bs = FS - 3, bw2 = tw(c.badge, bs, true); textItem(n, x + w - pad - bw2 - 2, y + pad + 10, bs, c.badgeInk ? hex(c.badgeInk) : T.muted, c.badge, 0, true); }
       if (c.sel) { var ms = FS - 2; textItem(n, x + w - pad - tw('✓', ms) - (c.badge ? tw(c.badge, FS - 3, true) + 6 : 2), y + pad + 11, ms, T.select, '✓', 0, true); }
-      /* entries scale down (to 6px) so every chip stays readable in a fixed cell; nothing is dropped */
-      var lines = c.lines || [], top = y + pad + 17, ih = Math.max(8, H - (top - y) - pad), sz = 11, fits = function (s) { var hsum = 0; for (var i = 0; i < lines.length; i++) { var t = lines[i].text, words = String(t).split(/\s+/); for (var j = 0; j < words.length; j++) if (tw(words[j], s) > iw + 0.5) return false; hsum += wrapH(t, s, iw, Math.max(8, s * 1.3)); } return hsum <= ih + 0.5; };
-      while (sz > 6 && !fits(sz)) sz -= 0.25; var cy = top;
-      lines.forEach(function (L, i) { var lh = Math.max(8, sz * 1.3), tn = nd(key + ':ln' + i, c, owner), wr = CORE.wrap(FONT, sz, L.text, iw, { lineHeight: lh });
-        tn.items.push(['tbox', ix, cy + lh * 0.72, sz, U(L.color ? hex(L.color) : T.ink), L.text, iw, lh]); counts.glyphs += L.text.replace(/\s/g, '').length; counts.items++; cy += wr.height; });
+      if (c.count) textItem(n, ix, y + pad + 19, Math.max(6, FS - 5), T.muted, c.count + (c.count === 1 ? ' item' : ' items'), 0);
+      /* 1.8.52: plain lines stack; steps are boxes tinted by kind that flow side by side with a small gap and move to the next
+         row only at the cell edge. Text shrinks (to 3px) until all of it fits the fixed cell; nothing is dropped or cut. */
+      var lines = c.lines || [], top = y + pad + (c.count ? 23 : 17), ih = Math.max(8, H - (top - y) - pad);
+      var TONE = { out: [[124, 92, 214, 46], [124, 92, 214, 120], [74, 52, 150, 255]], 'in': [[52, 140, 196, 46], [52, 140, 196, 120], [24, 92, 132, 255]],
+        debt: [[214, 150, 60, 52], [214, 150, 60, 130], [122, 78, 14, 255]] };
+      function lay(s, emit) { var lh = Math.max(3.5, s * 1.25), px = Math.max(1, s * 0.3), py = Math.max(0.5, s * 0.12), g = Math.max(1.5, s * 0.3), cy = top, cx = ix, rowH = 0, ok = true;
+        lines.forEach(function (L, i) { var t = String(L.text);
+          if (!L.chip) { if (rowH) { cy += rowH + g; rowH = 0; cx = ix; } var words = t.split(/\s+/); for (var q = 0; q < words.length; q++) if (tw(words[q], s) > iw + 0.5) ok = false;
+            var hh = wrapH(t, s, iw, lh); if (emit) { var tn = nd(key + ':ln' + i, c, owner); tn.items.push(['tbox', ix, cy + lh * 0.72, s, U(L.color ? hex(L.color) : T.ink), t, iw, lh]); counts.glyphs += t.replace(/\s/g, '').length; counts.items++; }
+            cy += hh; return; }
+          var maxIn = iw - 2 * px, wide = tw(t, s), words2 = t.split(/\s+/); for (var q2 = 0; q2 < words2.length; q2++) if (tw(words2[q2], s) > maxIn + 0.5) ok = false;
+          var inW = Math.min(wide, maxIn), bh = (wide > maxIn ? wrapH(t, s, maxIn, lh) : lh) + 2 * py, bw = inW + 2 * px;
+          if (cx > ix && cx + bw > ix + iw + 0.5) { cy += rowH + g; cx = ix; rowH = 0; }
+          if (emit) { var col = TONE[L.tone] || TONE.out, tn2 = nd(key + ':ln' + i, c, owner), r = Math.min(2, bh / 2);
+            tn2.items.push(['rrect', cx, cy, bw, bh, r, U(col[0])], ['border', cx, cy, bw, bh, r, 0.6, U(col[1])], ['tbox', cx + px, cy + py + lh * 0.72, s, U(L.color ? hex(L.color) : col[2]), t, inW + 0.5, lh]);
+            counts.glyphs += t.replace(/\s/g, '').length; counts.items++; }
+          cx += bw + g; rowH = Math.max(rowH, bh); });
+        return { h: cy + rowH - top, ok: ok }; }
+      var sz = 11; while (sz > 3) { var m = lay(sz, false); if (m.ok && m.h <= ih + 0.5) break; sz -= 0.25; }
+      lay(Math.max(3, sz), true);
       return H; }
 
     /* table: columns sized from content; rows may carry a full-width sub block (alternatives) */
@@ -11239,9 +11255,9 @@ function calVM(V,A,c,O){ const X=VMx(), M=window.JAtlasModel, E=window.JAtlasEva
   for(let i=0;i<first;i++) cells.push({t:'pad',k:'p'+i});
   days.forEach(d=>{ const rk=R.days[d], sel=!!CS.selected[d], drag=!!dragSet[d], name=rk?riskName(rk.c,sel,drag):null, st=name&&states[name];
     const lines=[]; if(d in lb) lines.push({text:labelFmt(c,lb[d]),color:'#566275'});
-    (by[d]||[]).forEach(r=>{ const it=M.get(A,r); if(it) lines.push({text:it.name}); });
+    (by[d]||[]).forEach(r=>{ const it=M.get(A,r); if(!it) return; const v=it.values||{}; lines.push({text:it.name,chip:true,tone:(v.flow==='in'||v.type==='income')?'in':(v.payTo||v.type==='debt')?'debt':'out'}); });
     V.vmInfo.days++; if(by[d]&&by[d].length) V.vmInfo.dayItems[d]=(by[d]||[]).map(r=>(M.get(A,r)||{}).name||r);
-    cells.push({t:'day',k:d,day:d,num:+d.slice(8),lines,risk:rk?rk.c:null,badge:rk?rk.c:null,badgeInk:rk?RISK_TEXT[rk.c]:null,sel,drag,anchor:CS.anchor===d,span:!!spanCover[d],today:d===today,
+    cells.push({t:'day',k:d,day:d,num:+d.slice(8),lines,count:(by[d]||[]).length,risk:rk?rk.c:null,badge:rk?rk.c:null,badgeInk:rk?RISK_TEXT[rk.c]:null,sel,drag,anchor:CS.anchor===d,span:!!spanCover[d],today:d===today,
       state:name,anim:st&&st.anim||null,title:rk?d+' · '+RISK_COL[rk.c][1]+' · '+rk.why:d,styleName:ds[d]||null}); });
   kids.push({t:'grid',k:'grid',cols:7,gap:5,cellH:80,kids:cells});
   if(o.legend) kids.push(X.row('legend',R.legend.map(L=>X.text(L.k,L.k+' '+L.label,'small',{color:RISK_TEXT[L.k],bold:true})),{gap:14}));
@@ -12674,7 +12690,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.51",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.52",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
