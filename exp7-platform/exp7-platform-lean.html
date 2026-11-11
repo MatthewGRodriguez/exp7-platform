@@ -104,7 +104,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.52. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.53. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -10452,8 +10452,8 @@ function planRisk(w){
      MODERATE if hr<hm OR fixed within ±3 days; LOW else. Path health GOOD/MARGINAL/BAD same palette.
      Plan feeds: dated reqs/calendar steps = fixed events; selected alt cost (Best()/userPick) → outflow;
      jreq slack (dayDiff), broken/conflict/cycle flags, resource stock pressure, what-if alt scores. */
-  w=effAtlas(w);
-  const ht=RISK_HT, CC=RISK_COL;
+  const w0=w; w=effAtlas(w);
+  const budget=!!(w0&&w0.meta&&w0.meta.budget), ht=budget?budgetRiskHT(w0):RISK_HT, CC=RISK_COL;
   const cal=(w.components&&(w.components[(w.meta&&w.meta.calId)||'trip_calendar']||w.components.trip_calendar))||{}, req=(w.components&&(w.components[(w.meta&&w.meta.planId)||'reqs']||w.components.reqs))||{};
   const ids=new Set([...(cal.items||[]),...(req.items||[])].map(r=>String(r).replace(/^item:/,'')));
   const steps=[]; ids.forEach(id=>{ const it=w.items[id]; if(!it) return; const v=it.values||{}, d=v.date;
@@ -10470,6 +10470,8 @@ function planRisk(w){
     const fixed=!!(d&&/^\d{4}-\d{2}-\d{2}$/.test(d));
     steps.push({id,name:it.name,date:d||null,fixed,impact,cost,hours,pick,slack,broken:!!F.broken,conflict:!!F.conflict,cycle:false,allBad,winBad,jreq:it.jreq||null});
   });
+  const days=budget?budgetDayRisk(w0,ht):legacyDays();
+  function legacyDays(){
   /* resource pressure: low stock raises outflow */
   let resPressure=0; resourcesOf(w).forEach(it=>{ const st=+((it.values||{}).stock); if(st===0) resPressure+=12; else if(st>0&&st<5) resPressure+=6; });
   /* build day series spanning calendar month ± a few days around dated steps */
@@ -10492,6 +10494,7 @@ function planRisk(w){
     const c=(D.hr<ht.hc||today)?'C':(D.hr<ht.hm||near.length)?'M':'L';
     const why='headroom '+Math.round(D.hr)+' until '+D.nextPay+' pay · bal '+Math.round(D.b)+(near.length?' · '+near.join('; '):'')+(D.pay?' · payday':'');
     days[D.k]={c,why,hr:D.hr,b:D.b}; });
+  return days; }
   const stepRisk={}; steps.forEach(s=>{ let c='L', why='low plan risk';
     if(s.broken||s.conflict||s.allBad){ c='C'; why=s.broken?'broken jreq':(s.conflict?'jreq conflict':'every alternative is BAD'); }
     else if(s.date&&days[s.date]&&days[s.date].c==='C'){ c='C'; why='fixed-date step on CRITICAL day · '+days[s.date].why; }
@@ -10505,6 +10508,41 @@ function planRisk(w){
     'Paydays 1st & 15th; cushion starts at '+ht.base+'; income '+ht.income+'/mo; outflows from Best()/selected alt cost÷10 (or hours)',
     'Step CRITICAL also if broken/conflict jreq or every alt BAD; MODERATE if weakest pick or slack<1 day',
     'Calendar day risk and Plan step risk share this map; both update live on plan/calendar edits']}; }
+/* 1.8.53: Budget day risk = the workbook's cash-criticality calendar (ranking_ui rdCalStrip), from the atlas's own money. */
+function budgetRiskHT(w){ return Object.assign({ hc:500, hm:1500, big:200 }, (w&&w.meta&&w.meta.riskHT)||{}); }
+function budgetDayRisk(w,HT){ const E=window.JAtlasEval, ids=(w.meta&&w.meta.boardIds)||{}, out={};
+  const list=t=>{ const c=w.components&&w.components[ids[t]||('board_'+t)]; return (c&&c.items)||[]; }, rec=r=>effItem(w,String(r).replace(/^item:/,''));
+  const onBoard={}; ['expense','income','debt','asset'].forEach(t=>list(t).forEach(r=>{ onBoard[r]=1; }));
+  /* a blocked plan step (values.planBlocked: its requirements can never be met) moves no money */
+  const blocked=r=>!!(((w.items[String(r).replace(/^item:/,'')]||{}).values||{}).planBlocked);
+  const plan=((w.components[(w.meta&&w.meta.planId)||'reqs']||{}).items||[]).filter(r=>!blocked(r)), planOnly=plan.filter(r=>!onBoard[r]);
+  /* opening cash, as the workbook's Cash-after start: checking minus credit-card balances (paid in full monthly) */
+  let chk=0, card=0; list('asset').forEach(r=>{ const it=rec(r); if(it&&/checking/i.test(it.name||'')) chk+=+((it.values||{}).amount)||0; });
+  list('debt').forEach(r=>{ const it=rec(r), v=(it&&it.values)||{}; if(/credit card/i.test((it&&it.name||'')+' '+(v.creditor||'')+' '+(v.purpose||''))) card+=+v.amount||0; });
+  const first=budgetTodayKey().slice(0,7), cal=w.components[(w.meta&&w.meta.calId)||'budget']||{}, cm=(cal.view&&cal.view.month)||first;
+  const lastM=budgetShiftMonth(cm>first?cm:first,2), months=[]; for(let m=first;m<=lastM&&months.length<40;m=budgetShiftMonth(m,1)) months.push(m);
+  let prev=chk-card; const flat=[];
+  months.forEach(m=>{ const F=budgetFigures(w,m), days=E.monthDays(m), inc={}, fix={}; let fixSum=0, extraIn=0, extraOut=0;
+    const put=(d,q)=>{ (fix[d]=fix[d]||[]).push(q); fixSum+=q.amt; };
+    list('income').forEach(r=>{ const ch=E.charges(rec(r)||{},m); Object.keys(ch).forEach(d=>{ inc[d]=(inc[d]||0)+(+ch[d]||0); }); });
+    /* fixed on its day: a one-off of $200+ or the rent; other recurring bills are spread like the workbook does */
+    const pinned=it=>{ const v=(it&&it.values)||{}, rp=String(v.repeat||'once'); return rp==='once'||rp==='dates'||/housing|rent/i.test(String(v.category||'')+' '+String(it&&it.name||'')); };
+    list('expense').forEach(r=>{ const it=rec(r), ch=E.charges(it||{},m); Object.keys(ch).forEach(d=>{ const a=+ch[d]||0; if(Math.abs(a)>=HT.big&&pinned(it)) put(d,{amt:a,lab:(it.name||r)+' '+budgetMoney(a),fixed:true}); }); });
+    planOnly.forEach(r=>{ const it=rec(r); if(!it) return; const v=it.values||{}, ch=E.charges(it,m), sg=(v.flow==='in'||v.type==='income')?1:-1;
+      Object.keys(ch).forEach(d=>{ const a=sg*Math.abs(+ch[d]||0); if(!a) return; if(a>0){ inc[d]=(inc[d]||0)+a; extraIn+=a; } else if(-a>=HT.big&&pinned(it)){ put(d,{amt:a,lab:(it.name||r)+' '+budgetMoney(a),fixed:true}); extraOut-=a; } else extraOut-=a; }); });
+    /* a plan step that starts this month: the category hands off to its selected item on that day */
+    plan.forEach(r=>{ const it=rec(r), v=(it&&it.values)||{}, d=v.then&&v.then.date; if(d&&String(d).slice(0,7)===m) put(String(d).slice(0,10),{amt:0,lab:(it.name||r)+' → '+(v.thenName||'plan')+' starts',fixed:true}); });
+    /* everything else spread evenly: board spending (living + debt payments) and small plan-only spending, less the fixed events */
+    const daily=(F.living+F.debtPay+extraOut+fixSum)/days.length; let b=prev;
+    days.forEach(d=>{ const pi=inc[d]||0; b+=pi-daily; (fix[d]||[]).forEach(q=>{ b+=q.amt; }); flat.push({k:d,b,evs:fix[d]||[],pay:pi>0}); });
+    prev=b; });
+  for(let i=flat.length-1, run=Infinity; i>=0; i--){ const D=flat[i], nx=flat[i+1]; if(!nx||nx.pay) run=Infinity; run=Math.min(run,D.b); D.hr=run;
+    let j=i+1; while(flat[j]&&!flat[j].pay) j++; D.nextPay=flat[j]?flat[j].k:'—'; }
+  flat.forEach((D,i)=>{ const near=[]; for(let t=Math.max(0,i-3); t<=Math.min(flat.length-1,i+3); t++) flat[t].evs.forEach(q=>{ near.push(q.lab+' '+flat[t].k.slice(5)); });
+    const today=D.evs.filter(q=>Math.abs(q.amt)>=HT.big||q.amt===0).length;
+    const c=(D.hr<HT.hc||today)?'C':(D.hr<HT.hm||near.length)?'M':'L';
+    out[D.k]={c,hr:D.hr,b:D.b,why:'headroom '+budgetMoney(D.hr)+' until '+D.nextPay+' pay · est. balance '+budgetMoney(D.b)+(near.length?' · '+near.join('; '):'')+(D.pay?' · payday':'')}; });
+  return out; }
 function riskOf(w){ return planRisk(w||W); }
 
 function clearFormFields(V){ if(V&&V._tfOff){ try{ V._tfOff(); }catch(e){} V._tfOff=null; } if(V) V._tfLazy=null; if(V&&V.view){ V._tfTear=1; try{ V.view.clearFields(); } finally{ V._tfTear=0; } } V.tf={}; }
@@ -11456,10 +11494,11 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       else if(role==='row'||role==='section'||role==='detail')face.push(['rect',x,y+h-1,w,0.8,rgba(C.line)]);
       if(st.bar)face.push(['rect',x+2,y+6,2,Math.max(1,h-12),rgba(C.accent)]);
     }else if(part==='day'){
-      fill=st.sel||st.drag?C.selected:st.span?C.expense:C.soft;
-      face.push(['rect',x,y,w,h,rgba(fill)],['border',x,y,w,h,0,0.7,rgba(C.line)]);
+      var RF={C:'#f3cdb3',M:'#f7e4b8',L:'#d3eee5'},RL={C:'#D55E00',M:'#E69F00',L:'#009E73'};
+      fill=st.sel||st.drag?C.selected:st.risk&&RF[st.risk]?RF[st.risk]:st.span?C.expense:C.soft;
+      face.push(['rect',x,y,w,h,rgba(fill)],['border',x,y,w,h,0,st.risk&&RL[st.risk]?1:0.7,rgba(st.risk&&RL[st.risk]?RL[st.risk]:C.line)]);
       if(st.today||st.sel||st.drag||st.anchor)face.push(['border',x+1,y+1,w-2,h-2,0,st.sel||st.drag?1.5:1,rgba(C.accent)]);
-      if(st.risk)face.push(['rect',x+2,y+4,2,h-8,rgba(st.risk==='L'?'#52947f':C.accent)]);
+
       hov=X.hex(C.expense);
     }else if(part==='row'){
       fill=st.sel?C.soft:C.white;face.push(['rect',x,y,w,h,rgba(fill)],['rect',x,y+h-1,w,0.8,rgba(st.header?C.strong:C.line)]);
@@ -12690,7 +12729,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.52",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.53",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
