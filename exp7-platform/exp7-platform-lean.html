@@ -10525,9 +10525,11 @@ function budgetDayRisk(w,HT){ const E=window.JAtlasEval, ids=(w.meta&&w.meta.boa
   months.forEach(m=>{ const F=budgetFigures(w,m), days=E.monthDays(m), inc={}, fix={}; let fixSum=0, extraIn=0, extraOut=0;
     const put=(d,q)=>{ (fix[d]=fix[d]||[]).push(q); fixSum+=q.amt; };
     list('income').forEach(r=>{ const ch=E.charges(rec(r)||{},m); Object.keys(ch).forEach(d=>{ inc[d]=(inc[d]||0)+(+ch[d]||0); }); });
-    list('expense').forEach(r=>{ const it=rec(r), ch=E.charges(it||{},m); Object.keys(ch).forEach(d=>{ const a=+ch[d]||0; if(Math.abs(a)>=HT.big) put(d,{amt:a,lab:(it.name||r)+' '+budgetMoney(a),fixed:true}); }); });
+    /* fixed on its day: a one-off of $200+ or the rent; other recurring bills are spread like the workbook does */
+    const pinned=it=>{ const v=(it&&it.values)||{}, rp=String(v.repeat||'once'); return rp==='once'||rp==='dates'||/housing|rent/i.test(String(v.category||'')+' '+String(it&&it.name||'')); };
+    list('expense').forEach(r=>{ const it=rec(r), ch=E.charges(it||{},m); Object.keys(ch).forEach(d=>{ const a=+ch[d]||0; if(Math.abs(a)>=HT.big&&pinned(it)) put(d,{amt:a,lab:(it.name||r)+' '+budgetMoney(a),fixed:true}); }); });
     planOnly.forEach(r=>{ const it=rec(r); if(!it) return; const v=it.values||{}, ch=E.charges(it,m), sg=(v.flow==='in'||v.type==='income')?1:-1;
-      Object.keys(ch).forEach(d=>{ const a=sg*Math.abs(+ch[d]||0); if(!a) return; if(a>0){ inc[d]=(inc[d]||0)+a; extraIn+=a; } else if(-a>=HT.big){ put(d,{amt:a,lab:(it.name||r)+' '+budgetMoney(a),fixed:true}); extraOut-=a; } else extraOut-=a; }); });
+      Object.keys(ch).forEach(d=>{ const a=sg*Math.abs(+ch[d]||0); if(!a) return; if(a>0){ inc[d]=(inc[d]||0)+a; extraIn+=a; } else if(-a>=HT.big&&pinned(it)){ put(d,{amt:a,lab:(it.name||r)+' '+budgetMoney(a),fixed:true}); extraOut-=a; } else extraOut-=a; }); });
     /* a plan step that starts this month: the category hands off to its selected item on that day */
     plan.forEach(r=>{ const it=rec(r), v=(it&&it.values)||{}, d=v.then&&v.then.date; if(d&&String(d).slice(0,7)===m) put(String(d).slice(0,10),{amt:0,lab:(it.name||r)+' → '+(v.thenName||'plan')+' starts',fixed:true}); });
     /* everything else spread evenly: board spending (living + debt payments) and small plan-only spending, less the fixed events */
