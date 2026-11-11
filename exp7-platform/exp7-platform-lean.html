@@ -11180,7 +11180,7 @@ function hostBoardAct(V,a){
 /* Plan session pins: when the live atlas has no userPick, pin true Best() so eval.js pickAlts resolves the same alternative
    the Plan shows as Selected(=Best). Never write these pins to the live atlas. userPick on the live atlas stays the user's
    Selected and never rewrites Best (bestRank ignores userPick). */
-function livePins(w){ const P={}; Object.keys(w.items).forEach(id=>{ const it=w.items[id]; if(it.alts&&!(it.state&&it.state.userPick)){ const B=bestRank(w,id); if(B.pick) P[id]=B.pick.pick; } }); return P; }
+function livePins(w){ const P={}; Object.keys(w.items).forEach(id=>{ const it=w.items[id]; if(it&&it.alts&&!(it.state&&it.state.userPick)){ const B=bestRank(w,id); if(B.pick) P[id]=B.pick.pick; } }); return P; }
 const sg=v=>v==null||v===''?'—':(v>0?'+':v<0?'−':'')+Math.abs(v);
 function planCells(A,id,pins,wiPick){ const it=A.items[id]; if(!it) return ['—','—']; const st=it.state||{};
   let sel; if(it.alts){ const B=bestRank(A,id); const bestRef=B.pick&&B.pick.pick; const bestName=bestRef&&A.items[bestRef.slice(5)]?A.items[bestRef.slice(5)].name:'—';
@@ -11338,7 +11338,7 @@ function calFormVM(V,AW){ const X=VMx(), F=V.form, open=F.open||null, src=F.src|
   const kids=[X.text('title',F.kind==='span'?'Span an item across the selected days':'Add an item to the selected days','h'),
     X.text('hint','Choose a plan step, an existing item, or a new item. Then set its time.','muted')];
   const cur=k=>src===k?(k==='new'?((F.name||'').trim()||'new item'):(it?it.name:'')):'';
-  const dd=(k,lab)=>X.btn('dd:'+k,lab+(cur(k)?': '+cur(k):'')+(open===k?'  ▾':'  ▸'),'form:calopen:'+k,{on:open===k||src===k});
+  const dd=(k,lab)=>X.btn('dd:'+k,lab+(cur(k)?': '+cur(k):'')+(open===k?'':'  ▸'),'form:calopen:'+k,{on:open===k||src===k});
   kids.push(X.row('dds',[dd('step','Step'),dd('item','Item'),dd('new','New item')]));
   if(open==='step'){ const L=calStepList(AW); kids.push(X.row('steps',L.length?L.map(P=>X.btn('s:'+P.id,P.name,'form:calpick:step:'+P.id,{on:src==='step'&&F.itemId===P.id})):[X.text('none','No plan steps.','muted')])); }
   if(open==='item'){ const L=calItemList(AW); kids.push(X.row('items',L.length?L.map(P=>X.btn('i:'+P.id,P.name+(P.routine?' · routine':''),'form:calpick:item:'+P.id,{on:src==='item'&&F.itemId===P.id})):[X.text('none','No items yet.','muted')])); }
