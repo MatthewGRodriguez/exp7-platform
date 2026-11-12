@@ -2,7 +2,7 @@
 
 **Source of the requirements:** `BUDGET_DIRECTION.md`, supplied by Matthew on 2026-11-11 **[REQ]**. That document states agreed behaviour. This page records what the platform now does about each part of it, the rules and thresholds it uses, how existing data is carried over, and what has and has not been verified.
 
-**Base:** `main` at `99dba06` (release 1.8.54). **Branch:** `budget-direction`. Merged to `main` in PR #92 as release 1.8.61. Later phone-first and product fixes are 1.8.62. 1.8.63 fixes a Budget Home boot error (`hit` was overwritten by the 44 pt typography constant). 1.8.64 matches the approved phone studies' visual tokens (Source Sans 3, ink, rules, mint/lavender tints, calendar marks, chevrons, spacing) in the real JRender journal path.
+**Base:** `main` at `99dba06` (release 1.8.54). **Branch:** `budget-direction`. Merged to `main` in PR #92 as release 1.8.61. Later phone-first and product fixes are 1.8.62. 1.8.63 fixes a Budget Home boot error (`hit` was overwritten by the 44 pt typography constant). 1.8.64 matches the approved phone studies' visual tokens (Source Sans 3, ink, rules, mint/lavender tints, calendar marks, chevrons, spacing) in the real JRender journal path. A follow-up on this release tightens Home, Plan, ledger, cash, the mini-month, the resilience calendar, and Today's schedule to those studies and records Mac Metal side-by-side residuals [MEAS].
 
 Evidence labels follow [EVIDENCE.md](./EVIDENCE.md). Everything run in a cloud browser is **[MOCK]** by that page's definition, however real the app code under test is. Nothing here is **[USER-HW]**.
 
