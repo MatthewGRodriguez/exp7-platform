@@ -76,6 +76,8 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.42** | PR #75 | Gradient paints and stroked paths ([jrender-paint-stroke.md](./jrender-paint-stroke.md)). |
 | **1.8.43** | PR #77 | Fixes from Ash's review of 1.8.42 (gradient hover, bold gradient text, per-placement uniforms, long field names). |
 | **1.8.44** | PR #78 | Budget is the default app; the Fish and Lumen apps are removed. |
+| **1.8.45–1.8.61** | PRs #80–#92 | Recorded in [budget-direction.md](./budget-direction.md). |
+| **1.8.62** | | Phone-first Budget journal, calendar-first entry, private auto-created data repo. |
 
 The 9 Nov 2026 overlay packet is recorded in [design/overlay-view-store.md](./design/overlay-view-store.md). Shell 1.8.28 plays it as the Fish app. Shell 1.8.29 plays the Lumen page the same way.
 
