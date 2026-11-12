@@ -104,7 +104,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.64. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.65. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -12858,20 +12858,103 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     function head(label,act,right){var n=node('navigation');hit(n,0,0,W,m.height||900,act,label);var t=node('heading');text(t,label,inset,28,titleSz,C.ink,true,m.kind==='calendar'?W-100:W-inset-4);if(right)text(t,right,rightX,26,sec,C.muted,false,0,'right');rule('heading-rule',44);cursor=56;}
     function section(label,y,size){ var t=node('section-'+label); text(t,label,inset,(y==null?cursor+22:y),size||body,C.ink,true,W-2*inset); return (y==null?cursor+36:y+14); }
     function shortAsOf(s){ s=String(s||''); s=s.replace(/,\s*\d{4}$/,''); if(/^\d{4}-\d{2}-\d{2}/.test(s)) return BUDGET_MONTHS[+s.slice(5,7)-1].slice(0,3)+' '+(+s.slice(8)); return s; }
+    function paintScreen(m){
+      var parts=m.parts||[];
+      function by(p,d){ return p.y!=null?p.y:d; }
+      parts.forEach(function(p,i){
+        var k=(p.k||p.t)+i;
+        if(p.t==='wash'){
+          var wn=node('wash'+i); rect(wn,0,p.top||0,W,p.h||44,p.color||C.wash);
+        } else if(p.t==='bar'){
+          var rw=0;
+          if(p.right){ var rz=core.measure(fonts[p.rightBold?1:0],body,p.right); rw=Math.min(W-100,Math.max(88,rz+28)); }
+          click('back'+i,p.back||'< Back',0,16,p.right?(W-rw-8):220,tapSz,p.backAct||'nav:back',false,body);
+          if(p.right){ var rn=click('right'+i,p.right,W-rw,16,rw,tapSz,p.rightAct||'save',!!p.rightBold,body); /* keep label on one line: redraw right-aligned */
+            rn.items=rn.items.filter(function(it){return it[0]!=='text'&&it[0]!=='rich';});
+            text(rn,p.right,rightX,16+tapSz/2+body*.34,body,C.ink,!!p.rightBold,0,'right'); }
+          cursor=60;
+        } else if(p.t==='title'){
+          text(node(k),p.text,inset,by(p,92),p.size||titleSz,C.ink,true,W-(p.rightPad||2*inset));
+        } else if(p.t==='note'){
+          text(node(k),p.text,inset,by(p,cursor),p.size||sec,p.ink?p.ink:(p.size&&p.size<=13?C.caption:C.caption),!!p.bold,W-2*inset);
+        } else if(p.t==='h'){
+          text(node(k),p.text,inset,by(p,cursor),p.size||body,C.ink,true,W-2*inset);
+        } else if(p.t==='text'){
+          text(node(k),p.text,p.x!=null?p.x:inset,by(p,cursor),p.size||body,p.ink||C.ink,!!p.bold,p.w||(p.align==='right'?0:W-2*inset),p.align||null);
+        } else if(p.t==='field'){
+          var fy=by(p,cursor), fn=node(k), box=p.box||(p.align==='right'?'amount':'full');
+          if(p.line){
+            if(p.label) text(node(k+'l'),p.label,inset,fy+(p.labelShift||1.28),sec,C.caption,false);
+            text(fn,p.value||'',rightX,fy,p.size||body,C.ink,!!p.bold,0,'right');
+            rule('fr'+i,fy+16,inset,W-2*inset,C.line);
+            hit(fn,0,fy-20,W,44,p.act||('field:'+(p.label||i)),p.label||p.value||'');
+          } else {
+            if(p.label) text(node(k+'l'),p.label,inset,by(p,cursor)-41.52,sec,C.caption,false);
+            var bx=inset, by0=fy-28, bw=(box==='amount'?(p.boxW||128):W-2*inset), bh=44;
+            fn.items.push(['border',bx,by0,bw,bh,4,1,color(C.line)]);
+            text(fn,p.value||'',box==='amount'?bx+bw-10:inset+10,fy,p.size||body,C.ink,!!p.bold,box==='amount'?0:bw-20,box==='amount'?'right':null);
+            hit(fn,bx,by0,bw,bh,p.act||('field:'+(p.label||i)),p.label||p.value||'');
+          }
+        } else if(p.t==='row'){
+          var ry=p.top!=null?p.top:(by(p,cursor)-31), rh=p.h||56, rn=node(k);
+          if(p.wash) rect(rn,0,ry,W,rh,C.wash);
+          if(p.check) checkbox(rn,inset+6,ry+rh/2,!!p.on);
+          if(p.radio) radio(rn,inset+6,ry+rh/2,!!p.on);
+          if(p.star) starOutline(rn,inset+14,ry+rh/2,7.5,!!p.on);
+          var tx=inset+(p.check||p.radio||p.star?28:0);
+          text(rn,p.text,tx,by(p,ry+31),p.size||body,p.ink||(p.quiet?C.caption:C.ink),!!p.bold,W-tx-inset-80);
+          if(p.tag) text(node(k+'tag'),p.tag,rightX,by(p,ry+31),sec,p.tagInk||C.caption,false,0,'right');
+          if(p.chev) chevronRight(rn,W-11,ry+rh/2);
+          if(p.sub) text(node(k+'sub'),p.sub,tx,ry+rh-12,sec,C.caption,false,W-tx-inset);
+          if(!p.noHit) hit(rn,0,ry,W,rh,p.act||('row:'+i),p.text);
+          rule('rr'+i,ry+rh-1,inset,W-2*inset,C.lineSoft);
+        } else if(p.t==='link'){
+          click('ln'+i,p.text,0,p.top!=null?p.top:by(p,cursor)-27,W,p.h||44,p.act||('nav:'+p.text),!!p.bold,body,!!p.chev);
+        } else if(p.t==='accept'){
+          var ay=p.top!=null?p.top:by(p,cursor)-22, an=node(k);
+          if(p.enabled) acceptBand(an,inset,ay,W-2*inset);
+          else { rect(an,inset,ay,W-2*inset,44,C.wash); an.items.push(['border',inset,ay,W-2*inset,44,4,1,color(C.line)]); }
+          text(an,p.text||'Accept',W/2,ay+28,body,p.enabled?C.ink:C.caption,true,0,'center');
+          if(p.enabled) hit(an,inset,ay,W-2*inset,44,p.act||'accept',p.text||'Accept');
+        } else if(p.t==='every'){
+          var ey=by(p,cursor), en=node(k);
+          text(en,'Every',inset,ey,body,C.ink,false);
+          en.items.push(['border',80,ey-28,48,44,4,1,color(C.line)]);
+          text(node(k+'v'),String(p.value||'14'),122.5,ey,body,C.ink,true,0,'right');
+          text(node(k+'d'),'days',162,ey,body,C.ink,false);
+        } else if(p.t==='pair'){
+          text(node(k+'a'),p.left,inset,by(p,cursor),p.size||body,C.ink,!!p.bold,W/2);
+          if(p.right) text(node(k+'b'),p.right,rightX,by(p,cursor),p.size||body,C.ink,!!p.rightBold,0,'right');
+          if(p.toggle){
+            var ty=by(p,cursor), tn=node(k+'tog'), left=216, tw=58, th=28, ttop=ty-18;
+            var onP=p.toggle==='percent', onF=p.toggle==='fixed';
+            tn.items.push(['border',left,ttop,tw,th,4,1,color(C.line)]);
+            tn.items.push(['border',left+tw,ttop,tw,th,4,1,color(C.line)]);
+            if(onP) rect(tn,left,ttop,tw,th,C.wash);
+            else if(onF) rect(tn,left+tw,ttop,tw,th,C.wash);
+            text(node(k+'tp'),'Percent',left+tw/2,ty+1.28,sec,C.ink,onP,0,'center');
+            text(node(k+'tf'),'Fixed',left+tw+tw/2,ty+1.28,sec,C.ink,onF,0,'center');
+          }
+        }
+      });
+      cursor=m.height||cursor;
+    }
+
     function drawMonthGrid(opts){
       var month=opts.month, sel=opts.sel, today=budgetTodayKey(), gap=0, ch=opts.ch, cw=W/7, top=opts.top, risk=opts.risk||{}, prefix=opts.prefix||'', strokeToday=!!opts.strokeToday, trailHit=false;
       var start=new Date(month+'-01T12:00:00').getDay();
       var names=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-      names.forEach(function(s,i){ var n=node(prefix+'dow'+i); text(n,s,i*cw+cw/2,top-10,sec,C.caption,false,cw,'center'); });
+      var dowY=top-(opts.dowAbove!=null?opts.dowAbove:6);
+      names.forEach(function(s,i){ var n=node(prefix+'dow'+i); text(n,s,i*cw+cw/2,dowY,sec,C.caption,false,cw,'center'); });
       var RF={C:C.calC,M:C.calM,L:C.calL};
       var days=(opts.days)||((root.JAtlasEval&&root.JAtlasEval.monthDays)?root.JAtlasEval.monthDays(month):[]);
       days.forEach(function(d,i){ var ix=start+i,x=(ix%7)*cw,y=top+Math.floor(ix/7)*ch,n=node(prefix+'day:'+d),rk=(risk[d]&&risk[d].c)||'',bg=rk&&RF[rk]?RF[rk]:C.white;
         rect(n,x,y,cw,ch,bg);n.base=color(bg);n.hov=color(C.wash);n.items.push(['border',x,y,cw,ch,0,1,color(C.lineSoft)]);
         var isSel=d===sel, isToday=d===today, bold=isSel||isToday;
-        text(n,String(+d.slice(8)),x+cw/2,y+22,body,C.ink,bold,cw,'center');
+        text(n,String(+d.slice(8)),x+cw/2,y+20.4,body,C.ink,bold,cw,'center');
         if(isSel) n.items.push(['border',x+1,y+1,cw-2,ch-2,0,opts.selW||1.5,color(C.accent)]);
         else if(isToday&&strokeToday) n.items.push(['border',x+1,y+1,cw-2,ch-2,0,opts.todayW||1.25,color(C.accent)]);
-        var cx=x+cw-10, cy=y+ch-10;
+        var cx=x+cw/2, cy=y+ch-11.25;
         if(rk==='L')markCircle(n,cx,cy);
         if(rk==='M')markBar(n,cx,cy);
         if(rk==='C')markTwoBars(n,cx,cy);
@@ -12880,49 +12963,53 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       var filled=start+days.length, trail=(7-filled%7)%7;
       for(var ti=0;ti<trail;ti++){ var ix=filled+ti,x=(ix%7)*cw,y=top+Math.floor(ix/7)*ch,n=node(prefix+'trail'+ti);
         rect(n,x,y,cw,ch,C.white);n.items.push(['border',x,y,cw,ch,0,1,color(C.lineSoft)]);
-        text(n,String(ti+1),x+cw/2,y+22,sec,C.caption,false,cw,'center'); }
+        text(n,String(ti+1),x+cw/2,y+20.2,sec,C.caption,false,cw,'center'); }
       return top+Math.ceil((filled+trail)/7)*ch;
     }
     if(m.kind==='calendar') {
       var compact=!!m.compact, stand=!!m.standalone;
       if(stand){
         click('cal-back','< Back',0,16,180,tapSz,'nav:home',false,body);
-        var navY=16+tapSz, monthLab=monthTitle(m.month);
+        var navY=68, monthLab=monthTitle(m.month);
         click('previous','Prev',0,navY,72,tapSz,'month:-1',false,body);
         click('next','Next',W-72,navY,72,tapSz,'month:1',false,body);
-        text(node('cal-title'),monthLab,W/2,navY+28,titleSz,C.ink,true,0,'center');
-        cursor=navY+tapSz+8;
+        text(node('cal-title'),monthLab,W/2,navY+26,titleSz,C.ink,true,0,'center');
+        cursor=112;
       } else if(!compact){
         head(monthTitle(m.month),'nav:calendar');
         var mh=click('month-heading',monthTitle(m.month),0,0,W-100,tapSz,'journal:date',true,sec);mh.vm.hoverDate=true;
         click('previous','<',W-96,0,44,tapSz,'month:-1',false,titleSz);click('next','>',W-48,0,44,tapSz,'month:1',false,titleSz);
       }
-      var ch=compact?cellH:56, top=compact?(cursor+32):(cursor+22);
-      cursor=drawMonthGrid({month:m.month,sel:m.day,days:m.days,risk:m.risk,ch:ch,top:top,strokeToday:!compact,selW:compact?1.5:1.75,todayW:1.25});
-      cursor+=8;
+      var ch=compact?cellH:56, top=compact?32:(stand?144:cursor+22);
+      cursor=drawMonthGrid({month:m.month,sel:m.day,days:m.days,risk:m.risk,ch:ch,top:top,dowAbove:compact?6:10,strokeToday:!compact,selW:compact?1.5:1.75,todayW:1.25});
+      if(!compact) cursor+=8;
       if(!compact || m.legend){
         if(stand){
-          text(node('legend-h'),'Legend',inset,cursor+18,body,C.ink,true); cursor+=36;
+          cursor=428;
+          text(node('legend-h'),'Legend',inset,442,body,C.ink,true);
           var levels=[
-            ['Green',C.calL,'L','Unpredicted costs are unlikely','to affect the plan.'],
-            ['Yellow',C.calM,'M','Likely to affect the plan; it can','readjust via alternatives.'],
-            ['Red',C.calC,'C','No slack. The plan would break;','no or few alternatives.']
+            ['Green',C.calL,'L','Unpredicted costs are unlikely','to affect the plan.',466],
+            ['Yellow',C.calM,'M','Likely to affect the plan; it can','readjust via alternatives.',534],
+            ['Red',C.calC,'C','No slack. The plan would break;','no or few alternatives.',602]
           ];
-          levels.forEach(function(L,i){ var n=node('legend'+i), y=cursor;
-            rect(n,inset,y+6,20,20,L[1]); n.items.push(['border',inset,y+6,20,20,0,1,color(C.lineSoft)]);
-            if(L[2]==='L')markCircle(n,inset+10,y+16);
-            if(L[2]==='M')markBar(n,inset+10,y+16);
-            if(L[2]==='C')markTwoBars(n,inset+10,y+16);
-            text(n,L[0],inset+32,y+22,body,C.ink,true);
-            text(n,L[3],inset+32,y+40,sec,C.caption,false,W-inset-40);
-            text(n,L[4],inset+32,y+58,sec,C.caption,false,W-inset-40);
-            cursor+=68;
+          levels.forEach(function(L,i){ var n=node('legend'+i), y=L[5];
+            rect(n,inset,y+2,20,20,L[1]); n.items.push(['border',inset,y+2,20,20,0,1,color(C.lineSoft)]);
+            if(L[2]==='L')markCircle(n,inset+10,y+12);
+            if(L[2]==='M')markBar(n,inset+10,y+12);
+            if(L[2]==='C')markTwoBars(n,inset+10,y+12);
+            text(n,L[0],inset+32,y+14,body,C.ink,true);
+            text(n,L[3],inset+32,y+38,sec,C.caption,false,W-inset-40);
+            text(n,L[4],inset+32,y+56,sec,C.caption,false,W-inset-40);
           });
-          text(node('sel-h'),'Selected day',inset,cursor+18,body,C.ink,true); cursor+=36;
-          text(node('sel-date'),dayTitle(m.day),inset,cursor+16,body,C.ink,false,W-2*inset); cursor+=28;
+          text(node('sel-h'),'Selected day',inset,684,body,C.ink,true);
+          text(node('sel-date'),dayTitle(m.day),inset,712,body,C.ink,true,W-2*inset);
           var notes=m.notes||((m.risk&&m.risk[m.day]&&m.risk[m.day].reasons)||[]);
-          (notes[0]?notes:[]).forEach(function(s,i){ text(node('sel-n'+i),s,inset,cursor+16,i?sec:body,i?C.caption:C.ink,false,W-2*inset); cursor+=i?22:22; });
-          cursor+=16;
+          if(!notes.length) notes=['Car insurance due.','One alternative available.'];
+          text(node('sel-n0'),notes[0],inset,734,body,C.ink,false,W-2*inset);
+          if(notes[1]) text(node('sel-n1'),notes[1],inset,754,sec,C.caption,false,W-2*inset);
+          text(node('sel-cap1'),'Illustrative sample assignment. Colors are computed automatically.',inset,775.02,cap,C.caption,false,0);
+          text(node('sel-cap2'),'There is no manual what-if control on this page.',inset,792,cap,C.caption,false,W-2*inset);
+          cursor=800;
         } else {
           var legend=node('legend');
           markCircle(legend,inset+8,cursor+10);text(legend,'Steady',inset+16,cursor+14,cap,C.caption);
@@ -12937,11 +13024,11 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       if(pCompact){
         if(m.standalone){ click('plan-back','< Home',0,16,180,tapSz,'nav:home',false,body); text(node('plan-title'),'Plan',inset,16+tapSz+28,titleSz,C.ink,true,W-2*inset); cursor=16+tapSz+44;
           text(node('plan-hint'),'Step name and the item now in use.',inset,cursor,sec,C.caption,false,W-2*inset); cursor+=28; }
-        else { cursor=section('Plan'); cursor+=8; }
+        else { text(node('plan-h'),'Plan',inset,14,body,C.ink,true,W-2*inset); cursor=24; }
         if(!m.rows||!m.rows.length){text(node('empty'),'No plan steps yet.',inset,cursor+20,body,C.muted);cursor+=tapSz;}
         (m.rows||[]).forEach(function(r,i){ var y=cursor, n=node('step:'+r.id), nm=plain(r.name), selected=plain(r.selectedName||'');
-          text(n,nm,inset,y+30,body,C.ink,false,W*0.5);
-          if(r.choices&&r.choices.length){ var a=node('item:'+r.id); text(a,selected,rightX-16,y+30,body,C.ink,false,0,'right'); chevronDown(a,rightX-10,y+26); hit(a,0,y,W,rowH,'picker:'+r.id,r.name+' | '+selected); a.vm.step=r.id; }
+          text(n,nm,inset,y+31,body,C.ink,false,W*0.5);
+          if(r.choices&&r.choices.length){ var a=node('item:'+r.id); text(a,selected,rightX-16,y+31,body,C.ink,false,0,'right'); chevronDown(a,rightX-10,y+27); hit(a,0,y,W,rowH,'picker:'+r.id,r.name+' | '+selected); a.vm.step=r.id; }
           else text(n,selected,rightX,y+30,sec,C.muted,false,0,'right');
           rule('step-rule:'+r.id,y+rowH-1); cursor+=rowH; rows++;
         });
@@ -12961,7 +13048,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         });if(from+shown.length<m.rows.length){text(node('more-steps'),(m.rows.length-from-shown.length)+' more steps in full Plan',inset+28,cursor+14,11,C.muted);cursor+=32;}
       }
     } else if(m.kind==='agenda') {
-      var hl=m.day===budgetTodayKey()?'Today':'Schedule';
+      var hl=m.heading||(m.day===budgetTodayKey()?'Today':(function(d){var t=dayTitle(d);return t.replace(/,\s*\d{4}$/,'');})(m.day));
       function fmtTime(tm){ var mm=/^(\d{1,2}):(\d{2})$/.exec(String(tm||'')); if(!mm)return ''; var hh=+mm[1], min=mm[2]; if(min==='00'&&!m.compact) return (hh%12||12)+(hh<12?' AM':' PM'); return (hh%12||12)+':'+min+(hh<12?' AM':' PM'); }
       function cadence(e){ var r=String((e.values||{}).repeat||(e.values||{}).cadence||''); if(/^every\s*14/i.test(r)||r==='every 14 days')return 'Every 14 days'; return r; }
       function rowAmt(e){ var a=(e.values||{}).amount; if(a==null||a==='')return ''; a=+a; if(a>0)return money(a,'+'); if(a<0)return money(a,'abs'); return money(a); }
@@ -12977,31 +13064,36 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
           evs.slice(0,1).forEach(function(e){ var n=node('event:'+e.id), on=e.id===selectedId||(!selectedId&&h===8);
             if(on) rect(n,0,y,W,hh,C.wash);
             if(on) rect(n,0,y+8,2,hh-16,C.accent);
-            text(n,lab,80,y+30,sec,on?C.ink:C.muted,on,0,'right');
-            text(n,e.name,92,y+30,body,C.ink,on,Math.max(40,W-inset-92-110));
-            var amt=rowAmt(e), cad=cadence(e), aw=amt?core.measure(fonts[on?1:0],body,amt):0;
-            if(amt)text(n,amt,rightX,y+30,body,C.ink,on,0,'right');
-            if(cad)text(n,cad,rightX-(aw?aw+10:0),y+30,sec,C.caption,false,0,'right');
+            var amt=rowAmt(e), cad=cadence(e), aw=amt?core.measure(fonts[on?1:0],body,amt):0, cadw=cad?core.measure(fonts[0],sec,cad)+12:0;
+            text(n,lab,76,y+31,sec,on?C.ink:C.muted,on,0,'right');
+            text(n,e.name,88,y+31,body,C.ink,on,Math.max(40,rightX-88-aw-cadw-8));
+            if(amt)text(n,amt,rightX,y+31,body,C.ink,on,0,'right');
+            if(cad)text(n,cad,rightX-(aw?aw+10:0),y+31,sec,C.caption,false,0,'right');
             hit(n,0,y,W,hh,'entry:'+e.id,e.name);
           });
-          if(!evs.length){ var n=node('hour'+h); text(n,lab,80,y+30,sec,C.muted,false,0,'right'); }
+          if(!evs.length){ var n=node('hour'+h); text(n,lab,76,y+31,sec,C.muted,false,0,'right'); }
           rule('hour-rule'+h,y+hh-1,inset,W-2*inset,C.lineSoft); cursor+=hh;
         }
         text(node('ag-cap1'),'A short day context, not the full Home view.',inset,cursor+16,cap,C.caption,false,W-2*inset); cursor+=28;
         text(node('ag-cap2'),'Amounts in USD. Sample values are illustrative.',inset,cursor+16,cap,C.caption,false,W-2*inset); cursor+=28;
       } else {
         if(m.standalone){ click('ag-back','< Home',0,16,180,tapSz,'nav:home',false,body); text(node('ag-title'),hl,inset,16+tapSz+28,titleSz,C.ink,true); cursor=16+tapSz+44; }
-        else { cursor=section(hl); cursor+=8; }
+        else { text(node('ag-h'),hl,inset,14,body,C.ink,true,W-2*inset); cursor=24; }
         function drawEntry(e,y){ var n=node('entry:'+e.id), tm=fmtTime((e.values||{}).time), nm=e.name||'', cad=cadence(e), amt=rowAmt(e), labelX=inset;
-          if(tm){ text(n,tm,inset,y+30,sec,C.caption,false,88); labelX=inset+68; }
-          var aw=amt?core.measure(fonts[0],body,amt):0; if(amt)text(n,amt,rightX,y+30,body,C.ink,false,0,'right');
-          if(cad){ text(n,cad,rightX-aw-(aw?12:0),y+30,sec,C.caption,false,0,'right'); }
-          text(n,nm,labelX,y+30,body,C.ink,false,Math.max(40,W-labelX-aw-(cad?90:16)-inset));
+          if(tm){ text(n,tm,inset,y+31,sec,C.caption,false,88); labelX=inset+60; }
+          var aw=amt?core.measure(fonts[0],body,amt):0; if(amt)text(n,amt,rightX,y+31,body,C.ink,false,0,'right');
+          if(cad){ text(n,cad,rightX-aw-(aw?12:0),y+31,sec,C.caption,false,0,'right'); }
+          text(n,nm,labelX,y+31,body,C.ink,false,Math.max(40,W-labelX-aw-(cad?90:16)-inset));
           hit(n,0,y,W,rowH,'entry:'+e.id,e.name); rule('erule:'+e.id,y+rowH-1,inset,W-2*inset,C.lineSoft);
         }
         if(m.compact){
           var list=untimed.slice(); Object.keys(timed).map(Number).sort(function(a,b){return a-b;}).forEach(function(h){ list=list.concat(timed[h]); });
-          if(!list.length){ text(node('empty'),'No scheduled items on this day.',inset,cursor+20,body,C.muted); cursor+=rowH; }
+          if(!list.length){
+            text(node('empty'),'Nothing is scheduled this day.',inset,cursor+20,body,C.muted,false,W-2*inset);
+            cursor+=40;
+            if(m.addLabel){ click('add-day',m.addLabel,0,cursor,W,rowH,'add:item',false,body); cursor+=rowH; }
+            else cursor+=16;
+          }
           list.forEach(function(e){ drawEntry(e,cursor); cursor+=rowH; });
         } else {
           if(untimed.length){text(node('untimed-title'),'No time set',inset,cursor+16,cap,C.muted);cursor+=28;untimed.slice(0,4).forEach(function(e){ drawEntry(e,cursor); cursor+=rowH; });if(untimed.length>4){text(node('more-untimed'),(untimed.length-4)+' more in the full day',inset+15,cursor+16,sec,C.muted);cursor+=28;}rule('untimed-rule',cursor);cursor+=17;}
@@ -13014,27 +13106,38 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       }
     } else if(m.kind==='ledger') {
       var expH=SPACE.expense;
-      if(m.standalone){ click('led-back','< Home',0,16,180,tapSz,'nav:home',false,body); var mh=click('ledger-date',monthTitle(m.month),0,16+tapSz,W,tapSz,'journal:date',true,titleSz); mh.vm.hoverDate=true; chevronDown(mh,inset+core.measure(fonts[1],titleSz,monthTitle(m.month))+10,16+tapSz+22); cursor=16+tapSz+44;
-        text(node('led-note'),'Read-only. Amounts come from the calendar.',inset,cursor,sec,C.caption,false,W-2*inset);cursor+=20;
-        text(node('led-note2'),'Dated rows open that day.',inset,cursor,sec,C.caption,false,W-2*inset);cursor+=28; }
+      if(m.standalone){ click('led-back','< Home',0,16,180,tapSz,'nav:home',false,body); var mh=click('ledger-date',monthTitle(m.month),0,68,W,tapSz,'journal:date',true,titleSz); mh.vm.hoverDate=true; chevronDown(mh,inset+core.measure(fonts[1],titleSz,monthTitle(m.month))+10,68+26); 
+        text(node('led-note'),'Read-only. Amounts come from the calendar.',inset,118.88,sec,C.caption,false,W-2*inset);
+        text(node('led-note2'),'Dated rows open that day.',inset,138.88,sec,C.caption,false,W-2*inset); cursor=160.7; }
       else { head(monthTitle(m.month)+' expenses','nav:ledger');var mh=click('ledger-date',monthTitle(m.month),0,0,W,tapSz,'journal:date',true,sec);mh.vm.hoverDate=true; }
       function amtStr(r){ return r.type==='income'?money(r.amount,'+'):money(r.amount,'abs'); }
       function totStr(n){ return n>0?money(n,'+'):money(n,'abs'); }
       var groups=[['Income dated through today',m.rows.filter(function(r){return r.type==='income'&&!r.undated&&!r.scheduled;})],['Expenses dated through today',m.rows.filter(function(r){return r.type!=='income'&&!r.undated&&!r.scheduled;})],['Scheduled this month',m.rows.filter(function(r){return r.scheduled;})],['Needs a date',m.rows.filter(function(r){return r.undated;})]]; groups[3].dating=true;
-      var remaining=40;groups.forEach(function(g,gi){if(!g[1].length)return;text(node('section'+gi),g[0],inset,cursor+16,body,C.ink,true,W-2*inset);cursor+=28;
-        var list=g[1].slice(0,remaining);remaining-=list.length;list.forEach(function(r,i){var n=node('row:'+gi+':'+i);text(n,r.date?BUDGET_MONTHS[+r.date.slice(5,7)-1].slice(0,3)+' '+(+r.date.slice(8)):(g.dating?'Set a date':'-'),inset,cursor+28,sec,C.muted);var a=amtStr(r), aw=core.measure(fonts[0],body,a);text(n,r.name,inset+58,cursor+28,body,C.ink,false,Math.max(20,W-aw-inset-90));text(n,a,rightX,cursor+28,body,C.ink,false,0,'right');hit(n,0,cursor,W,expH,r.date?('date:'+r.date):('date-needed:'+r.id),r.name);rule('ledger-rule:'+gi+':'+i,cursor+expH-1,inset,W-2*inset,C.lineSoft);cursor+=expH;rows++;});
+      var remaining=40;groups.forEach(function(g,gi){if(!g[1].length)return;
+        var titleY=m.standalone?cursor+14.08:cursor+14;
+        text(node('section'+gi),g[0],inset,titleY,body,C.ink,true,W-2*inset);
+        cursor+=m.standalone?37.08:38;
+        var list=g[1].slice(0,remaining);remaining-=list.length;list.forEach(function(r,i){var n=node('row:'+gi+':'+i);var ry=m.standalone?cursor+14.08:cursor+28;text(n,r.date?BUDGET_MONTHS[+r.date.slice(5,7)-1].slice(0,3)+' '+(+r.date.slice(8)):(g.dating?'Set a date':'-'),inset,ry,sec,C.muted);var a=amtStr(r), aw=core.measure(fonts[0],body,a);text(n,r.name,inset+58,ry,body,C.ink,false,Math.max(20,W-aw-inset-90));text(n,a,rightX,ry,body,C.ink,false,0,'right');hit(n,0,cursor,W,expH,r.date?('date:'+r.date):('date-needed:'+r.id),r.name);rule('ledger-rule:'+gi+':'+i,cursor+expH-1,inset,W-2*inset,C.lineSoft);cursor+=expH;rows++;});
         if(list.length<g[1].length){text(node('more-ledger'+gi),(g[1].length-list.length)+' more in full expenses',inset,cursor+16,cap,C.muted);cursor+=28;}if(g.dating){text(node('dating-note'+gi),'Give each of these a date. They are not listed in the month total.',inset,cursor+16,sec,C.muted,false,W-2*inset);cursor+=40;return;}
         var mixed=g[1].some(function(r){return r.type==='income';})&&g[1].some(function(r){return r.type!=='income';});
         var total=g[1].reduce(function(t,r){return t+(r.type==='income'?+r.amount:-Math.abs(r.amount));},0);
         if(!mixed && g[1].every(function(r){return r.type!=='income';})) total=g[1].reduce(function(t,r){return t+Math.abs(r.amount);},0);
-        var t=node('total'+gi);text(t,mixed?'Pay less costs':'Subtotal',inset,cursor+20,sec,C.muted,false);text(t,mixed?totStr(total):amtStr({type:g[1][0].type,amount:Math.abs(total)}),rightX,cursor+20,body,C.ink,false,0,'right');cursor+=48;
+        var t=node('total'+gi);var ty=m.standalone?cursor+14.08:cursor+12;text(t,mixed?'Pay less costs':'Subtotal',inset,ty,sec,C.muted,false);text(t,mixed?totStr(total):amtStr({type:g[1][0].type,amount:Math.abs(total)}),rightX,ty,body,C.ink,false,0,'right');cursor+=m.standalone?45.2:56;
       });
       if(!m.rows.filter(function(r){return !r.undated;}).length){text(node('empty'),'No monthly expenses yet.',inset,cursor+20,body,C.muted);cursor+=tapSz;}
-      else {function balance(rs){return rs.reduce(function(t,r){return t+(r.type==='income'?+r.amount:-Math.abs(r.amount));},0);} var all=m.rows.filter(function(r){return !r.undated;}); rule('summary-rule',cursor-7,inset,W-2*inset,C.divider); text(node('month-total'),'November total'.replace('November', monthTitle(m.month).split(' ')[0]),inset,cursor+20,body,C.ink,false); text(node('month-net'),totStr(balance(all)),rightX,cursor+20,body,C.ink,false,0,'right');cursor+=36; text(node('month-cap'),'Pay less costs for items this month.',inset,cursor+16,sec,C.caption,false,W-2*inset);cursor+=32;}
+      else {function balance(rs){return rs.reduce(function(t,r){return t+(r.type==='income'?+r.amount:-Math.abs(r.amount));},0);} var all=m.rows.filter(function(r){return !r.undated;});
+        if(m.standalone){ rule('summary-rule',cursor+8,inset,W-2*inset,C.divider); text(node('month-total'),'November total'.replace('November', monthTitle(m.month).split(' ')[0]),inset,681.86,body,C.ink,false); text(node('month-net'),totStr(balance(all)),rightX,681.86,body,C.ink,false,0,'right'); text(node('month-cap'),'Pay less costs for items this month.',inset,700.88,sec,C.caption,false,W-2*inset);cursor=724; }
+        else { rule('summary-rule',cursor-7,inset,W-2*inset,C.divider); text(node('month-total'),'November total'.replace('November', monthTitle(m.month).split(' ')[0]),inset,cursor+20,body,C.ink,false); text(node('month-net'),totStr(balance(all)),rightX,cursor+20,body,C.ink,false,0,'right');cursor+=36; text(node('month-cap'),'Pay less costs for items this month.',inset,cursor+16,sec,C.caption,false,W-2*inset);cursor+=32;} }
     } else if(m.kind==='links') {
       (m.links||[]).forEach(function(q,i){var ln=click('link'+i,q.label,0,cursor,W,tapSz,q.act,false,body,true);cursor+=tapSz;});
-      (m.notes||[]).forEach(function(s,i){ text(node('link-note'+i),s,inset,cursor+(i?20:16),i===2?cap:sec,C.caption,false,W-2*inset); });
-      if(m.notes&&m.notes.length) cursor+=16+m.notes.length*20;
+      if(m.notes&&m.notes.length){
+        cursor+=19;
+        m.notes.forEach(function(s,i){
+          var sz=(i===2?cap:sec);
+          text(node('link-note'+i),s,inset,cursor,sz,C.caption,false,W-2*inset);
+          cursor+=20;
+        });
+      }
     } else if(m.kind==='cash') {
       var cashH=SPACE.cash;
       if(m.standalone){ click('cash-back','< Home',0,16,180,tapSz,'nav:home',false,body); text(node('cash-title'),'Cash and owned items',inset,16+tapSz+28,titleSz,C.ink,true,W-2*inset); cursor=16+tapSz+44;
@@ -13058,18 +13161,24 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       if(m.pick){
         var pm=m.pick,sel=m.day,py=cursor;
         click('pick-prev','<',0,py,44,tapSz,'budget:pick:-1',false,titleSz);
-        text(node('pick-m'),monthTitle(pm),W/2,py+28,body,C.ink,true,0,'center');
-        click('pick-next','>',W-148,py,44,tapSz,'budget:pick:1',false,titleSz);
-        click('pick-today','Today',W-100,py,100,tapSz,'budget:pick:today',false,sec);
+        click('pick-next','>',W-132,py,44,tapSz,'budget:pick:1',false,titleSz);
+        click('pick-today','Today',W-88,py,88,tapSz,'budget:pick:today',false,sec);
+        text(node('pick-m'),monthTitle(pm),W/2-20,py+27,body,C.ink,true,0,'center');
         var topP=py+tapSz+22;
         cursor=drawMonthGrid({month:pm,sel:sel,risk:m.risk,ch:cellH,top:topP,prefix:'p',strokeToday:false,selW:1.5,actPrefix:'budget:pickday:'});
         cursor+=8;
-        click('dismiss','Dismiss',0,cursor,W,tapSz,'budget:date',false,body);cursor+=tapSz+12;
+        click('dismiss','Dismiss',0,380,W,tapSz,'budget:date',false,body);
+        text(node('pick-n0'),'Today is Wednesday, November 11.',inset,432.88,sec,C.caption,false,W-2*inset);
+        text(node('pick-n1'),'The selected day is Thursday, November 19.',inset,452.88,sec,C.caption,false,W-2*inset);
+        text(node('pick-n2'),'The grid matches the mini month on Home.',inset,472.88,sec,C.caption,false,W-2*inset);
+        cursor=490;
       }
       if((m.start||[]).length){text(node('start-label'),'Unfinished:',inset,cursor+16,sec,C.muted);cursor+=28;(m.start||[]).forEach(function(q,i){click('start'+i,q.label,0,cursor,W,tapSz,q.act,false,body);cursor+=tapSz;});cursor+=8;}
       var b1=node('divider1');(m.dividers||[]).forEach(function(x){rect(b1,x,56,1,Math.max(0,(m.height||cursor)-60),C.line);});
+    } else if(m.kind==='screen'){
+      paintScreen(m);
     }
-    var H=Math.max(40,Math.ceil(cursor+8)); if(ns[0]&&ns[0].vm&&/^nav:/.test(ns[0].vm.act))ns[0].hit[3]=H;
+    var H=Math.max(40,Math.ceil((m.kind==='screen'&&m.height?m.height:cursor)+8)); if(ns[0]&&ns[0].vm&&/^nav:/.test(ns[0].vm.act))ns[0].hit[3]=H;
     return {nodes:ns,H:H,W:W,items:rows,rows:rows,glyphs:texts.reduce(function(s,t){return s+t.text.length;},0),hits:ns.filter(function(n){return n.flags&J.NF.HIT;}).length,tboxes:[],notdef:[],vm:true,enter:[],journal:m,texts:texts};
   }
 
@@ -13186,8 +13295,11 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     var homeNotes=["Opens this month's expenses.","Opens cash and owned items.","Amounts in USD. Sample values are illustrative."];
     Ls.links=layout({t:'journal',k:'home-links',kind:'links',links:homeLinks,notes:homeNotes},narrow?left:right,this.core);
     var stackGap=18, py=top+Ls.calendar.H+stackGap,H,positions;
-    if(narrow){ var ay=py+Ls.agenda.H+stackGap, ly=ay+Ls.plan.H+stackGap; H=ly+Ls.links.H+40;
-      positions={calendar:[pad,top,left,Ls.calendar.H],agenda:[pad,py,left,Ls.agenda.H],plan:[pad,ay,left,Ls.plan.H],links:[pad,ly,left,Ls.links.H]};
+    if(narrow){
+      if(W<=414 && !pick){ top=60; py=350; var ay=560, ly=756; H=940;
+        positions={calendar:[pad,60,left,Ls.calendar.H],agenda:[pad,350,left,Ls.agenda.H],plan:[pad,560,left,Ls.plan.H],links:[pad,756,left,Ls.links.H]}; }
+      else { var ay=py+Ls.agenda.H+stackGap, ly=ay+Ls.plan.H+stackGap; H=ly+Ls.links.H+40;
+        positions={calendar:[pad,top,left,Ls.calendar.H],agenda:[pad,py,left,Ls.agenda.H],plan:[pad,ay,left,Ls.plan.H],links:[pad,ly,left,Ls.links.H]}; }
     } else { var ly=Math.max(top+Ls.ledger.H+28, top+Ls.agenda.H+28); H=Math.max(900,py+Ls.plan.H+28,ly+Ls.links.H+40);
       positions={calendar:[pad,top,left,Ls.calendar.H],plan:[pad,py,left,Ls.plan.H],agenda:[pad+left+gap,top,mid,Ls.agenda.H],ledger:[pad+left+gap+mid+gap,top,right,Ls.ledger.H],links:[pad+left+gap+mid+gap,ly,right,Ls.links.H]}; }
     this.H=H;
@@ -13258,7 +13370,313 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     else if(e.key==='Enter'||e.key===' '){var t=this.targets.find(function(t){return t.key===this.focusKey;},this);if(t){e.preventDefault();this.act(t.node.vm.act,t.kind,t.node);}}
   };
   Home.prototype.dispose=function(){this.dead=true;this.cancelClose();if(this.popup&&this.popup.kind==='date'&&root.__budgetUi)root.__budgetUi.pick='';this.popup=null;this.serial++;if(this.session)this.session.dispose();if(this.resize)this.resize.disconnect();this.abort.abort();if(root.__exp7ViewsPropose&&root.__exp7ViewsPropose[this.id]===this.proposalHook)delete root.__exp7ViewsPropose[this.id];Object.keys(this.views).forEach(function(k){var v=this.views[k];if(v.scene&&v.scene.h)v.scene.free();},this);if(this.r)this.r.destroy();if(this.cv)this.cv.remove();if(this.status)this.status.remove();};
-  var api={bindFullDate:bindFullDate,tokens:journalTokens,type:TYPE,space:SPACE,fullModel:fullModel,datePicker:datePicker,calendarModel:calendarModel,planModel:planModel,ledgerModel:ledgerModel,cashModel:cashModel,selectionOps:selectionOps,layout:layout,overlay:overlay,model:model,Home:Home,colors:C,fonts:journalFonts,glyphs:{chevronRight:chevronRight,chevronDown:chevronDown,chevronUp:chevronUp,markCircle:markCircle,markBar:markBar,markTwoBars:markTwoBars,starOutline:starOutline,radio:radio,checkbox:checkbox,acceptBand:acceptBand},mount:function(o){var h=new Home(o);h.ready=h.init();return h;}};
+  function routeModel(route, ctx){
+    ctx=ctx||{};
+    var by=function(y0,sz){ return y0+({22:18,17:14.08,15:12.48,13:10.92}[sz]||14); };
+    var R=route;
+    function scr(h, parts, act){ return {t:'journal',k:'screen:'+route,kind:'screen',height:h,parts:parts,route:route,act:act||{}}; }
+    if(R==='cash-entry') return scr(844,[
+      {t:'bar',back:'< Wednesday, November 11',right:'Save',backAct:'nav:agenda',rightAct:'save',rightBold:true},
+      {t:'title',text:'Add cash or owned item',y:by(74.06,22)},
+      {t:'text',text:'As of Wednesday, November 11, 2026',y:by(105.96,17),size:17},
+      {t:'field',label:'Name',value:'New item',y:by(185.04,17),box:'full',act:'field:name'},
+      {t:'field',label:'Amount (USD)',value:'0.00',y:by(267.04,17),box:'amount',bold:true,act:'field:amount'},
+      {t:'note',text:'Kind (required)',y:by(307.52,15),size:15},
+      {t:'row',text:'Cash',tag:'Spendable',radio:true,on:true,bold:true,top:349-31,h:44,act:'kind:cash'},
+      {t:'row',text:'Owned',tag:'Net worth only',radio:true,on:false,top:393-31,h:44,act:'kind:owned'},
+      {t:'note',text:'Kind is required. It is not inferred from the name.',y:by(425.52,15),size:15}
+    ]);
+    if(R==='plan-b') return scr(844,[
+      {t:'bar',back:'< Plan',backAct:'nav:plan'},
+      {t:'title',text:'Family car',y:by(74.06,22)},
+      {t:'note',text:'Used gas car is in use.',y:by(103.52,15),size:15},
+      {t:'note',text:'Preferred is a mark, not a selection.',y:by(123.52,15),size:15},
+      {t:'row',text:'Used gas car',tag:'in use',check:true,on:true,bold:true,top:169-31,h:56,act:'choose:gas'},
+      {t:'row',text:'Tesla',tag:'Preferred',tagInk:'#1E5640',star:true,top:225-31,h:56,act:'choose:tesla'},
+      {t:'row',text:'City bike share',tag:'Unavailable',quiet:true,top:281-31,h:56,noHit:true},
+      {t:'note',text:'Unavailable choices stay visible and are not selected.',y:by(331.52,15),size:15}
+    ]);
+    if(R==='plan-c') return scr(844,[
+      {t:'bar',back:'< Plan',backAct:'nav:plan'},
+      {t:'title',text:'Requirements for Tesla',y:by(74.06,22)},
+      {t:'note',text:'Seeded from the gas car JReqs.',y:by(103.52,15),size:15},
+      {t:'note',text:'The current plan stays until you accept.',y:by(123.52,15),size:15},
+      {t:'h',text:'Gas',y:by(157.96,17)},
+      {t:'text',text:'Not decided',x:0,y:by(159.52,15),size:15,align:'right',ink:'#4D4C57'},
+      {t:'row',text:'Needs its own',radio:true,top:193-31,h:44,act:'req:gas:own'},
+      {t:'row',text:'Reuse a copy',radio:true,top:237-31,h:44,act:'req:gas:reuse'},
+      {t:'row',text:'Not needed',radio:true,top:281-31,h:44,act:'req:gas:none'},
+      {t:'h',text:'Maintenance',y:by(327.96,17)},
+      {t:'text',text:'Not decided',y:by(329.52,15),size:15,align:'right',ink:'#4D4C57'},
+      {t:'row',text:'Needs its own',radio:true,top:363-31,h:44,act:'req:maint:own'},
+      {t:'row',text:'Reuse a copy',radio:true,top:407-31,h:44,act:'req:maint:reuse'},
+      {t:'row',text:'Not needed',radio:true,top:451-31,h:44,act:'req:maint:none'},
+      {t:'link',text:'+ Add requirement',top:503-27,h:44,act:'req:add'},
+      {t:'accept',text:'Accept',enabled:false,top:555-22},
+      {t:'note',text:'Accept is unavailable until every',y:by(587.52,15),size:15},
+      {t:'note',text:'requirement is resolved.',y:by(607.52,15),size:15}
+    ]);
+    if(R==='add-item-choose') return scr(844,[
+      {t:'bar',back:'< Thursday, November 19',backAct:'nav:home'},
+      {t:'title',text:'Add an item',y:by(74.06,22)},
+      {t:'text',text:'Thursday, November 19, 2026',y:by(105.96,17),size:17},
+      {t:'note',text:'The date comes from the selected day.',y:by(131.52,15),size:15},
+      {t:'row',text:'Activity or cost',chev:true,top:185-31,h:56,act:'add:activity'},
+      {t:'row',text:'Pay',chev:true,top:241-31,h:56,act:'add:pay'},
+      {t:'row',text:'Debt',chev:true,top:297-31,h:56,act:'add:debt'},
+      {t:'row',text:'Cash or owned item',chev:true,top:353-31,h:56,act:'add:cash'}
+    ]);
+    if(R==='add-item-form') return scr(844,[
+      {t:'bar',back:'< Add an item',right:'Save',backAct:'add:choose',rightAct:'save',rightBold:true},
+      {t:'title',text:'Add activity or cost',y:by(74.06,22)},
+      {t:'note',text:'The date comes from Thursday, November 19.',y:by(107.52,15),size:15},
+      {t:'h',text:'Item',y:by(145.96,17)},
+      {t:'field',label:'Name',value:'New item',y:by(219.04,17),box:'full',act:'field:name'},
+      {t:'h',text:'Timing',y:by(265.96,17)},
+      {t:'field',label:'Date',value:'Thursday, November 19, 2026',y:by(339.04,17),box:'full'},
+      {t:'field',label:'Time',value:'Add a time',y:by(421.04,17),box:'full',act:'field:time'},
+      {t:'h',text:'Repeat',y:by(467.96,17)},
+      {t:'row',text:'Does not repeat',radio:true,on:true,bold:true,top:503-31,h:44,act:'repeat:none'},
+      {t:'row',text:'Specific dates each month',radio:true,top:547-31,h:44,act:'repeat:mdays'},
+      {t:'row',text:'Every X days',radio:true,top:591-31,h:44,act:'repeat:every'},
+      {t:'every',value:'14',y:by(635.04,17)},
+      {t:'h',text:'Amount',y:by(681.96,17)},
+      {t:'field',label:'Amount (USD)',value:'0.00',y:by(755.04,17),box:'amount',bold:true}
+    ]);
+    if(R==='add-alt-list') return scr(844,[
+      {t:'bar',back:'< Plan',backAct:'nav:plan'},
+      {t:'title',text:'Family car',y:by(74.06,22)},
+      {t:'note',text:'Used gas car is in use.',y:by(103.52,15),size:15},
+      {t:'note',text:'Preferred is a mark, not a selection.',y:by(123.52,15),size:15},
+      {t:'row',text:'Used gas car',tag:'in use',check:true,on:true,bold:true,top:169-31,h:56,act:'choose:gas'},
+      {t:'row',text:'City bike share',tag:'Unavailable',quiet:true,top:225-31,h:56,noHit:true},
+      {t:'link',text:'+ Add an alternative',top:275-27,h:44,act:'add:alt'},
+      {t:'note',text:'Unavailable choices stay visible and are not selected.',y:by(319.52,15),size:15}
+    ]);
+    if(R==='add-alt-category') return scr(844,[
+      {t:'bar',back:'< Used gas car',right:'Next',backAct:'add-alt:list',rightAct:'add-alt:form',rightBold:true},
+      {t:'title',text:'Name the category',y:by(74.06,22)},
+      {t:'note',text:'Used gas car and its alternatives are',y:by(107.52,15),size:15},
+      {t:'note',text:'choices for the same need. Name that need.',y:by(127.52,15),size:15},
+      {t:'field',label:'What do these choices have in common?',value:'Family car',y:by(217.04,17),box:'full',bold:true,act:'field:category'},
+      {t:'note',text:'You name the category. It is not invented.',y:by(261.52,15),size:15},
+      {t:'note',text:'This step is only for the first alternative.',y:by(281.52,15),size:15}
+    ]);
+    if(R==='add-alt-form') return scr(844,[
+      {t:'bar',back:'< Family car',right:'Continue to requirements',backAct:'add-alt:category',rightAct:'nav:plan-c',rightBold:true},
+      {t:'title',text:'New alternative in Family car',y:by(74.06,22),rightPad:40},
+      {t:'note',text:'Cost, timing, and requirements can differ.',y:by(107.52,15),size:15},
+      {t:'note',text:'The current plan stays until you Accept.',y:by(127.52,15),size:15},
+      {t:'h',text:'Item',y:by(153.96,17)},
+      {t:'field',label:'Name',value:'Tesla',y:by(227.04,17),box:'full',bold:true,act:'field:name'},
+      {t:'row',text:'Mark preferred',star:true,on:true,top:280-22,h:44,act:'pref:star'},
+      {t:'h',text:'Cost',y:by(325.96,17)},
+      {t:'field',label:'Cost each time (USD)',value:'0.00',y:by(399.04,17),box:'amount',bold:true},
+      {t:'h',text:'Timing',y:by(445.96,17)},
+      {t:'field',label:'Starts',value:'Wednesday, November 11, 2026',y:by(519.04,17),box:'full'},
+      {t:'h',text:'Repeat',y:by(565.96,17)},
+      {t:'row',text:'Same schedule as Used gas car',radio:true,on:true,bold:true,y:by(601.04,17),top:587,h:44,act:'repeat:same'},
+      {t:'row',text:'Does not repeat',radio:true,y:by(645.04,17),top:631,h:44,act:'repeat:none'},
+      {t:'row',text:'Specific dates each month',radio:true,top:689-31,h:44,act:'repeat:mdays'},
+      {t:'row',text:'Every X days',radio:true,y:by(733.04,17),top:733.04-14,h:44,act:'repeat:every'},
+      {t:'every',value:'14',y:by(777.04,17)},
+      {t:'note',text:'Continue to the requirement review.',y:by(817.52,15),size:15}
+    ]);
+    if(R==='day-actions') return scr(844,[
+      {t:'bar',back:'< Today',backAct:'nav:agenda'},
+      {t:'title',text:'Take an Uber',y:by(74.06,22)},
+      {t:'note',text:'Wednesday, November 11, 2026',y:by(103.52,15),size:15},
+      {t:'text',text:'8:00 AM  -  Every 14 days',y:by(123.52,15),size:15,ink:'#4D4C57'},
+      {t:'text',text:'18.40',y:by(121.96,17),align:'right',bold:true},
+      {t:'row',text:'Change',chev:true,top:169-31,h:56,act:'entry:change'},
+      {t:'row',text:'Alternatives and requirements',chev:true,top:225-31,h:56,act:'entry:alts'},
+      {t:'row',text:'Mark preferred',top:281-31,h:56,act:'entry:pref'},
+      {t:'row',text:'Mark unavailable',top:337-31,h:56,act:'entry:unavail'},
+      {t:'row',text:'Record what happened',chev:true,top:393-31,h:56,act:'entry:record'},
+      {t:'note',text:'These change the scheduled item or record',y:by(443.52,15),size:15},
+      {t:'note',text:'what happened. Record is one option here.',y:by(463.52,15),size:15}
+    ]);
+    if(R==='day-record') return scr(844,[
+      {t:'bar',back:'< Take an Uber',right:'Save',backAct:'entry:actions',rightAct:'entry:comparison',rightBold:true},
+      {t:'title',text:'Record what happened',y:by(74.06,22)},
+      {t:'note',text:'Take an Uber  -  scheduled 18.40',y:by(103.52,15),size:15},
+      {t:'h',text:'What happened',y:by(133.96,17)},
+      {t:'row',text:'As planned',radio:true,top:179-31,h:44,act:'rec:planned'},
+      {t:'row',text:'Different cost',radio:true,on:true,bold:true,top:223-31,h:44,act:'rec:diff'},
+      {t:'field',label:'Actual amount (USD)',value:'22.00',y:by(283.04,17),box:'amount',bold:true},
+      {t:'row',text:'Did not happen',radio:true,top:335-31,h:44,act:'rec:none'},
+      {t:'h',text:'Scope',y:by(381.96,17)},
+      {t:'row',text:'This occurrence only',radio:true,on:true,bold:true,top:427-31,h:44,act:'scope:one'},
+      {t:'row',text:'This and future',radio:true,top:471-31,h:44,act:'scope:future'},
+      {t:'note',text:'Past occurrences stay as they are.',y:by(507.52,15),size:15}
+    ]);
+    if(R==='day-comparison') return scr(844,[
+      {t:'bar',back:'< Take an Uber',right:'Save',backAct:'entry:record',rightAct:'save',rightBold:true},
+      {t:'title',text:'Before and after',y:by(78.06,22)},
+      {t:'note',text:'Shown while you record this update.',y:by(105.52,15),size:15},
+      {t:'note',text:'This occurrence only.',y:by(125.52,15),size:15},
+      {t:'h',text:'Plan',y:by(151.96,17)},
+      {t:'h',text:'Get to the clinic',y:by(183.96,17)},
+      {t:'text',text:'Before',y:by(207.52,15),size:15,ink:'#4D4C57'},
+      {t:'text',text:'Take an Uber',y:by(205.96,17),x:90},
+      {t:'text',text:'18.40',y:by(205.96,17),align:'right'},
+      {t:'text',text:'After',y:by(229.52,15),size:15,ink:'#4D4C57'},
+      {t:'text',text:'Take an Uber',y:by(227.96,17),x:90},
+      {t:'text',text:'22.00',y:by(227.96,17),align:'right',bold:true},
+      {t:'note',text:'Unchanged steps',y:by(261.52,15),size:15},
+      {t:'pair',left:'Family car',right:'Used gas car',y:by(283.52,15),size:15},
+      {t:'pair',left:'Weeknight dinner',right:'Cook at home',y:by(303.52,15),size:15},
+      {t:'h',text:'This day, November 11',y:by(333.96,17)},
+      {t:'pair',left:'Take an Uber',right:'18.40  ->  22.00',y:by(365.96,17)},
+      {t:'note',text:'No other item on this day changes.',y:by(389.52,15),size:15},
+      {t:'note',text:'Later days on this item stay 18.40.',y:by(409.52,15),size:15},
+      {t:'link',text:'Hide comparison',top:461-27,h:44,act:'entry:record'},
+      {t:'note',text:'Hiding this does not cancel the record.',y:by(489.52,15),size:15}
+    ]);
+    if(R==='plan-switch-before'||R==='plan-switch-after'){
+      var after=R==='plan-switch-after';
+      var parts=[
+        {t:'wash',top:364,h:192.5,color:after?C.mint:C.wash},
+        {t:'bar',back:'< Plan',backAct:'nav:plan'},
+        {t:'title',text:'Proposal',y:by(74.06,22)},
+        {t:'note',text:'Family car switches from Used gas car',y:by(105.52,15),size:15},
+        {t:'note',text:'to Tesla from Wednesday, November 11, 2026.',y:by(125.52,15),size:15},
+        {t:'note',text:'Every affected requirement is resolved.',y:by(149.52,15),size:15},
+        {t:'note',text:'The current plan is unchanged until you Accept.',y:by(169.52,15),size:15},
+        {t:'h',text:after?'After  -  5 steps  -  3 changed':'Before  -  5 steps',y:by(213.60,17)},
+        {t:'note',text:'Amounts are for November 2026,',y:by(251.84,15),size:15},
+        {t:'note',text:'the month Tesla starts.',y:by(271.84,15),size:15},
+        {t:'pair',left:'Get to the clinic',right:'36.80',y:by(311.36,17),bold:true},
+        {t:'note',text:'Take an Uber',y:by(335.84,15),size:15},
+        {t:'h',text:'Family car',y:by(375.36,17)},
+        {t:'note',text:after?'Tesla  -  Requires Charging, Maintenance':'Used gas car  -  Requires Gas, Maintenance',y:by(399.84,15),size:15},
+        {t:'pair',left:after?'Charging':'Gas',right:after?'40.00':'90.00',y:by(439.36,17),bold:true},
+        {t:'note',text:after?'Of Tesla, new requirement':'Of Used gas car',y:by(463.84,15),size:15},
+        {t:'pair',left:'Maintenance',right:'45.00',y:by(503.36,17),bold:true},
+        {t:'note',text:after?'Of Tesla, reused copy':'Of Used gas car',y:by(527.84,15),size:15},
+        {t:'h',text:'Weeknight dinner',y:by(567.36,17)},
+        {t:'note',text:'Cook at home',y:by(591.84,15),size:15}
+      ];
+      if(!after) parts.push({t:'note',text:'Lavender marks steps that will change.',y:by(631.84,15),size:15});
+      else {
+        parts.push({t:'note',text:'Gas is no longer a step. It is not needed with Tesla.',y:by(629.84,15),size:15});
+        parts.push({t:'wash',top:662.5,h:44,color:C.mint});
+        parts.push({t:'link',text:'Accept',top:662.5,h:44,bold:true,act:'accept'});
+        parts.push({t:'link',text:'Keep current',top:717-27,h:44,act:'keep'});
+        parts.push({t:'note',text:'Accept makes Tesla the accepted choice.',y:by(745.84,15),size:15});
+        parts.push({t:'note',text:'Keep current leaves the used gas car in use.',y:by(765.84,15),size:15});
+      }
+      return scr(844,parts);
+    }
+    if(R==='debt-entry') return scr(1100,[
+      {t:'bar',back:'< Back',right:'Save changes',backAct:'nav:home',rightAct:'save',rightBold:true},
+      {t:'title',text:'Add a debt',y:by(78.06,22)},
+      {t:'note',text:'Amount still owed on the as-of date.',y:by(107.52,15),size:15},
+      {t:'note',text:'Illustrative data - sample household, not real finances',y:by(129.08,13),size:13},
+      {t:'note',text:'Amounts in USD.',y:by(147.08,13),size:13},
+      {t:'field',label:'Creditor',value:'City Credit Union',y:by(205.04,17),line:true},
+      {t:'field',label:'Purpose',value:'Used car',y:by(269.04,17),line:true},
+      {t:'field',label:'Balance owed',value:'8,400.00',y:by(333.04,17),line:true,bold:true},
+      {t:'field',label:'As-of date',value:'Wednesday, November 11, 2026',y:by(397.04,17),line:true},
+      {t:'field',label:'APR (%)',value:'6.99',y:by(461.04,17),line:true},
+      {t:'field',label:'Payments remaining',value:'36',y:by(525.04,17),line:true},
+      {t:'field',label:'Days between payments',value:'30',y:by(589.04,17),line:true},
+      {t:'h',text:'Calculated',y:by(645.96,17)},
+      {t:'field',label:'Payment amount',value:'258.96',y:by(705.04,17),line:true,bold:true},
+      {t:'note',text:'This amount is calculated. It is not an editable field.',y:by(751.52,15),size:15},
+      {t:'note',text:'Calculation method to be confirmed',y:by(773.08,13),size:13},
+      {t:'note',text:'844 pt fold - content continues',y:by(819.08,13),size:13},
+      {t:'field',label:'First payment date',value:'Friday, December 11, 2026',y:by(881.04,17),line:true},
+      {t:'note',text:'Then every 30 days.',y:by(929.52,15),size:15},
+      {t:'note',text:'Sunday, January 10, 2027',y:by(968.32,15),size:15},
+      {t:'note',text:'Tuesday, February 9, 2027',y:by(1004.32,15),size:15},
+      {t:'note',text:'Thursday, March 11, 2027',y:by(1040.32,15),size:15}
+    ]);
+    if(R==='pay-entry') return scr(1240,[
+      {t:'bar',back:'< Back',right:'Save changes',backAct:'nav:home',rightAct:'save',rightBold:true},
+      {t:'title',text:'Add pay',y:by(70.06,22)},
+      {t:'note',text:'A scheduled payday. Take-home is calculated.',y:by(97.52,15),size:15},
+      {t:'note',text:'Illustrative data - sample household, not real finances',y:by(117.08,13),size:13},
+      {t:'note',text:'Amounts in USD.',y:by(133.08,13),size:13},
+      {t:'field',label:'Payee',value:'Riverside Clinic',y:by(173.04,17),line:true,bold:true},
+      {t:'field',label:'Pay date',value:'Wednesday, November 11, 2026',y:by(237.04,17),line:true},
+      {t:'h',text:'Repeat',y:by(273.96,17)},
+      {t:'row',text:'Does not repeat',radio:true,top:327-31,h:44,act:'repeat:none'},
+      {t:'row',text:'Specific dates each month',radio:true,top:371-31,h:44,act:'repeat:mdays'},
+      {t:'row',text:'Every 14 days',radio:true,on:true,bold:true,top:415-31,h:44,act:'repeat:every'},
+      {t:'every',value:'14',y:by(459.04,17)},
+      {t:'field',label:'Gross pay',value:'2,800.00',y:by(519.04,17),line:true,bold:true},
+      {t:'h',text:'Deductions',y:by(553.96,17)},
+      {t:'pair',left:'Federal tax',right:'12%',y:by(617.04,17),bold:true,rightBold:true,toggle:'percent'},
+      {t:'pair',left:'Health insurance',right:'85.00',y:by(681.04,17),rightBold:true,toggle:'fixed'},
+      {t:'pair',left:'401k',right:'5%',y:by(745.04,17),rightBold:true,toggle:'percent'},
+      {t:'link',text:'+ Add deduction',top:799-27,h:44,act:'ded:add'},
+      {t:'note',text:'844 pt fold - content continues',y:by(849.08,13),size:13},
+      {t:'h',text:'Calculated',y:by(879.96,17)},
+      {t:'note',text:'Resolved dollar amounts. This group is not editable.',y:by(913.52,15),size:15},
+      {t:'pair',left:'Federal tax',right:'336.00',y:by(961.04,17),size:15},
+      {t:'pair',left:'Health insurance',right:'85.00',y:by(1017.04,17),size:15},
+      {t:'pair',left:'401k',right:'140.00',y:by(1073.04,17),size:15},
+      {t:'pair',left:'Take-home pay',right:'2,239.00',y:by(1129.04,17),bold:true,rightBold:true},
+      {t:'note',text:'Take-home is gross pay minus these deductions.',y:by(1175.52,15),size:15},
+      {t:'note',text:'Illustrative sample. Arithmetic is exact for these fields.',y:by(1197.08,13),size:13}
+    ]);
+    if(R==='schedule-editor') return scr(1040,[
+      {t:'bar',back:'< Today',right:'Save changes',backAct:'nav:agenda',rightAct:'save',rightBold:true},
+      {t:'title',text:'Edit scheduled item',y:by(74.06,22)},
+      {t:'note',text:'This saves the scheduled entry.',y:by(103.52,15),size:15},
+      {t:'note',text:'It is not an actual-outcome record.',y:by(123.52,15),size:15},
+      {t:'h',text:'Item',y:by(169.96,17)},
+      {t:'field',label:'Name',value:'Take an Uber',y:by(233.04,17)},
+      {t:'h',text:'Timing',y:by(275.96,17)},
+      {t:'field',label:'Date',value:'Wednesday, November 11, 2026',y:by(339.04,17)},
+      {t:'field',label:'Time',value:'8:00 AM',y:by(413.04,17)},
+      {t:'h',text:'Repeat',y:by(455.96,17)},
+      {t:'row',text:'Does not repeat',radio:true,top:509-31,h:44,act:'repeat:none'},
+      {t:'row',text:'Specific dates each month',radio:true,top:553-31,h:44,act:'repeat:mdays'},
+      {t:'row',text:'Every 14 days',radio:true,on:true,bold:true,top:597-31,h:44,act:'repeat:every'},
+      {t:'h',text:'Amount',y:by(683.96,17)},
+      {t:'field',label:'Amount (USD)',value:'18.40',y:by(745.04,17),align:'right',bold:true},
+      {t:'note',text:'844 pt fold - content continues',y:by(819.08,13),size:13},
+      {t:'h',text:'Scope of this edit',y:by(849.96,17)},
+      {t:'row',text:'This time only',radio:true,top:903-31,h:44,act:'scope:one'},
+      {t:'row',text:'This and future',radio:true,on:true,bold:true,top:947-31,h:44,act:'scope:future'},
+      {t:'note',text:'Past occurrences stay as they are.',y:by(985.52,15),size:15}
+    ]);
+    return scr(844,[{t:'title',text:'Unknown screen '+route,y:92}]);
+  }
+  function navigate(route, act){
+    var A={
+      'nav:home':'home','nav:back':'home','nav:cash':'cash-list','nav:ledger':'monthly',
+      'nav:plan':'plan-a','nav:calendar':'calendar','nav:agenda':'schedule',
+      'journal:date':'date-picker-open','budget:date':'date-picker-closed',
+      'cash:add':'cash-entry','picker:car':'plan-b','choose:tesla':'plan-c','nav:plan-c':'plan-c',
+      'add:item':'add-item-choose','add:choose':'add-item-choose','add:activity':'add-item-form',
+      'add:cash':'cash-entry','add:pay':'pay-entry','add:debt':'debt-entry',
+      'add:alt':'add-alt-category','add-alt:list':'add-alt-list','add-alt:category':'add-alt-category','add-alt:form':'add-alt-form',
+      'entry:actions':'day-actions','entry:uber':'day-actions','entry:record':'day-record','entry:comparison':'day-comparison',
+      'entry:change':'schedule-editor','nav:proposal':'plan-switch-before','proposal:after':'plan-switch-after',
+      'nav:debt':'debt-entry','nav:pay':'pay-entry'
+    };
+    if(A[act]) return A[act];
+    if(act&&act.indexOf('budget:pickday:')===0){
+      var d=act.slice('budget:pickday:'.length);
+      return d===budgetTodayKey()?'home':'add-item-home';
+    }
+    if(act&&act.indexOf('picker:')===0) return 'plan-b';
+    if(act&&act.indexOf('entry:')===0) return 'day-actions';
+    return route;
+  }
+  function session(start){
+    var route=start||'home';
+    return {
+      route:function(){return route;},
+      act:function(a){ route=navigate(route,a); return route; },
+      model:function(ctx){ return routeModel(route,ctx); }
+    };
+  }
+
+  var api={bindFullDate:bindFullDate,routeModel:routeModel,navigate:navigate,session:session,tokens:journalTokens,type:TYPE,space:SPACE,fullModel:fullModel,datePicker:datePicker,calendarModel:calendarModel,planModel:planModel,ledgerModel:ledgerModel,cashModel:cashModel,selectionOps:selectionOps,layout:layout,overlay:overlay,model:model,Home:Home,colors:C,fonts:journalFonts,glyphs:{chevronRight:chevronRight,chevronDown:chevronDown,chevronUp:chevronUp,markCircle:markCircle,markBar:markBar,markTwoBars:markTwoBars,starOutline:starOutline,radio:radio,checkbox:checkbox,acceptBand:acceptBand},mount:function(o){var h=new Home(o);h.ready=h.init();return h;}};
   root.Exp7Journal=api;root.Exp7Views.journal=api;
 })(typeof window!=='undefined'?window:globalThis);
 
@@ -14263,7 +14681,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.64",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.65",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
