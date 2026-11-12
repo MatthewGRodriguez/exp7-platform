@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Budget</title>
+<style>
+:root{--bg:#ffffff;--fg:#1c2333;--ac:#75510f;--line:#dde2ea;--muted:#49556a}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font:14px/1.4 "IBM Plex Sans",system-ui,sans-serif;background:var(--bg);color:var(--fg)}
+#budgetBootStatus{padding:10px 12px;background:#fff6dc;color:#6b4300}
+.top{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.top button{background:#fff;border:1px solid var(--line);padding:6px 10px;cursor:pointer;color:var(--fg)}
+.top button.on{border-color:var(--ac);background:#f7f1e6}
+.jrv{min-height:420px;width:100%;position:relative;background:var(--bg)}
+.jrv canvas{display:block;width:100%}
+.jrerr{padding:12px;color:#8c3600;background:#fff0e7;white-space:pre-wrap}
+/* Same visibility contract as Exp7 demo (section.on) so Exp7Slabs/parallax activate. */
+section{display:none;padding:8px 10px}
+section.on{display:block}
+#boardTypeTabs{display:flex;gap:8px;align-items:center;padding:0 0 8px;flex-wrap:wrap}
+#boardTypeTabs button{background:#fff;border:1px solid var(--line);padding:6px 10px;cursor:pointer;color:var(--fg)}
+#boardTypeTabs button.on{border-color:var(--ac);background:#f7f1e6}
+.boardPane{display:none}
+.boardPane.on{display:block}
+/*
+ * Platform scopes app CSS under #appSlot-budget. Put the jr-chrome class on #budgetRoot
+ * (inside the slot) so hide rules match after scoping.
+ */
+#budgetTabs, #boardTypeTabs, #budgetFacts{display:none!important}
+</style>
+</head>
+<body>
+<div id="budgetRoot" class="budget-root">
+<div id="budgetBootStatus">Budget starting…</div>
+<div class="top" id="budgetTabs">
+  <button data-t="home" class="on">Home</button>
+  <button data-t="cal">Calendar</button>
+  <button data-t="brd">Board</button>
+  <button data-t="plan">Plan</button>
+</div>
+<div class="top" id="budgetFacts"></div>
+<section id="budget-t-home" class="on"><div id="budget-vf-home" class="jrv"></div></section>
+<section id="budget-t-cal"><div class="jrv" id="budget-vf-cal"></div></section>
+<section id="budget-t-brd">
+  <div id="boardTypeTabs" role="tablist" aria-label="Board type">
+    <button type="button" data-board="expense" class="on">expense</button>
+    <button type="button" data-board="income">income</button>
+    <button type="button" data-board="debt">debt</button>
+    <button type="button" data-board="asset">asset</button>
+  </div>
+  <div class="boardPane on" id="budget-pane-expense"><div class="jrv" id="budget-vf-brd-expense" data-budget-board="expense"></div></div>
+  <div class="boardPane" id="budget-pane-income"><div class="jrv" id="budget-vf-brd-income" data-budget-board="income"></div></div>
+  <div class="boardPane" id="budget-pane-debt"><div class="jrv" id="budget-vf-brd-debt" data-budget-board="debt"></div></div>
+  <div class="boardPane" id="budget-pane-asset"><div class="jrv" id="budget-vf-brd-asset" data-budget-board="asset"></div></div>
+</section>
+<section id="budget-t-plan"><div class="jrv" id="budget-vf-plan"></div></section>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script>/* Budget app — Exp7Views consumer (same module as Exp7 demo).
+ * Isolated IDB (budget-app-v1). Four type boards (expense/income/debt/asset) on one atlas;
+ * Cal/Plan see the combined membership. View content is JRViews→JRender (slabs/parallax).
+ */
+(function () {
+  'use strict';
+  var DB_NAME = 'budget-app-v1';
+  var TAB = 'home';
+  var BOARD_TAB = 'expense';
+  var BOARD_TYPES = ['expense', 'income', 'debt', 'asset'];
+  var W = null;
+  var surface = null;
+  var home = null;
+  var handles = { cal: null, expense: null, income: null, debt: null, asset: null, plan: null };
+  var RISK_COL = window.RISK_COL || {
+    C: ['#D55E00', 'CRITICAL', '#fff0e7'],
+    M: ['#E69F00', 'MODERATE', '#fff6dc'],
+    L: ['#009E73', 'LOW', '#e8f5ef']
+  };
+  var DEFAULT_THEME = { tokens: { bg: '#ffffff', fg: '#1c2333', accent: '#75510f' } };
+  var DEFAULT_CRIT_STATES = {
+    critical: { bg: RISK_COL.C[2], border: RISK_COL.C[0], sm: 'invalid', anim: 'shake', label: 'CRITICAL' },
+    moderate: { bg: RISK_COL.M[2], border: RISK_COL.M[0], sm: 'idle', anim: 'none', label: 'MODERATE' },
+    low: { bg: RISK_COL.L[2], border: RISK_COL.L[0], sm: 'idle', anim: 'none', label: 'LOW' },
+    bad: { bg: RISK_COL.C[2], border: RISK_COL.C[0], sm: 'invalid', anim: 'shake', label: 'CRITICAL' },
+    tight: { bg: RISK_COL.M[2], border: RISK_COL.M[0], sm: 'idle', anim: 'none', label: 'MODERATE' },
+    busy: { bg: RISK_COL.M[2], border: RISK_COL.M[0], sm: 'idle', anim: 'none', label: '2+ items' },
+    overload: { bg: RISK_COL.C[2], border: RISK_COL.C[0], sm: 'invalid', anim: 'shake', label: 'overload' },
+    selected: { bg: '#e7eefb', border: '#2458a6', sm: 'idle', anim: 'none', label: 'SELECTED' }
+  };
+
+  function pub(p) {
+    var d = Object.assign({ source: 'budget-app', v: 1 }, p);
+    try { window.dispatchEvent(new CustomEvent('budget-app-signal', { detail: d })); } catch (e) {}
+    try { window.postMessage(d, '*'); } catch (e) {}
+  }
+  function $(id) { return document.getElementById(id); }
+
+  function db() {
+    return new Promise(function (res, rej) {
+      var q = indexedDB.open(DB_NAME, 1);
+      q.onupgradeneeded = function () {
+        var d = q.result;
+        if (!d.objectStoreNames.contains('kv')) d.createObjectStore('kv');
+      };
+      q.onsuccess = function () { res(q.result); };
+      q.onerror = function () { rej(q.error || new Error('indexedDB open failed')); };
+      q.onblocked = function () { rej(new Error('indexedDB open blocked')); };
+    });
+  }
+  async function idbGet(k) {
+    var d = await db();
+    return await new Promise(function (res, rej) {
+      var g = d.transaction('kv', 'readonly').objectStore('kv').get(k);
+      g.onsuccess = function () { res(g.result || null); };
+      g.onerror = function () { rej(g.error); };
+    });
+  }
+  async function idbPut(k, v) {
+    var d = await db();
+    return await new Promise(function (res, rej) {
+      var t = d.transaction('kv', 'readwrite');
+      t.objectStore('kv').put(v, k);
+      t.oncomplete = function () { res(); };
+      t.onerror = function () { rej(t.error); };
+    });
+  }
+
+  function applyDefaultViewStyling(w) {
+    Object.values(w.components || {}).forEach(function (c) {
+      if (!c || !c.view) return;
+      c.view.theme = JSON.parse(JSON.stringify(DEFAULT_THEME));
+      if (Array.isArray(c.view.states)) return;
+      c.view.states = Object.assign({}, c.view.states || {}, DEFAULT_CRIT_STATES);
+    });
+  }
+
+  function boardIdsOf(w) {
+    var EV = window.Exp7Views;
+    if (EV && typeof EV.typeBoardIds === 'function') {
+      var ids = EV.typeBoardIds(w) || [];
+      if (ids.length) return ids;
+    }
+    var meta = (w && w.meta && w.meta.boardIds) || {};
+    return BOARD_TYPES.map(function (t) { return meta[t]; }).filter(Boolean);
+  }
+
+  function mkBudgetAtlas() {
+    var EV = window.Exp7Views;
+    var w = EV.blankMoneyAtlas('Budget');
+    EV.normalizeDemoViews(w);
+    EV.ensureBudgetBoards(w);
+    var R = EV.rootsFor(w);
+    var cal = w.components[R.calId];
+    w.joys = w.joys || {};
+    w.joys.priority_pool = { id: 'priority_pool', name: 'Priority pool', value: 0, jtype: 'ranking', rangeMin: 0, rangeMax: 100, inv: false };
+    w.joys.attention_pool = { id: 'attention_pool', name: 'Attention pool', value: 0, jtype: 'ranking', rangeMin: 0, rangeMax: 10, inv: false };
+    if (cal) cal.items = [];
+    boardIdsOf(w).forEach(function (bid) {
+      if (w.components[bid]) w.components[bid].items = [];
+    });
+    if (w.components.reqs) w.components.reqs.items = [];
+    applyDefaultViewStyling(w);
+    w.meta = Object.assign({}, w.meta, {
+      budget: 1, label: 'blank', calId: R.calId, planId: 'reqs',
+      viewsModule: EV.MODULE_ID,
+      provenance: 'Exp7Views mountSurface → cal + 4 boards + plan → JRViews → JRender'
+    });
+    return w;
+  }
+
+  function pathSet(obj, path, value, op) {
+    var parts = String(path).split('/');
+    var cur = obj;
+    for (var i = 0; i < parts.length - 1; i++) {
+      var k = parts[i];
+      if (cur[k] == null || typeof cur[k] !== 'object') cur[k] = {};
+      cur = cur[k];
+    }
+    var leaf = parts[parts.length - 1];
+    if (op === 'add' && Array.isArray(cur[leaf])) {
+      if (cur[leaf].indexOf(value) < 0) cur[leaf].push(value);
+    } else if (op === 'remove' && Array.isArray(cur[leaf])) {
+      cur[leaf] = cur[leaf].filter(function (x) { return x !== value; });
+    } else if (op === 'drop') {
+      delete cur[leaf];
+    } else if (op === 'add' && cur[leaf] == null) {
+      if (leaf === 'items' && typeof value === 'string' && value.indexOf('item:') === 0) cur[leaf] = [value];
+      else cur[leaf] = value;
+    } else {
+      cur[leaf] = value;
+    }
+  }
+
+  function applyOpsLocal(ops) {
+    (ops || []).forEach(function (o) {
+      pathSet(W, o.path, o.value, o.op || 'set');
+    });
+    W.rev = (W.rev || 0) + 1;
+  }
+
+  function stampTypeFromBoardOps(ops) {
+    (ops || []).forEach(function (o) {
+      if (!o || o.op !== 'add' || typeof o.path !== 'string') return;
+      var bm = /^components\/(board_(expense|income|debt|asset))\/items$/.exec(o.path);
+      if (!bm || typeof o.value !== 'string' || o.value.indexOf('item:') !== 0) return;
+      var id = o.value.slice(5);
+      var it = W.items[id]; if (!it) return;
+      it.values = it.values || {};
+      if (it.values.type == null) it.values.type = bm[2];
+    });
+  }
+
+  function onPropose(ops) {
+    applyOpsLocal(ops);
+    stampTypeFromBoardOps(ops);
+    remountViews();
+    persist();
+    return { ok: true, ops: ops.length, rev: W.rev };
+  }
+
+  function disposeViews() {
+    if (home) { home.dispose(); home = null; }
+    if (surface) {
+      try { surface.dispose(); } catch (e) {}
+      surface = null;
+    }
+    handles = { cal: null, expense: null, income: null, debt: null, asset: null, plan: null };
+  }
+
+  function budgetViewSpecs() {
+    var EV = window.Exp7Views;
+    EV.ensureBudgetBoards(W);
+    var R = EV.rootsFor(W);
+    var ids = W.meta.boardIds || {};
+    return [
+      { id: 'calendar', kind: 'calendar', host: $('budget-vf-cal'), root: R.calendar },
+      { id: 'board_expense', kind: 'board', host: $('budget-vf-brd-expense'), root: ['comp:' + (ids.expense || 'board_expense')] },
+      { id: 'board_income', kind: 'board', host: $('budget-vf-brd-income'), root: ['comp:' + (ids.income || 'board_income')] },
+      { id: 'board_debt', kind: 'board', host: $('budget-vf-brd-debt'), root: ['comp:' + (ids.debt || 'board_debt')] },
+      { id: 'board_asset', kind: 'board', host: $('budget-vf-brd-asset'), root: ['comp:' + (ids.asset || 'board_asset')] },
+      { id: 'plan', kind: 'plan', host: $('budget-vf-plan'), root: R.plan }
+    ];
+  }
+
+  function remountViews() {
+    if (!window.Exp7Views) throw new Error('Budget requires Exp7Views');
+    applyDefaultViewStyling(W);
+    window.Exp7Views.ensureBudgetBoards(W);
+    var onError = function () { scheduleChromeMode(); };
+    var onUpdate = function () { scheduleChromeMode(); };
+    if (surface) {
+      surface.update(W);
+    } else {
+      surface = window.Exp7Views.mountSurface({
+        atlas: W,
+        views: budgetViewSpecs(),
+        onPropose: onPropose,
+        onError: onError,
+        onUpdate: onUpdate
+      });
+      handles = {
+        cal: surface.get('calendar'),
+        expense: surface.get('board_expense'),
+        income: surface.get('board_income'),
+        debt: surface.get('board_debt'),
+        asset: surface.get('board_asset'),
+        plan: surface.get('plan')
+      };
+    }
+    syncBudgetUi();
+    if (home) home.update(W);
+    else {
+      home = window.Exp7Views.journal.mount({host:$('budget-vf-home'), atlas:W,
+        onPropose:onPropose, onNavigate:navigateFromHome,
+        onError:function(e){ setBootStatus('Budget Home: '+String(e.message||e),false); },
+        onUpdate:function(){ scheduleChromeMode(); }});
+      home.ready.catch(function(e){setBootStatus('Budget Home: '+String(e.message||e),false);});
+    }
+    showTab(TAB);
+    showBoardTab(BOARD_TAB);
+    scheduleChromeMode();
+  }
+
+  function syncBudgetUi() {
+    var prev = window.__budgetUi || {};
+    var d = new Date();
+    var today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    var calId = W && W.meta && W.meta.calId;
+    var cal = calId && W.components && W.components[calId];
+    var fromCal = cal && cal.view && cal.view.month;
+    var month = /^\d{4}-\d{2}$/.test(prev.month || '') ? prev.month : (/^\d{4}-\d{2}$/.test(fromCal || '') ? fromCal : today);
+    /* One selected date. The views show its whole month. A month with no day yet reads as today, or the first of another month. */
+    var now = today + '-' + String(d.getDate()).padStart(2, '0');
+    var day = /^\d{4}-\d{2}-\d{2}$/.test(prev.day || '') && prev.day.slice(0, 7) === month ? prev.day : (month === today ? now : month + '-01');
+    var pick = /^\d{4}-\d{2}$/.test(prev.pick || '') ? prev.pick : '';
+    window.__budgetUi = { tab: TAB, boardTab: BOARD_TAB, month: month, day: day, pick: pick };
+    window.__budgetAtlas = W;
+  }
+
+  function stampBudgetMonth(month) {
+    if (!W || !W.components) return;
+    Object.keys(W.components).forEach(function (id) {
+      var c = W.components[id];
+      if (!c || !c.view) return;
+      if (c.view.layout === 'calendar' || c.view.layout === 'board') c.view.month = month;
+    });
+  }
+
+  var _chromeModeTimer = 0;
+  function scheduleChromeMode() {
+    if (_chromeModeTimer) clearTimeout(_chromeModeTimer);
+    _chromeModeTimer = setTimeout(function () {
+      _chromeModeTimer = 0;
+      refreshChromeMode();
+    }, 0);
+    /* Draw is async — recheck after JRViews finishes (or jrerr appears). */
+    setTimeout(refreshChromeMode, 250);
+    setTimeout(refreshChromeMode, 1000);
+  }
+
+  /** When JRViews painted a view canvas, hide DOM tabs — chrome lives in-scene (slabs/parallax).
+   * Class goes on #budgetRoot (inside #appSlot-budget) so scoped app CSS still matches. */
+  function refreshChromeMode() {
+    ['budgetTabs','boardTypeTabs','budgetFacts'].forEach(function(id){var el=$(id);if(el)el.style.setProperty('display','none','important');});
+    if(TAB==='home') return;
+
+    var painted = false;
+    var failed = false;
+    var ids = ['budget-vf-cal', 'budget-vf-plan', 'budget-vf-brd-expense', 'budget-vf-brd-income', 'budget-vf-brd-debt', 'budget-vf-brd-asset'];
+    try {
+      ids.forEach(function (id) {
+        var h = $(id);
+        if (!h) return;
+        if (h.querySelector('.jrerr')) failed = true;
+        var jvs = window.exp7views && window.exp7views.JVS && window.exp7views.JVS[id];
+        if (h.querySelector('canvas') && jvs && jvs.n > 0 && !jvs.err) painted = true;
+      });
+    } catch (e) {}
+    if (failed) painted = false;
+    var root = $('budgetRoot');
+    if (root) root.classList.toggle('jr-chrome', painted);
+    /* Force-hide with !important — platform scopes app CSS under #appSlot-*, so
+     * html/body-based selectors never match; inline !important is reliable. */
+    var tabs = $('budgetTabs');
+    var types = $('boardTypeTabs');
+    if (tabs) {
+      if (painted) tabs.style.setProperty('display', 'none', 'important');
+      else tabs.style.removeProperty('display');
+    }
+    if (types) {
+      if (painted) types.style.setProperty('display', 'none', 'important');
+      else types.style.removeProperty('display');
+    }
+    var facts = $('budgetFacts');
+    if (facts) {
+      if (painted) facts.style.setProperty('display', 'none', 'important');
+      else {
+        facts.style.removeProperty('display');
+        if (W && typeof window.__budgetFactsHtml === 'function') {
+          facts.innerHTML = window.__budgetFactsHtml(W);
+          facts.onclick = function (e) {
+            var b = e.target.closest && e.target.closest('[data-jv-act]');
+            if (b && window.__budgetChromeAct) window.__budgetChromeAct(b.getAttribute('data-jv-act'));
+          };
+        }
+      }
+    }
+  }
+
+  function redrawChromeViews() {
+    syncBudgetUi();
+    if (surface && typeof surface.update === 'function' && W) {
+      try { surface.update(W); } catch (e) {}
+    }
+    if (home) home.update(W);
+    refreshChromeMode();
+    try { if (window.Exp7Slabs && window.Exp7Slabs.notify) window.Exp7Slabs.notify(); } catch (e) {}
+    try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+  }
+
+  function showBoardTab(t) {
+    if (BOARD_TYPES.indexOf(t) < 0) t = 'expense';
+    BOARD_TAB = t;
+    syncBudgetUi();
+    document.querySelectorAll('#boardTypeTabs button[data-board]').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.board === t);
+    });
+    BOARD_TYPES.forEach(function (k) {
+      var pane = $('budget-pane-' + k);
+      if (pane) pane.classList.toggle('on', k === t);
+    });
+    try { if (window.Exp7Slabs && window.Exp7Slabs.notify) window.Exp7Slabs.notify(); } catch (e) {}
+    try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+  }
+
+  function openDay(day, after) {
+    showTab('cal');
+    var v=window.JVS&&window.JVS['budget-vf-cal'];
+    if(v){ var nav=window.calNavOf(v); nav.level='day'; nav.day=day||null;
+      var sel=window.calSelOf(v); sel.selected={}; if(day)sel.selected[day]=1; sel.anchor=day;
+      if(v.sess&&v.queue)v.queue(v.sess,'home-navigation');
+      if(typeof after==='function'){ try{ after(v); }catch(e){} } }
+  }
+  function navigateFromHome(kind,day,extra) {
+    if (day) window.__budgetUi=Object.assign({},window.__budgetUi||{},{day:day,month:String(day).slice(0,7)});
+    if (kind==='calendar'||kind==='agenda') {
+      openDay(day, function(v){
+        if(extra&&extra.entry&&window.BudgetFlows) window.BudgetFlows.act(v,'occ:actions:'+extra.entry);
+        if(extra&&extra.add&&window.BudgetFlows) window.BudgetFlows.act(v,'add:open');
+      });
+    } else if(kind==='ledger'){showTab('brd');showBoardTab('expense');}
+    else if(kind==='cash'){showTab('brd');showBoardTab('asset');}
+    else if(kind==='date-needed'){ showTab('brd');showBoardTab('expense'); }
+    else if(String(kind).indexOf('board:')===0){ /* leftover Board setup paths go to the calendar day */
+      openDay(day||((window.__budgetUi||{}).day), function(v){ if(window.BudgetFlows){ var k=String(kind).slice(6); window.BudgetFlows.act(v, k==='asset'?'add:kind:cash':k==='debt'?'add:kind:debt':'add:open'); } }); }
+    else if(kind==='pay'){ openDay(day||((window.__budgetUi||{}).day), function(v){ if(window.BudgetFlows) window.BudgetFlows.act(v,'add:kind:pay'); }); }
+    else if(kind==='plan')showTab('plan');
+    else if(kind==='home')showTab('home');
+    redrawChromeViews();
+  }
+  function showTab(t) {
+    if (['home','cal','brd','plan'].indexOf(t)<0) t='home';
+    if (home && t!=='home') home.close();
+    TAB = t;
+    syncBudgetUi();
+    document.querySelectorAll('#budgetTabs button[data-t]').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.t === t);
+    });
+    ['home', 'cal', 'brd', 'plan'].forEach(function (k) {
+      var sec = $('budget-t-' + k);
+      if (sec) {
+        sec.classList.toggle('on', k === t);
+        sec.hidden = false;
+      }
+    });
+    if (t === 'home' && home) home.update(W);
+    if (t === 'cal') { var cv=window.JVS&&window.JVS['budget-vf-cal']; if(cv&&window.calNavOf){ var n=window.calNavOf(cv); n.level='day'; n.day=n.day||((window.__budgetUi||{}).day); } }
+    if (t === 'brd') showBoardTab(BOARD_TAB);
+    try { if (window.Exp7Slabs && window.Exp7Slabs.notify) window.Exp7Slabs.notify(); } catch (e) {}
+  }
+
+  window.__budgetChromeAct = function (a) {
+    if (!a) return;
+    /* Date button: open or close the mini calendar. Its arrows only browse; a day or Today sets the date and closes it. */
+    if (a === 'budget:date') {
+      var cur = window.__budgetUi || {};
+      window.__budgetUi = Object.assign({}, cur, { pick: cur.pick ? '' : (cur.month || '') });
+      redrawChromeViews();
+      return;
+    }
+    if (a.indexOf('budget:pick:') === 0 || a.indexOf('budget:pickday:') === 0) {
+      var ui = window.__budgetUi || {};
+      var cmd = a.indexOf('budget:pickday:') === 0 ? a.slice(15) : a.slice(12);
+      if (cmd === '-1' || cmd === '1') {
+        var from = ui.pick || ui.month || '';
+        window.__budgetUi = Object.assign({}, ui, { pick: typeof window.budgetShiftMonth === 'function' ? window.budgetShiftMonth(from, +cmd) : from });
+        redrawChromeViews();
+        return;
+      }
+      var day = cmd === 'today' ? (function () { var t = new Date(); return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); })() : cmd;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+      window.__budgetUi = Object.assign({}, ui, { month: day.slice(0, 7), day: day, pick: '' });
+      stampBudgetMonth(day.slice(0, 7));
+      redrawChromeViews();
+      return;
+    }
+    if (a.indexOf('budget:tab:') === 0) {
+      window.__budgetUi = Object.assign({}, window.__budgetUi || {}, { pick: '' });
+      showTab(a.slice(11));
+      redrawChromeViews();
+      return;
+    }
+    if (a.indexOf('budget:board:') === 0) {
+      window.__budgetUi = Object.assign({}, window.__budgetUi || {}, { pick: '' });
+      showTab('brd');
+      showBoardTab(a.slice(13));
+      redrawChromeViews();
+    }
+  };
+
+  async function persist() {
+    if (!W) return;
+    var payload = {
+      atlas: JSON.parse(JSON.stringify(W)),
+      at: Date.now(),
+      viewsModule: window.Exp7Views.MODULE_ID,
+      presentation: window.Exp7Views.presentation
+    };
+    await idbPut('atlasState', payload);
+    try { if (window.__budgetLocalChange) window.__budgetLocalChange(); } catch (e) {}
+    var cur = await idbGet('state');
+    if (!cur || cur.atlas) await idbPut('state', payload);
+  }
+
+  function wireUi() {
+    $('budgetTabs').onclick = function (e) {
+      var b = e.target.closest('button[data-t]'); if (b) showTab(b.dataset.t);
+    };
+    var typeTabs = $('boardTypeTabs');
+    if (typeTabs) {
+      typeTabs.onclick = function (e) {
+        var b = e.target.closest('button[data-board]'); if (b) showBoardTab(b.dataset.board);
+      };
+    }
+    window.addEventListener('beforeunload', function () { disposeViews(); });
+  }
+
+  function setBootStatus(text, hide) {
+    var bs = $('budgetBootStatus');
+    if (!bs) return;
+    if (text != null) bs.textContent = text;
+    bs.hidden = !!hide;
+  }
+  function withTimeout(p, ms, label) {
+    return new Promise(function (res, rej) {
+      var done = false;
+      var t = setTimeout(function () {
+        if (done) return;
+        done = true;
+        rej(new Error((label || 'operation') + ' timed out after ' + ms + 'ms'));
+      }, ms);
+      Promise.resolve(p).then(function (v) {
+        if (done) return;
+        done = true; clearTimeout(t); res(v);
+      }, function (e) {
+        if (done) return;
+        done = true; clearTimeout(t); rej(e);
+      });
+    });
+  }
+
+  var PROPOSALS = [];
+  /* 1.8.57: a preferred item no longer selects itself. An atlas saved before that keeps its plan: what was in use is recorded as the accepted choice. */
+  function migrateSelection(w) { if (!w || !w.meta || w.meta.selModel >= 2) return;
+    Object.keys(w.items || {}).forEach(function (id) { var it = w.items[id], A = it && it.alts; if (!A || !Array.isArray(A.members) || !A.members.length) return;
+      var st = (it.state && typeof it.state === 'object' && !Array.isArray(it.state)) ? it.state : (it.state = {}); if (st.userPick) return;
+      var un = [].concat(A.unavail || []), av = A.members.filter(function (m) { return w.items[String(m).replace(/^item:/, '')] && un.indexOf(m) < 0; });
+      var cur = (A.pref && av.indexOf(A.pref) >= 0) ? A.pref : ((st.pick && av.indexOf(st.pick) >= 0) ? st.pick : null); if (cur) st.userPick = cur; });
+    w.meta.selModel = 2; }
+  function healMembership(w) {
+    window.Exp7Views.normalizeDemoViews(w);
+    window.Exp7Views.ensureBudgetBoards(w);
+    var R = window.Exp7Views.rootsFor(w);
+    var ids = w.meta.boardIds || {};
+    /* meta.planOwn: the atlas keeps its own Plan (only the steps it lists); 1.8.51. */
+    var own = !!(w.meta && w.meta.planOwn);
+    var ensure = function (compId, ref) {
+      var c = w.components[compId]; if (!c) return;
+      c.items = c.items || [];
+      if (c.items.indexOf(ref) < 0) c.items.push(ref);
+    };
+    ((w.components[R.calId] || {}).items || []).forEach(function (ref) {
+      var id = String(ref).replace(/^item:/, '');
+      var it = w.items[id];
+      var t = (it && it.values && it.values.type) || 'expense';
+      if (t !== 'routine') { /* 1.8.54: routines are schedule-only and stay off the money boards */
+      if (BOARD_TYPES.indexOf(t) < 0) t = 'expense';
+      ensure(ids[t] || ids.expense, ref); }
+      if (!own) ensure(R.planId, ref);
+    });
+    /* 1.8.55: the Plan lists scheduled entries; a bare asset or debt is not a step */
+    var notStep = function (ref) { var x = w.items[String(ref).replace(/^item:/, '')], t = x && x.values && x.values.type; return (t === 'asset' || t === 'debt') && !(x.values && x.values.date); };
+    if (!own && w.components[R.planId] && Array.isArray(w.components[R.planId].items)) w.components[R.planId].items = w.components[R.planId].items.filter(function (ref) { return !notStep(ref); });
+    boardIdsOf(w).forEach(function (bid) {
+      ((w.components[bid] || {}).items || []).forEach(function (ref) {
+        if (!own && !notStep(ref)) ensure(R.planId, ref);
+        var id = String(ref).replace(/^item:/, '');
+        var it = w.items[id];
+        if (it && it.values && it.values.date) ensure(R.calId, ref);
+      });
+    });
+  }
+
+  async function boot() {
+    setBootStatus('Budget starting…', false);
+    try {
+      if (!window.Exp7Views || window.Exp7Views.MODULE_ID !== 'exp7-views@1') {
+        throw new Error('Budget requires Exp7Views exp7-views@1 (got ' +
+          ((window.Exp7Views && window.Exp7Views.MODULE_ID) || 'missing') + ')');
+      }
+      if (typeof window.setView !== 'function') {
+        throw new Error('Budget requires Exp7Views host (setView missing)');
+      }
+      if (typeof window.Exp7Views.ensureBudgetBoards !== 'function') {
+        throw new Error('Budget requires Exp7Views.ensureBudgetBoards');
+      }
+      setBootStatus('Budget loading atlas…', false);
+      var saved = await withTimeout(
+        idbGet('atlasState').then(function (a) { return a || idbGet('state'); }),
+        8000,
+        'Budget IDB'
+      );
+      if (saved && saved.atlas) {
+        W = saved.atlas;
+        W.meta = W.meta || {};
+        delete W.meta.htmlViews;
+        healMembership(W);
+        applyDefaultViewStyling(W);
+        W.meta.viewsModule = window.Exp7Views.MODULE_ID;
+        W.meta.provenance = 'Exp7Views mountSurface → cal + 4 boards + plan → JRViews → JRender';
+        W.meta.budget = 1;
+      } else {
+        setBootStatus('Budget creating blank atlas…', false);
+        W = mkBudgetAtlas();
+      }
+      migrateSelection(W);
+      try { PROPOSALS = (await withTimeout(idbGet('proposals'), 8000, 'Budget IDB')) || []; } catch (e) { PROPOSALS = []; }
+      if (!Array.isArray(PROPOSALS)) PROPOSALS = [];
+      window.__budgetProposals = { list: function () { return PROPOSALS; }, save: function (L) { PROPOSALS = JSON.parse(JSON.stringify(L || [])); return idbPut('proposals', PROPOSALS).then(function () { return idbPut('proposalsAt', Date.now()); }).then(function () { if (window.__budgetLocalChange) window.__budgetLocalChange(); }).catch(function () {}); } };
+      setBootStatus('Budget mounting views…', false);
+      wireUi();
+      remountViews();
+      showTab('home');
+      window.budget = {
+        W: function () { return W; },
+        persist: persist,
+        home: function(){return home;},
+        navigateHome: function(){showTab('home');},
+        /* one step back inside Budget: a Calendar day or year returns to its month, any full view returns to Home. False on Home. */
+        back: function(){ if (TAB === 'home') return false;
+          if (TAB === 'cal') { var V = window.JVS && window.JVS['budget-vf-cal']; try { if (V && typeof calNavOf === 'function' && calNavOf(V).level === 'day' && typeof hostCalAct === 'function') { hostCalAct(V, 'cal:back'); return true; } } catch (e) {} }
+          showTab('home'); return true; },
+        dispose: disposeViews,
+        mode: function () { return 'exp7-views'; },
+        viewsModuleId: function () { return window.Exp7Views.MODULE_ID; },
+        boardIds: function () { return (W && W.meta && W.meta.boardIds) || null; },
+        provenance: function () {
+          return {
+            viewsModule: window.Exp7Views.MODULE_ID,
+            presentation: window.Exp7Views.presentation,
+            demoBase: false,
+            legacyDom: false,
+            jrender: true,
+            boards: 4,
+            theme: 'EXP7_LIGHT_DEFAULT+RISK_COL'
+          };
+        }
+      };
+      await home.ready;
+      await home.chain;
+      if(!home.painted||home.error)throw new Error(home.error||'Home has not drawn');
+      setBootStatus(null, true);
+      pub({
+        type: 'budget-app-ready', renderReady: true, mode: 'exp7-views',
+        viewsModule: window.Exp7Views.MODULE_ID, tabs: 4, boards: 4, sectionOn: 't-home',
+        proof: {
+          moduleId: window.Exp7Views.MODULE_ID,
+          presentation: window.Exp7Views.presentation,
+          demoBase: false, legacyDom: false, jrender: true, boards: 4,
+          boardIds: W.meta.boardIds
+        }
+      });
+    } catch (e) {
+      setBootStatus('Budget boot error: ' + ((e && e.message) || e), false);
+      pub({ type: 'budget-app-error', error: String((e && e.message) || e), renderReady: false });
+      console.error(e);
+    }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+</body>
+</html>
