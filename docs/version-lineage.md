@@ -82,6 +82,7 @@ Verified by `git fetch origin main`, `release.json` on tip, and file SHA.
 | **1.8.64** | | Budget phone art fidelity: study tokens, Source Sans 3, calendar marks, drawn chevrons. Follow-up: Home/Today/Plan stack, compact plan list, ledger signs, flush mini-month, standalone calendar legend, compared on Mac Metal against the phone studies [MEAS]. |
 | **1.8.65** | | Budget phone art fidelity, all screens: Home stack, centered calendar marks, remaining study states (cash entry, plan B/C, add-item, add-alternative, day path, plan-switch, debt, pay, schedule editor) compared on Mac Metal [MEAS]. |
 | **1.8.66** | | Budget journal at every width: legacy three-column Home and Budget calendar/plan/timeline/board frames removed; cash/owned walker fixed; compared on Mac Chrome (Metal) at 1000×712 and 390×844 [MEAS]. |
+| **1.8.67** | | Budget Home uses a viewport-sized canvas (px height ≤ 8192) and the shared JRViews device, so a tall journal cannot black out Safari or the platform bar; compared on Mac Safari/Chrome at 1000×712 and 390×844 [MEAS]. |
 
 The 9 Nov 2026 overlay packet is recorded in [design/overlay-view-store.md](./design/overlay-view-store.md). Shell 1.8.28 plays it as the Fish app. Shell 1.8.29 plays the Lumen page the same way.
 
