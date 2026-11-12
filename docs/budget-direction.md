@@ -2,7 +2,7 @@
 
 **Source of the requirements:** `BUDGET_DIRECTION.md`, supplied by Matthew on 2026-11-11 **[REQ]**. That document states agreed behaviour. This page records what the platform now does about each part of it, the rules and thresholds it uses, how existing data is carried over, and what has and has not been verified.
 
-**Base:** `main` at `99dba06` (release 1.8.54). **Branch:** `budget-direction`. Merged to `main` in PR #92 as release 1.8.61. Later phone-first and product fixes are 1.8.62.
+**Base:** `main` at `99dba06` (release 1.8.54). **Branch:** `budget-direction`. Merged to `main` in PR #92 as release 1.8.61. Later phone-first and product fixes are 1.8.62. 1.8.63 fixes a Budget Home boot error (`hit` was overwritten by the 44 pt typography constant).
 
 Evidence labels follow [EVIDENCE.md](./EVIDENCE.md). Everything run in a cloud browser is **[MOCK]** by that page's definition, however real the app code under test is. Nothing here is **[USER-HW]**.
 
@@ -190,4 +190,4 @@ On first open in 1.8.57 or later, a budget without `meta.selModel` is migrated o
 
 ## Where the sources are
 
-The platform file is built from the pinned base by ordered patches. From 1.8.62 the Budget scripts (`budget-rules`, `budget-flows`, `journal-views`, `eval`) and a new unit suite are delivered as a sidecar archive outside this repository, so a release PR stays within docs, the platform file, `release.json`, and the launchers. The original 72 unit + 231 integration checks from 1.8.55–1.8.61 were delivered as a separate archive and are not in this repository.
+The platform file is built from the pinned base by ordered patches. From 1.8.62 the Budget scripts (`budget-rules`, `budget-flows`, `journal-views`, `eval`) and a new unit suite are delivered as a sidecar archive outside this repository, so a release PR stays within docs, the platform file, `release.json`, and the launchers. 1.8.63 keeps that layout and only renames the 44 pt typography constant so it cannot overwrite `hit()`. The original 72 unit + 231 integration checks from 1.8.55–1.8.61 were delivered as a separate archive and are not in this repository.
