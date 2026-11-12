@@ -2,7 +2,7 @@
 
 **Source of the requirements:** `BUDGET_DIRECTION.md`, supplied by Matthew on 2026-11-11 **[REQ]**. That document states agreed behaviour. This page records what the platform now does about each part of it, the rules and thresholds it uses, how existing data is carried over, and what has and has not been verified.
 
-**Base:** `main` at `99dba06` (release 1.8.54). **Branch:** `budget-direction`. Not merged, not deployed.
+**Base:** `main` at `99dba06` (release 1.8.54). **Branch:** `budget-direction`. Merged to `main` in PR #92 as release 1.8.61. Later phone-first and product fixes are 1.8.62.
 
 Evidence labels follow [EVIDENCE.md](./EVIDENCE.md). Everything run in a cloud browser is **[MOCK]** by that page's definition, however real the app code under test is. Nothing here is **[USER-HW]**.
 
@@ -24,7 +24,11 @@ No new artwork or visual design was made. New controls reuse the existing form, 
 
 ## 2. First visit
 
-Home shows a quiet *Start here:* line until each step has something in it, in the document's order:
+**Superseded in 1.8.62.** There is no first-visit setup flow and no *Start here:* / *Enter assets and cash* / *Enter debts* links. People enter cash and owned items, debts, pay, and activities from a calendar day. Home may still list unfinished proposals as *Resume proposal*.
+
+The 1.8.55–1.8.61 behaviour, kept here as history, was:
+
+Home showed a quiet *Start here:* line until each step had something in it, in the document's order:
 
 1. *Enter assets and cash* opens the asset Board.
 2. *Enter debts* opens the debt Board. It stays until a debt exists or pay is scheduled, so a person with no debts is not asked forever.
@@ -35,7 +39,7 @@ An activity is scheduled from the Calendar's *Add item* without creating a categ
 
 ## 3. Starting finances
 
-**Assets.** An asset is a *cash balance* or an *owned item* (`values.assetKind`). Cash counts as money available and is the opening cash for the day colours. An owned item counts toward net worth only. An asset saved before 1.8.55 has no kind; until it is edited, it is read as cash when its name contains check, saving, cash, bank or wallet.
+**Assets.** An asset is a *cash balance* or an *owned item* (`values.assetKind`). Cash counts as money available and is the opening cash for the day colours. An owned item counts toward net worth only. An asset saved before 1.8.55 has no kind. **From 1.8.62, unmarked items are not treated as cash** and the kind is never inferred from the name. A new item added from a calendar day defaults to Cash, and the user can switch it to Owned. The as-of date is that day.
 
 **Debts.** Fields: creditor, purpose, balance owed, as-of date, APR, payments remaining, days between payments. The payment is calculated, shown before saving, and can be put on the Calendar as a repeating entry that pays the debt.
 
@@ -186,4 +190,4 @@ On first open in 1.8.57 or later, a budget without `meta.selModel` is migrated o
 
 ## Where the sources are
 
-The platform file is built from the pinned base by ordered patches, with the new scripts and the tests kept beside them. Because of the two-file release rule these are not in this repository; they were delivered to Matthew as an archive with this work.
+The platform file is built from the pinned base by ordered patches. From 1.8.62 the Budget scripts (`budget-rules`, `budget-flows`, `journal-views`, `eval`) and a new unit suite live in the sidecar folder `exp7-platform/budget-src/`, beside the two-file release. The original 72 unit + 231 integration checks from 1.8.55–1.8.61 were delivered as a separate archive and are not in this repository.
