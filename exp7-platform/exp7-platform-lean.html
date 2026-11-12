@@ -104,7 +104,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 </button>
 </header>
 <div id="exp7DbgPanel" hidden role="dialog" aria-label="Debug handoff">
-<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.62. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
+<p id="exp7DbgNote" style="margin:0">Reproduce the problem, then press Copy and paste the whole box back. Shift+D opens this. The paste must say shell 1.8.63. style.note should mention lifted controls and sampled penumbra rows. A selected day keeps its place. The first draw must not sit. Hover a button and the face rises while the shadow stays. No keys or account text.</p>
 <textarea id="exp7DbgText" readonly></textarea>
 <div class="row"><button type="button" id="exp7DbgCopy">Copy</button><button type="button" id="exp7DbgClose">Close</button></div>
 </div>
@@ -12559,7 +12559,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     if(!m)throw Error('Missing journal model');
     core=core||JV.__core&&JV.__core(); if(!core)throw Error('JRender core not ready');
     var ns=[], used=new Set([0,JV.GID]), fonts=[JV.font(),JV.fontBold?JV.fontBold():JV.font()], cursor=0, rows=0, texts=[];
-    var body=17, sec=15, cap=13, titleSz=22, hit=44;
+    var body=17, sec=15, cap=13, titleSz=22, tapSz=44;
     function node(k,vm) {var s=m.k+':'+k,h=2166136261; for(var i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619)>>>0; while(!h||used.has(h)||h===0xffffffff)h=(h+1)>>>0; used.add(h);
       var n={key:s,id:h,flags:0,items:[],hit:null,vm:vm||null,act:null,mo:'cell'}; ns.push(n);return n;}
     function rect(n,x,y,w,h,c){n.items.push(['rect',x,y,w,h,color(c)]);}
@@ -12568,13 +12568,13 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       if(bold)n.items.push(['rich',px,y-size*.92,[{text:s,size:size,color:color(c||C.ink),bold:true}],w||0,1.25]);else n.items.push(['text',px,y,size,color(c||C.ink),s,w||0]);
       texts.push({text:s,x:px,y:y,size:size,width:Math.min(z,w||Infinity),right:align==='right'?x:null});return z;}
     function hit(n,x,y,w,h,act,label){n.flags=J.NF.HIT;n.hit=[x,y,w,h];n.act='vm';n.vm=Object.assign(n.vm||{},{act:act,label:label||act});}
-    function click(k,label,x,y,w,h,act,bold,size){h=Math.max(h||hit,hit);var n=node(k);rect(n,x,y,w,h,C.white);n.base=color(C.white);n.hov=color(C.soft);hit(n,x,y,w,h,act,label);var sz=size||body;text(n,label,x+8,y+h/2+sz*.34,sz,C.ink,bold,w-16);return n;}
+    function click(k,label,x,y,w,h,act,bold,size){h=Math.max(h||tapSz,tapSz);var n=node(k);rect(n,x,y,w,h,C.white);n.base=color(C.white);n.hov=color(C.soft);hit(n,x,y,w,h,act,label);var sz=size||body;text(n,label,x+8,y+h/2+sz*.34,sz,C.ink,bold,w-16);return n;}
     function head(label,act,right){var n=node('navigation');hit(n,0,0,W,m.height||900,act,label);var t=node('heading');text(t,label,0,28,titleSz,C.ink,true,m.kind==='calendar'?W-100:W-4);if(right)text(t,right,W,26,sec,C.muted,false,0,'right');rule('heading-rule',44);cursor=56;}
     if(m.kind==='calendar') {
       head(monthTitle(m.month),'nav:calendar');
-      var mh=click('month-heading',monthTitle(m.month),0,0,W-100,hit,'journal:date',true,sec);mh.vm.hoverDate=true;
-      click('previous','<',W-96,0,44,hit,'month:-1',false,titleSz);click('next','>',W-48,0,44,hit,'month:1',false,titleSz);
-      var start=new Date(m.month+'-01T12:00:00').getDay(), gap=4,cw=(W-6*gap)/7,ch=hit,top=cursor+22;
+      var mh=click('month-heading',monthTitle(m.month),0,0,W-100,tapSz,'journal:date',true,sec);mh.vm.hoverDate=true;
+      click('previous','<',W-96,0,44,tapSz,'month:-1',false,titleSz);click('next','>',W-48,0,44,tapSz,'month:1',false,titleSz);
+      var start=new Date(m.month+'-01T12:00:00').getDay(), gap=4,cw=(W-6*gap)/7,ch=tapSz,top=cursor+22;
       var names=['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; names.forEach(function(s,i){var n=node('dow'+i);text(n,s,i*(cw+gap)+4,top-6,cap,C.muted,true,cw-6);});
       var RF={C:'#f3cdb3',M:'#e6e1f0',L:'#dcefe7'};
       m.days.forEach(function(d,i){var ix=start+i,x=(ix%7)*(cw+gap),y=top+Math.floor(ix/7)*(ch+gap),n=node('day:'+d),rk=(m.risk&&m.risk[d]&&m.risk[d].c)||'',bg=d===m.day?C.selected:(rk&&RF[rk]?RF[rk]:C.soft);
@@ -12596,7 +12596,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       if(m.risk&&m.risk[m.day]&&m.risk[m.day].reasons&&m.risk[m.day].reasons.length){var why=node('reason');text(why,m.risk[m.day].reasons[0],0,cursor+14,sec,C.muted,false,W);cursor+=36;}
         } else if(m.kind==='plan') {
       head('Plan','nav:plan');var hint=node('hint');text(hint,'Sequence and dependencies',W,26,sec,C.muted,false,0,'right');
-      if(!m.rows.length){text(node('empty'),'No plan steps yet.',0,cursor+20,body,C.muted);cursor+=hit;}
+      if(!m.rows.length){text(node('empty'),'No plan steps yet.',0,cursor+20,body,C.muted);cursor+=tapSz;}
       var from=0,limit=7,ci=m.rows.findIndex(function(r){return r.current;});if(ci>=limit)from=Math.max(0,ci-3);var shown=m.rows.slice(from,from+limit);if(from){text(node('earlier-count'),from+' earlier steps in full Plan',0,cursor+16,cap,C.muted);cursor+=28;}shown.forEach(function(r,i){var y=cursor, n=node('step:'+r.id),num=String(r.seq||i+1), nm=plain(r.name), fs=body;
         var labelMax=Math.max(64,W*.43-28), z=core.measure(fonts[0],fs,nm), labelW=Math.min(z,labelMax), sx=32+labelW+13, sw=W-sx-4;
         n.items.push(['rrect',0,y+3,18,18,9,color(r.current?C.selected:C.white)],['border',0,y+3,18,18,9,0.9,color(r.current?C.accent:C.strong)]);text(n,num,9-core.measure(fonts[r.current?1:0],11,num)/2,y+17,11,r.current?C.ink:C.muted,r.current);text(n,nm,28,y+30,fs,C.ink,false,labelMax);text(n,'|',sx-9,y+30,fs,C.muted);
@@ -12611,52 +12611,52 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       var hl=m.day===budgetTodayKey()?'Today':'Schedule';head(hl,'nav:agenda');var date=node('date');text(date,budgetDateLabel(m.day),Math.round(core.measure(fonts[1],titleSz,hl))+12,26,sec,C.muted);
       var untimed=[],timed={}; m.entries.forEach(function(e){var v=e.values||{}, t=String(v.time||''), match=/^(\d{1,2}):(\d{2})$/.exec(t);if(match&&+match[1]<24&&+match[2]<60){var h=+match[1];(timed[h]=timed[h]||[]).push(e);}else untimed.push(e);});
       var extraHours=Object.keys(timed).map(Number),first=Math.min.apply(null,[7].concat(extraHours)),last=Math.max.apply(null,[21].concat(extraHours));
-      if(untimed.length){text(node('untimed-title'),'No time set',0,cursor+16,cap,C.muted);cursor+=28;untimed.slice(0,4).forEach(function(e){var n=node('untimed:'+e.id);text(n,e.name,35,cursor+28,body,C.ink,true,W-40);rect(n,25,cursor+12,2,20,C.accent);hit(n,0,cursor,W,hit,'entry:'+e.id,e.name);cursor+=hit;});if(untimed.length>4){text(node('more-untimed'),(untimed.length-4)+' more in the full day',35,cursor+16,sec,C.muted);cursor+=28;}rule('untimed-rule',cursor);cursor+=17;}
-      if(!m.entries.length){text(node('empty'),'No scheduled items on this day.',35,cursor+20,body,C.muted,false,W-40);cursor+=hit;}
-      for(var h=first;h<=last;h++) {var allEvents=timed[h]||[],evs=allEvents.slice(0,3),hh=Math.max(hit,evs.length*hit+8);text(node('hour'+h),String(h%12||12)+(h<12?' AM':' PM'),0,cursor+16,cap,C.muted);rule('hour-rule'+h,cursor,36,W-36);
-        evs.forEach(function(e,i){var n=node('event:'+e.id);rect(n,43,cursor+10+i*hit,2,24,C.accent);text(n,e.name,53,cursor+28+i*hit,body,C.ink,true,W-57);hit(n,0,cursor+i*hit,W,hit,'entry:'+e.id,e.name);});if(allEvents.length>3){text(node('more-hour'+h),'+'+(allEvents.length-3)+' in full day',53,cursor+hh-8,cap,C.muted);}cursor+=hh;
+      if(untimed.length){text(node('untimed-title'),'No time set',0,cursor+16,cap,C.muted);cursor+=28;untimed.slice(0,4).forEach(function(e){var n=node('untimed:'+e.id);text(n,e.name,35,cursor+28,body,C.ink,true,W-40);rect(n,25,cursor+12,2,20,C.accent);hit(n,0,cursor,W,tapSz,'entry:'+e.id,e.name);cursor+=tapSz;});if(untimed.length>4){text(node('more-untimed'),(untimed.length-4)+' more in the full day',35,cursor+16,sec,C.muted);cursor+=28;}rule('untimed-rule',cursor);cursor+=17;}
+      if(!m.entries.length){text(node('empty'),'No scheduled items on this day.',35,cursor+20,body,C.muted,false,W-40);cursor+=tapSz;}
+      for(var h=first;h<=last;h++) {var allEvents=timed[h]||[],evs=allEvents.slice(0,3),hh=Math.max(tapSz,evs.length*tapSz+8);text(node('hour'+h),String(h%12||12)+(h<12?' AM':' PM'),0,cursor+16,cap,C.muted);rule('hour-rule'+h,cursor,36,W-36);
+        evs.forEach(function(e,i){var n=node('event:'+e.id);rect(n,43,cursor+10+i*tapSz,2,24,C.accent);text(n,e.name,53,cursor+28+i*tapSz,body,C.ink,true,W-57);hit(n,0,cursor+i*tapSz,W,tapSz,'entry:'+e.id,e.name);});if(allEvents.length>3){text(node('more-hour'+h),'+'+(allEvents.length-3)+' in full day',53,cursor+hh-8,cap,C.muted);}cursor+=hh;
       }
     } else if(m.kind==='ledger') {
-      head(monthTitle(m.month)+' expenses','nav:ledger');var mh=click('ledger-date',monthTitle(m.month),0,0,W,hit,'journal:date',true,sec);mh.vm.hoverDate=true;var n=node('columns');text(n,'Date',0,cursor,cap,C.muted,true);text(n,'Item',70,cursor,cap,C.muted,true);text(n,'Amount',W,cursor,cap,C.muted,true,0,'right');rule('column-rule',cursor+8,0,W,C.strong);cursor+=28;
+      head(monthTitle(m.month)+' expenses','nav:ledger');var mh=click('ledger-date',monthTitle(m.month),0,0,W,tapSz,'journal:date',true,sec);mh.vm.hoverDate=true;var n=node('columns');text(n,'Date',0,cursor,cap,C.muted,true);text(n,'Item',70,cursor,cap,C.muted,true);text(n,'Amount',W,cursor,cap,C.muted,true,0,'right');rule('column-rule',cursor+8,0,W,C.strong);cursor+=28;
       /* The atlas has dates and amounts, not proof of payment. A past date is
        * called 'dated through today', never fabricated into 'paid'. */
       var groups=[['Income dated through today',m.rows.filter(function(r){return r.type==='income'&&!r.undated&&!r.scheduled;})],['Expenses dated through today',m.rows.filter(function(r){return r.type!=='income'&&!r.undated&&!r.scheduled;})],['Scheduled this month',m.rows.filter(function(r){return r.scheduled;})],['Needs a date',m.rows.filter(function(r){return r.undated;})]]; groups[3].dating=true;
       var remaining=40;groups.forEach(function(g,gi){if(!g[1].length)return;text(node('section'+gi),g[0],0,cursor+16,sec,C.muted,true,W);cursor+=28;var total=0;
-        var list=g[1].slice(0,remaining);remaining-=list.length;list.forEach(function(r,i){var n=node('row:'+gi+':'+i);text(n,r.date?BUDGET_MONTHS[+r.date.slice(5,7)-1].slice(0,3)+' '+(+r.date.slice(8)):(g.dating?'Set a date':'-'),0,cursor+28,sec,C.muted);var a=money(r.amount), aw=core.measure(fonts[0],body,a);text(n,r.name,70,cursor+28,body,C.ink,false,Math.max(20,W-aw-90));text(n,a,W,cursor+28,body,C.ink,false,0,'right');hit(n,0,cursor,W,hit,r.date?('date:'+r.date):('date-needed:'+r.id),r.name);rule('ledger-rule:'+gi+':'+i,cursor+hit-1);if(!g.dating)total+=r.amount;cursor+=hit;rows++;});
+        var list=g[1].slice(0,remaining);remaining-=list.length;list.forEach(function(r,i){var n=node('row:'+gi+':'+i);text(n,r.date?BUDGET_MONTHS[+r.date.slice(5,7)-1].slice(0,3)+' '+(+r.date.slice(8)):(g.dating?'Set a date':'-'),0,cursor+28,sec,C.muted);var a=money(r.amount), aw=core.measure(fonts[0],body,a);text(n,r.name,70,cursor+28,body,C.ink,false,Math.max(20,W-aw-90));text(n,a,W,cursor+28,body,C.ink,false,0,'right');hit(n,0,cursor,W,tapSz,r.date?('date:'+r.date):('date-needed:'+r.id),r.name);rule('ledger-rule:'+gi+':'+i,cursor+tapSz-1);if(!g.dating)total+=r.amount;cursor+=tapSz;rows++;});
         if(list.length<g[1].length){text(node('more-ledger'+gi),(g[1].length-list.length)+' more in full expenses',0,cursor+16,cap,C.muted);cursor+=28;}if(g.dating){text(node('dating-note'+gi),'Give each of these a date. They are not listed in the month total.',0,cursor+16,sec,C.muted,false,W);cursor+=40;return;}
         var mixed=g[1].some(function(r){return r.type==='income';})&&g[1].some(function(r){return r.type!=='income';});
         total=g[1].reduce(function(t,r){return t+(mixed&&r.type!=='income'?-r.amount:r.amount);},0);var t=node('total'+gi);text(t,mixed?'Pay less costs':'Subtotal',0,cursor+20,sec,C.muted,true);text(t,money(total),W,cursor+20,body,C.ink,true,0,'right');cursor+=48;
       });
-      if(!m.rows.filter(function(r){return !r.undated;}).length){text(node('empty'),'No monthly expenses yet.',0,cursor+20,body,C.muted);cursor+=hit;}else {var dated=m.rows.filter(function(r){return !r.undated&&!r.scheduled;}),all=m.rows.filter(function(r){return !r.undated;});function balance(rs){return rs.reduce(function(t,r){return t+(r.type==='income'?r.amount:-r.amount);},0);}rule('summary-rule',cursor-7,0,W,C.strong);text(node('dated-balance'),'Dated income less expenses',0,cursor+20,sec,C.muted);text(node('dated-net'),money(balance(dated)),W,cursor+20,body,C.ink,true,0,'right');cursor+=32;text(node('month-total'),'Month total',0,cursor+20,sec,C.muted,true);text(node('month-net'),money(balance(all)),W,cursor+20,body,C.ink,true,0,'right');cursor+=48;}
+      if(!m.rows.filter(function(r){return !r.undated;}).length){text(node('empty'),'No monthly expenses yet.',0,cursor+20,body,C.muted);cursor+=tapSz;}else {var dated=m.rows.filter(function(r){return !r.undated&&!r.scheduled;}),all=m.rows.filter(function(r){return !r.undated;});function balance(rs){return rs.reduce(function(t,r){return t+(r.type==='income'?r.amount:-r.amount);},0);}rule('summary-rule',cursor-7,0,W,C.strong);text(node('dated-balance'),'Dated income less expenses',0,cursor+20,sec,C.muted);text(node('dated-net'),money(balance(dated)),W,cursor+20,body,C.ink,true,0,'right');cursor+=32;text(node('month-total'),'Month total',0,cursor+20,sec,C.muted,true);text(node('month-net'),money(balance(all)),W,cursor+20,body,C.ink,true,0,'right');cursor+=48;}
     } else if(m.kind==='links') {
-      (m.links||[]).forEach(function(q,i){var ln=click('link'+i,q.label,0,cursor,W,hit,q.act,false,body);text(ln,'>',W-18,cursor+28,sec,C.muted,false,0,'right');cursor+=hit;});
+      (m.links||[]).forEach(function(q,i){var ln=click('link'+i,q.label,0,cursor,W,tapSz,q.act,false,body);text(ln,'>',W-18,cursor+28,sec,C.muted,false,0,'right');cursor+=tapSz;});
     } else if(m.kind==='cash') {
       head('Cash and owned items','nav:cash');
       text(node('cash-note'),'Balances as of a calendar day. Add or update them from that day.',0,cursor,sec,C.muted,false,W);cursor+=36;
       [['Cash (spendable)',m.rows&&m.rows.cash],['Owned (net worth only)',m.rows&&m.rows.owned],['Needs a kind',m.rows&&m.rows.unmarked]].forEach(function(g,gi){
         var list=g[1]||[]; if(!list.length && gi===2)return; text(node('cg'+gi),g[0],0,cursor+16,sec,C.muted,true,W);cursor+=28;
-        if(!list.length){text(node('cempty'+gi),'None yet.',0,cursor+20,body,C.muted);cursor+=hit;return;}
-        list.forEach(function(r,i){var n=node('crow:'+gi+':'+i);text(n,r.name,0,cursor+20,body,C.ink,true,W-120);if(r.asOf)text(n,'as of '+r.asOf,0,cursor+38,cap,C.muted);text(n,money(r.amount||0),W,cursor+28,body,C.ink,true,0,'right');rule('crule:'+gi+':'+i,cursor+hit-1);cursor+=hit;});
+        if(!list.length){text(node('cempty'+gi),'None yet.',0,cursor+20,body,C.muted);cursor+=tapSz;return;}
+        list.forEach(function(r,i){var n=node('crow:'+gi+':'+i);text(n,r.name,0,cursor+20,body,C.ink,true,W-120);if(r.asOf)text(n,'as of '+r.asOf,0,cursor+38,cap,C.muted);text(n,money(r.amount||0),W,cursor+28,body,C.ink,true,0,'right');rule('crule:'+gi+':'+i,cursor+tapSz-1);cursor+=tapSz;});
       });
         } else if(m.kind==='page') {
-      var bg=node('paper');rect(bg,0,0,W,m.height,C.white);text(bg,'Budget Home',0,28,titleSz,C.ink,true);var dx=core.measure(fonts[1],titleSz,'Budget Home')+20;var dh=click('date-heading',dayTitle(m.day)+'  ',dx,2,Math.max(hit,W-dx),hit,'journal:date',false,body);dh.vm.hoverDate=true;rule('page-rule',48);
+      var bg=node('paper');rect(bg,0,0,W,m.height,C.white);text(bg,'Budget Home',0,28,titleSz,C.ink,true);var dx=core.measure(fonts[1],titleSz,'Budget Home')+20;var dh=click('date-heading',dayTitle(m.day)+'  ',dx,2,Math.max(tapSz,W-dx),tapSz,'journal:date',false,body);dh.vm.hoverDate=true;rule('page-rule',48);
       cursor=56;
       if(m.pick){
         var pm=m.pick,sel=m.day,py=cursor,startP=new Date(pm+'-01T12:00:00').getDay(),gapP=4,cwP=(W-6*gapP)/7;
-        click('pick-prev','<',0,py,44,hit,'budget:pick:-1',false,titleSz);text(node('pick-m'),monthTitle(pm),52,py+28,sec,C.ink,true,W-160);click('pick-next','>',W-148,py,44,hit,'budget:pick:1',false,titleSz);click('pick-today','Today',W-100,py,100,hit,'budget:pick:today',false,sec);
-        var topP=py+hit+18;['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function(s,i){text(node('pdow'+i),s,i*(cwP+gapP)+4,topP-4,cap,C.muted,true,cwP-4);});
+        click('pick-prev','<',0,py,44,tapSz,'budget:pick:-1',false,titleSz);text(node('pick-m'),monthTitle(pm),52,py+28,sec,C.ink,true,W-160);click('pick-next','>',W-148,py,44,tapSz,'budget:pick:1',false,titleSz);click('pick-today','Today',W-100,py,100,tapSz,'budget:pick:today',false,sec);
+        var topP=py+tapSz+18;['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function(s,i){text(node('pdow'+i),s,i*(cwP+gapP)+4,topP-4,cap,C.muted,true,cwP-4);});
         var daysP=(root.JAtlasEval&&root.JAtlasEval.monthDays)?root.JAtlasEval.monthDays(pm):[];
         var riskP=m.risk||{};
         var RF={C:'#f3cdb3',M:'#e6e1f0',L:'#dcefe7'};
-        daysP.forEach(function(d,i){var ix=startP+i,x=(ix%7)*(cwP+gapP),y=topP+Math.floor(ix/7)*(hit+gapP),n=node('pday:'+d),rk=(riskP[d]&&riskP[d].c)||'',bg=d===sel?C.selected:(rk&&RF[rk]?RF[rk]:C.soft);
-          rect(n,x,y,cwP,hit,bg);n.base=color(bg);n.hov=color(C.expense);text(n,String(+d.slice(8)),x+6,y+20,sec,C.ink,d===budgetTodayKey()||d===sel);
-          if(d===sel)n.items.push(['border',x+1,y+1,cwP-2,hit-2,0,1.5,color(C.accent)]);
-          hit(n,x,y,cwP,hit,'budget:pickday:'+d,d);
+        daysP.forEach(function(d,i){var ix=startP+i,x=(ix%7)*(cwP+gapP),y=topP+Math.floor(ix/7)*(tapSz+gapP),n=node('pday:'+d),rk=(riskP[d]&&riskP[d].c)||'',bg=d===sel?C.selected:(rk&&RF[rk]?RF[rk]:C.soft);
+          rect(n,x,y,cwP,tapSz,bg);n.base=color(bg);n.hov=color(C.expense);text(n,String(+d.slice(8)),x+6,y+20,sec,C.ink,d===budgetTodayKey()||d===sel);
+          if(d===sel)n.items.push(['border',x+1,y+1,cwP-2,tapSz-2,0,1.5,color(C.accent)]);
+          hit(n,x,y,cwP,tapSz,'budget:pickday:'+d,d);
         });
-        cursor=topP+Math.ceil((startP+daysP.length)/7)*(hit+gapP)+8;
-        click('dismiss','Dismiss',0,cursor,W,hit,'budget:date',false,body);cursor+=hit+12;
+        cursor=topP+Math.ceil((startP+daysP.length)/7)*(tapSz+gapP)+8;
+        click('dismiss','Dismiss',0,cursor,W,tapSz,'budget:date',false,body);cursor+=tapSz+12;
       }
-      if((m.start||[]).length){text(node('start-label'),'Unfinished:',0,cursor+16,sec,C.muted);cursor+=28;(m.start||[]).forEach(function(q,i){click('start'+i,q.label,0,cursor,W,hit,q.act,false,body);cursor+=hit;});cursor+=8;}
+      if((m.start||[]).length){text(node('start-label'),'Unfinished:',0,cursor+16,sec,C.muted);cursor+=28;(m.start||[]).forEach(function(q,i){click('start'+i,q.label,0,cursor,W,tapSz,q.act,false,body);cursor+=tapSz;});cursor+=8;}
       var b1=node('divider1');(m.dividers||[]).forEach(function(x){rect(b1,x,56,1,Math.max(0,(m.height||cursor)-60),C.line);});
     }
     var H=Math.max(40,Math.ceil(cursor+8)); if(ns[0]&&ns[0].vm&&/^nav:/.test(ns[0].vm.act))ns[0].hit[3]=H;
@@ -13849,7 +13849,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.62",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.63",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
