@@ -2,7 +2,7 @@
   "format": "exp7-platform-release/1",
   "version": "1.8.70",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "3087f0f03ab5bb23cb75881ef89f76ed1b7d1d116d177e6f45776fa992977226",
+  "sha256": "43ee2c76479dd739430dada802551fee2c35b488f5764d57833b129527e18735",
   "minLauncherMajor": 1,
   "contains": {
     "1.8.70": "Home has one way to open a day's schedule (second tap on the selected mini-month day). Activity date pickers expand inline; Repeat subrows reflow; times are 24-hour; Amount has one label. Plan lives only on Home, with wrapped step text and a back stack to the step. New alternatives and new requirements share date/time/repeat fields.",
