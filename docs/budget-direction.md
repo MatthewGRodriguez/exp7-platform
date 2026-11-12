@@ -190,4 +190,4 @@ On first open in 1.8.57 or later, a budget without `meta.selModel` is migrated o
 
 ## Where the sources are
 
-The platform file is built from the pinned base by ordered patches. From 1.8.62 the Budget scripts (`budget-rules`, `budget-flows`, `journal-views`, `eval`) and a new unit suite live in the sidecar folder `exp7-platform/budget-src/`, beside the two-file release. The original 72 unit + 231 integration checks from 1.8.55–1.8.61 were delivered as a separate archive and are not in this repository.
+The platform file is built from the pinned base by ordered patches. From 1.8.62 the Budget scripts (`budget-rules`, `budget-flows`, `journal-views`, `eval`) and a new unit suite are delivered as a sidecar archive outside this repository, so a release PR stays within docs, the platform file, `release.json`, and the launchers. The original 72 unit + 231 integration checks from 1.8.55–1.8.61 were delivered as a separate archive and are not in this repository.
