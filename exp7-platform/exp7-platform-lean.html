@@ -12861,6 +12861,23 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       var drawW=max>0?Math.min(z,max):z, px=align==='right'?x-drawW:align==='center'?x-z/2:x, ink=c||(size<=cap?C.caption:C.ink);
       if(bold)n.items.push(['rich',px,y-size*.92,[{text:s,size:size,color:color(ink),bold:true}],max||0,1.25]);else n.items.push(['text',px,y,size,color(ink),s,max||0,fonts[0]]);
       texts.push({text:s,x:px,y:y,size:size,width:drawW,max:max||0,right:align==='right'?x:null});return drawW;}
+    function wrapStrings(s,font,size,maxW){
+      s=plain(s||''); if(!s) return [''];
+      if(!(maxW>0) || core.measure(font,size,s)<=maxW) return [s];
+      var words=s.split(/\s+/), lines=[], cur='';
+      words.forEach(function(w){
+        var trial=cur?cur+' '+w:w;
+        if(core.measure(font,size,trial)<=maxW) cur=trial;
+        else { if(cur) lines.push(cur); cur=w; }
+      });
+      if(cur) lines.push(cur);
+      return lines.length?lines:[s];
+    }
+    function wrapPaint(n,s,x,y,size,c,bold,maxW){
+      var lines=wrapStrings(s,fonts[bold?1:0],size,maxW), lh=Math.round(size*1.25);
+      lines.forEach(function(ln,i){ text(n,ln,x,y+i*lh,size,c,bold,maxW); });
+      return {lines:lines, height:Math.max(lh, lines.length*lh), extra:Math.max(0,(lines.length-1)*lh)};
+    }
     function hit(n,x,y,w,h,act,label){n.flags=J.NF.HIT;n.hit=[x,y,w,h];n.act='vm';n.vm=Object.assign(n.vm||{},{act:act,label:label||act});}
     function click(k,label,x,y,w,h,act,bold,size,chev){h=Math.max(h||tapSz,tapSz);var n=node(k);rect(n,x,y,w,h,C.white);n.base=color(C.white);n.hov=color(C.wash);hit(n,x,y,w,h,act,label);var sz=size||body, tx=x+(w>=W-1?inset:8);
       text(n,label,tx,y+h/2+sz*.34,sz,C.ink,bold,w-(chev?28:16)-(tx-x));if(chev)chevronRight(n,x+w-11,y+h/2);return n;}
@@ -12872,6 +12889,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     function paintScreen(m){
       var parts=m.parts||[];
       function by(p,d){ return p.y!=null?p.y:d; }
+      var flowShift=0;
       parts.forEach(function(p,i){
         var k=(p.k||p.t)+i;
         if(p.t==='wash'){
@@ -12885,15 +12903,17 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
             text(rn,p.right,rightX,16+tapSz/2+body*.34,body,C.ink,!!p.rightBold,0,'right'); }
           cursor=60;
         } else if(p.t==='title'){
-          text(node(k),p.text,inset,by(p,92),p.size||titleSz,C.ink,true,W-(p.rightPad||2*inset));
+          var ty=by(p,92)+flowShift, maxW=W-(p.rightPad||2*inset);
+          var tw=wrapPaint(node(k),p.text,inset,ty,p.size||titleSz,C.ink,true,maxW);
+          if(p.wrap!==false) flowShift+=tw.extra;
         } else if(p.t==='note'){
-          text(node(k),p.text,inset,by(p,cursor),p.size||sec,p.ink?p.ink:(p.size&&p.size<=13?C.caption:C.caption),!!p.bold,W-2*inset);
+          text(node(k),p.text,inset,by(p,cursor)+flowShift,p.size||sec,p.ink?p.ink:(p.size&&p.size<=13?C.caption:C.caption),!!p.bold,W-2*inset);
         } else if(p.t==='h'){
-          text(node(k),p.text,inset,by(p,cursor),p.size||body,C.ink,true,W-2*inset);
+          text(node(k),p.text,inset,by(p,cursor)+flowShift,p.size||body,C.ink,true,W-2*inset);
         } else if(p.t==='text'){
-          text(node(k),p.text,p.x!=null?p.x:inset,by(p,cursor),p.size||body,p.ink||C.ink,!!p.bold,p.w||(p.align==='right'?0:W-2*inset),p.align||null);
+          text(node(k),p.text,p.x!=null?p.x:inset,by(p,cursor)+flowShift,p.size||body,p.ink||C.ink,!!p.bold,p.w||(p.align==='right'?0:W-2*inset),p.align||null);
         } else if(p.t==='field'){
-          var fy=by(p,cursor), fn=node(k), box=p.box||(p.align==='right'?'amount':'full');
+          var fy=by(p,cursor)+flowShift, fn=node(k), box=p.box||(p.align==='right'?'amount':'full');
           if(p.line){
             if(p.label) text(node(k+'l'),p.label,inset,fy+(p.labelShift||1.28),sec,C.caption,false);
             text(fn,p.value||'',rightX,fy,p.size||body,C.ink,!!p.bold,0,'right');
@@ -12907,7 +12927,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
             hit(fn,bx,by0,bw,bh,p.act||('field:'+(p.label||i)),p.label||p.value||'');
           }
         } else if(p.t==='row'){
-          var ry=p.top!=null?p.top:(by(p,cursor)-31), rh=p.h||56, rn=node(k);
+          var ry=(p.top!=null?p.top:(by(p,cursor)-31))+flowShift, rh=p.h||56, rn=node(k);
           if(p.wash) rect(rn,0,ry,W,rh,C.wash);
           if(p.check) checkbox(rn,inset+6,ry+rh/2,!!p.on);
           if(p.radio) radio(rn,inset+6,ry+rh/2,!!p.on);
@@ -12920,7 +12940,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
           if(!p.noHit) hit(rn,0,ry,W,rh,p.act||('row:'+i),p.text);
           rule('rr'+i,ry+rh-1,inset,W-2*inset,C.lineSoft);
         } else if(p.t==='link'){
-          click('ln'+i,p.text,0,p.top!=null?p.top:by(p,cursor)-27,W,p.h||44,p.act||('nav:'+p.text),!!p.bold,body,!!p.chev);
+          click('ln'+i,p.text,0,(p.top!=null?p.top:by(p,cursor)-27)+flowShift,W,p.h||44,p.act||('nav:'+p.text),!!p.bold,body,!!p.chev);
         } else if(p.t==='accept'){
           var ay=p.top!=null?p.top:by(p,cursor)-22, an=node(k);
           if(p.enabled) acceptBand(an,inset,ay,W-2*inset);
@@ -12956,6 +12976,25 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
             hit(node(k+'bhit'),rightX-vw,py-22,vw,44,p.valueAct||p.act,p.left||'value');
           }
           if(p.nameAct) hit(node(k+'ahit'),inset,py-22,Math.max(80,W/2-20),44,p.nameAct,p.left||'name');
+        } else if(p.t==='timepick'){
+          var tt=p.top||cursor, cur=formatTime24(p.value)||'07:00', chh=+cur.slice(0,2), cmm=+cur.slice(3,5);
+          text(node(k+'hlab'),'Hour',inset,tt+14,sec,C.caption,false);
+          var cols=6, cw=(W-2*inset)/cols, rh=44;
+          for(var hr=0;hr<24;hr++){
+            var cx=inset+(hr%cols)*cw, cy=tt+Math.floor(hr/cols)*rh, lab=(hr<10?'0':'')+hr, on=hr===chh, hn=node(k+'h'+hr);
+            if(on) rect(hn,cx,cy,cw,rh,C.wash);
+            text(hn,lab,cx+cw/2,cy+28,sec,C.ink,on,cw,'center');
+            hit(hn,cx,cy,cw,rh,'time:hour:'+lab,lab);
+          }
+          var my=tt+4*rh+8;
+          text(node(k+'mlab'),'Minute',inset,my+14,sec,C.caption,false);
+          ['00','15','30','45'].forEach(function(ms,mi){
+            var mx=inset+mi*((W-2*inset)/4), on=cmm===+ms, mn=node(k+'m'+ms);
+            if(on) rect(mn,mx,my, (W-2*inset)/4, rh, C.wash);
+            text(mn,ms,mx+((W-2*inset)/4)/2,my+28,body,C.ink,on,0,'center');
+            hit(mn,mx,my,(W-2*inset)/4,rh,'time:min:'+ms,ms);
+          });
+          cursor=my+rh;
         } else if(p.t==='picker'){
           var pm=p.month||budgetMonthKey(), sel=p.sel||budgetDateKey();
           click(k+'prev','Prev',0,p.top||cursor,72,tapSz,'month:-1',false,body);
@@ -13055,29 +13094,37 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       if(pCompact){
         if(m.standalone){ backBtn('plan-back','Home',0,16,180,tapSz,'nav:home'); text(node('plan-title'),'Plan',inset,16+tapSz+28,titleSz,C.ink,true,W-2*inset); cursor=16+tapSz+44;
           text(node('plan-hint'),'Step name and the item now in use.',inset,cursor,sec,C.caption,false,W-2*inset); cursor+=28; }
-        else { click('plan-h','Plan',0,0,W,tapSz,'nav:plan',true,body,true); cursor=tapSz+4; }
+        else { var ph=node('plan-h'); text(ph,'Plan',inset,31,body,C.ink,true,W-2*inset); cursor=tapSz+4; }
         if(!m.rows||!m.rows.length){text(node('empty'),'No plan steps yet.',inset,cursor+20,body,C.muted);cursor+=tapSz;}
-        (m.rows||[]).forEach(function(r,i){ var y=cursor, n=node('step:'+r.id), nm=plain(r.name), selected=plain(r.selectedName||'');
-          var nameW=core.measure(fonts[0],body,nm), selW=core.measure(fonts[0],body,selected||'');
+        (m.rows||[]).forEach(function(r,i){ var y=cursor, n=node('step:'+r.id), nm=plain(r.name), selected=plain(r.selectedName||'No alternative');
           var chev=18, gap=16, nameMax=Math.min(W*0.48, W-inset-80);
+          var nameW=core.measure(fonts[0],body,nm), selW=core.measure(fonts[0],body,selected||'');
           var fits=nameW<=nameMax && (inset+nameW+gap+selW+chev+8)<=W;
-          var rh=fits?rowH:Math.max(rowH, 80);
           if(fits){
+            var rh=rowH;
             text(n,nm,inset,y+31,body,C.ink,false,nameMax);
-            if(r.choices&&r.choices.length){ var a=node('item:'+r.id); var selMax=Math.max(40,W-inset-Math.min(nameW,nameMax)-gap-chev-8); text(a,selected,rightX-16,y+31,body,C.ink,false,selMax,'right'); chevronDown(a,rightX-10,y+27); hit(a,0,y,W,rh,'picker:'+r.id,r.name+' | '+selected); a.vm.step=r.id; }
-            else text(n,selected||'No alternative',rightX,y+30,sec,C.muted,false,Math.max(40,W/2-16),'right');
+            if(r.choices&&r.choices.length){ var a=node('item:'+r.id); var selMax=Math.max(40,W-inset-Math.min(nameW,nameMax)-gap-chev-8); text(a,selected,rightX-16,y+31,body,C.ink,false,selMax,'right'); chevronDown(a,rightX-10,y+rh/2); hit(a,0,y,W,rh,'picker:'+r.id,r.name+' | '+selected); a.vm.step=r.id; }
+            else text(n,selected,rightX,y+30,sec,C.muted,false,Math.max(40,W/2-16),'right');
+            rule('step-rule:'+r.id,y+rh-1); cursor+=rh; rows++;
           } else {
-            text(n,nm,inset,y+24,body,C.ink,false,W-inset-24);
-            if(r.choices&&r.choices.length){ var a=node('item:'+r.id); text(a,selected,inset,y+48,sec,C.ink,false,W-inset-28); chevronDown(a,rightX-10,y+44); hit(a,0,y,W,rh,'picker:'+r.id,r.name+' | '+selected); a.vm.step=r.id; }
-            else text(n,selected||'No alternative',inset,y+48,sec,C.muted,false,W-2*inset);
+            var wrapMax=W-inset-24-chev, bodyLh=Math.round(body*1.25), secLh=Math.round(sec*1.25);
+            var nameLines=wrapStrings(nm,fonts[0],body,wrapMax);
+            var selLines=wrapStrings(selected,fonts[0],sec,wrapMax);
+            var nameH=nameLines.length*bodyLh, selH=selLines.length*secLh;
+            var rh=Math.max(rowH, 16+nameH+8+selH+14);
+            var ny=y+16+body*0.8;
+            nameLines.forEach(function(ln,li){ text(n,ln,inset,ny+li*bodyLh,body,C.ink,false,wrapMax); });
+            var sy=ny+nameH+8;
+            if(r.choices&&r.choices.length){ var a=node('item:'+r.id); selLines.forEach(function(ln,li){ text(a,ln,inset,sy+li*secLh,sec,C.ink,false,wrapMax); }); chevronDown(a,rightX-10,y+rh/2); hit(a,0,y,W,rh,'picker:'+r.id,r.name+' | '+selected); a.vm.step=r.id; }
+            else selLines.forEach(function(ln,li){ text(n,ln,inset,sy+li*secLh,sec,C.muted,false,wrapMax); });
+            rule('step-rule:'+r.id,y+rh-1); cursor+=rh; rows++;
           }
-          rule('step-rule:'+r.id,y+rh-1); cursor+=rh; rows++;
         });
         if(m.standalone){ text(node('plan-foot'),'Tap a selected item to see alternatives.',inset,cursor+16,sec,C.caption,false,W-2*inset); cursor+=36; }
       }
     } else if(m.kind==='agenda') {
       var hl=m.heading||(m.day===budgetTodayKey()?'Today':(function(d){var t=dayTitle(d);return t.replace(/,\s*\d{4}$/,'');})(m.day));
-      function fmtTime(tm){ var mm=/^(\d{1,2}):(\d{2})$/.exec(String(tm||'')); if(!mm)return ''; var hh=+mm[1], min=mm[2]; if(min==='00'&&!m.compact) return (hh%12||12)+(hh<12?' AM':' PM'); return (hh%12||12)+':'+min+(hh<12?' AM':' PM'); }
+      function fmtTime(tm){ return formatTime24(tm); }
       function cadence(e){ var r=String((e.values||{}).repeat||(e.values||{}).cadence||''); if(/^every\s*14/i.test(r)||r==='every 14 days')return 'Every 14 days'; return r; }
       function rowAmt(e){ var a=(e.values||{}).amount; if(a==null||a==='')return ''; a=+a; if(a>0)return money(a,'+'); if(a<0)return money(a,'abs'); return money(a); }
       var untimed=[],timed={}; (m.entries||[]).forEach(function(e){var v=e.values||{}, t=String(v.time||''), match=/^(\d{1,2}):(\d{2})$/.exec(t);if(match&&+match[1]<24&&+match[2]<60){var h=+match[1];(timed[h]=timed[h]||[]).push(e);}else untimed.push(e);});
@@ -13102,12 +13149,13 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         }
         var first=m.firstHour!=null?m.firstHour:7, last=m.lastHour!=null?m.lastHour:13;
         var selectedId=m.selected||'';
-        for(var h=first;h<=last;h++){ var evs=timed[h]||[], hh=rowH, y=cursor, lab=String(h%12||12)+(h<12?' AM':' PM');
+        for(var h=first;h<=last;h++){ var evs=timed[h]||[], hh=rowH, y=cursor, lab=hourLabel24(h);
           evs.slice(0,1).forEach(function(e){ var n=node('event:'+e.id), on=e.id===selectedId||(!selectedId&&h===8);
             if(on) rect(n,0,y,W,hh,C.wash);
             if(on) rect(n,0,y+8,2,hh-16,C.accent);
             var amt=rowAmt(e), cad=cadence(e), aw=amt?core.measure(fonts[on?1:0],body,amt):0, cadw=cad?core.measure(fonts[0],sec,cad)+12:0;
-            text(n,lab,76,y+31,sec,on?C.ink:C.muted,on,0,'right');
+            var tlab=fmtTime((e.values||{}).time)||lab;
+            text(n,tlab,76,y+31,sec,on?C.ink:C.muted,on,0,'right');
             text(n,e.name,88,y+31,body,C.ink,on,Math.max(40,rightX-88-aw-cadw-8));
             if(amt)text(n,amt,rightX,y+31,body,C.ink,on,0,'right');
             if(cad)text(n,cad,rightX-(aw?aw+10:0),y+31,sec,C.caption,false,0,'right');
@@ -13120,7 +13168,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         text(node('ag-cap2'),'Amounts in USD. Sample values are illustrative.',inset,cursor+16,cap,C.caption,false,W-2*inset); cursor+=28;
       } else {
         if(m.standalone){ backBtn('ag-back','Home',0,16,180,tapSz,'nav:home'); text(node('ag-title'),hl,inset,16+tapSz+28,titleSz,C.ink,true); cursor=16+tapSz+44; }
-        else { click('ag-h',hl,0,0,W,tapSz,'view:day',true,body,true); cursor=tapSz+4; }
+        else { var ah=node('ag-h'); text(ah,hl,inset,31,body,C.ink,true,W-2*inset); cursor=tapSz+4; }
         function drawEntry(e,y){ var n=node('entry:'+e.id), tm=fmtTime((e.values||{}).time), nm=e.name||'', cad=cadence(e), amt=rowAmt(e), labelX=inset;
           if(tm){ text(n,tm,inset,y+31,sec,C.caption,false,88); labelX=inset+60; }
           var aw=amt?core.measure(fonts[0],body,amt):0; if(amt)text(n,amt,rightX,y+31,body,C.ink,false,Math.max(40,aw+8),'right');
@@ -13131,7 +13179,6 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         if(m.compact){
           var list=untimed.slice(); Object.keys(timed).map(Number).sort(function(a,b){return a-b;}).forEach(function(h){ list=list.concat(timed[h]); });
           if(m.addLabel){ click('add-day',m.addLabel,0,cursor,W,rowH,'add:item',false,body,true); cursor+=rowH; }
-          click('view-day','View '+(hl==='Today'?'today':hl)+' schedule',0,cursor,W,rowH,'view:day',false,body,true); cursor+=rowH;
           if(!list.length){
             text(node('empty'),'Nothing is scheduled this day.',inset,cursor+20,body,C.muted,false,W-2*inset);
             cursor+=40;
@@ -13141,7 +13188,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
           if(untimed.length){text(node('untimed-title'),'No time set',inset,cursor+16,cap,C.muted);cursor+=28;var ut=m.standalone?untimed:untimed.slice(0,4);ut.forEach(function(e){ drawEntry(e,cursor); cursor+=rowH; });if(!m.standalone&&untimed.length>4){text(node('more-untimed'),(untimed.length-4)+' more in the full day',inset+15,cursor+16,sec,C.muted);cursor+=28;}rule('untimed-rule',cursor);cursor+=17;}
           if(!m.entries.length){text(node('empty'),'No scheduled items on this day.',inset,cursor+20,body,C.muted,false,W-40);cursor+=tapSz;}
           var extraHours=Object.keys(timed).map(Number),first=Math.min.apply(null,[7].concat(extraHours)),last=Math.max.apply(null,[21].concat(extraHours));
-          for(var h=first;h<=last;h++) {var allEvents=timed[h]||[],evs=m.standalone?allEvents:allEvents.slice(0,3),hh=Math.max(rowH,evs.length*rowH+8);text(node('hour'+h),String(h%12||12)+(h<12?' AM':' PM'),inset,cursor+16,cap,C.muted);rule('hour-rule'+h,cursor,inset+36,W-inset-36,C.lineSoft);
+          for(var h=first;h<=last;h++) {var allEvents=timed[h]||[],evs=m.standalone?allEvents:allEvents.slice(0,3),hh=Math.max(rowH,evs.length*rowH+8);text(node('hour'+h),hourLabel24(h),inset,cursor+16,cap,C.muted);rule('hour-rule'+h,cursor,inset+36,W-inset-36,C.lineSoft);
             evs.forEach(function(e,i){var n=node('event:'+e.id);rect(n,inset+43,cursor+10+i*rowH,2,24,C.accent);text(n,e.name,inset+53,cursor+28+i*rowH,body,C.ink,true,Math.max(40,W-inset-70));hit(n,0,cursor+i*rowH,W,rowH,'entry:'+e.id,e.name);});if(!m.standalone&&allEvents.length>3){text(node('more-hour'+h),'+'+(allEvents.length-3)+' in full day',inset+53,cursor+hh-8,cap,C.muted);}cursor+=hh;
           }
           if(m.addLabel){ click('add-day',m.addLabel,0,cursor,W,rowH,'add:item',false,body,true); cursor+=rowH; }
@@ -13350,6 +13397,30 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     if(route==='debt-entry') return asOf||date||day||'';
     return date||asOf||day||'';
   }
+  function formPickerHeight(month, cellH){
+    cellH=cellH||SPACE.cell;
+    month=String(month||'')|| (typeof budgetMonthKey==='function'?budgetMonthKey():'2026-11');
+    var y=+month.slice(0,4), mo=+month.slice(5,7);
+    if(!(y>0&&mo>=1&&mo<=12)){ y=2026; mo=11; }
+    var start=new Date(y,mo-1,1).getDay(), days=new Date(y,mo,0).getDate();
+    var filled=start+days, trail=(7-filled%7)%7, weeks=Math.ceil((filled+trail)/7)||5;
+    return 44+22 + weeks*cellH + 8+44;
+  }
+  function formTimePickerHeight(){ return 4*44 + 44 + 16; }
+  function formatTime24(raw){
+    var s=String(raw==null?'':raw).trim();
+    if(!s||/^add a time$/i.test(s)) return '';
+    var am=/\s*a\.?m\.?$/i.test(s), pm=/\s*p\.?m\.?$/i.test(s);
+    s=s.replace(/\s*(a\.?m\.?|p\.?m\.?)$/i,'').trim();
+    var mm=/^(\d{1,2}):(\d{2})$/.exec(s) || /^(\d{2})(\d{2})$/.exec(s);
+    if(!mm) return '';
+    var h=+mm[1], min=+mm[2];
+    if(am||pm){ if(pm&&h<12) h+=12; if(am&&h===12) h=0; }
+    if(h<0||h>23||min<0||min>59) return '';
+    return (h<10?'0':'')+h+':'+(min<10?'0':'')+min;
+  }
+  function hourLabel24(h){ h=((+h)+24)%24; return (h<10?'0':'')+h+':00'; }
+
   function overlayCorrection(expected, measured){
     expected=expected||{}; measured=measured||expected;
     return {
@@ -13361,7 +13432,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   }
   function fieldKey(raw){
     var k=String(raw||'').trim();
-    var map={'Payee':'payee','Pay date':'date','Gross pay':'gross','Amount (USD)':'amount','Amount':'amount','Name':'name','Time':'time','Date':'date','As-of date':'asOf','APR (%)':'apr','APR':'apr','Balance owed':'balance','Balance':'balance','Creditor':'creditor','Purpose':'purpose','Payments remaining':'terms','Days between payments':'every','First payment date':'first','Payment amount':'payment','Actual amount (USD)':'actual','What do these choices have in common?':'category','Category':'category','cname':'cname','aname':'aname'};
+    var map={'Payee':'payee','Pay date':'date','Gross pay':'gross','Amount (USD)':'amount','Amount':'amount','Name':'name','Time':'time','Date':'date','As-of date':'asOf','APR (%)':'apr','APR':'apr','Balance owed':'balance','Balance':'balance','Creditor':'creditor','Purpose':'purpose','Payments remaining':'terms','Days between payments':'every','First payment date':'first','Payment amount':'payment','Actual amount (USD)':'actual','What do these choices have in common?':'category','Category':'category','cname':'cname','aname':'aname','rname':'rname'};
     if(map[k]) return map[k];
     k=k.replace(/\s+/g,'').replace(/\(.*\)/,'').toLowerCase();
     if(k==='paydate') return 'date';
@@ -13437,6 +13508,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     var risk=((this.models.calendar&&this.models.calendar.kids&&this.models.calendar.kids[0]&&this.models.calendar.kids[0].risk)||(this.models.calendar&&this.models.calendar.risk)||{});
     var startLinks=root.BudgetFlows?root.BudgetFlows.startLinks(this.atlas):[];
     var route=this.route||'home';
+    root.__budgetUi=restorePlan(root.__budgetUi||{});
     if(route==='date-picker-open') pick=pick||budgetMonthKey();
     if(route==='date-picker-closed') pick='';
     var Ls={}, positions={}, H;
@@ -13494,6 +13566,12 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     order.forEach(function(k){var p=positions[k]||[0,0,colW,H],record={format:'exp7-view-record/1',id:'exp7.journal.'+k,version:1,role:k==='selector'?'overlay':'slot',hit:k==='selector'?'fallthrough':'capture',canvas:{w:p[2],h:p[3]},states:{idle:{},open:{},selected:{}},edgeMs:0,resources:{fonts:['regular','bold']},dl:{file:k},paint:{ops:['rect','text','stroke','border'],gaps:[]}};
       cat.views.push({id:record.id,role:record.role,record:record});if(k!=='selector')blobs[k]=JV.fullDL(Ls[k],p[2],p[3]).bytes();});
     this.positions=positions;this.layouts=Ls;this.planDraw=Ls.plan;this.targets=[];Object.keys(Ls).forEach(function(k){var p=positions[k];if(!p||!Ls[k]||!Ls[k].nodes)return;Ls[k].nodes.forEach(function(n){if(n.flags&J.NF.HIT)self.targets.push({key:n.key,node:n,kind:k,rect:[p[0]+n.hit[0],p[1]+n.hit[1],n.hit[2],n.hit[3]]});});});
+    var scrollStep=(root.__budgetUi||{}).scrollPlanStep;
+    if(route==='home' && scrollStep && this.host){
+      var tHit=this.targets.find(function(q){ var act=(q.node&&q.node.vm&&q.node.vm.act)||''; return act==='picker:'+scrollStep || (q.node&&q.node.key&&String(q.node.key).indexOf('step:'+scrollStep)>=0); });
+      if(tHit&&tHit.rect) this.host.scrollTop=Math.max(0, tHit.rect[1]-24);
+      root.__budgetUi.scrollPlanStep='';
+    }
     var focus=this.targets.find(function(t){return t.key===self.focusKey;}),ov=overlay(hostW,H,this.popup,this.core,focus&&focus.rect);blobs.selector=ov.dl.bytes();this.overlayNodes=ov.nodes;
     this.store=new root.Exp7ViewStore.Store(cat,function(rec){return blobs[rec.dl.file];},J);this.store.bindResources(this.core,{regular:jf[0],bold:jf[1]});this.blobs=blobs;
     var list=[];order.forEach(function(k){var rec=self.store.record('exp7.journal.'+k),v=self.views[k];if(!v){v=self.store.create(rec.id,{renderer:self.r});self.views[k]=v;}else{v.record=rec;v.scene.load(self.store.dl(rec.id));}
@@ -13563,11 +13641,17 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       this.route='plan-c'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey(),{step:ui.step,choice:ref}); return this.models?this.render():this.update();}
     if(this.popup){this.close();return;}
     if(a.indexOf('entry:')===0){ var eid=a.slice(6); if(eid&&eid!=='actions'&&eid!=='change'&&eid!=='alts'&&eid!=='record'&&eid!=='comparison'&&eid!=='pref'&&eid!=='unavail'){ root.__budgetUi=Object.assign({},root.__budgetUi||{},{entry:eid}); var it=this.atlas&&this.atlas.items&&this.atlas.items[eid]; if(it){ var v=it.values||{}, d=this.uiDraft(); d.name=it.name; d.date=v.date||(root.__budgetUi.day||budgetDateKey()); d.time=v.time||''; d.amount=v.amount!=null?String(Math.abs(+v.amount)):''; d.repeat=v.repeat||'none'; d.every=v.every||'14'; d.mdays=v.mdays||''; root.__budgetUi.draft=d; } } this.route=navigate(this.route||'home',a); if(this.o.onNavigate) this.o.onNavigate(this.route,budgetDateKey(),{entry:eid}); return this.models?this.render():this.update();}
-    if(a.indexOf('nav:')===0){this.route=navigate(this.route||'home',a); if(this.o.onNavigate) this.o.onNavigate(this.route,budgetDateKey()); return this.models?this.render():this.update();}
+    if(a.indexOf('nav:')===0){
+      var dest=navigate(this.route||'home',a);
+      if(dest==='home'||a==='nav:home'||a==='nav:back'||a==='nav:plan') return this.returnHomeToPlanStep();
+      this.route=dest;
+      if(this.o.onNavigate) this.o.onNavigate(this.route,budgetDateKey());
+      return this.models?this.render():this.update();
+    }
     if(a.indexOf('date-needed:')===0){this.route='monthly'; return this.models?this.render():this.update();}
     if(a.indexOf('date:')===0){root.__budgetUi=Object.assign({},root.__budgetUi||{},{day:a.slice(5),month:a.slice(5,12)});this.route='schedule'; return this.models?this.render():this.update();}
 
-    if(a==='keep'){ this.route='plan-a'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey()); return this.models?this.render():this.update(); }
+    if(a==='keep'){ return this.returnHomeToPlanStep(); }
     if(a==='cash:view'){ if(this.status) this.status.textContent='Add or update this item from a calendar day (as-of date).'; return; }
     if(a==='field:preferred'){ var d=this.uiDraft(); d.preferred=d.preferred===false; root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
     if(a.indexOf('repeat:')===0){ var d=this.uiDraft(); d.repeat=a.slice(7); root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
@@ -13591,7 +13675,17 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     }
     if(a==='pref:star'||a==='field:preferred'){ if(this.closeField) this.closeField(false); var d=this.uiDraft(); d.preferred=!(d.preferred!==false); root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
     if(a.indexOf('kind:')===0){ root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:Object.assign({},(root.__budgetUi||{}).draft||{},{kind:a.slice(5)})}); return this.models?this.render():this.update(); }
-    if(a.indexOf('req:')===0){ var parts=a.slice(4).split(':'), reqs=Object.assign({},(root.__budgetUi||{}).reqs||{}); if(a==='req:add'){ reqs['new-'+Date.now().toString(36)]='own'; } else if(parts[0]){ reqs[parts[0]]=parts[1]||'own'; } root.__budgetUi=Object.assign({},root.__budgetUi||{},{reqs:reqs}); this.route='plan-c'; return this.models?this.render():this.update(); }
+    if(a.indexOf('time:hour:')===0||a.indexOf('time:min:')===0){
+      if(this.closeField) this.closeField(false);
+      var d=this.uiDraft(), cur=formatTime24(d.time)||'07:00', hh=cur.slice(0,2), mm=cur.slice(3,5);
+      if(a.indexOf('time:hour:')===0) hh=a.slice(10);
+      else mm=a.slice(9);
+      d.time=formatTime24(hh+':'+mm)||(hh+':'+mm);
+      root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:d, picking:'time'});
+      return this.models?this.render():this.update();
+    }
+    if(a==='req:add'){ if(this.closeField) this.closeField(false); var d=this.uiDraft(); d.rname=''; d.time=d.time||''; root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:d, picking:''}); this.route='add-req-form'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey()); return this.models?this.render():this.update(); }
+    if(a.indexOf('req:')===0){ var parts=a.slice(4).split(':'), reqs=Object.assign({},(root.__budgetUi||{}).reqs||{}); if(parts[0]){ reqs[parts[0]]=parts[1]||'own'; } root.__budgetUi=Object.assign({},root.__budgetUi||{},{reqs:reqs}); this.route='plan-c'; return this.models?this.render():this.update(); }
     if(a==='save'||a==='rightAct'){ return this.saveJournal(); }
     if(a==='accept'||a==='proposal:accept'||a==='proposal:after'){
       var rt=this.route||'home';
@@ -13606,7 +13700,11 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       if(this.dateTarget||(root.__budgetUi&&root.__budgetUi.picking)){ root.__budgetUi=Object.assign({},root.__budgetUi||{},{formPick:next}); return this.models?this.render():this.update(); }
       root.__budgetUi=Object.assign({},root.__budgetUi||{},{month:next,day:next+'-01',pick:next});var cid=this.atlas.meta.calId,ops=[{path:'components/'+cid+'/view/month',op:'set',value:next}];await submitViews(ops,'calendar:month',this.context);return this.update();}
   };
-  Home.prototype.uiDraft=function(){ root.__budgetUi=root.__budgetUi||{}; root.__budgetUi.draft=root.__budgetUi.draft||{}; return root.__budgetUi.draft; };
+  function planSession(){ root.__budgetPlanSession=root.__budgetPlanSession||{}; return root.__budgetPlanSession; }
+  function rememberPlan(ui){ var s=planSession(); if(!ui) return s; ['step','stepName','choice','choiceName','preferred','reqs','reqItems','draft','scrollPlanStep'].forEach(function(k){ if(ui[k]!=null) s[k]=ui[k]; }); return s; }
+  function restorePlan(ui){ var s=planSession(); ui=ui||{}; ['step','stepName','choice','choiceName','preferred','reqs','reqItems','scrollPlanStep'].forEach(function(k){ if(ui[k]==null&&s[k]!=null) ui[k]=s[k]; }); if(!ui.draft&&s.draft) ui.draft=s.draft; return ui; }
+  Home.prototype.uiDraft=function(){ root.__budgetUi=restorePlan(root.__budgetUi||{}); root.__budgetUi.draft=root.__budgetUi.draft||{}; return root.__budgetUi.draft; };
+
   Home.prototype.fieldLayoutRect=function(n){
     var t=(this.targets||[]).find(function(q){ return q.node===n || (n&&q.node&&q.node.id===n.id&&n.vm&&q.node.vm&&q.node.vm.act===n.vm.act); });
     if(t&&t.rect) return t.rect.slice();
@@ -13652,8 +13750,10 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         var i=+key.split(':')[2]||+key.split(':')[1], list=draft.deductions||[];
         if(list[i]) list[i].name=v;
         draft.deductions=list;
-      } else if(key) draft[key]=v;
+      } else if(key==='time'){ draft.time=formatTime24(v)||v; root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:draft, picking:''}); }
+      else if(key) draft[key]=v;
     }
+    if(key==='time' && (root.__budgetUi||{}).picking==='time'){ root.__budgetUi=Object.assign({},root.__budgetUi||{},{picking:''}); }
     try{ el.remove(); }catch(e){}
     this.fieldEl=null; this.fieldLayout=null; this.fieldKey=null; this.fieldScreen=null;
   };
@@ -13671,11 +13771,17 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     key=fieldKey(key);
     if(fieldKind(key)==='date') return this.openDateField(key,n);
     this.closeField(false);
+    if(key==='time'){
+      root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:draft, picking:'time'});
+      this.dateTarget=null;
+    }
     var inp=document.createElement('input');
-    inp.type=key==='time'?'time':'text';
-    inp.inputMode=fieldKind(key)==='number'?'decimal':'text';
+    inp.type='text';
+    inp.inputMode=(key==='time'||fieldKind(key)==='number')?(key==='time'?'numeric':'decimal'):'text';
+    if(key==='time'){ inp.placeholder='HH:MM'; inp.maxLength=5; inp.autocomplete='off'; }
     var initial=draft[key];
     if(key.indexOf('deduct:')===0){ var i=+key.split(':')[1]; initial=draft.deductions&&draft.deductions[i]&&draft.deductions[i].value; }
+    if(key==='time') initial=formatTime24(initial)||'';
     if(initial==null||initial==='') initial=(key==='time'?'':(fieldKind(key)==='number'?'0.00':''));
     inp.value=String(initial);
     inp.setAttribute('aria-label',key);
@@ -13684,7 +13790,14 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     document.body.appendChild(inp);
     this.fieldEl=inp; this.fieldKey=key; this.fieldLayout=this.fieldLayoutRect(n);
     var placed=this.placeFieldEl();
-    inp.focus(); if(inp.type!=='time') inp.select();
+    inp.focus(); inp.select();
+    if(key==='time'){
+      inp.addEventListener('input',function(){
+        var d=inp.value.replace(/[^0-9]/g,'').slice(0,4);
+        if(d.length>=3) d=d.slice(0,2)+':'+d.slice(2);
+        if(inp.value!==d) inp.value=d;
+      });
+    }
     if(this.status) this.status.textContent=key+' — enter a value';
     var committed=false;
     function commit(){ if(committed||self.fieldEl!==inp)return; committed=true; self.closeField(true); if(self.status) self.status.textContent=key+' set'; return self.models?self.render():self.update(); }
@@ -13695,7 +13808,8 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   };
   Home.prototype.saveJournal=async function(){
     this.dateTarget=null;
-    var route=this.route||'', ui=root.__budgetUi||{}, draft=this.uiDraft(), day=ui.day||budgetDateKey(), name=String(draft.name||draft.aname||draft.cname||'').trim()||'New item';
+    if(this.closeField) this.closeField(true);
+    var route=this.route||'', ui=root.__budgetUi||{}, draft=this.uiDraft(), day=ui.day||budgetDateKey(), name=String(draft.name||draft.aname||draft.cname||draft.rname||'').trim()||'New item';
     root.__budgetUi=Object.assign({},ui,{picking:'',formPick:'',dateField:''}); ui=root.__budgetUi;
     var amount=parseMoney(draft.amount!=null&&draft.amount!==''?draft.amount:(draft.gross!=null&&draft.gross!==''?draft.gross:draft.balance||'0')); if(!(amount>=0)) amount=0;
     var when=journalWhen(draft, day, route);
@@ -13703,7 +13817,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     var calId=journalCalId(atlas);
     function boardId(kind){ var ids=(atlas.meta&&atlas.meta.boardIds)||{}, comps=atlas.components||{}; if(kind==='asset') return ids.asset||ids.cash||Object.keys(comps).find(function(k){return /asset|cash/i.test(k);})||'board_asset'; if(kind==='income'||kind==='pay') return ids.income||ids.pay||'board_income'; if(kind==='debt') return ids.debt||'board_debt'; return ids.expense||ids.ledger||'board_expense'; }
     function addItem(values, board){ ops.push({path:'items/'+id,op:'add',value:{id:id,name:name,values:values,state:{},alts:null,jreq:[],blueprint:null}}); if(board) ops.push({path:'components/'+board+'/items',op:'add',value:'item:'+id}); if(values.date||values.asOf) ops.push({path:'components/'+calId+'/items',op:'add',value:'item:'+id}); }
-    function repeatValues(v){ if(draft.repeat==='every'){ v.repeat='every'; v.every=Math.max(1,+draft.every||14); } else if(draft.repeat==='mdays'){ v.repeat='mdays'; v.mdays=String(draft.mdays||'1'); } else v.repeat='none'; if(draft.time&&/^\d{1,2}:\d{2}/.test(draft.time)){ v.time=draft.time; v.allDay=false; } else v.allDay=true; return v; }
+    function repeatValues(v){ if(draft.repeat==='every'){ v.repeat='every'; v.every=Math.max(1,+draft.every||14); } else if(draft.repeat==='mdays'){ v.repeat='mdays'; v.mdays=String(draft.mdays||'1'); } else v.repeat='none'; var tm=formatTime24(draft.time); if(tm){ v.time=tm; v.allDay=false; } else v.allDay=true; return v; }
     if(route==='cash-entry'){ var kind=(draft.kind==='owned')?'owned':'cash'; name=String(draft.name||name).trim()||'New item'; addItem({type:'asset',assetKind:kind,amount:amount,asOf:when,date:when}, boardId('asset')); }
     else if(route==='add-item-form'){ name=String(draft.name||name).trim()||'New item'; addItem(repeatValues({type:'expense',flow:'out',consume:true,amount:-amount,date:when}), boardId('expense')); }
     else if(route==='schedule-editor'){ var eid=(ui.entry||draft.entry||''); if(eid&&atlas.items&&atlas.items[eid]){ var it=atlas.items[eid], vals=Object.assign({},it.values||{},repeatValues({amount:-(amount),date:when})); if(draft.name) name=String(draft.name).trim(); ops.push({path:'items/'+eid+'/name',op:'set',value:name}); ops.push({path:'items/'+eid+'/values',op:'set',value:vals}); } else { name=String(draft.name||name).trim()||'Scheduled item'; addItem(repeatValues({type:'expense',flow:'out',consume:true,amount:-amount,date:when}), boardId('expense')); } }
@@ -13713,13 +13827,25 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     else if(route==='add-alt-form'||route==='add-alt-category'){
       if(route==='add-alt-category'){ draft.cname=name; this.route='add-alt-form'; if(this.status) this.status.textContent='Category named. Now add the alternative.'; return this.models?this.render():this.update(); }
       var step=ui.step, an=String(draft.aname||draft.name||'').trim()||'New alternative';
-      addItem({type:'expense',flow:'out',amount:-amount,date:day,allDay:true}, null);
+      name=an;
+      addItem(repeatValues({type:'expense',flow:'out',amount:-amount,date:when}), null);
       if(step&&atlas.items&&atlas.items[step]){
         var it=atlas.items[step];
         if(!it.alts){ ops.push({path:'items/'+step+'/alts',op:'set',value:{name:draft.cname||it.name,members:['item:'+step,'item:'+id],pref:'item:'+id}}); }
         else { var mem=(it.alts.members||[]).concat(['item:'+id]); ops.push({path:'items/'+step+'/alts/members',op:'set',value:mem}); ops.push({path:'items/'+step+'/alts/pref',op:'ref',value:'item:'+id}); }
       }
-      ui.choice='item:'+id; ui.choiceName=an; ui.preferred=true;
+      ui.choice='item:'+id; ui.choiceName=an; ui.preferred=true; rememberPlan(ui);
+    }
+    else if(route==='add-req-form'){
+      var rname=String(draft.rname||draft.name||'').trim()||'New requirement';
+      var items=(ui.reqItems||planSession().reqItems||[]).slice();
+      items.push({id:'req'+Date.now().toString(36), name:rname, date:when, time:formatTime24(draft.time)||'', repeat:draft.repeat||'none', every:draft.every, mdays:draft.mdays, amount:amount});
+      root.__budgetUi=Object.assign({},ui,{reqItems:items, choiceName:ui.choiceName||planSession().choiceName, draft:Object.assign({},draft,{rname:''})});
+      rememberPlan(root.__budgetUi);
+      this.route='plan-c';
+      if(this.status) this.status.textContent='Requirement added.';
+      if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey());
+      return this.models?this.render():this.update();
     }
     else { if(this.status) this.status.textContent='Nothing to save on this page.'; return; }
     function applyLocal(list, A){
@@ -13768,8 +13894,15 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       if(ops&&ops.length) await submitViews(ops,'plan:select',this.context);
     }
     if(this.status) this.status.textContent='Plan updated. Current step preserved.';
-    this.route='plan-a'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey());
-    return this.update();
+    return this.returnHomeToPlanStep();
+  };
+  Home.prototype.returnHomeToPlanStep=function(){
+    var ui=root.__budgetUi||{};
+    if(ui.step) ui.scrollPlanStep=ui.step;
+    root.__budgetUi=ui;
+    this.route='home';
+    if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey());
+    return this.models?this.render():this.update();
   };
   Home.prototype.key=function(e){if(!this.targets)return;var p=this.popup;
     if(p&&p.kind==='date'){
@@ -13805,13 +13938,14 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         {t:'field',label:'Pay date',value:dateVal('date',dayLong),y:by(237.04,17),line:true,act:'field:date'}
       ];
       var y=260;
-      if(picking==='date'){ parts=parts.concat(pickerAfter('date', y)); y+=260; }
+      if(picking==='date'){ parts=parts.concat(pickerAfter('date', y)); y+=formPickerHeight(pickMonth)+SPACE.group; }
       parts.push({t:'h',text:'Repeat',y:by(y,17)}); y+=36;
       parts.push({t:'row',text:'Does not repeat',radio:true,on:pay.repeat==='none',bold:pay.repeat==='none',top:y,h:44,act:'repeat:none'}); y+=44;
       parts.push({t:'row',text:'Specific dates each month',radio:true,on:pay.repeat==='mdays',bold:pay.repeat==='mdays',top:y,h:44,act:'repeat:mdays'}); y+=44;
-      parts.push({t:'row',text:'Every '+(pay.every||'14')+' days',radio:true,on:pay.repeat==='every'||!pay.repeat,bold:pay.repeat==='every'||!pay.repeat,top:y,h:44,act:'repeat:every'}); y+=52;
-      if(pay.repeat==='every'||!pay.repeat){ parts.push({t:'every',value:String(pay.every||'14'),y:by(y,17),act:'field:every'}); y+=56; }
-      if(pay.repeat==='mdays'){ parts.push({t:'field',label:'Days of the month',value:pay.mdays||'1, 15',y:by(y,17),line:true,act:'field:mdays'}); y+=56; }
+      if(pay.repeat==='mdays'){ y+=44; parts.push({t:'field',label:'Days of the month',value:pay.mdays||'1, 15',y:by(y,17),line:true,act:'field:mdays'}); y+=56; }
+      parts.push({t:'row',text:'Every '+(pay.every||'14')+' days',radio:true,on:pay.repeat==='every',bold:pay.repeat==='every',top:y,h:44,act:'repeat:every'}); y+=44;
+      if(pay.repeat==='every'){ y+=44; parts.push({t:'every',value:String(pay.every||'14'),y:by(y,17),act:'field:every'}); y+=56; }
+      y+=48;
       parts.push({t:'field',label:'Gross pay',value:pay.gross===''||pay.gross==null?'':fmtMoney(parseMoney(pay.gross)),y:by(y,17),line:true,bold:true,act:'field:gross'}); y+=52;
       parts.push({t:'h',text:'Deductions',y:by(y,17)}); y+=36;
       (pay.deductions||[]).forEach(function(d,i){
@@ -13842,7 +13976,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         {t:'field',label:'As-of date',value:dateVal('asOf',dayLong),y:by(397.04,17),line:true,act:'field:asOf'}
       ];
       var y=469.04;
-      if(picking==='asOf'){ parts=parts.concat(pickerAfter('asOf', y)); y+=260; }
+      if(picking==='asOf'){ parts=parts.concat(pickerAfter('asOf', y)); y+=formPickerHeight(pickMonth)+SPACE.group; }
       parts.push({t:'field',label:'APR (%)',value:draft.apr==null||draft.apr===''?'':String(draft.apr),y:by(y,17),line:true,act:'field:apr'}); y+=64;
       parts.push({t:'field',label:'Payments remaining',value:draft.terms==null||draft.terms===''?'':String(draft.terms),y:by(y,17),line:true,act:'field:terms'}); y+=64;
       parts.push({t:'field',label:'Days between payments',value:draft.every==null||draft.every===''?'':String(draft.every),y:by(y,17),line:true,act:'field:every'}); y+=64;
@@ -13870,15 +14004,16 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         {t:'field',label:'Date',value:dateVal('date',dayLong),y:by(339.04,17),box:'full',act:'field:date'}
       ];
       var y=421.04;
-      if(picking==='date'){ parts=parts.concat(pickerAfter('date', y)); y+=260; }
-      parts.push({t:'field',label:'Time',value:draft.time||(edit?'':'Add a time'),y:by(y,17),box:'full',act:'field:time'}); y+=56;
+      if(picking==='date'){ parts=parts.concat(pickerAfter('date', y)); y+=formPickerHeight(pickMonth)+SPACE.group; }
+      parts.push({t:'field',label:'Time',value:formatTime24(draft.time)||(edit?'':'Add a time'),y:by(y,17),box:'full',act:'field:time'}); y+=72;
+      if(picking==='time'){ parts.push({t:'timepick',top:y,value:formatTime24(draft.time)||'07:00'}); y+=formTimePickerHeight()+SPACE.group; }
       parts.push({t:'h',text:'Repeat',y:by(y,17)}); y+=36;
       parts.push({t:'row',text:'Does not repeat',radio:true,on:draft.repeat==='none',bold:draft.repeat==='none',top:y,h:44,act:'repeat:none'}); y+=44;
       parts.push({t:'row',text:'Specific dates each month',radio:true,on:draft.repeat==='mdays',bold:draft.repeat==='mdays',top:y,h:44,act:'repeat:mdays'}); y+=44;
-      parts.push({t:'row',text:'Every '+(draft.every||'14')+' days',radio:true,on:draft.repeat==='every',bold:draft.repeat==='every',top:y,h:44,act:'repeat:every'}); y+=52;
-      if(draft.repeat==='every'){ parts.push({t:'every',value:String(draft.every||'14'),y:by(y,17),act:'field:every'}); y+=56; }
-      if(draft.repeat==='mdays'){ parts.push({t:'field',label:'Days of the month',value:draft.mdays||'1, 15',y:by(y,17),box:'full',act:'field:mdays'}); y+=56; }
-      parts.push({t:'h',text:'Amount',y:by(y,17)}); y+=36;
+      if(draft.repeat==='mdays'){ y+=44; parts.push({t:'field',label:'Days of the month',value:draft.mdays||'1, 15',y:by(y,17),box:'full',act:'field:mdays'}); y+=56; }
+      parts.push({t:'row',text:'Every '+(draft.every||'14')+' days',radio:true,on:draft.repeat==='every',bold:draft.repeat==='every',top:y,h:44,act:'repeat:every'}); y+=44;
+      if(draft.repeat==='every'){ y+=44; parts.push({t:'every',value:String(draft.every||'14'),y:by(y,17),act:'field:every'}); y+=56; }
+      y+=48;
       parts.push({t:'field',label:'Amount (USD)',value:draft.amount==null||draft.amount===''?'0.00':String(draft.amount),y:by(y,17),box:'amount',bold:true,act:'field:amount'}); y+=64;
       if(edit){
         parts.push({t:'h',text:'Scope of this edit',y:by(y,17)}); y+=36;
@@ -13906,11 +14041,44 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       parts.push({t:'note',text:'Past occurrences stay as they are.',y:by(y,15),size:15}); y+=28;
       return scr(Math.max(844,y+40), parts);
     }
+    if(R==='add-alt-form'||R==='add-req-form'){
+      var isReq=R==='add-req-form';
+      if(!draft.date) draft.date=day;
+      if(!draft.repeat) draft.repeat='none';
+      var parts=[
+        {t:'bar',back:isReq?'Requirements':'Alternatives',right:isReq?'Save':'Continue',backAct:isReq?'nav:plan-c':'add-alt:list',rightAct:'save',rightBold:true},
+        {t:'title',text:isReq?'New requirement':'New alternative',y:by(74.06,22)},
+        {t:'note',text:isReq?'This requirement is added to the review list.':'Preferred is a mark, not a selection. New alternatives start preferred.',y:by(107.52,15),size:15}
+      ];
+      var y=145;
+      if(isReq){
+        parts.push({t:'field',label:'Name',value:draft.rname||draft.name||'Add a name',y:by(y+40,17),box:'full',bold:true,act:'field:rname'}); y+=112;
+      } else {
+        parts.push({t:'field',label:'Name',value:draft.aname||draft.name||'Add a name',y:by(y+40,17),box:'full',bold:true,act:'field:aname'}); y+=112;
+        parts.push({t:'row',text:'Preferred',star:true,on:draft.preferred!==false,tag:'Star marks preferred',top:y,h:56,act:'pref:star'}); y+=64;
+      }
+      parts.push({t:'h',text:'Timing',y:by(y,17)}); y+=56;
+      parts.push({t:'field',label:'Date',value:dateVal('date',dayLong),y:by(y,17),box:'full',act:'field:date'}); y+=72;
+      if(picking==='date'){ parts=parts.concat(pickerAfter('date', y)); y+=formPickerHeight(pickMonth)+SPACE.group; }
+      parts.push({t:'field',label:'Time',value:formatTime24(draft.time)||'Add a time',y:by(y,17),box:'full',act:'field:time'}); y+=72;
+      if(picking==='time'){ parts.push({t:'timepick',top:y,value:formatTime24(draft.time)||'07:00'}); y+=formTimePickerHeight()+SPACE.group; }
+      parts.push({t:'h',text:'Repeat',y:by(y,17)}); y+=36;
+      parts.push({t:'row',text:'Does not repeat',radio:true,on:draft.repeat==='none',bold:draft.repeat==='none',top:y,h:44,act:'repeat:none'}); y+=44;
+      parts.push({t:'row',text:'Specific dates each month',radio:true,on:draft.repeat==='mdays',bold:draft.repeat==='mdays',top:y,h:44,act:'repeat:mdays'}); y+=44;
+      if(draft.repeat==='mdays'){ y+=44; parts.push({t:'field',label:'Days of the month',value:draft.mdays||'1, 15',y:by(y,17),box:'full',act:'field:mdays'}); y+=56; }
+      parts.push({t:'row',text:'Every '+(draft.every||'14')+' days',radio:true,on:draft.repeat==='every',bold:draft.repeat==='every',top:y,h:44,act:'repeat:every'}); y+=44;
+      if(draft.repeat==='every'){ y+=44; parts.push({t:'every',value:String(draft.every||'14'),y:by(y,17),act:'field:every'}); y+=56; }
+      y+=48;
+      parts.push({t:'field',label:'Amount (USD)',value:draft.amount==null||draft.amount===''?'0.00':String(draft.amount),y:by(y,17),box:'amount',bold:true,act:'field:amount'}); y+=64;
+      if(!isReq) parts.push({t:'note',text:'Continue to requirements review.',y:by(y,15),size:15});
+      return scr(Math.max(844,y+80), parts);
+    }
     return scr(844,[{t:'title',text:'Unknown form '+R,y:92}]);
   }
   function routeModel(route, ctx){
     ctx=ctx||{};
     var by=function(y0,sz){ return y0+({22:18,17:14.08,15:12.48,13:10.92}[sz]||14); };
+    if(ctx.ui) ctx.ui=restorePlan(ctx.ui); else if(root.__budgetUi) root.__budgetUi=restorePlan(root.__budgetUi);
     var R=route;
     var ui=ctx.ui||((typeof root!=='undefined'&&root.__budgetUi)||{});
     var day=ctx.day||ui.day||budgetDateKey();
@@ -13931,7 +14099,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     function liveAltList(){
       var plan=ctx.plan||{}, rows=plan.rows||[], id=ui.step, r=rows.find(function(q){return q.id===id;})||rows[0];
       if(!r) return null;
-      var parts=[{t:'bar',back:'Plan',backAct:'nav:plan'},{t:'title',text:r.name||'Step',y:by(74.06,22)},{t:'note',text:(r.selectedName?r.selectedName+' is in use.':'No alternative is in use yet.'),y:by(103.52,15),size:15},{t:'note',text:'Preferred is a mark, not a selection.',y:by(123.52,15),size:15}];
+      var parts=[{t:'bar',back:'Home',backAct:'nav:home'},{t:'title',text:r.name||'Step',y:by(74.06,22),wrap:true},{t:'note',text:(r.selectedName?r.selectedName+' is in use.':'No alternative is in use yet.'),y:by(103.52,15),size:15},{t:'note',text:'Preferred is a mark, not a selection.',y:by(123.52,15),size:15}];
       var top=169-31;
       (r.choices||[]).forEach(function(c){
         var on=c.ref===r.selected||c.id===r.selected, un=!!c.unavailable||c.tag==='Unavailable';
@@ -13947,8 +14115,9 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       var choice=ui.choiceName||'New alternative', stepName=ui.stepName||'this step';
       var reqs=ui.reqs||{}, keys=Object.keys(reqs), seeded=(ctx.atlas&&ctx.atlas.items&&ui.step&&ctx.atlas.items[ui.step]&&ctx.atlas.items[ui.step].jreq)||[];
       var names=seeded.length?seeded.map(function(q,i){return (q&&(q.name||q.title))||('Requirement '+(i+1));}):['Needs from '+stepName];
+      (ui.reqItems||[]).forEach(function(r){ if(r&&r.name&&names.indexOf(r.name)<0) names.push(r.name); });
       if(!keys.length&&names.length){ /* still undecided */ }
-      var parts=[{t:'bar',back:'Plan',backAct:'nav:plan'},{t:'title',text:'Requirements for '+choice,y:by(74.06,22)},{t:'note',text:'Seeded from the current item JReqs.',y:by(103.52,15),size:15},{t:'note',text:'The current plan stays until you accept.',y:by(123.52,15),size:15}];
+      var parts=[{t:'bar',back:'New alternative',backAct:'add-alt:form'},{t:'title',text:'Requirements for '+choice,y:by(74.06,22),wrap:true},{t:'note',text:'Seeded from the current item JReqs.',y:by(103.52,15),size:15},{t:'note',text:'The current plan stays until you accept.',y:by(123.52,15),size:15}];
       var y=157;
       names.forEach(function(nm,i){
         var key='r'+i, decided=reqs[key]||reqs[nm];
@@ -13965,16 +14134,8 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       if(!resolved){ parts.push({t:'note',text:'Accept is unavailable until every',y:by(y,15),size:15}); parts.push({t:'note',text:'requirement is resolved.',y:by(y+20,15),size:15}); }
       return scr(Math.max(844,y+80),parts);
     }
-    if(R==='add-alt-form'){
-      return scr(844,[
-        {t:'bar',back:'Alternatives',right:'Continue',backAct:'add-alt:list',rightAct:'save',rightBold:true},
-        {t:'title',text:'New alternative',y:by(74.06,22)},
-        {t:'note',text:'Preferred is a mark, not a selection. New alternatives start preferred.',y:by(107.52,15),size:15},
-        {t:'field',label:'Name',value:draft.aname||draft.name||'New alternative',y:by(185.04,17),box:'full',bold:true,act:'field:aname'},
-        {t:'field',label:'Amount (USD)',value:draft.amount||'0.00',y:by(267.04,17),box:'amount',bold:true,act:'field:amount'},
-        {t:'row',text:'Preferred',star:true,on:draft.preferred!==false,tag:'Star marks preferred',top:349-31,h:56,act:'pref:star'},
-        {t:'note',text:'Continue to requirements review.',y:by(425.52,15),size:15}
-      ]);
+    if(R==='add-alt-form'||R==='add-req-form'){
+      return liveFormScreen(R, scr, by, day, dayLong, dayShort, draft, ui);
     }
 
     if(R==='pay-entry'||R==='debt-entry'||R==='add-item-form'||R==='schedule-editor'||R==='day-record'){
@@ -13992,7 +14153,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       {t:'note',text:'Kind is required. It is not inferred from the name.',y:by(425.52,15),size:15}
     ]);
     if(R==='plan-b') return scr(844,[
-      {t:'bar',back:'< Plan',backAct:'nav:plan'},
+      {t:'bar',back:'Requirements',backAct:'nav:plan-c'},
       {t:'title',text:'Family car',y:by(74.06,22)},
       {t:'note',text:'Used gas car is in use.',y:by(103.52,15),size:15},
       {t:'note',text:'Preferred is a mark, not a selection.',y:by(123.52,15),size:15},
@@ -14002,7 +14163,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       {t:'note',text:'Unavailable choices stay visible and are not selected.',y:by(331.52,15),size:15}
     ]);
     if(R==='plan-c') return scr(844,[
-      {t:'bar',back:'< Plan',backAct:'nav:plan'},
+      {t:'bar',back:'Requirements',backAct:'nav:plan-c'},
       {t:'title',text:'Requirements for Tesla',y:by(74.06,22)},
       {t:'note',text:'Seeded from the gas car JReqs.',y:by(103.52,15),size:15},
       {t:'note',text:'The current plan stays until you accept.',y:by(123.52,15),size:15},
@@ -14049,7 +14210,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       {t:'field',label:'Amount (USD)',value:'0.00',y:by(755.04,17),box:'amount',bold:true}
     ]);
     if(R==='add-alt-list') return scr(844,[
-      {t:'bar',back:'< Plan',backAct:'nav:plan'},
+      {t:'bar',back:'Requirements',backAct:'nav:plan-c'},
       {t:'title',text:'Family car',y:by(74.06,22)},
       {t:'note',text:'Used gas car is in use.',y:by(103.52,15),size:15},
       {t:'note',text:'Preferred is a mark, not a selection.',y:by(123.52,15),size:15},
@@ -14091,7 +14252,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       {t:'bar',back:'< Today',backAct:'nav:agenda'},
       {t:'title',text:'Take an Uber',y:by(74.06,22)},
       {t:'note',text:'Wednesday, November 11, 2026',y:by(103.52,15),size:15},
-      {t:'text',text:'8:00 AM  -  Every 14 days',y:by(123.52,15),size:15,ink:'#4D4C57'},
+      {t:'text',text:'08:00  -  Every 14 days',y:by(123.52,15),size:15,ink:'#4D4C57'},
       {t:'text',text:'18.40',y:by(121.96,17),align:'right',bold:true},
       {t:'row',text:'Change',chev:true,top:169-31,h:56,act:'entry:change'},
       {t:'row',text:'Alternatives and requirements',chev:true,top:225-31,h:56,act:'entry:alts'},
@@ -14142,7 +14303,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       var after=R==='plan-switch-after';
       var parts=[
         {t:'wash',top:364,h:192.5,color:after?C.mint:C.wash},
-        {t:'bar',back:'< Plan',backAct:'nav:plan'},
+        {t:'bar',back:'Requirements',backAct:'nav:plan-c'},
         {t:'title',text:'Proposal',y:by(74.06,22)},
         {t:'note',text:'Family car switches from Used gas car',y:by(105.52,15),size:15},
         {t:'note',text:'to Tesla from Wednesday, November 11, 2026.',y:by(125.52,15),size:15},
@@ -14235,7 +14396,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       {t:'field',label:'Name',value:'Take an Uber',y:by(233.04,17)},
       {t:'h',text:'Timing',y:by(275.96,17)},
       {t:'field',label:'Date',value:'Wednesday, November 11, 2026',y:by(339.04,17)},
-      {t:'field',label:'Time',value:'8:00 AM',y:by(413.04,17)},
+      {t:'field',label:'Time',value:'08:00',y:by(413.04,17)},
       {t:'h',text:'Repeat',y:by(455.96,17)},
       {t:'row',text:'Does not repeat',radio:true,top:509-31,h:44,act:'repeat:none'},
       {t:'row',text:'Specific dates each month',radio:true,top:553-31,h:44,act:'repeat:mdays'},
@@ -14253,12 +14414,12 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   function navigate(route, act){
     var A={
       'nav:home':'home','nav:back':'home','nav:cash':'cash-list','nav:ledger':'monthly',
-      'nav:plan':'plan-a','nav:calendar':'calendar','nav:agenda':'schedule','view:day':'schedule',
+      'nav:plan':'home','req:add':'add-req-form','nav:plan-c':'plan-c','nav:calendar':'calendar','nav:agenda':'schedule','view:day':'schedule',
       'journal:date':'date-picker-open','budget:date':'date-picker-closed',
       'cash:add':'cash-entry','picker:car':'add-alt-list','choose:tesla':'plan-c','nav:plan-c':'plan-c',
       'add:item':'add-item-choose','add:choose':'add-item-choose','add:activity':'add-item-form',
       'add:cash':'cash-entry','add:pay':'pay-entry','add:debt':'debt-entry',
-      'add:alt':'add-alt-category','add-alt:list':'add-alt-list','add-alt:category':'add-alt-category','add-alt:form':'add-alt-form','accept':'plan-switch-before',
+      'add:alt':'add-alt-category','add-alt:list':'add-alt-list','add-alt:category':'add-alt-category','add-alt:form':'add-alt-form',
       'entry:actions':'day-actions','entry:uber':'day-actions','entry:record':'day-record','entry:comparison':'day-comparison',
       'entry:change':'schedule-editor','entry:alts':'add-alt-list','entry:pref':'day-actions','entry:unavail':'day-actions','nav:proposal':'plan-switch-before','proposal:after':'plan-switch-after',
       'nav:debt':'debt-entry','nav:pay':'pay-entry'
@@ -14277,7 +14438,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       return 'add-alt-category';
     }
     if(act==='save') return route;
-    if(act==='accept'||act==='proposal:accept') return route==='plan-switch-before'?'plan-switch-after':(route==='plan-switch-after'?'plan-a':'plan-switch-before');
+    if(act==='accept'||act==='proposal:accept') return route==='plan-switch-before'?'plan-switch-after':(route==='plan-switch-after'?'home':'plan-switch-before');
     if(act==='cash:view') return route;
     return route;
     function ctxItem(id){ try{ var A=(typeof root!=='undefined'&&root.__budgetUi&&root.__budgetUi.atlas)||null; return (id&&A&&A.items&&A.items[id])||null; }catch(e){ return null; } }
@@ -14291,7 +14452,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     };
   }
 
-  var api={bindFullDate:bindFullDate,routeModel:routeModel,navigate:navigate,session:session,tokens:journalTokens,type:TYPE,space:SPACE,fullModel:fullModel,datePicker:datePicker,calendarModel:calendarModel,planModel:planModel,ledgerModel:ledgerModel,cashModel:cashModel,selectionOps:selectionOps,layout:layout,overlay:overlay,model:model,viewMetrics:viewMetrics,maxTexPx:maxTexPx,Home:Home,colors:C,fonts:journalFonts,overlayRect:overlayRect,overlayCorrection:overlayCorrection,journalCalId:journalCalId,journalWhen:journalWhen,fieldKey:fieldKey,fieldKind:fieldKind,payDraft:payDraft,glyphs:{chevronRight:chevronRight,chevronDown:chevronDown,chevronUp:chevronUp,chevronLeft:chevronLeft,markCircle:markCircle,markBar:markBar,markTwoBars:markTwoBars,starOutline:starOutline,radio:radio,checkbox:checkbox,acceptBand:acceptBand},hostCssSize:hostCssSize,mount:function(o){var h=new Home(o);h.ready=h.init();return h;}};
+  var api={bindFullDate:bindFullDate,routeModel:routeModel,navigate:navigate,session:session,tokens:journalTokens,type:TYPE,space:SPACE,fullModel:fullModel,datePicker:datePicker,calendarModel:calendarModel,planModel:planModel,ledgerModel:ledgerModel,cashModel:cashModel,selectionOps:selectionOps,layout:layout,overlay:overlay,model:model,viewMetrics:viewMetrics,maxTexPx:maxTexPx,Home:Home,colors:C,fonts:journalFonts,overlayRect:overlayRect,overlayCorrection:overlayCorrection,journalCalId:journalCalId,journalWhen:journalWhen,formPickerHeight:formPickerHeight,formatTime24:formatTime24,hourLabel24:hourLabel24,fieldKey:fieldKey,fieldKind:fieldKind,payDraft:payDraft,glyphs:{chevronRight:chevronRight,chevronDown:chevronDown,chevronUp:chevronUp,chevronLeft:chevronLeft,markCircle:markCircle,markBar:markBar,markTwoBars:markTwoBars,starOutline:starOutline,radio:radio,checkbox:checkbox,acceptBand:acceptBand},hostCssSize:hostCssSize,mount:function(o){var h=new Home(o);h.ready=h.init();return h;}};
   root.Exp7Journal=api;root.Exp7Views.journal=api;
 })(typeof window!=='undefined'?window:globalThis);
 
@@ -15296,7 +15457,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.69",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.70",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
