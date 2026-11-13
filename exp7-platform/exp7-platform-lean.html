@@ -14204,7 +14204,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       if(!draft.repeat) draft.repeat='none';
       var parts=[
         {t:'bar',back:isReq?'Requirements':'Alternatives',right:isReq?'Save':'Continue',backAct:isReq?'nav:plan-c':'add-alt:list',rightAct:'save',rightBold:true},
-        {t:'title',text:isReq?'New requirement':'New alternative',y:by(74.06,22)},
+        {t:'title',text:isReq?'New requirement':((draft.cname||draft.category)?'New alternative in '+(draft.cname||draft.category):'New alternative'),y:by(74.06,22),wrap:true},
         {t:'note',text:isReq?'This requirement is added to the review list.':'Preferred is a mark, not a selection. New alternatives start preferred.',y:by(107.52,15),size:15}
       ];
       var y=145;
@@ -14290,6 +14290,18 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       parts.push({t:'accept',text:'Accept',enabled:resolved,act:'accept',top:y-22}); y+=48;
       if(!resolved){ parts.push({t:'note',text:'Accept is unavailable until every',y:by(y,15),size:15}); parts.push({t:'note',text:'requirement is resolved.',y:by(y+20,15),size:15}); }
       return scr(Math.max(844,y+80),parts);
+    }
+    if(R==='add-alt-category'&&(ctx.plan||ui.step)){
+      /* Live category step: names the item the person is on, never the sample car. */
+      var crows=((ctx.plan||{}).rows)||[], cr=crows.find(function(q){return q.id===ui.step;})||null;
+      var cname=(cr&&cr.name)||ui.stepName||'This item';
+      return scr(844,[
+        {t:'bar',back:cname,right:'Next',backAct:'add-alt:list',rightAct:'add-alt:form',rightBold:true},
+        {t:'title',text:'Name the category',y:by(74.06,22)},
+        {t:'note',text:cname+' and its alternatives are choices for the same need. Name that need.',y:by(107.52,15),size:15},
+        {t:'field',label:'What do these choices have in common?',value:draft.category||'Add a name',y:by(217.04,17),box:'full',bold:true,act:'field:category'},
+        {t:'note',text:'You name the category. This step is only for the first alternative.',y:by(261.52,15),size:15}
+      ]);
     }
     if(R==='add-alt-form'||R==='add-req-form'){
       return liveFormScreen(R, scr, by, day, dayLong, dayShort, draft, ui);
