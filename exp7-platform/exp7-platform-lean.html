@@ -12708,8 +12708,9 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       pts.push('L', cx+Math.cos(b)*R*0.38, cy+Math.sin(b)*R*0.38); }
     var cmds=[]; for(i=0;i<pts.length;){ if(pts[i]==='M'||pts[i]==='L'){ cmds.push([pts[i],pts[i+1],pts[i+2]]); i+=3; } else i++; }
     cmds.push(['Z']);
-    if(filled)n.items.push(['stroke',cmds,rgba(C.accent),{width:1.25,join:'miter'}]);
-    else n.items.push(['stroke',cmds,rgba(C.accent),{width:1.25,join:'miter'}]);
+    /* Preferred reads as a filled star; not preferred as an outline. */
+    if(filled)n.items.push(['path',cmds,rgba(C.accent)]);
+    n.items.push(['stroke',cmds,rgba(C.accent),{width:1.25,join:'miter'}]);
   }
   function radio(n,cx,cy,on){
     if(on)n.items.push(['rrect',cx-8,cy-8,16,16,8,rgba(C.accent)]);
