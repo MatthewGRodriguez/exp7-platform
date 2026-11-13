@@ -2,7 +2,7 @@
   "format": "exp7-platform-release/1",
   "version": "1.8.71",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "3e29bcbc461e51cdaffb574890407b7358e595efd4e36b7023fe8c96f9f8a6d7",
+  "sha256": "6c074ce8f094a5b6e7beb07ef416876843c7fbf94842d123d792be28634f5a2c",
   "minLauncherMajor": 1,
   "contains": {
     "1.8.71": "Calendar-first and data-repo fixes. The data repo is created private by itself once GitHub access works (no create button, never from a half-typed repo name, never overwritten) and every failure says what GitHub reports while local saving continues. Items with no date open their edit page with the date picker so they can be dated; Change applies to this occurrence or this and future without rewriting earlier ones; Record what happened is saved to the occurrence; Specific dates each month repeats on those days, and the days box shows what will be saved (the date's day until changed); day rows say how an item repeats in words; a tap on Save or a row while a field is still open now lands on the first tap; tapping a calendar entry opens that item's own page (name, day, time, repeat, amount) instead of the sample item; pay on the calendar is the take-home. Old Board asset, debt and pay entries open the selected calendar day; Budget has no what-if path; cash is never inferred from a name.",
