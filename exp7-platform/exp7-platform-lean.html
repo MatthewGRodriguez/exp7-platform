@@ -12899,7 +12899,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       parts.forEach(function(p,i){
         var k=(p.k||p.t)+i;
         if(p.t==='wash'){
-          var wn=node('wash'+i); rect(wn,0,p.top||0,W,p.h||44,p.color||C.wash);
+          var wn=node('wash'+i); rect(wn,0,(p.top||0)+flowShift,W,p.h||44,p.color||C.wash);
         } else if(p.t==='bar'){
           var rw=0;
           if(p.right){ var rz=core.measure(fonts[p.rightBold?1:0],body,p.right); rw=Math.min(W-100,Math.max(88,rz+28)); }
@@ -12963,7 +12963,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
           text(node(k+'d'),'days',162,ey,body,C.ink,false);
           hit(en,80,ey-28,48,44,p.act||'field:every','Every N days');
         } else if(p.t==='pair'){
-          var py=by(p,cursor);
+          var py=by(p,cursor)+flowShift;
           text(node(k+'a'),p.left,inset,py,p.size||body,C.ink,!!p.bold,W/2);
           if(p.right) text(node(k+'b'),p.right,rightX,py,p.size||body,C.ink,!!p.rightBold,0,'right');
           if(p.toggle){
@@ -13790,7 +13790,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     if(a==='save'||a==='rightAct'){ return this.saveJournal(); }
     if(a==='accept'||a==='proposal:accept'||a==='proposal:after'){
       var rt=this.route||'home';
-      if(rt==='plan-c'){ this.route='plan-switch-before'; }
+      if(rt==='plan-c'){ this.route=(this.models&&this.models.plan)?'plan-switch-after':'plan-switch-before'; /* live: one stacked Before and After page */ }
       else if(rt==='plan-switch-before'){ this.route='plan-switch-after'; }
       else if(rt==='plan-switch-after'){ return this.acceptPlanSwitch(); }
       else this.route=navigate(rt,a);
@@ -14476,6 +14476,38 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       {t:'link',text:'Hide comparison',top:461-27,h:44,act:'entry:record'},
       {t:'note',text:'Hiding this does not cancel the record.',y:by(489.52,15),size:15}
     ]);
+    if((R==='plan-switch-before'||R==='plan-switch-after')&&ctx.plan&&(ctx.plan.rows||[]).length&&ui.choiceName){
+      /* Live switch review: Before and After stacked on one phone page, from the person's own plan. */
+      var prow=ctx.plan.rows, sid=ui.step, sr=prow.find(function(q){return q.id===sid;})||null;
+      var inUse=function(r){ return (r.selectedName&&r.selectedName!=='No alternative')?r.selectedName:r.name; };
+      var sj=ctx.atlas&&ctx.atlas.items&&sid&&ctx.atlas.items[sid]&&ctx.atlas.items[sid].jreq; sj=Array.isArray(sj)?sj:[];
+      var stepNm=(sr&&sr.name)||ui.stepName||'This step', fromNm=sr?inUse(sr):stepNm, toNm=ui.choiceName;
+      var rnames=sj.length?sj.map(function(q,i){return (q&&(q.name||q.title))||('Requirement '+(i+1));}):['Needs from '+stepNm];
+      (ui.reqItems||[]).forEach(function(q){ if(q&&q.name&&rnames.indexOf(q.name)<0) rnames.push(q.name); });
+      var sreqs=ui.reqs||{}, word={own:'Needs its own',reuse:'Reuse a copy',none:'Not needed'};
+      var sparts=[{t:'bar',back:'Requirements',backAct:'nav:plan-c'},{t:'title',text:'Review the switch',y:by(74.06,22),wrap:true},
+        {t:'note',text:stepNm+' switches from '+fromNm+' to '+toNm+' from '+dayLong+'.',y:by(105.52,15),size:15},
+        {t:'note',text:'The current plan is unchanged until you accept.',y:by(129.52,15),size:15}];
+      var sy=180;
+      [false,true].forEach(function(afterView){
+        sparts.push({t:'h',text:(afterView?'After':'Before')+'  -  '+prow.length+(prow.length===1?' step':' steps'),y:by(sy,17)}); sy+=40;
+        prow.forEach(function(r){
+          var changed=r.id===sid, start=sy, at=sparts.length;
+          sparts.push({t:'h',text:r.name,y:by(sy,17)}); sy+=24;
+          sparts.push({t:'note',text:changed&&afterView?toNm:inUse(r),y:by(sy,15),size:15}); sy+=28;
+          if(changed&&afterView) rnames.forEach(function(nm,i){ var d=sreqs['r'+i]||sreqs[nm]||''; sparts.push({t:'note',text:nm+': '+(word[d]||'Not decided'),y:by(sy,15),size:15}); sy+=22; });
+          if(changed) sparts.splice(at,0,{t:'wash',top:start-10,h:sy-start+6,color:afterView?C.mint:C.wash});
+          sy+=12;
+        });
+        sy+=16;
+      });
+      sparts.push({t:'note',text:'Lavender is the step now; green is the step after you accept.',y:by(sy,15),size:15}); sy+=40;
+      sparts.push({t:'wash',top:sy,h:44,color:C.mint});
+      sparts.push({t:'link',text:'Accept',top:sy,h:44,bold:true,act:'accept'}); sy+=52;
+      sparts.push({t:'link',text:'Keep current',top:sy,h:44,act:'keep'}); sy+=56;
+      sparts.push({t:'note',text:'Accept makes '+toNm+' the choice in use.',y:by(sy,15),size:15}); sy+=40;
+      return scr(Math.max(844,sy+60),sparts);
+    }
     if(R==='plan-switch-before'||R==='plan-switch-after'){
       var after=R==='plan-switch-after';
       var parts=[
