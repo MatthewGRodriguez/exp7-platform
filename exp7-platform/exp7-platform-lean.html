@@ -14293,7 +14293,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     }
     if(R==='add-alt-category'&&(ctx.plan||ui.step)){
       /* Live category step: names the item the person is on, never the sample car. */
-      var crows=((ctx.plan||{}).rows)||[], cr=crows.find(function(q){return q.id===ui.step;})||null;
+      var crows=((ctx.plan||{}).rows)||[], cr=crows.find(function(q){return q.id===ui.step;})||crows[0]||null;
       var cname=(cr&&cr.name)||ui.stepName||'This item';
       return scr(844,[
         {t:'bar',back:cname,right:'Next',backAct:'add-alt:list',rightAct:'add-alt:form',rightBold:true},
