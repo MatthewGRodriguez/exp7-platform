@@ -12360,7 +12360,8 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       if (rep === 'every') { var n = Math.max(1, Math.floor(+v.every || 1)), gap = BR.dayDiff(v.date, start); v.date = BR.addDays(v.date, Math.ceil(gap / n) * n); }
       else if (rep === 'monthdays') v.date = firstMonthday(start, BR.monthDayList(v.on)) || start; else if (rep === 'monthly') v.date = firstMonthday(start, [BR.pdate(v.date).getDate()]) || start; else v.date = start; }
     if (v.until && String(v.until) < String(v.date)) delete v.until;
-    var id = uid(R.name + ' ' + T.name, V, taken || []); return { id: id, ops: reqAddOps(w, id, R.name + ' (' + T.name + ')', v) }; }
+    var O = (R.values && R.values.copyOf && w.items[bare(R.values.copyOf)]) || R, nm = O.name || R.name; /* a copy of a copy keeps the original's name */
+    var id = uid(nm + ' ' + T.name, V, taken || []); return { id: id, ops: reqAddOps(w, id, nm + ' (' + T.name + ')', v) }; }
 
   /* ---- the panel under an entry: its choices, their marks and requirements ---- */
   function reqBlock(V, w, xid) { var X = VM(), out = [], L = reqsOf(w, xid), x = w.items[xid] || {};
@@ -13841,10 +13842,26 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   function reqCtx(ui){ ui=ui||{}; return String(ui.step||'')+'>'+String(ui.choice||''); }
   function reqAnswers(ui){ ui=ui||{}; return (ui.reqsFor&&ui.reqsFor===reqCtx(ui)&&ui.reqs)||{}; }
   function reqAdded(ui){ ui=ui||{}; return (ui.reqItemsFor&&ui.reqItemsFor===reqCtx(ui)&&Array.isArray(ui.reqItems)&&ui.reqItems)||[]; }
-  /* The review's requirements: the step's JReqs (a ref, a list, {jgroup:[...]} or a record, as in 1.8.72), then those added for this choice.
-     Each has a stable key; an atlas item keeps its id so its answer can be saved with the switch. */
+  /* The review's requirements are those of the choice in use: the step's JReqs (a ref, a list, {jgroup:[...]} or a record, as in 1.8.72) while the step's own
+     item is in use; after a switch, what that switch kept (a Reuse copy in place of the original, "Needs its own" as the original, "Not needed" dropped) and the
+     requirements made for that choice. Then those added here for this choice. Each has a stable key; an atlas item keeps its id so its answer can be saved. */
+  function forAltOf(AT, ref){ var BF=root.BudgetFlows, out=[]; if(!ref) return out; if(BF&&typeof BF.reqsOf==='function'){ try{ return BF.reqsOf(AT, ref)||[]; }catch(e){} }
+    Object.keys(AT.items||{}).forEach(function(id){ var v=(AT.items[id]||{}).values; if(v&&v.forAlt===ref) out.push(id); }); return out; }
+  function inUseReqs(AT, step, seeded){ var cur=null; try{ cur=(typeof root.selectedRef==='function')?root.selectedRef(AT, step):null; }catch(e){ cur=null; }
+    if(!cur||cur==='item:'+step) return seeded;
+    var C=AT.items[String(cur).replace(/^item:/,'')]; if(!C) return seeded;
+    var rv=(C.values&&C.values.reqReview&&typeof C.values.reqReview==='object')?C.values.reqReview:null, made=forAltOf(AT, cur);
+    if(!rv&&!made.length) return seeded; /* switched before 1.8.75 kept anything: the step's own list stands */
+    var out=[];
+    if(rv) seeded.forEach(function(q){ var m=typeof q==='string'?/^(?:item:)?(.+)$/.exec(q):null, id=m&&AT.items[m[1]]?m[1]:(q&&typeof q==='object'&&q.id&&AT.items[q.id]?q.id:null), r=id?rv[id]:null;
+      if(!r){ out.push(q); return; } if(r.d==='none') return;
+      if(r.d==='reuse'&&r.ref&&AT.items[String(r.ref).replace(/^item:/,'')]){ out.push('item:'+String(r.ref).replace(/^item:/,'')); return; }
+      out.push(q); });
+    made.forEach(function(id){ if(out.indexOf('item:'+id)<0) out.push('item:'+id); });
+    return out; }
   function reviewReqs(AT, ui){ AT=AT||{}; ui=ui||{}; var stepIt=(AT.items&&ui.step&&AT.items[ui.step])||null, raw=stepIt?stepIt.jreq:null, out=[], seen={};
     var seeded=Array.isArray(raw)?raw:(raw&&typeof raw==='object'&&Array.isArray(raw.jgroup)?raw.jgroup:(raw?[raw]:[]));
+    if(stepIt) seeded=inUseReqs(AT, ui.step, seeded);
     seeded.forEach(function(q,i){ var id=null, nm=null;
       if(typeof q==='string'){ var m=/^(item|bp|joy|comp):(.+)$/.exec(q), col=m?({item:'items',bp:'blueprints',joy:'joys',comp:'components'})[m[1]]:'items', key=m?m[2]:q, t=(AT[col]||{})[key]; nm=(t&&(t.name||t.title))||null; if(col==='items'&&t) id=key; }
       else if(q&&typeof q==='object'){ nm=q.name||q.title||null; if(q.id&&AT.items&&AT.items[q.id]) id=q.id; }
