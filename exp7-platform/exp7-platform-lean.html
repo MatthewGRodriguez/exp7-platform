@@ -13550,7 +13550,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       self.models=models;self.render();if(self.o.onUpdate)self.o.onUpdate(self);return self;
     }).catch(function(e){if(self.dead)return;self.error=String(e&&e.message||e);if(self.o.onError)self.o.onError(e);var err=self.host.querySelector('.jrerr')||self.host.appendChild(document.createElement('div'));err.className='jrerr';err.setAttribute('role','alert');err.textContent='JRender composition not drawn: '+self.error;});return this.chain;};
   /* Fill the item page's draft from the tapped entry: its name, the tapped day, that day's time and charge, and its repeat. */
-  Home.prototype.draftEntry=function(eid){ var it=this.atlas&&this.atlas.items&&this.atlas.items[eid]; if(it){ root.__budgetUi=Object.assign({},root.__budgetUi||{},{entry:eid}); var v=it.values||{}, d=this.uiDraft(), oday=root.__budgetUi.day||v.date||budgetDateKey(), BF=root.BudgetFlows, en=null; try{ en=BF&&BF.entryOn&&this.atlas?BF.entryOn(this.atlas,eid,oday):null; }catch(e){ en=null; } d.name=it.name; d.date=v.date&&(!en||!en.repeating)?v.date:oday; d.time=(en&&en.ex&&en.ex.time!=null)?en.ex.time:(v.time||''); d.amount=en&&en.charge!=null?String(Math.abs(+en.charge)):(v.amount!=null?String(Math.abs(+v.amount)):''); d.repeat=journalRepeatDraft(v); d.every=v.every||'14'; d.mdays=Array.isArray(v.on)?v.on.join(', '):(v.mdays||''); d.scope=d.scope||'future'; d.rec='planned'; d.actual=''; root.__budgetUi.draft=d; } };
+  Home.prototype.draftEntry=function(eid){ var it=this.atlas&&this.atlas.items&&this.atlas.items[eid]; if(it){ root.__budgetUi=Object.assign({},root.__budgetUi||{},{entry:eid}); var v=it.values||{}, d=this.uiDraft(), oday=root.__budgetUi.day||v.date||budgetDateKey(), BF=root.BudgetFlows, en=null; try{ en=BF&&BF.entryOn&&this.atlas?BF.entryOn(this.atlas,eid,oday):null; }catch(e){ en=null; } d.name=it.name; d.date=v.date&&(!en||!en.repeating)?v.date:oday; d.time=(en&&en.ex&&en.ex.time!=null)?en.ex.time:(v.time||''); d.amount=en&&en.charge!=null?String(Math.abs(+en.charge)):(v.amount!=null?String(Math.abs(+v.amount)):''); d.repeat=journalRepeatDraft(v); d.every=v.every||'14'; d.mdays=Array.isArray(v.on)?v.on.join(', '):(v.mdays||''); d.scope=d.scope||'future'; d.recScope='one'; d.rec='planned'; d.actual=''; root.__budgetUi.draft=d; } };
   Home.prototype.show=function(route,day,extra){
     if(day) root.__budgetUi=Object.assign({},root.__budgetUi||{},{day:day,month:String(day).slice(0,7)});
     if(extra&&extra.entry) this.draftEntry(extra.entry);
@@ -13725,7 +13725,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     if(a==='field:preferred'){ var d=this.uiDraft(); d.preferred=d.preferred===false; root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
     if(a.indexOf('repeat:')===0){ var d=this.uiDraft(); d.repeat=a.slice(7); root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
     if(a.indexOf('rec:')===0){ var d=this.uiDraft(); d.rec=a.slice(4); root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
-    if(a.indexOf('scope:')===0){ var d=this.uiDraft(); d.scope=a.slice(6); root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
+    if(a.indexOf('scope:')===0){ var d=this.uiDraft(); if(this.route==='day-record') d.recScope=a.slice(6); else d.scope=a.slice(6); root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
     if(a==='ded:add'){ var d=this.uiDraft(); d.deductions=d.deductions||[]; d.deductions.push({name:'New deduction',kind:'percent',value:'0'}); root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
     if(a.indexOf('ded:kind:')===0){ var parts=a.split(':'), i=+parts[2], kind=parts[3]||'percent', d=this.uiDraft(); d.deductions=d.deductions||[]; if(!d.deductions[i]) d.deductions[i]={name:'Deduction',kind:kind,value:'0'}; else d.deductions[i].kind=kind; root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
     if(a.indexOf('ded:value:')===0){ return this.openField('deduct:'+a.split(':')[2],n); }
@@ -13906,7 +13906,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       var rk=draft.rec||'planned', c={actual:true,outcome:rk==='diff'?'changed':rk==='none'?'skipped':'done'};
       if(c.outcome==='skipped') c.skip=true;
       if(c.outcome==='changed'){ var act=parseMoney(draft.actual); if(!(act>=0)||String(draft.actual==null?'':draft.actual).trim()===''){ if(this.status) this.status.textContent='Enter the actual amount.'; return; } c.amount=Math.round((en.income?1:-1)*act*100)/100; }
-      ops=BF.occOps(atlas,en,c,draft.scope==='future'?'future':'once',day); name=en.name; when=day; }
+      ops=BF.occOps(atlas,en,c,draft.recScope==='future'?'future':'once',day); name=en.name; when=day; }
     else if(route==='add-alt-form'||route==='add-alt-category'){
       if(route==='add-alt-category'){ draft.cname=name; this.route='add-alt-form'; if(this.status) this.status.textContent='Category named. Now add the alternative.'; return this.models?this.render():this.update(); }
       var step=ui.step, an=String(draft.aname||draft.name||'').trim()||'New alternative';
@@ -14147,10 +14147,11 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       return scr(Math.max(844,y+40), parts);
     }
     if(R==='day-record'){
-      var rec=draft.rec||'planned', scope=draft.scope||'one';
+      var rec=draft.rec||'planned', scope=draft.recScope||'one';
       var parts=[
-        {t:'bar',back:'Actions',right:'Save',backAct:'entry:actions',rightAct:'save',rightBold:true},
+        {t:'bar',back:draft.name||'Actions',right:'Save',backAct:'entry:actions',rightAct:'save',rightBold:true},
         {t:'title',text:'Record what happened',y:by(74.06,22)},
+        {t:'note',text:(draft.name?draft.name+'  -  ':'')+dateVal('date',dayLong)+'  -  planned '+fmtMoney(parseMoney(draft.amount||'0')),y:by(103.52,15),size:15},
         {t:'h',text:'What happened',y:by(133.96,17)},
         {t:'row',text:'As planned',radio:true,on:rec==='planned',bold:rec==='planned',top:179-31,h:44,act:'rec:planned'},
         {t:'row',text:'Different cost',radio:true,on:rec==='diff',bold:rec==='diff',top:223-31,h:44,act:'rec:diff'}
