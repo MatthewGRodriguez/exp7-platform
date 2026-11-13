@@ -13653,7 +13653,8 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     var scrollEntry=uiNow.scrollEntry;
     if((route==='schedule'||route==='agenda') && scrollEntry && this.host){
       var eHit=this.targets.find(function(q){ var lab=(q.node&&q.node.vm&&q.node.vm.label)||'', act=(q.node&&q.node.vm&&q.node.vm.act)||''; return lab===scrollEntry || (act&&act.indexOf('entry:')===0&&lab===scrollEntry); });
-      if(eHit&&eHit.rect) this.host.scrollTop=Math.max(0, eHit.rect[1]-24);
+      /* Only scroll when the saved item would be off screen, so the back row stays in view otherwise. */
+      if(eHit&&eHit.rect && eHit.rect[1]+eHit.rect[3] > (this.host.scrollTop||0)+(this.host.clientHeight||hostH)) this.host.scrollTop=Math.max(0, eHit.rect[1]-24);
       root.__budgetUi.scrollEntry='';
     }
     var focus=this.targets.find(function(t){return t.key===self.focusKey;}),ov=overlay(hostW,H,this.popup,this.core,focus&&focus.rect);blobs.selector=ov.dl.bytes();this.overlayNodes=ov.nodes;
