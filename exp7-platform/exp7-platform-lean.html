@@ -13851,7 +13851,8 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     this.fieldEl=null; this.fieldLayout=null; this.fieldKey=null; this.fieldScreen=null;
   };
   Home.prototype.openDateField=function(key,n){
-    this.closeField(false);
+    /* Moving to another field keeps what was typed in the open one. */
+    this.closeField(true);
     var draft=this.uiDraft();
     root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:draft, picking:key, formPick:budgetMonthKey(), dateField:key});
     this.dateTarget=key;
@@ -13860,10 +13861,12 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     return this.models?this.render():this.update();
   };
   Home.prototype.openField=function(key,n){
-    var self=this, draft=this.uiDraft();
+    var self=this;
     key=fieldKey(key);
     if(fieldKind(key)==='date') return this.openDateField(key,n);
-    this.closeField(false);
+    /* Moving to another field keeps what was typed in the open one. */
+    this.closeField(true);
+    var draft=this.uiDraft();
     if(key==='time'){
       root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:draft, picking:'time'});
       this.dateTarget=null;
