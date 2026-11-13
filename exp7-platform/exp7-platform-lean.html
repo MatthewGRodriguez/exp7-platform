@@ -13005,8 +13005,9 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
           cursor=my+rh;
         } else if(p.t==='picker'){
           var pm=p.month||budgetMonthKey(), sel=p.sel||budgetDateKey();
-          click(k+'prev','Prev',0,p.top||cursor,72,tapSz,'month:-1',false,body);
-          click(k+'next','Next',W-72,p.top||cursor,72,tapSz,'month:1',false,body);
+          /* Drawn chevrons on the text inset, like the Home picker, instead of words at the screen edge. */
+          var pvN=click(k+'prev','',0,p.top||cursor,72,tapSz,'month:-1',false,body); pvN.vm.label='Previous month'; chevronLeft(pvN,inset+4,(p.top||cursor)+tapSz/2,C.ink);
+          var nxN=click(k+'next','',W-72,p.top||cursor,72,tapSz,'month:1',false,body); nxN.vm.label='Next month'; chevronRight(nxN,W-inset-4,(p.top||cursor)+tapSz/2);
           text(node(k+'m'),monthTitle(pm),W/2,(p.top||cursor)+26,body,C.ink,true,0,'center');
           var ptop=(p.top||cursor)+tapSz+22;
           cursor=drawMonthGrid({month:pm,sel:sel,risk:p.risk||{},ch:cellH,top:ptop,prefix:(p.prefix||'f'),strokeToday:false,selW:1.5,actPrefix:p.actPrefix||'budget:pickday:'});
