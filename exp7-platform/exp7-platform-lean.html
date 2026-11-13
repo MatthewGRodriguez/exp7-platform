@@ -80,6 +80,8 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 #accountScrim{position:fixed;top:var(--bar-h);left:0;right:0;bottom:0;z-index:45;background:transparent}
 /* App content begins strictly below reserved bar */
 #appShell{position:fixed;top:var(--bar-h);left:var(--sa-l);right:var(--sa-r);bottom:var(--sa-b);padding:0;overflow:auto;isolation:isolate}
+/* Budget is phone-first: in a narrow window the journal column uses the whole width (390 pt on an iPhone); only real safe-area insets remain. */
+@media (max-width:500px){#appShell:has(#appSlot-budget.is-active){left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px)}}
 /* Keep WebGPU canvases laid out (Safari drops swapchain / marks renderer.hidden under display:none). */
 .appSlot{position:absolute;inset:0;min-height:100%;height:100%;overflow:auto;z-index:0}
 .appSlot.is-active{z-index:1;opacity:1;pointer-events:auto;visibility:visible}
@@ -12706,8 +12708,9 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       pts.push('L', cx+Math.cos(b)*R*0.38, cy+Math.sin(b)*R*0.38); }
     var cmds=[]; for(i=0;i<pts.length;){ if(pts[i]==='M'||pts[i]==='L'){ cmds.push([pts[i],pts[i+1],pts[i+2]]); i+=3; } else i++; }
     cmds.push(['Z']);
-    if(filled)n.items.push(['stroke',cmds,rgba(C.accent),{width:1.25,join:'miter'}]);
-    else n.items.push(['stroke',cmds,rgba(C.accent),{width:1.25,join:'miter'}]);
+    /* Preferred reads as a filled star; not preferred as an outline. */
+    if(filled)n.items.push(['path',cmds,rgba(C.accent)]);
+    n.items.push(['stroke',cmds,rgba(C.accent),{width:1.25,join:'miter'}]);
   }
   function radio(n,cx,cy,on){
     if(on)n.items.push(['rrect',cx-8,cy-8,16,16,8,rgba(C.accent)]);
@@ -12892,11 +12895,15 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     function paintScreen(m){
       var parts=m.parts||[];
       function by(p,d){ return p.y!=null?p.y:d; }
-      var flowShift=0;
+      var flowShift=0, openWash=null;
       parts.forEach(function(p,i){
         var k=(p.k||p.t)+i;
         if(p.t==='wash'){
-          var wn=node('wash'+i); rect(wn,0,p.top||0,W,p.h||44,p.color||C.wash);
+          var wn=node('wash'+i); rect(wn,0,(p.top||0)+flowShift,W,p.h||44,p.color||C.wash);
+          if(p.until) openWash={item:wn.items[wn.items.length-1], top:(p.top||0)+flowShift};
+        } else if(p.t==='washEnd'){
+          /* Close a wash that grows with wrapped lines inside it. */
+          if(openWash){ openWash.item[4]=Math.max(openWash.item[4], (p.at||0)+flowShift-openWash.top); openWash=null; }
         } else if(p.t==='bar'){
           var rw=0;
           if(p.right){ var rz=core.measure(fonts[p.rightBold?1:0],body,p.right); rw=Math.min(W-100,Math.max(88,rz+28)); }
@@ -12910,42 +12917,50 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
           var tw=wrapPaint(node(k),p.text,inset,ty,p.size||titleSz,C.ink,true,maxW);
           if(p.wrap!==false) flowShift+=tw.extra;
         } else if(p.t==='note'){
-          text(node(k),p.text,inset,by(p,cursor)+flowShift,p.size||sec,p.ink?p.ink:(p.size&&p.size<=13?C.caption:C.caption),!!p.bold,W-2*inset);
+          /* Notes wrap on a narrow phone and push what follows down, instead of being cut off. */
+          var nw=wrapPaint(node(k),p.text,inset,by(p,cursor)+flowShift,p.size||sec,p.ink?p.ink:C.caption,!!p.bold,W-2*inset); flowShift+=nw.extra;
         } else if(p.t==='h'){
-          text(node(k),p.text,inset,by(p,cursor)+flowShift,p.size||body,C.ink,true,W-2*inset);
+          /* A long step or requirement name wraps and pushes the rows under it down, instead of running into them. */
+          var hw=wrapPaint(node(k),p.text,inset,by(p,cursor)+flowShift,p.size||body,C.ink,true,p.w||(W-2*inset)); if(p.wrap!==false) flowShift+=hw.extra;
         } else if(p.t==='text'){
           text(node(k),p.text,p.x!=null?p.x:(p.align==='right'?W-inset:inset),by(p,cursor)+flowShift,p.size||body,p.ink||C.ink,!!p.bold,p.w||(p.align==='right'?0:W-2*inset),p.align||null);
         } else if(p.t==='field'){
           var fy=by(p,cursor)+flowShift, fn=node(k), box=p.box||(p.align==='right'?'amount':'full');
           if(p.line){
             if(p.label) text(node(k+'l'),p.label,inset,fy+(p.labelShift||1.28),sec,C.caption,false);
-            text(fn,p.value||'',rightX,fy,p.size||body,C.ink,!!p.bold,0,'right');
+            var lw=p.label?core.measure(fonts[0],sec,plain(p.label)):0;
+            text(fn,p.value||'',rightX,fy,p.size||body,C.ink,!!p.bold,Math.max(60,W-2*inset-lw-16),'right'); /* the value never runs over its label */
             rule('fr'+i,fy+16,inset,W-2*inset,C.line);
             hit(fn,0,fy-20,W,44,p.act||('field:'+(p.label||i)),p.label||p.value||'');
           } else {
-            if(p.label) text(node(k+'l'),p.label,inset,by(p,cursor)-41.52,sec,C.caption,false);
+            if(p.label) text(node(k+'l'),p.label,inset,by(p,cursor)-41.52+flowShift,sec,C.caption,false); /* the label moves with its box when a note above wraps */
             var bx=inset, by0=fy-28, bw=(box==='amount'?(p.boxW||128):W-2*inset), bh=44;
             fn.items.push(['border',bx,by0,bw,bh,4,1,color(C.line)]);
             text(fn,p.value||'',box==='amount'?bx+bw-10:inset+10,fy,p.size||body,C.ink,!!p.bold,box==='amount'?0:bw-20,box==='amount'?'right':null);
             hit(fn,bx,by0,bw,bh,p.act||('field:'+(p.label||i)),p.label||p.value||'');
           }
         } else if(p.t==='row'){
-          var ry=(p.top!=null?p.top:(by(p,cursor)-31))+flowShift, rh=p.h||56, rn=node(k);
+          var ry=(p.top!=null?p.top:(by(p,cursor)-31))+flowShift, rh=p.h||56, rh0=rh, rn=node(k);
+          var tx=inset+(p.check||p.radio||p.star?28:0), rsz=p.size||body, rmax=W-tx-inset-(p.tag?80:(p.chev?28:0));
+          /* A long row label wraps inside a taller row and pushes later rows down, instead of running into them. */
+          var rlines=wrapStrings(p.text||'',fonts[p.bold?1:0],rsz,rmax), rlh=Math.round(rsz*1.25), rextra=p.y!=null?0:Math.max(0,(rlines.length-1)*rlh);
+          rh+=rextra;
           if(p.wash) rect(rn,0,ry,W,rh,C.wash);
-          if(p.check) checkbox(rn,inset+6,ry+rh/2,!!p.on);
-          if(p.radio) radio(rn,inset+6,ry+rh/2,!!p.on);
-          if(p.star) starOutline(rn,inset+14,ry+rh/2,7.5,!!p.on);
-          var tx=inset+(p.check||p.radio||p.star?28:0);
-          text(rn,p.text,tx,by(p,ry+31),p.size||body,p.ink||(p.quiet?C.caption:C.ink),!!p.bold,W-tx-inset-80);
+          if(p.check) checkbox(rn,inset+6,ry+rh0/2,!!p.on);
+          if(p.radio) radio(rn,inset+6,ry+rh0/2,!!p.on);
+          if(p.star) starOutline(rn,inset+14,ry+rh0/2,7.5,!!p.on);
+          if(rextra) rlines.forEach(function(ln,li){ text(rn,ln,tx,ry+31+li*rlh,rsz,p.ink||(p.quiet?C.caption:C.ink),!!p.bold,rmax); });
+          else text(rn,p.text,tx,by(p,ry+31),rsz,p.ink||(p.quiet?C.caption:C.ink),!!p.bold,W-tx-inset-80);
           if(p.tag) text(node(k+'tag'),p.tag,rightX,by(p,ry+31),sec,p.tagInk||C.caption,false,0,'right');
           if(p.chev) chevronRight(rn,W-11,ry+rh/2);
           if(p.sub) text(node(k+'sub'),p.sub,tx,ry+rh-12,sec,C.caption,false,W-tx-inset);
           if(!p.noHit) hit(rn,0,ry,W,rh,p.act||('row:'+i),p.text);
           rule('rr'+i,ry+rh-1,inset,W-2*inset,C.lineSoft);
+          flowShift+=rextra;
         } else if(p.t==='link'){
           click('ln'+i,p.text,0,(p.top!=null?p.top:by(p,cursor)-27)+flowShift,W,p.h||44,p.act||('nav:'+p.text),!!p.bold,body,!!p.chev);
         } else if(p.t==='accept'){
-          var ay=p.top!=null?p.top:by(p,cursor)-22, an=node(k);
+          var ay=(p.top!=null?p.top:by(p,cursor)-22)+flowShift, an=node(k);
           if(p.enabled) acceptBand(an,inset,ay,W-2*inset);
           else { rect(an,inset,ay,W-2*inset,44,C.wash); an.items.push(['border',inset,ay,W-2*inset,44,4,1,color(C.line)]); }
           text(an,p.text||'Accept',W/2,ay+28,body,p.enabled?C.ink:C.caption,true,0,'center');
@@ -12958,7 +12973,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
           text(node(k+'d'),'days',162,ey,body,C.ink,false);
           hit(en,80,ey-28,48,44,p.act||'field:every','Every N days');
         } else if(p.t==='pair'){
-          var py=by(p,cursor);
+          var py=by(p,cursor)+flowShift;
           text(node(k+'a'),p.left,inset,py,p.size||body,C.ink,!!p.bold,W/2);
           if(p.right) text(node(k+'b'),p.right,rightX,py,p.size||body,C.ink,!!p.rightBold,0,'right');
           if(p.toggle){
@@ -13000,8 +13015,9 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
           cursor=my+rh;
         } else if(p.t==='picker'){
           var pm=p.month||budgetMonthKey(), sel=p.sel||budgetDateKey();
-          click(k+'prev','Prev',0,p.top||cursor,72,tapSz,'month:-1',false,body);
-          click(k+'next','Next',W-72,p.top||cursor,72,tapSz,'month:1',false,body);
+          /* Drawn chevrons on the text inset, like the Home picker, instead of words at the screen edge. */
+          var pvN=click(k+'prev','',0,p.top||cursor,72,tapSz,'month:-1',false,body); pvN.vm.label='Previous month'; chevronLeft(pvN,inset+4,(p.top||cursor)+tapSz/2,C.ink);
+          var nxN=click(k+'next','',W-72,p.top||cursor,72,tapSz,'month:1',false,body); nxN.vm.label='Next month'; chevronRight(nxN,W-inset-4,(p.top||cursor)+tapSz/2);
           text(node(k+'m'),monthTitle(pm),W/2,(p.top||cursor)+26,body,C.ink,true,0,'center');
           var ptop=(p.top||cursor)+tapSz+22;
           cursor=drawMonthGrid({month:pm,sel:sel,risk:p.risk||{},ch:cellH,top:ptop,prefix:(p.prefix||'f'),strokeToday:false,selW:1.5,actPrefix:p.actPrefix||'budget:pickday:'});
@@ -13010,7 +13026,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
           cursor+=8+tapSz;
         }
       });
-      cursor=m.height||cursor;
+      cursor=(m.height||cursor)+flowShift; /* wrapped lines make the page taller, so nothing at the bottom is cut off */
     }
 
     function drawMonthGrid(opts){
@@ -13091,7 +13107,11 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
           cursor+=36;
         }
       }
-      if(m.risk&&m.risk[m.day]&&m.risk[m.day].reasons&&m.risk[m.day].reasons.length&&!stand){var why=node('reason');text(why,m.risk[m.day].reasons[0],inset,cursor+14,sec,C.muted,false,W-2*inset);cursor+=36;}
+      if(compact&&!stand){ /* Home's mini month: the plain-words legend (swatch + colour-blind mark) and the selected day's reason, wrapped, never cut off */
+        var lgs=[[C.calL,'L','Green: a surprise cost or late pay is absorbed.'],[C.calM,'M','Yellow: one would bite; there is room to recover.'],[C.calC,'C','Red: one would bite with no room to recover.']], ly=cursor+10;
+        lgs.forEach(function(L,i){ var n=node('mini-legend'+i); rect(n,inset,ly,18,18,L[0]); n.items.push(['border',inset,ly,18,18,0,1,color(C.lineSoft)]); if(L[1]==='L')markCircle(n,inset+9,ly+9); if(L[1]==='M')markBar(n,inset+9,ly+9); if(L[1]==='C')markTwoBars(n,inset+9,ly+9); var wl=wrapPaint(n,L[2],inset+28,ly+14,sec,C.caption,false,W-2*inset-28); ly+=Math.max(24,wl.height+6); });
+        cursor=ly+2; }
+      if(m.risk&&m.risk[m.day]&&m.risk[m.day].reasons&&m.risk[m.day].reasons.length&&!stand){var why=node('reason');var wr=wrapPaint(why,m.risk[m.day].reasons[0],inset,cursor+16,sec,C.muted,false,W-2*inset);cursor+=16+wr.height+8;}
     } else if(m.kind==='plan') {
       var pCompact=true;
       if(pCompact){
@@ -13135,10 +13155,14 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       function rowAmt(e){ var a=(e.values||{}).amount; if(a==null||a==='')return ''; a=+a; if(a>0)return money(a,'+'); if(a<0)return money(a,'abs'); return money(a); }
       var untimed=[],timed={}; (m.entries||[]).forEach(function(e){var v=e.values||{}, t=String(v.time||''), match=/^(\d{1,2}):(\d{2})$/.exec(t);if(match&&+match[1]<24&&+match[2]<60){var h=+match[1];(timed[h]=timed[h]||[]).push(e);}else untimed.push(e);});
       if(m.standalone && !m.compact){
-        text(node('ag-title'),"Today's schedule",inset,38,titleSz,C.ink,true,W-2*inset);
-        text(node('ag-date'),dayTitle(m.day),inset,64,sec,C.muted,false,W-2*inset);
-        text(node('ag-note'),'Amounts in USD.',inset,86,cap,C.caption,false,W-2*inset);
-        cursor=110;
+        /* Full day schedule: a back control to Home, the day named (not "Today" on another day), and its Add to <day> row. */
+        backBtn('ag-back','Home',0,16,180,tapSz,'nav:home');
+        var agToday=m.day===budgetTodayKey();
+        text(node('ag-title'),agToday?"Today's schedule":'Schedule',inset,16+tapSz+28,titleSz,C.ink,true,W-2*inset);
+        text(node('ag-date'),dayTitle(m.day),inset,16+tapSz+52,sec,C.muted,false,W-2*inset);
+        text(node('ag-note'),'Amounts in USD.',inset,16+tapSz+72,cap,C.caption,false,W-2*inset);
+        cursor=16+tapSz+84;
+        if(m.addLabel){ click('add-day',m.addLabel,0,cursor,W,tapSz,'add:item',false,body,true); rule('add-day-rule',cursor+tapSz-1,inset,W-2*inset,C.lineSoft); cursor+=tapSz+4; }
         if(untimed.length){
           text(node('allday-title'),'All day',inset,cursor+14,cap,C.muted,false,W-2*inset);
           cursor+=28;
@@ -13170,7 +13194,6 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
           });
           rule('hour-rule'+h,y+hh-1,inset,W-2*inset,C.lineSoft); cursor+=hh;
         }
-        text(node('ag-cap1'),'A short day context, not the full Home view.',inset,cursor+16,cap,C.caption,false,W-2*inset); cursor+=28;
         text(node('ag-cap2'),'Tap an item to change it or record what happened.',inset,cursor+16,cap,C.caption,false,W-2*inset); cursor+=28;
       } else {
         if(m.standalone){ backBtn('ag-back','Home',0,16,180,tapSz,'nav:home'); text(node('ag-title'),hl,inset,16+tapSz+28,titleSz,C.ink,true); cursor=16+tapSz+44; }
@@ -13189,7 +13212,9 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
             text(node('empty'),'Nothing is scheduled this day.',inset,cursor+20,body,C.muted,false,W-2*inset);
             cursor+=40;
           }
-          list.forEach(function(e){ drawEntry(e,cursor); cursor+=rowH; });
+          /* Untimed items (pay, debt, cash and owned) sit in an All day section at the top, as on the day schedule. */
+          if(untimed.length){ text(node('allday-h'),'All day',inset,cursor+16,cap,C.muted,false,W-2*inset); cursor+=24; }
+          list.forEach(function(e,i){ if(i===untimed.length&&untimed.length&&i<list.length){ rule('allday-end',cursor+2,inset,W-2*inset,C.line); cursor+=6; } drawEntry(e,cursor); cursor+=rowH; });
         } else {
           if(untimed.length){text(node('untimed-title'),'No time set',inset,cursor+16,cap,C.muted);cursor+=28;var ut=m.standalone?untimed:untimed.slice(0,4);ut.forEach(function(e){ drawEntry(e,cursor); cursor+=rowH; });if(!m.standalone&&untimed.length>4){text(node('more-untimed'),(untimed.length-4)+' more in the full day',inset+15,cursor+16,sec,C.muted);cursor+=28;}rule('untimed-rule',cursor);cursor+=17;}
           if(!m.entries.length){text(node('empty'),'No scheduled items on this day.',inset,cursor+20,body,C.muted,false,W-40);cursor+=tapSz;}
@@ -13236,7 +13261,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       }
     } else if(m.kind==='cash') {
       var cashH=SPACE.cash;
-      if(m.standalone){ backBtn('cash-back','Home',0,16,180,tapSz,'nav:home'); text(node('cash-title'),'Cash and owned items',inset,16+tapSz+28,titleSz,C.ink,true,W-2*inset); cursor=16+tapSz+44;
+      if(m.standalone){ backBtn('cash-back','Home',0,16,180,tapSz,'nav:home'); text(node('cash-title'),'Cash and owned items',inset,16+tapSz+28,titleSz,C.ink,true,W-2*inset); cursor=16+tapSz+54; /* room under the 22 pt title */
         text(node('cash-note'),'Cash is spendable. Owned items count',inset,cursor,sec,C.caption,false,W-2*inset);cursor+=20;
         text(node('cash-note1b'),'toward net worth only.',inset,cursor,sec,C.caption,false,W-2*inset);cursor+=24;
         text(node('cash-note2'),'Read-only. Add or update from a calendar day.',inset,cursor,sec,C.caption,false,W-2*inset);cursor+=28; }
@@ -13257,18 +13282,19 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       cursor=dhY+tapSz+8;
       if(m.pick){
         var pm=m.pick,sel=m.day,py=cursor;
-        click('pick-prev','<',0,py,44,tapSz,'budget:pick:-1',false,titleSz);
-        click('pick-next','>',W-132,py,44,tapSz,'budget:pick:1',false,titleSz);
+        var pPrev=click('pick-prev','',0,py,44,tapSz,'budget:pick:-1',false,titleSz); pPrev.vm.label='Previous month'; chevronLeft(pPrev,20,py+tapSz/2,C.ink);
+        var pNext=click('pick-next','',W-132,py,44,tapSz,'budget:pick:1',false,titleSz); pNext.vm.label='Next month'; chevronRight(pNext,W-132+20,py+tapSz/2,C.ink);
         click('pick-today','Today',W-88,py,88,tapSz,'budget:pick:today',false,sec);
         text(node('pick-m'),monthTitle(pm),W/2-20,py+27,body,C.ink,true,0,'center');
         var topP=py+tapSz+22;
         cursor=drawMonthGrid({month:pm,sel:sel,risk:m.risk,ch:cellH,top:topP,prefix:'p',strokeToday:false,selW:1.5,actPrefix:'budget:pickday:'});
         cursor+=8;
-        click('dismiss','Dismiss',0,380,W,tapSz,'budget:date',false,body);
-        text(node('pick-n0'),'Today is Wednesday, November 11.',inset,432.88,sec,C.caption,false,W-2*inset);
-        text(node('pick-n1'),'The selected day is Thursday, November 19.',inset,452.88,sec,C.caption,false,W-2*inset);
-        text(node('pick-n2'),'The grid matches the mini month on Home.',inset,472.88,sec,C.caption,false,W-2*inset);
-        cursor=490;
+        click('dismiss','Dismiss',0,cursor,W,tapSz,'budget:date',false,body); cursor+=tapSz;
+        var tdy=budgetTodayKey();
+        text(node('pick-n0'),'Today is '+dateLabel(tdy)+'.',inset,cursor+20,sec,C.caption,false,W-2*inset);
+        if(sel!==tdy) text(node('pick-n1'),'The selected day is '+dateLabel(sel)+'.',inset,cursor+40,sec,C.caption,false,W-2*inset);
+        cursor+=sel!==tdy?52:32;
+        rule('pick-end',cursor,inset,W-2*inset,C.line); cursor+=4;
       }
       if((m.start||[]).length){text(node('start-label'),'Unfinished:',inset,cursor+16,sec,C.muted);cursor+=28;(m.start||[]).forEach(function(q,i){click('start'+i,q.label,0,cursor,W,tapSz,q.act,false,body);cursor+=tapSz;});cursor+=8;}
       var b1=node('divider1');(m.dividers||[]).forEach(function(x){rect(b1,x,56,1,Math.max(0,(m.height||cursor)-60),C.line);});
@@ -13372,7 +13398,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   function hostCssSize(host){
     var dpr=cssDpr();
     var r=host&&host.getBoundingClientRect?host.getBoundingClientRect():null;
-    var w=(r&&r.width)||(host&&host.clientWidth)||390, h=(r&&r.height)||(host&&host.clientHeight)||1;
+    var w=(host&&host.clientWidth)||(r&&r.width)||390, h=(r&&r.height)||(host&&host.clientHeight)||1; /* clientWidth: a visible scrollbar never covers the journal's right column */
     var vw=(typeof visualViewport!=='undefined'&&visualViewport&&visualViewport.width)||0;
     var sw=(window.screen&&screen.width)||0;
     if(dpr>1.2){
@@ -13533,7 +13559,10 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     cv.addEventListener('keydown',function(e){self.key(e);},{signal:this.abort.signal});
     /* A press on the page while a field is open: the field keeps its value and the redraw waits for the release, so the tap (Save, a row) still lands. */
     cv.addEventListener('pointerdown',function(){self.cvDown=true;},{capture:true,signal:this.abort.signal});
-    function cvUp(){ if(!self.cvDown)return; setTimeout(function(){ self.cvDown=false; if(self.pendingRender&&!self.dead){ self.pendingRender=false; if(!self.fieldEl) (self.models?self.render():self.update()); } },0); }
+    function cvUp(){ if(!self.cvDown)return; setTimeout(function(){ self.cvDown=false; if(self.pendingRender&&!self.dead){ self.pendingRender=false;
+      /* The tap that committed one field may have opened the next: redraw now (so the committed value shows and a time picker appears), then keep the open box on its drawn field. */
+      var r=self.models?self.render():self.update();
+      if(self.fieldEl) Promise.resolve(r).then(function(){ if(!self.fieldEl||self.dead) return; var act=self.fieldAct, t=act&&(self.targets||[]).find(function(q){return q.node&&q.node.vm&&q.node.vm.act===act;}); if(t&&t.rect) self.fieldLayout=t.rect.slice(); if(self.placeFieldEl) self.placeFieldEl(); }); } },0); }
     window.addEventListener('pointerup',cvUp,{signal:this.abort.signal}); window.addEventListener('pointercancel',cvUp,{signal:this.abort.signal});
     cv.addEventListener('pointermove',function(e){self.pointer(e);},{capture:true,signal:this.abort.signal});
     cv.addEventListener('pointerleave',function(){self.deferClose();},{signal:this.abort.signal});
@@ -13575,6 +13604,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     var risk=((this.models.calendar&&this.models.calendar.kids&&this.models.calendar.kids[0]&&this.models.calendar.kids[0].risk)||(this.models.calendar&&this.models.calendar.risk)||{});
     var startLinks=root.BudgetFlows?root.BudgetFlows.startLinks(this.atlas):[];
     var route=this.route||'home';
+    if(route==='calendar') route=this.route='home'; /* no full-page month view: the mini month on Home is the only month calendar */
     root.__budgetUi=restorePlan(root.__budgetUi||{});
     if(route==='date-picker-open') pick=pick||budgetMonthKey();
     if(route==='date-picker-closed') pick='';
@@ -13590,17 +13620,15 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       var homeLinks=[{label:'Monthly expenses',act:'nav:ledger'},{label:'Cash and owned items',act:'nav:cash'}];
       var homeNotes=["Opens this month's expenses.","Opens cash and owned items.","Amounts in USD."];
       var links=layout({t:'journal',k:'home-links',kind:'links',links:homeLinks,notes:homeNotes},colW,this.core);
-      if(pick){
-        var heading=layout({t:'journal',k:'home-page',kind:'page',day:selDay,pick:pick,risk:risk,height:80,dividers:[],start:startLinks},colW,this.core);
-        H=Math.max(844, heading.H+40);
-        one('page',layout({t:'journal',k:'home-page',kind:'page',day:selDay,pick:pick,risk:risk,height:H,dividers:[],start:startLinks},colW,this.core),padX,0);
-      } else {
-        var ay=350, py, ly;
-        if(agenda.H<=210){ py=560; ly=756; H=940; }
-        else { py=350+agenda.H+18; ly=py+plan.H+18; H=Math.max(940, ly+links.H+24); }
-        one('page',layout({t:'journal',k:'home-page',kind:'page',day:selDay,pick:'',risk:risk,height:H,dividers:[],start:startLinks},colW,this.core),padX,0);
-        one('calendar',cal,padX,60); one('agenda',agenda,padX,ay); one('plan',plan,padX,py); one('links',links,padX,ly);
-      }
+      /* One column at every width. The open date picker is an inline expansion under the heading: it takes the mini month's
+       * place and pushes Today, Plan and the links down (never over them). Each block starts where the one above ends. */
+      var ay, py, ly;
+      if(pick){ var heading=layout({t:'journal',k:'home-page',kind:'page',day:selDay,pick:pick,risk:risk,height:80,dividers:[],start:startLinks},colW,this.core); ay=heading.H+12; }
+      else ay=Math.max(350, 60+cal.H+12);
+      py=ay+Math.max(agenda.H,192)+18; ly=py+plan.H+18; H=Math.max(pick?844:940, ly+links.H+24);
+      one('page',layout({t:'journal',k:'home-page',kind:'page',day:selDay,pick:pick||'',risk:risk,height:H,dividers:[],start:startLinks},colW,this.core),padX,0);
+      if(!pick) one('calendar',cal,padX,60);
+      one('agenda',agenda,padX,ay); one('plan',plan,padX,py); one('links',links,padX,ly);
     } else {
       var baseM=null, L=null;
       if(route==='cash-list'||route==='cash') baseM=Object.assign({},journalOf(this.models.cash||{}),{kind:'cash',standalone:true});
@@ -13639,7 +13667,8 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     var scrollEntry=uiNow.scrollEntry;
     if((route==='schedule'||route==='agenda') && scrollEntry && this.host){
       var eHit=this.targets.find(function(q){ var lab=(q.node&&q.node.vm&&q.node.vm.label)||'', act=(q.node&&q.node.vm&&q.node.vm.act)||''; return lab===scrollEntry || (act&&act.indexOf('entry:')===0&&lab===scrollEntry); });
-      if(eHit&&eHit.rect) this.host.scrollTop=Math.max(0, eHit.rect[1]-24);
+      /* Only scroll when the saved item would be off screen, so the back row stays in view otherwise. */
+      if(eHit&&eHit.rect && eHit.rect[1]+eHit.rect[3] > (this.host.scrollTop||0)+(this.host.clientHeight||hostH)) this.host.scrollTop=Math.max(0, eHit.rect[1]-24);
       root.__budgetUi.scrollEntry='';
     }
     var focus=this.targets.find(function(t){return t.key===self.focusKey;}),ov=overlay(hostW,H,this.popup,this.core,focus&&focus.rect);blobs.selector=ov.dl.bytes();this.overlayNodes=ov.nodes;
@@ -13678,7 +13707,10 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     else {var cur=root.__budgetUi||{}, month=budgetMonthKey();root.__budgetUi=Object.assign({},cur,{pick:cur.pick? '':month});this.render();}
     this.status.textContent='Choose a date.';};
   Home.prototype.close=function(){this.cancelClose();if(this.popup&&this.popup.kind==='date'&&root.__budgetUi)root.__budgetUi.pick='';this.popup=null;this.paintOverlay();};
-  Home.prototype.dateAct=async function(a){var p=this.popup;if(!p||p.kind!=='date')return;
+  Home.prototype.dateAct=async function(a){var p=this.popup;
+    /* Inline picker (phone-first, no popup): previous / next browse the month shown in the expansion. */
+    if((!p||p.kind!=='date')&&/^budget:pick:-?1$/.test(a)){var ui0=root.__budgetUi||{},cur=ui0.pick||String(ui0.day||budgetDateKey()).slice(0,7),nm=budgetShiftMonth(cur,+a.split(':').pop());root.__budgetUi=Object.assign({},ui0,{pick:nm});if(this.status)this.status.textContent=monthTitle(nm);return this.models?this.render():this.update();}
+    if(!p||p.kind!=='date')return;
     if(/^budget:pick:-?1$/.test(a)){var old=p.month;p.month=budgetShiftMonth(old,+a.split(':').pop());p.cursor=p.month+'-01';root.__budgetUi=Object.assign({},root.__budgetUi||{},{pick:old});
       if(root.__budgetChromeAct)root.__budgetChromeAct(a);else root.__budgetUi.pick=p.month;this.paintOverlay();this.status.textContent=monthTitle(p.month);return;}
     var d=a==='budget:pick:today'?budgetTodayKey():a.slice('budget:pickday:'.length);if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return;
@@ -13711,6 +13743,12 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       root.__budgetUi=Object.assign({},ui,{choice:ref,choiceName:(ui.choices||[]).map(function(c){return c.ref===ref||c.id===ref?c.name:'';}).filter(Boolean)[0]||ref});
       this.route='plan-c'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey(),{step:ui.step,choice:ref}); return this.models?this.render():this.update();}
     if(this.popup){this.close();return;}
+    if(a==='entry:alts'&&(root.__budgetUi||{}).entry){
+      /* Alternatives opened from a day item belong to that item, not to the first plan row. */
+      var sid=root.__budgetUi.entry, spm=journalOf(this.models&&this.models.plan||{}), sr=(spm.rows||[]).find(function(q){return q.id===sid;});
+      root.__budgetUi=Object.assign({},root.__budgetUi,{step:sid,stepName:(sr&&sr.name)||((this.atlas&&this.atlas.items&&this.atlas.items[sid]||{}).name),selected:sr&&sr.selected,choices:sr&&sr.choices});
+      rememberPlan(root.__budgetUi);
+    }
     if(a.indexOf('entry:')===0){ var eid=a.slice(6); if(eid&&eid!=='actions'&&eid!=='change'&&eid!=='alts'&&eid!=='record'&&eid!=='comparison'&&eid!=='pref'&&eid!=='unavail'){ this.draftEntry(eid); } this.route=navigate(this.route||'home',a); if(this.o.onNavigate) this.o.onNavigate(this.route,budgetDateKey(),{entry:eid}); return this.models?this.render():this.update();}
     if(a.indexOf('nav:')===0){
       var dest=navigate(this.route||'home',a);
@@ -13740,11 +13778,11 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     if(a.indexOf('field:')===0){ return this.openField(a.slice(6),n); }
     if(a.indexOf('add:')===0||a.indexOf('add-alt:')===0){
       if(a==='add:pay'||a==='add:debt'||a==='add:activity'||a==='add:cash'){
-        var keepDay=(this.uiDraft().date||(root.__budgetUi&&root.__budgetUi.day)||budgetDateKey());
-        root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:{date:keepDay,asOf:keepDay,kind:'cash',repeat:a==='add:pay'?'every':'none',every:'14'}});
+        var keepDay=((root.__budgetUi&&root.__budgetUi.day)||this.uiDraft().date||budgetDateKey()); /* the selected day, not a leftover draft */
+        root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:{date:keepDay,asOf:keepDay,kind:'cash',repeat:a==='add:pay'?'every':'none',every:a==='add:debt'?'30':'14'}});
       }
       if(a==='add-alt:form'||a==='add-alt-form'){ if(this.closeField) this.closeField(true); var d=this.uiDraft(); d.cname=String(d.category||d.cname||d.name||'').trim()||d.cname; root.__budgetUi.draft=d; }
-      if(a==='add:alt'){ var ui=root.__budgetUi||{}, it=this.atlas&&this.atlas.items&&this.atlas.items[ui.step]; this.route=(it&&it.alts&&(it.alts.name||(it.alts.members&&it.alts.members.length)))?'add-alt-form':'add-alt-category'; }
+      if(a==='add:alt'){ var ad=this.uiDraft(); ad.aname=''; delete ad.preferred; var ui=root.__budgetUi||{}, it=this.atlas&&this.atlas.items&&this.atlas.items[ui.step]; this.route=(it&&it.alts&&(it.alts.name||(it.alts.members&&it.alts.members.length)))?'add-alt-form':'add-alt-category'; }
       else this.route=navigate(this.route||'home',a);
       if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey());
       return this.models?this.render():this.update();
@@ -13760,12 +13798,12 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:d, picking:'time'});
       return this.models?this.render():this.update();
     }
-    if(a==='req:add'){ if(this.closeField) this.closeField(false); var d=this.uiDraft(); d.rname=''; d.time=d.time||''; root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:d, picking:''}); this.route='add-req-form'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey()); return this.models?this.render():this.update(); }
+    if(a==='req:add'){ if(this.closeField) this.closeField(false); var d=this.uiDraft(); d.rname=''; d.time=''; d.amount=''; d.repeat='none'; /* a new requirement starts empty, on the same date */ root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:d, picking:''}); this.route='add-req-form'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey()); return this.models?this.render():this.update(); }
     if(a.indexOf('req:')===0){ var parts=a.slice(4).split(':'), reqs=Object.assign({},(root.__budgetUi||{}).reqs||{}); if(parts[0]){ reqs[parts[0]]=parts[1]||'own'; } root.__budgetUi=Object.assign({},root.__budgetUi||{},{reqs:reqs}); this.route='plan-c'; return this.models?this.render():this.update(); }
     if(a==='save'||a==='rightAct'){ return this.saveJournal(); }
     if(a==='accept'||a==='proposal:accept'||a==='proposal:after'){
       var rt=this.route||'home';
-      if(rt==='plan-c'){ this.route='plan-switch-before'; }
+      if(rt==='plan-c'){ this.route=(this.models&&this.models.plan)?'plan-switch-after':'plan-switch-before'; /* live: one stacked Before and After page */ }
       else if(rt==='plan-switch-before'){ this.route='plan-switch-after'; }
       else if(rt==='plan-switch-after'){ return this.acceptPlanSwitch(); }
       else this.route=navigate(rt,a);
@@ -13834,7 +13872,8 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     this.fieldEl=null; this.fieldLayout=null; this.fieldKey=null; this.fieldScreen=null;
   };
   Home.prototype.openDateField=function(key,n){
-    this.closeField(false);
+    /* Moving to another field keeps what was typed in the open one. */
+    this.closeField(true);
     var draft=this.uiDraft();
     root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:draft, picking:key, formPick:budgetMonthKey(), dateField:key});
     this.dateTarget=key;
@@ -13843,10 +13882,13 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     return this.models?this.render():this.update();
   };
   Home.prototype.openField=function(key,n){
-    var self=this, draft=this.uiDraft();
+    var self=this;
     key=fieldKey(key);
     if(fieldKind(key)==='date') return this.openDateField(key,n);
-    this.closeField(false);
+    /* Moving to another field keeps what was typed in the open one; redraw so it shows. */
+    if(this.fieldEl) this.pendingRender=true;
+    this.closeField(true);
+    var draft=this.uiDraft();
     if(key==='time'){
       root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:draft, picking:'time'});
       this.dateTarget=null;
@@ -13865,9 +13907,10 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     inp.setAttribute('data-budget-field',key);
     inp.style.cssText='position:fixed;box-sizing:border-box;font:17px "Source Sans 3","Source Sans Pro",sans-serif;border:1.5px solid #1A1A1A;border-radius:4px;padding:0 10px;background:#fff;color:#1A1A1A;caret-color:#1A1A1A;margin:0;';
     document.body.appendChild(inp);
-    this.fieldEl=inp; this.fieldKey=key; this.fieldLayout=this.fieldLayoutRect(n);
+    this.fieldEl=inp; this.fieldKey=key; this.fieldLayout=this.fieldLayoutRect(n); this.fieldAct=(n&&n.vm&&n.vm.act)||null;
     var placed=this.placeFieldEl();
     inp.focus(); inp.select();
+    if(this.pendingRender&&!this.cvDown){ this.pendingRender=false; Promise.resolve(this.models?this.render():this.update()).then(function(){ if(self.fieldEl!==inp||self.dead) return; var act=self.fieldAct, t=act&&(self.targets||[]).find(function(q){return q.node&&q.node.vm&&q.node.vm.act===act;}); if(t&&t.rect) self.fieldLayout=t.rect.slice(); self.placeFieldEl(); inp.focus(); }); }
     if(key==='time'){
       inp.addEventListener('input',function(){
         var d=inp.value.replace(/[^0-9]/g,'').slice(0,4);
@@ -13918,18 +13961,21 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       ops=BF.occOps(atlas,en,c,draft.recScope==='future'?'future':'once',day); name=en.name; when=day; }
     else if(route==='add-alt-form'||route==='add-alt-category'){
       if(route==='add-alt-category'){ draft.cname=name; this.route='add-alt-form'; if(this.status) this.status.textContent='Category named. Now add the alternative.'; return this.models?this.render():this.update(); }
-      var step=ui.step, an=String(draft.aname||draft.name||'').trim()||'New alternative';
+      var step=ui.step, an=String(draft.aname||'').trim()||'New alternative', isPref=draft.preferred!==false; /* the star decides preferred */
       name=an;
-      addItem(repeatValues({type:'expense',flow:'out',amount:-amount,date:when}), null);
+      /* An alternative is charged the same way as the item it replaces (per occurrence for an activity), so its amount reads as typed. */
+      var sv=(step&&atlas.items&&atlas.items[step]&&atlas.items[step].values)||{}, sIn=sv.flow==='in';
+      var base={type:sv.type||'expense',flow:sIn?'in':'out',amount:(sIn?1:-1)*amount,date:when}; if(sv.consume!=null) base.consume=sv.consume; if(sv.charge) base.charge=sv.charge;
+      addItem(repeatValues(base), null);
       if(step&&atlas.items&&atlas.items[step]){
         var it=atlas.items[step];
-        if(!it.alts){ ops.push({path:'items/'+step+'/alts',op:'set',value:{name:draft.cname||it.name,members:['item:'+step,'item:'+id],pref:'item:'+id}}); }
-        else { var mem=(it.alts.members||[]).concat(['item:'+id]); ops.push({path:'items/'+step+'/alts/members',op:'set',value:mem}); ops.push({path:'items/'+step+'/alts/pref',op:'ref',value:'item:'+id}); }
+        if(!it.alts){ var av={name:draft.cname||it.name,members:['item:'+step,'item:'+id]}; if(isPref) av.pref='item:'+id; ops.push({path:'items/'+step+'/alts',op:'set',value:av}); }
+        else { var mem=(it.alts.members||[]).concat(['item:'+id]); ops.push({path:'items/'+step+'/alts/members',op:'set',value:mem}); if(isPref) ops.push({path:'items/'+step+'/alts/pref',op:'ref',value:'item:'+id}); }
       }
-      ui.choice='item:'+id; ui.choiceName=an; ui.preferred=true; rememberPlan(ui);
+      ui.choice='item:'+id; ui.choiceName=an; ui.preferred=isPref; rememberPlan(ui);
     }
     else if(route==='add-req-form'){
-      var rname=String(draft.rname||draft.name||'').trim()||'New requirement';
+      var rname=String(draft.rname||'').trim()||'New requirement';
       var items=(ui.reqItems||planSession().reqItems||[]).slice();
       items.push({id:'req'+Date.now().toString(36), name:rname, date:when, time:formatTime24(draft.time)||'', repeat:draft.repeat||'none', every:draft.every, mdays:draft.mdays, amount:amount});
       root.__budgetUi=Object.assign({},ui,{reqItems:items, choiceName:ui.choiceName||planSession().choiceName, draft:Object.assign({},draft,{rname:''})});
@@ -14053,19 +14099,19 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         {t:'bar',back:'Add an item',right:'Save',backAct:'add:choose',rightAct:'save',rightBold:true},
         {t:'title',text:'Add pay',y:by(70.06,22)},
         {t:'note',text:'A scheduled payday. Take-home is calculated.',y:by(97.52,15),size:15},
-        {t:'field',label:'Payee',value:pay.payee||'',y:by(173.04,17),line:true,bold:true,act:'field:payee'},
+        {t:'field',label:'Payee',value:pay.payee||'Add a payee',y:by(173.04,17),line:true,bold:true,act:'field:payee'},
         {t:'field',label:'Pay date',value:dateVal('date',dayLong),y:by(237.04,17),line:true,act:'field:date'}
       ];
-      var y=260;
+      var y=272; /* clears the Pay date row before the picker or Repeat */
       if(picking==='date'){ parts=parts.concat(pickerAfter('date', y)); y+=formPickerHeight(pickMonth)+SPACE.group; }
-      parts.push({t:'h',text:'Repeat',y:by(y,17)}); y+=36;
+      parts.push({t:'h',text:'Repeat',y:by(y+24,17)}); y+=60;
       parts.push({t:'row',text:'Does not repeat',radio:true,on:pay.repeat==='none',bold:pay.repeat==='none',top:y,h:44,act:'repeat:none'}); y+=44;
       parts.push({t:'row',text:'Specific dates each month',radio:true,on:pay.repeat==='mdays',bold:pay.repeat==='mdays',top:y,h:44,act:'repeat:mdays'}); y+=44;
       if(pay.repeat==='mdays'){ y+=44; parts.push({t:'field',label:'Days of the month',value:pay.mdays||String(+String(pay.date||draft.date||day||'').slice(8)||''),y:by(y,17),line:true,act:'field:mdays'}); y+=56; }
       parts.push({t:'row',text:'Every '+(pay.every||'14')+' days',radio:true,on:pay.repeat==='every',bold:pay.repeat==='every',top:y,h:44,act:'repeat:every'}); y+=44;
       if(pay.repeat==='every'){ y+=44; parts.push({t:'every',value:String(pay.every||'14'),y:by(y,17),act:'field:every'}); y+=56; }
       y+=48;
-      parts.push({t:'field',label:'Gross pay',value:pay.gross===''||pay.gross==null?'':fmtMoney(parseMoney(pay.gross)),y:by(y,17),line:true,bold:true,act:'field:gross'}); y+=52;
+      parts.push({t:'field',label:'Gross pay',value:pay.gross===''||pay.gross==null?'0.00':fmtMoney(parseMoney(pay.gross)),y:by(y,17),line:true,bold:true,act:'field:gross'}); y+=52;
       parts.push({t:'h',text:'Deductions',y:by(y,17)}); y+=36;
       (pay.deductions||[]).forEach(function(d,i){
         parts.push({t:'pair',left:d.name||('Deduction '+(i+1)),right:d.kind==='percent'?String(d.value||'0')+'%':fmtMoney(parseMoney(d.value)),y:by(y,17),bold:true,rightBold:true,toggle:d.kind==='fixed'?'fixed':'percent',idx:i,valueAct:'ded:value:'+i,nameAct:'ded:name:'+i});
@@ -14089,21 +14135,22 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         {t:'bar',back:'Add an item',right:'Save',backAct:'add:choose',rightAct:'save',rightBold:true},
         {t:'title',text:'Add a debt',y:by(78.06,22)},
         {t:'note',text:'Amount still owed on the as-of date.',y:by(107.52,15),size:15},
-        {t:'field',label:'Creditor',value:draft.creditor||'',y:by(205.04,17),line:true,act:'field:creditor'},
-        {t:'field',label:'Purpose',value:draft.purpose||'',y:by(269.04,17),line:true,act:'field:purpose'},
-        {t:'field',label:'Balance owed',value:draft.balance==null||draft.balance===''?'':fmtMoney(parseMoney(draft.balance)),y:by(333.04,17),line:true,bold:true,act:'field:balance'},
+        {t:'field',label:'Creditor',value:draft.creditor||'Add a creditor',y:by(205.04,17),line:true,act:'field:creditor'},
+        {t:'field',label:'Purpose',value:draft.purpose||'Add a purpose',y:by(269.04,17),line:true,act:'field:purpose'},
+        {t:'field',label:'Balance owed',value:draft.balance==null||draft.balance===''?'0.00':fmtMoney(parseMoney(draft.balance)),y:by(333.04,17),line:true,bold:true,act:'field:balance'},
         {t:'field',label:'As-of date',value:dateVal('asOf',dayLong),y:by(397.04,17),line:true,act:'field:asOf'}
       ];
       var y=469.04;
       if(picking==='asOf'){ parts=parts.concat(pickerAfter('asOf', y)); y+=formPickerHeight(pickMonth)+SPACE.group; }
-      parts.push({t:'field',label:'APR (%)',value:draft.apr==null||draft.apr===''?'':String(draft.apr),y:by(y,17),line:true,act:'field:apr'}); y+=64;
+      parts.push({t:'field',label:'APR (%)',value:draft.apr==null||draft.apr===''?'0':String(draft.apr),y:by(y,17),line:true,act:'field:apr'}); y+=64;
       parts.push({t:'field',label:'Payments remaining',value:draft.terms==null||draft.terms===''?'':String(draft.terms),y:by(y,17),line:true,act:'field:terms'}); y+=64;
       parts.push({t:'field',label:'Days between payments',value:draft.every==null||draft.every===''?'':String(draft.every),y:by(y,17),line:true,act:'field:every'}); y+=64;
       parts.push({t:'h',text:'Calculated',y:by(y,17)}); y+=36;
-      parts.push({t:'field',label:'Payment amount',value:sch&&sch.ok&&sch.payment!=null?fmtMoney(sch.payment):(sch&&sch.errors&&sch.errors[0]||'—'),y:by(y,17),line:true,bold:true}); y+=48;
+      parts.push({t:'pair',left:'Payment amount',right:sch&&sch.ok&&sch.payment!=null?fmtMoney(sch.payment):'—',y:by(y,17),rightBold:true}); y+=48; /* calculated: drawn, never a tap target */
+      if(!(sch&&sch.ok)&&sch&&sch.errors&&sch.errors[0]){ parts.push({t:'note',text:sch.errors[0],y:by(y,15),size:15,ink:C.muted}); y+=28; }
       parts.push({t:'note',text:'This amount is calculated. It is not an editable field.',y:by(y,15),size:15}); y+=36;
       if(sch&&sch.ok&&sch.rows&&sch.rows.length){
-        parts.push({t:'field',label:'First payment date',value:dateLabel(sch.rows[0].date||sch.first||''),y:by(y,17),line:true}); y+=48;
+        parts.push({t:'pair',left:'First payment date',right:dateLabel(sch.rows[0].date||sch.first||''),y:by(y,17)}); y+=48;
         parts.push({t:'note',text:'Then every '+(input.every||30)+' days.',y:by(y,15),size:15}); y+=24;
         sch.rows.slice(1,4).forEach(function(r){ parts.push({t:'note',text:dateLabel(r.date||r.day||''),y:by(y,15),size:15}); y+=24; });
       }
@@ -14185,17 +14232,17 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       if(!draft.repeat) draft.repeat='none';
       var parts=[
         {t:'bar',back:isReq?'Requirements':'Alternatives',right:isReq?'Save':'Continue',backAct:isReq?'nav:plan-c':'add-alt:list',rightAct:'save',rightBold:true},
-        {t:'title',text:isReq?'New requirement':'New alternative',y:by(74.06,22)},
+        {t:'title',text:isReq?'New requirement':((draft.cname||draft.category)?'New alternative in '+(draft.cname||draft.category):'New alternative'),y:by(74.06,22),wrap:true},
         {t:'note',text:isReq?'This requirement is added to the review list.':'Preferred is a mark, not a selection. New alternatives start preferred.',y:by(107.52,15),size:15}
       ];
       var y=145;
       if(isReq){
-        parts.push({t:'field',label:'Name',value:draft.rname||draft.name||'Add a name',y:by(y+40,17),box:'full',bold:true,act:'field:rname'}); y+=112;
+        parts.push({t:'field',label:'Name',value:draft.rname||'Add a name',y:by(y+40,17),box:'full',bold:true,act:'field:rname'}); y+=112;
       } else {
-        parts.push({t:'field',label:'Name',value:draft.aname||draft.name||'Add a name',y:by(y+40,17),box:'full',bold:true,act:'field:aname'}); y+=112;
+        parts.push({t:'field',label:'Name',value:draft.aname||'Add a name',y:by(y+40,17),box:'full',bold:true,act:'field:aname'}); y+=112;
         parts.push({t:'row',text:'Preferred',star:true,on:draft.preferred!==false,tag:'Star marks preferred',top:y,h:56,act:'pref:star'}); y+=64;
       }
-      parts.push({t:'h',text:'Timing',y:by(y,17)}); y+=56;
+      parts.push({t:'h',text:'Timing',y:by(y,17)}); y+=72; /* same gap as the activity form, so Date clears the heading */
       parts.push({t:'field',label:'Date',value:dateVal('date',dayLong),y:by(y,17),box:'full',act:'field:date'}); y+=72;
       if(picking==='date'){ parts=parts.concat(pickerAfter('date', y)); y+=formPickerHeight(pickMonth)+SPACE.group; }
       parts.push({t:'field',label:'Time',value:formatTime24(draft.time)||'Add a time',y:by(y,17),box:'full',act:'field:time'}); y+=72;
@@ -14265,7 +14312,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         var key='r'+i, decided=reqs[key]||reqs[nm];
         parts.push({t:'h',text:nm,y:by(y,17)});
         parts.push({t:'text',text:decided==='own'?'Needs its own':(decided==='reuse'?'Reuse a copy':(decided==='none'?'Not needed':'Not decided')),x:0,y:by(y+1.5,15),size:15,align:'right',ink:'#4D4C57'});
-        y+=36;
+        y+=48; /* room between the requirement name and its first choice */
         parts.push({t:'row',text:'Needs its own',radio:true,on:decided==='own',top:y-31,h:44,act:'req:'+key+':own'}); y+=44;
         parts.push({t:'row',text:'Reuse a copy',radio:true,on:decided==='reuse',top:y-31,h:44,act:'req:'+key+':reuse'}); y+=44;
         parts.push({t:'row',text:'Not needed',radio:true,on:decided==='none',top:y-31,h:44,act:'req:'+key+':none'}); y+=52;
@@ -14275,6 +14322,18 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       parts.push({t:'accept',text:'Accept',enabled:resolved,act:'accept',top:y-22}); y+=48;
       if(!resolved){ parts.push({t:'note',text:'Accept is unavailable until every',y:by(y,15),size:15}); parts.push({t:'note',text:'requirement is resolved.',y:by(y+20,15),size:15}); }
       return scr(Math.max(844,y+80),parts);
+    }
+    if(R==='add-alt-category'&&(ctx.plan||ui.step)){
+      /* Live category step: names the item the person is on, never the sample car. */
+      var crows=((ctx.plan||{}).rows)||[], cr=crows.find(function(q){return q.id===ui.step;})||crows[0]||null;
+      var cname=(cr&&cr.name)||ui.stepName||'This item';
+      return scr(844,[
+        {t:'bar',back:cname,right:'Next',backAct:'add-alt:list',rightAct:'add-alt:form',rightBold:true},
+        {t:'title',text:'Name the category',y:by(74.06,22)},
+        {t:'note',text:cname+' and its alternatives are choices for the same need. Name that need.',y:by(107.52,15),size:15},
+        {t:'field',label:'What do these choices have in common?',value:draft.category||'Add a name',y:by(217.04,17),box:'full',bold:true,act:'field:category'},
+        {t:'note',text:'You name the category. This step is only for the first alternative.',y:by(261.52,15),size:15}
+      ]);
     }
     if(R==='add-alt-form'||R==='add-req-form'){
       return liveFormScreen(R, scr, by, day, dayLong, dayShort, draft, ui);
@@ -14442,6 +14501,40 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       {t:'link',text:'Hide comparison',top:461-27,h:44,act:'entry:record'},
       {t:'note',text:'Hiding this does not cancel the record.',y:by(489.52,15),size:15}
     ]);
+    if((R==='plan-switch-before'||R==='plan-switch-after')&&ctx.plan&&(ctx.plan.rows||[]).length&&ui.choiceName){
+      /* Live switch review: Before and After stacked on one phone page, from the person's own plan. */
+      var prow=ctx.plan.rows, sid=ui.step, sr=prow.find(function(q){return q.id===sid;})||null;
+      var inUse=function(r){ return (r.selectedName&&r.selectedName!=='No alternative')?r.selectedName:r.name; };
+      /* Same requirement names as the review page: jreq may be a ref string, a list, {jgroup:[...]} or a record. */
+      var SAT=ctx.atlas||{}, sraw=(SAT.items&&sid&&SAT.items[sid])?SAT.items[sid].jreq:null;
+      var sj=Array.isArray(sraw)?sraw:(sraw&&typeof sraw==='object'&&Array.isArray(sraw.jgroup)?sraw.jgroup:(sraw?[sraw]:[]));
+      var stepNm=(sr&&sr.name)||ui.stepName||'This step', fromNm=sr?inUse(sr):stepNm, toNm=ui.choiceName;
+      var rnames=sj.length?sj.map(function(q,i){ if(typeof q==='string'){ var m=/^(item|bp|joy|comp):(.+)$/.exec(q), col=m?({item:'items',bp:'blueprints',joy:'joys',comp:'components'})[m[1]]:'items', t=(SAT[col]||{})[m?m[2]:q]; return (t&&(t.name||t.title))||('Requirement '+(i+1)); } return (q&&typeof q==='object'&&(q.name||q.title))||('Requirement '+(i+1)); }):['Needs from '+(ui.stepName||'this step')];
+      (ui.reqItems||[]).forEach(function(q){ if(q&&q.name&&rnames.indexOf(q.name)<0) rnames.push(q.name); });
+      var sreqs=ui.reqs||{}, word={own:'Needs its own',reuse:'Reuse a copy',none:'Not needed'};
+      var sparts=[{t:'bar',back:'Requirements',backAct:'nav:plan-c'},{t:'title',text:'Review the switch',y:by(74.06,22),wrap:true},
+        {t:'note',text:stepNm+' switches from '+fromNm+' to '+toNm+' from '+dayLong+'.',y:by(105.52,15),size:15},
+        {t:'note',text:'The current plan is unchanged until you accept.',y:by(129.52,15),size:15}];
+      var sy=180;
+      [false,true].forEach(function(afterView){
+        sparts.push({t:'h',text:(afterView?'After':'Before')+'  -  '+prow.length+(prow.length===1?' step':' steps'),y:by(sy,17)}); sy+=40;
+        prow.forEach(function(r){
+          var changed=r.id===sid, start=sy, at=sparts.length;
+          sparts.push({t:'h',text:r.name,y:by(sy,17)}); sy+=24;
+          sparts.push({t:'note',text:changed&&afterView?toNm:inUse(r),y:by(sy,15),size:15}); sy+=28;
+          if(changed&&afterView) rnames.forEach(function(nm,i){ var d=sreqs['r'+i]||sreqs[nm]||''; sparts.push({t:'note',text:nm+': '+(word[d]||'Not decided'),y:by(sy,15),size:15}); sy+=22; });
+          if(changed){ sparts.splice(at,0,{t:'wash',top:start-10,h:sy-start+6,color:afterView?C.mint:C.wash,until:true}); sparts.push({t:'washEnd',at:sy-4}); }
+          sy+=12;
+        });
+        sy+=16;
+      });
+      sparts.push({t:'note',text:'Lavender is the step now; green is the step after you accept.',y:by(sy,15),size:15}); sy+=40;
+      sparts.push({t:'wash',top:sy,h:44,color:C.mint});
+      sparts.push({t:'link',text:'Accept',top:sy,h:44,bold:true,act:'accept'}); sy+=52;
+      sparts.push({t:'link',text:'Keep current',top:sy,h:44,act:'keep'}); sy+=56;
+      sparts.push({t:'note',text:'Accept makes '+toNm+' the choice in use.',y:by(sy,15),size:15}); sy+=40;
+      return scr(Math.max(844,sy+60),sparts);
+    }
     if(R==='plan-switch-before'||R==='plan-switch-after'){
       var after=R==='plan-switch-after';
       var parts=[
@@ -14557,7 +14650,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   function navigate(route, act){
     var A={
       'nav:home':'home','nav:back':'home','nav:cash':'cash-list','nav:ledger':'monthly',
-      'nav:plan':'home','req:add':'add-req-form','nav:plan-c':'plan-c','nav:calendar':'calendar','nav:agenda':'schedule','view:day':'schedule',
+      'nav:plan':'home','req:add':'add-req-form','nav:plan-c':'plan-c','nav:calendar':'home','nav:agenda':'schedule','view:day':'schedule',
       'journal:date':'date-picker-open','budget:date':'date-picker-closed',
       'cash:add':'cash-entry','picker:car':'add-alt-list','choose:tesla':'plan-c','nav:plan-c':'plan-c',
       'add:item':'add-item-choose','add:choose':'add-item-choose','add:activity':'add-item-form',
@@ -15602,7 +15695,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.73",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.74",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
