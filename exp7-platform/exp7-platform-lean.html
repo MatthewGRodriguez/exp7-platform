@@ -12458,7 +12458,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
      save is accepted, so a refused save leaves the plan as it was. */
   function acceptChoice(w, V, cat, to, answers, extra) {
     if (!w || !w.items || !w.items[cat]) return { ok: false, note: 'That step is no longer in the plan.' };
-    var tid = bare(to), T = w.items[tid], ref = 'item:' + tid, C0 = w.items[cat], cname = (C0.alts && C0.alts.name) || C0.name || cat;
+    var tid = bare(to), T = w.items[tid], ref = 'item:' + tid, C0 = w.items[cat], cname = C0.name || (C0.alts && C0.alts.name) || cat;
     if (!T || catMembers(w.items[cat]).indexOf(ref) < 0) return { ok: false, note: 'That choice is no longer one of the alternatives for ' + cname + '.' };
     var cur = selectedRef(w, cat);
     if (cur === ref) return { ok: true, ops: [], note: T.name + ' is already in use for ' + cname + '.', done: function () {} };

@@ -2,7 +2,7 @@
   "format": "exp7-platform-release/1",
   "version": "1.8.75",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "271bda584832183553eb023a214b549cbb3c4747037fd3639caed0bad0531437",
+  "sha256": "ba6e1d1456c3989b565801aab14d34b3ef253840b87ccefbeddc1b03f1afec4b",
   "minLauncherMajor": 1,
   "contains": {
     "1.8.75": "Fix: Accept on the plan switch review now switches the plan. Before, it only started a proposal and still said \"Plan updated\". The requirement answers are saved with the switch: Reuse a copy makes a separate copy for the new choice, starting when it does; Not needed and Needs its own are recorded; requirements added for the new choice are added. The plan changes only when the save is accepted, and says so; otherwise the current plan stays. Answers belong to one step and one choice, so the next alternative's review starts unanswered. The requirement status (Not decided, Needs its own...) now shows on the right instead of off screen, and the review says \"Carried over from the choice in use.\"",
