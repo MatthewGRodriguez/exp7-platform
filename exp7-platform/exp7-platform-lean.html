@@ -14220,7 +14220,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         parts.push({t:'field',label:'Name',value:draft.aname||'Add a name',y:by(y+40,17),box:'full',bold:true,act:'field:aname'}); y+=112;
         parts.push({t:'row',text:'Preferred',star:true,on:draft.preferred!==false,tag:'Star marks preferred',top:y,h:56,act:'pref:star'}); y+=64;
       }
-      parts.push({t:'h',text:'Timing',y:by(y,17)}); y+=56;
+      parts.push({t:'h',text:'Timing',y:by(y,17)}); y+=72; /* same gap as the activity form, so Date clears the heading */
       parts.push({t:'field',label:'Date',value:dateVal('date',dayLong),y:by(y,17),box:'full',act:'field:date'}); y+=72;
       if(picking==='date'){ parts=parts.concat(pickerAfter('date', y)); y+=formPickerHeight(pickMonth)+SPACE.group; }
       parts.push({t:'field',label:'Time',value:formatTime24(draft.time)||'Add a time',y:by(y,17),box:'full',act:'field:time'}); y+=72;
