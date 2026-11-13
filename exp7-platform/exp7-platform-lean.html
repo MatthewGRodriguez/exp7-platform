@@ -13766,7 +13766,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     if(a.indexOf('add:')===0||a.indexOf('add-alt:')===0){
       if(a==='add:pay'||a==='add:debt'||a==='add:activity'||a==='add:cash'){
         var keepDay=((root.__budgetUi&&root.__budgetUi.day)||this.uiDraft().date||budgetDateKey()); /* the selected day, not a leftover draft */
-        root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:{date:keepDay,asOf:keepDay,kind:'cash',repeat:a==='add:pay'?'every':'none',every:'14'}});
+        root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:{date:keepDay,asOf:keepDay,kind:'cash',repeat:a==='add:pay'?'every':'none',every:a==='add:debt'?'30':'14'}});
       }
       if(a==='add-alt:form'||a==='add-alt-form'){ if(this.closeField) this.closeField(true); var d=this.uiDraft(); d.cname=String(d.category||d.cname||d.name||'').trim()||d.cname; root.__budgetUi.draft=d; }
       if(a==='add:alt'){ var ad=this.uiDraft(); ad.aname=''; delete ad.preferred; var ui=root.__budgetUi||{}, it=this.atlas&&this.atlas.items&&this.atlas.items[ui.step]; this.route=(it&&it.alts&&(it.alts.name||(it.alts.members&&it.alts.members.length)))?'add-alt-form':'add-alt-category'; }
@@ -14117,22 +14117,22 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         {t:'bar',back:'Add an item',right:'Save',backAct:'add:choose',rightAct:'save',rightBold:true},
         {t:'title',text:'Add a debt',y:by(78.06,22)},
         {t:'note',text:'Amount still owed on the as-of date.',y:by(107.52,15),size:15},
-        {t:'field',label:'Creditor',value:draft.creditor||'',y:by(205.04,17),line:true,act:'field:creditor'},
-        {t:'field',label:'Purpose',value:draft.purpose||'',y:by(269.04,17),line:true,act:'field:purpose'},
-        {t:'field',label:'Balance owed',value:draft.balance==null||draft.balance===''?'':fmtMoney(parseMoney(draft.balance)),y:by(333.04,17),line:true,bold:true,act:'field:balance'},
+        {t:'field',label:'Creditor',value:draft.creditor||'Add a creditor',y:by(205.04,17),line:true,act:'field:creditor'},
+        {t:'field',label:'Purpose',value:draft.purpose||'Add a purpose',y:by(269.04,17),line:true,act:'field:purpose'},
+        {t:'field',label:'Balance owed',value:draft.balance==null||draft.balance===''?'0.00':fmtMoney(parseMoney(draft.balance)),y:by(333.04,17),line:true,bold:true,act:'field:balance'},
         {t:'field',label:'As-of date',value:dateVal('asOf',dayLong),y:by(397.04,17),line:true,act:'field:asOf'}
       ];
       var y=469.04;
       if(picking==='asOf'){ parts=parts.concat(pickerAfter('asOf', y)); y+=formPickerHeight(pickMonth)+SPACE.group; }
-      parts.push({t:'field',label:'APR (%)',value:draft.apr==null||draft.apr===''?'':String(draft.apr),y:by(y,17),line:true,act:'field:apr'}); y+=64;
+      parts.push({t:'field',label:'APR (%)',value:draft.apr==null||draft.apr===''?'0':String(draft.apr),y:by(y,17),line:true,act:'field:apr'}); y+=64;
       parts.push({t:'field',label:'Payments remaining',value:draft.terms==null||draft.terms===''?'':String(draft.terms),y:by(y,17),line:true,act:'field:terms'}); y+=64;
       parts.push({t:'field',label:'Days between payments',value:draft.every==null||draft.every===''?'':String(draft.every),y:by(y,17),line:true,act:'field:every'}); y+=64;
       parts.push({t:'h',text:'Calculated',y:by(y,17)}); y+=36;
-      parts.push({t:'field',label:'Payment amount',value:sch&&sch.ok&&sch.payment!=null?fmtMoney(sch.payment):'—',y:by(y,17),line:true,bold:true}); y+=48;
+      parts.push({t:'pair',left:'Payment amount',right:sch&&sch.ok&&sch.payment!=null?fmtMoney(sch.payment):'—',y:by(y,17),rightBold:true}); y+=48; /* calculated: drawn, never a tap target */
       if(!(sch&&sch.ok)&&sch&&sch.errors&&sch.errors[0]){ parts.push({t:'note',text:sch.errors[0],y:by(y,15),size:15,ink:C.muted}); y+=28; }
       parts.push({t:'note',text:'This amount is calculated. It is not an editable field.',y:by(y,15),size:15}); y+=36;
       if(sch&&sch.ok&&sch.rows&&sch.rows.length){
-        parts.push({t:'field',label:'First payment date',value:dateLabel(sch.rows[0].date||sch.first||''),y:by(y,17),line:true}); y+=48;
+        parts.push({t:'pair',left:'First payment date',right:dateLabel(sch.rows[0].date||sch.first||''),y:by(y,17)}); y+=48;
         parts.push({t:'note',text:'Then every '+(input.every||30)+' days.',y:by(y,15),size:15}); y+=24;
         sch.rows.slice(1,4).forEach(function(r){ parts.push({t:'note',text:dateLabel(r.date||r.day||''),y:by(y,15),size:15}); y+=24; });
       }
