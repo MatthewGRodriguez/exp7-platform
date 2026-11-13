@@ -12927,7 +12927,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
             rule('fr'+i,fy+16,inset,W-2*inset,C.line);
             hit(fn,0,fy-20,W,44,p.act||('field:'+(p.label||i)),p.label||p.value||'');
           } else {
-            if(p.label) text(node(k+'l'),p.label,inset,by(p,cursor)-41.52,sec,C.caption,false);
+            if(p.label) text(node(k+'l'),p.label,inset,by(p,cursor)-41.52+flowShift,sec,C.caption,false); /* the label moves with its box when a note above wraps */
             var bx=inset, by0=fy-28, bw=(box==='amount'?(p.boxW||128):W-2*inset), bh=44;
             fn.items.push(['border',bx,by0,bw,bh,4,1,color(C.line)]);
             text(fn,p.value||'',box==='amount'?bx+bw-10:inset+10,fy,p.size||body,C.ink,!!p.bold,box==='amount'?0:bw-20,box==='amount'?'right':null);
@@ -13729,6 +13729,12 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       root.__budgetUi=Object.assign({},ui,{choice:ref,choiceName:(ui.choices||[]).map(function(c){return c.ref===ref||c.id===ref?c.name:'';}).filter(Boolean)[0]||ref});
       this.route='plan-c'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey(),{step:ui.step,choice:ref}); return this.models?this.render():this.update();}
     if(this.popup){this.close();return;}
+    if(a==='entry:alts'&&(root.__budgetUi||{}).entry){
+      /* Alternatives opened from a day item belong to that item, not to the first plan row. */
+      var sid=root.__budgetUi.entry, spm=journalOf(this.models&&this.models.plan||{}), sr=(spm.rows||[]).find(function(q){return q.id===sid;});
+      root.__budgetUi=Object.assign({},root.__budgetUi,{step:sid,stepName:(sr&&sr.name)||((this.atlas&&this.atlas.items&&this.atlas.items[sid]||{}).name),selected:sr&&sr.selected,choices:sr&&sr.choices});
+      rememberPlan(root.__budgetUi);
+    }
     if(a.indexOf('entry:')===0){ var eid=a.slice(6); if(eid&&eid!=='actions'&&eid!=='change'&&eid!=='alts'&&eid!=='record'&&eid!=='comparison'&&eid!=='pref'&&eid!=='unavail'){ this.draftEntry(eid); } this.route=navigate(this.route||'home',a); if(this.o.onNavigate) this.o.onNavigate(this.route,budgetDateKey(),{entry:eid}); return this.models?this.render():this.update();}
     if(a.indexOf('nav:')===0){
       var dest=navigate(this.route||'home',a);
@@ -13758,11 +13764,11 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     if(a.indexOf('field:')===0){ return this.openField(a.slice(6),n); }
     if(a.indexOf('add:')===0||a.indexOf('add-alt:')===0){
       if(a==='add:pay'||a==='add:debt'||a==='add:activity'||a==='add:cash'){
-        var keepDay=(this.uiDraft().date||(root.__budgetUi&&root.__budgetUi.day)||budgetDateKey());
+        var keepDay=((root.__budgetUi&&root.__budgetUi.day)||this.uiDraft().date||budgetDateKey()); /* the selected day, not a leftover draft */
         root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:{date:keepDay,asOf:keepDay,kind:'cash',repeat:a==='add:pay'?'every':'none',every:'14'}});
       }
       if(a==='add-alt:form'||a==='add-alt-form'){ if(this.closeField) this.closeField(true); var d=this.uiDraft(); d.cname=String(d.category||d.cname||d.name||'').trim()||d.cname; root.__budgetUi.draft=d; }
-      if(a==='add:alt'){ var ui=root.__budgetUi||{}, it=this.atlas&&this.atlas.items&&this.atlas.items[ui.step]; this.route=(it&&it.alts&&(it.alts.name||(it.alts.members&&it.alts.members.length)))?'add-alt-form':'add-alt-category'; }
+      if(a==='add:alt'){ var ad=this.uiDraft(); ad.aname=''; delete ad.preferred; var ui=root.__budgetUi||{}, it=this.atlas&&this.atlas.items&&this.atlas.items[ui.step]; this.route=(it&&it.alts&&(it.alts.name||(it.alts.members&&it.alts.members.length)))?'add-alt-form':'add-alt-category'; }
       else this.route=navigate(this.route||'home',a);
       if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey());
       return this.models?this.render():this.update();
@@ -14211,7 +14217,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       if(isReq){
         parts.push({t:'field',label:'Name',value:draft.rname||draft.name||'Add a name',y:by(y+40,17),box:'full',bold:true,act:'field:rname'}); y+=112;
       } else {
-        parts.push({t:'field',label:'Name',value:draft.aname||draft.name||'Add a name',y:by(y+40,17),box:'full',bold:true,act:'field:aname'}); y+=112;
+        parts.push({t:'field',label:'Name',value:draft.aname||'Add a name',y:by(y+40,17),box:'full',bold:true,act:'field:aname'}); y+=112;
         parts.push({t:'row',text:'Preferred',star:true,on:draft.preferred!==false,tag:'Star marks preferred',top:y,h:56,act:'pref:star'}); y+=64;
       }
       parts.push({t:'h',text:'Timing',y:by(y,17)}); y+=56;
