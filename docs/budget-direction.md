@@ -20,7 +20,7 @@ Evidence labels follow [EVIDENCE.md](./EVIDENCE.md). Everything run in a cloud b
 | 1.8.62 | Phone-first journal, calendar-first entry, no first-visit setup, private data repo created automatically |
 | 1.8.63–1.8.68 | Boot fix, phone-study tokens and screens, journal at every width, viewport canvas, reachable add paths |
 | 1.8.69–1.8.70 | Day and Plan entry from Home, inline date pickers, 24-hour times, plan only on Home |
-| 1.8.71 | Undated items are dated from their edit page; Change and Record are saved per occurrence or this and future; Specific dates each month repeats; pay is the take-home; old Board entries open the calendar day; no what-if in Budget; repo creation never runs on a half-typed name |
+| 1.8.71 | Undated items are dated from their edit page; Change and Record are saved per occurrence or this and future; Specific dates each month repeats; pay is the take-home; old Board entries open the calendar day; no what-if in Budget; repo creation never runs on a half-typed name; a tapped entry opens its own item page (not the sample); a first tap on Save or a row lands while a field is open; day rows show that day's recorded amount and the repeat in words; a calendar amount is the cost each time |
 
 The view architecture is unchanged: views are still built by the views host as view models and drawn by JRViews and JRender. Two shared scripts were added to the platform file (`budget-rules`, pure functions; `budget-flows`, controllers and view-model fragments). There is no second renderer and no separate app.
 
@@ -67,6 +67,7 @@ An entry can be spending, income or a routine (schedule only, no money). It is o
 - A new entry's amount is per occurrence (`charge: 'per'`). Entries saved earlier keep the way they were charged.
 - Every entry is added from a calendar day and has a date. Monthly expenses has no *No date set* group. An item saved without a date before 1.8.62 is listed under *Needs a date*, outside every total; a tap opens its edit page with the date picker open (1.8.71), and saving gives it the date.
 - The journal's Repeat choices are stored in the evaluator's own terms (1.8.71): *Does not repeat* is `once`, *Specific dates each month* is `monthdays` with `on[]`, *Every X days* is `every`. Before 1.8.71 the journal stored `mdays`, which the evaluator did not know, so such an item occurred only on its first day.
+- 1.8.71, found testing in Chrome: tapping an entry opened the sample item page (*Take an Uber*) whatever was tapped, because each date or tab refresh rebuilt the page state and dropped the tapped entry and any form draft. The refresh now keeps the rest of the state, and the item page shows the tapped item (name, day, time, repeat, amount) with Change, Alternatives and requirements, and Record. The journal's amount is the cost each time (`charge: 'per'`), a dated *Needs a date* item joins the calendar, *Record what happened* defaults to this occurrence only, and the live schedule no longer calls real values sample data.
 - A month's occurrences are capped at that month's last valid day, never `month + '-31'` (1.8.62).
 
 **Changing a repeating entry** offers two scopes:
