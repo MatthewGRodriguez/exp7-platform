@@ -14081,19 +14081,19 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         {t:'bar',back:'Add an item',right:'Save',backAct:'add:choose',rightAct:'save',rightBold:true},
         {t:'title',text:'Add pay',y:by(70.06,22)},
         {t:'note',text:'A scheduled payday. Take-home is calculated.',y:by(97.52,15),size:15},
-        {t:'field',label:'Payee',value:pay.payee||'',y:by(173.04,17),line:true,bold:true,act:'field:payee'},
+        {t:'field',label:'Payee',value:pay.payee||'Add a payee',y:by(173.04,17),line:true,bold:true,act:'field:payee'},
         {t:'field',label:'Pay date',value:dateVal('date',dayLong),y:by(237.04,17),line:true,act:'field:date'}
       ];
-      var y=260;
+      var y=272; /* clears the Pay date row before the picker or Repeat */
       if(picking==='date'){ parts=parts.concat(pickerAfter('date', y)); y+=formPickerHeight(pickMonth)+SPACE.group; }
-      parts.push({t:'h',text:'Repeat',y:by(y,17)}); y+=36;
+      parts.push({t:'h',text:'Repeat',y:by(y+24,17)}); y+=60;
       parts.push({t:'row',text:'Does not repeat',radio:true,on:pay.repeat==='none',bold:pay.repeat==='none',top:y,h:44,act:'repeat:none'}); y+=44;
       parts.push({t:'row',text:'Specific dates each month',radio:true,on:pay.repeat==='mdays',bold:pay.repeat==='mdays',top:y,h:44,act:'repeat:mdays'}); y+=44;
       if(pay.repeat==='mdays'){ y+=44; parts.push({t:'field',label:'Days of the month',value:pay.mdays||String(+String(pay.date||draft.date||day||'').slice(8)||''),y:by(y,17),line:true,act:'field:mdays'}); y+=56; }
       parts.push({t:'row',text:'Every '+(pay.every||'14')+' days',radio:true,on:pay.repeat==='every',bold:pay.repeat==='every',top:y,h:44,act:'repeat:every'}); y+=44;
       if(pay.repeat==='every'){ y+=44; parts.push({t:'every',value:String(pay.every||'14'),y:by(y,17),act:'field:every'}); y+=56; }
       y+=48;
-      parts.push({t:'field',label:'Gross pay',value:pay.gross===''||pay.gross==null?'':fmtMoney(parseMoney(pay.gross)),y:by(y,17),line:true,bold:true,act:'field:gross'}); y+=52;
+      parts.push({t:'field',label:'Gross pay',value:pay.gross===''||pay.gross==null?'0.00':fmtMoney(parseMoney(pay.gross)),y:by(y,17),line:true,bold:true,act:'field:gross'}); y+=52;
       parts.push({t:'h',text:'Deductions',y:by(y,17)}); y+=36;
       (pay.deductions||[]).forEach(function(d,i){
         parts.push({t:'pair',left:d.name||('Deduction '+(i+1)),right:d.kind==='percent'?String(d.value||'0')+'%':fmtMoney(parseMoney(d.value)),y:by(y,17),bold:true,rightBold:true,toggle:d.kind==='fixed'?'fixed':'percent',idx:i,valueAct:'ded:value:'+i,nameAct:'ded:name:'+i});
