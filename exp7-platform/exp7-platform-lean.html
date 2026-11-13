@@ -14487,9 +14487,11 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       /* Live switch review: Before and After stacked on one phone page, from the person's own plan. */
       var prow=ctx.plan.rows, sid=ui.step, sr=prow.find(function(q){return q.id===sid;})||null;
       var inUse=function(r){ return (r.selectedName&&r.selectedName!=='No alternative')?r.selectedName:r.name; };
-      var sj=ctx.atlas&&ctx.atlas.items&&sid&&ctx.atlas.items[sid]&&ctx.atlas.items[sid].jreq; sj=Array.isArray(sj)?sj:[];
+      /* Same requirement names as the review page: jreq may be a ref string, a list, {jgroup:[...]} or a record. */
+      var SAT=ctx.atlas||{}, sraw=(SAT.items&&sid&&SAT.items[sid])?SAT.items[sid].jreq:null;
+      var sj=Array.isArray(sraw)?sraw:(sraw&&typeof sraw==='object'&&Array.isArray(sraw.jgroup)?sraw.jgroup:(sraw?[sraw]:[]));
       var stepNm=(sr&&sr.name)||ui.stepName||'This step', fromNm=sr?inUse(sr):stepNm, toNm=ui.choiceName;
-      var rnames=sj.length?sj.map(function(q,i){return (q&&(q.name||q.title))||('Requirement '+(i+1));}):['Needs from '+stepNm];
+      var rnames=sj.length?sj.map(function(q,i){ if(typeof q==='string'){ var m=/^(item|bp|joy|comp):(.+)$/.exec(q), col=m?({item:'items',bp:'blueprints',joy:'joys',comp:'components'})[m[1]]:'items', t=(SAT[col]||{})[m?m[2]:q]; return (t&&(t.name||t.title))||('Requirement '+(i+1)); } return (q&&typeof q==='object'&&(q.name||q.title))||('Requirement '+(i+1)); }):['Needs from '+(ui.stepName||'this step')];
       (ui.reqItems||[]).forEach(function(q){ if(q&&q.name&&rnames.indexOf(q.name)<0) rnames.push(q.name); });
       var sreqs=ui.reqs||{}, word={own:'Needs its own',reuse:'Reuse a copy',none:'Not needed'};
       var sparts=[{t:'bar',back:'Requirements',backAct:'nav:plan-c'},{t:'title',text:'Review the switch',y:by(74.06,22),wrap:true},
