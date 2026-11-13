@@ -1,8 +1,8 @@
-# Budget direction: what 1.8.55 to 1.8.61 implement
+# Budget direction: what 1.8.55 onward implements
 
 **Source of the requirements:** `BUDGET_DIRECTION.md`, supplied by Matthew on 2026-11-11 **[REQ]**. That document states agreed behaviour. This page records what the platform now does about each part of it, the rules and thresholds it uses, how existing data is carried over, and what has and has not been verified.
 
-**Base:** `main` at `99dba06` (release 1.8.54). **Branch:** `budget-direction`. Merged to `main` in PR #92 as release 1.8.61. Later phone-first and product fixes are 1.8.62. 1.8.63 fixes a Budget Home boot error (`hit` was overwritten by the 44 pt typography constant). 1.8.64 matches the approved phone studies' visual tokens (Source Sans 3, ink, rules, mint/lavender tints, calendar marks, chevrons, spacing) in the real JRender journal path. 1.8.64 tightened Home, Plan, ledger, cash, the mini-month, the resilience calendar, and Today's schedule to those studies and records Mac Metal side-by-side residuals [MEAS]. 1.8.65 tightens remaining residuals (Home stack, calendar mark centering, ledger captions, date-picker month title, schedule wrapping, resilience legend) and adds the remaining study screens, compared on Mac Metal [MEAS].
+**Status:** on `main`. The 1.8.55–1.8.61 work was built on branch `budget-direction` from `main` at `99dba06` (release 1.8.54) and merged to `main` in PR #92 as release 1.8.61; it is not a pending branch. Every later release below was also merged to `main` through its own pull request (1.8.62 in PR #93 through 1.8.70 in PR #101). 1.8.71 is the current pull request. Later phone-first and product fixes are 1.8.62. 1.8.63 fixes a Budget Home boot error (`hit` was overwritten by the 44 pt typography constant). 1.8.64 matches the approved phone studies' visual tokens (Source Sans 3, ink, rules, mint/lavender tints, calendar marks, chevrons, spacing) in the real JRender journal path. 1.8.64 tightened Home, Plan, ledger, cash, the mini-month, the resilience calendar, and Today's schedule to those studies and records Mac Metal side-by-side residuals [MEAS]. 1.8.65 tightens remaining residuals (Home stack, calendar mark centering, ledger captions, date-picker month title, schedule wrapping, resilience legend) and adds the remaining study screens, compared on Mac Metal [MEAS].
 
 Evidence labels follow [EVIDENCE.md](./EVIDENCE.md). Everything run in a cloud browser is **[MOCK]** by that page's definition, however real the app code under test is. Nothing here is **[USER-HW]**.
 
@@ -17,6 +17,10 @@ Evidence labels follow [EVIDENCE.md](./EVIDENCE.md). Everything run in a cloud b
 | 1.8.59 | Managed encryption key, transfer code, automatic sync, offline pending, keep-both conflicts, passphrase-copy migration |
 | 1.8.60 | Dedicated Budget and Demo launchers; app limit enforced where apps mount; Back steps inside Budget |
 | 1.8.61 | Audit repairs: Home's scheduled subtotal, *Schedule paydays* opens the Calendar, *Enter debts* link, compressed sync payload, calmer automatic pushes |
+| 1.8.62 | Phone-first journal, calendar-first entry, no first-visit setup, private data repo created automatically |
+| 1.8.63–1.8.68 | Boot fix, phone-study tokens and screens, journal at every width, viewport canvas, reachable add paths |
+| 1.8.69–1.8.70 | Day and Plan entry from Home, inline date pickers, 24-hour times, plan only on Home |
+| 1.8.71 | Undated items are dated from their edit page; Change and Record are saved per occurrence or this and future; Specific dates each month repeats; pay is the take-home; old Board entries open the calendar day; no what-if in Budget; repo creation never runs on a half-typed name |
 
 The view architecture is unchanged: views are still built by the views host as view models and drawn by JRViews and JRender. Two shared scripts were added to the platform file (`budget-rules`, pure functions; `budget-flows`, controllers and view-model fragments). There is no second renderer and no separate app.
 
@@ -53,7 +57,7 @@ The rule, shown in the form next to the result:
 
 This is one stated rule. It is **not** a claim to match any creditor's terms, and the form says so.
 
-**Income.** Gross pay and a list of deductions, each a fixed amount or a percentage of gross. Take-home = gross − fixed deductions − Σ round(gross × percent/100). Each percentage is of gross pay, never of what is left after other deductions, and is rounded to the cent on its own. Paydays are *dates each month* or *every X days*.
+**Income.** Gross pay and a list of deductions, each a fixed amount or a percentage of gross. The pay put on the calendar is the take-home (from 1.8.71 also for pay added from a calendar day; before that the day form stored gross). Take-home = gross − fixed deductions − Σ round(gross × percent/100). Each percentage is of gross pay, never of what is left after other deductions, and is rounded to the cent on its own. Paydays are *dates each month* or *every X days*.
 
 ## 4. Calendar scheduling
 
@@ -61,11 +65,16 @@ An entry can be spending, income or a routine (schedule only, no money). It is o
 
 - A monthly date that does not exist in a month uses that month's last day, and returns to the requested date in months that have it.
 - A new entry's amount is per occurrence (`charge: 'per'`). Entries saved earlier keep the way they were charged.
+- Every entry is added from a calendar day and has a date. Monthly expenses has no *No date set* group. An item saved without a date before 1.8.62 is listed under *Needs a date*, outside every total; a tap opens its edit page with the date picker open (1.8.71), and saving gives it the date.
+- The journal's Repeat choices are stored in the evaluator's own terms (1.8.71): *Does not repeat* is `once`, *Specific dates each month* is `monthdays` with `on[]`, *Every X days* is `every`. Before 1.8.71 the journal stored `mdays`, which the evaluator did not know, so such an item occurred only on its first day.
+- A month's occurrences are capped at that month's last valid day, never `month + '-31'` (1.8.62).
 
 **Changing a repeating entry** offers two scopes:
 
 - *This occurrence only* writes `values.ex[date]` (amount, time, moved, skip, outcome, note).
 - *This occurrence and future* adds a phase that starts on that day (`values.then` with `cut`). Earlier occurrences are evaluated from the original values and are not rewritten.
+
+From 1.8.71 the journal's *Change* page and *Record what happened* page write through these same two scopes. Before 1.8.71 the journal's *Change* replaced the item's values outright (rewriting earlier occurrences) and *Record what happened* showed a message but saved nothing.
 
 ## 5. Alternatives and requirements
 
@@ -78,13 +87,15 @@ An entry can be spending, income or a routine (schedule only, no money). It is o
 
 ## 6. Reviewing and accepting a proposal
 
-The review is on the Plan. It shows the full dependencies and sequence before and after, side by side, with changed rows marked; money columns are for the month the new choice starts. The current plan does not change until *Accept*.
+The review is reached from the plan on Home (there is no separate Plan page). It shows the full dependencies and sequence before and after, not a cost summary, with changed rows marked. On the phone the before and after are stacked as sections; on a wide screen they may stand side by side. Budget has no what-if path and no *Clear what-if*; money columns are for the month the new choice starts. The current plan does not change until *Accept*.
 
 Proposals are saved in the browser apart from the atlas (IndexedDB key `proposals`), including answers and unresolved requirements, and are restored after a restart. They are included in sync.
 
 ## 7. Home
 
-Layout unchanged. The day schedule lists entries; clicking an entry opens *Record what happened* for it in the full day view, while the section heading still opens the full day. Plan rows keep *Step | Selected item* with inline alternatives; choosing one from Home starts a proposal and opens its review.
+**Superseded from 1.8.62.** Home is the single journal column: date heading with the shared picker, the mini month (the only month calendar; a second tap on the selected day opens its schedule), Today, the plan as *Step | Selected item*, then links to Monthly expenses and Cash and owned items. A tap on a schedule row opens the item's actions page (Change, Alternatives and requirements, Mark preferred, Mark unavailable, Record what happened); *Record what happened* is one choice there, not where a tap lands. A plan step's selected item opens its alternatives list; choosing one opens the requirement review and then the before/after plan review with *Accept* and *Keep current*.
+
+The 1.8.55–1.8.61 behaviour, kept as history: the day schedule's entries opened *Record what happened*, and Plan rows had inline alternatives.
 
 1.8.61 corrects one figure: the *Scheduled this month* group used to add pay to costs in its subtotal. When a group holds both, it now shows *Pay less costs*. The two balance lines below it were already right and are unchanged.
 
@@ -121,6 +132,8 @@ Assumptions and limits:
 ## 10. Saving, encryption and sync
 
 **Local.** Every change is written to IndexedDB at once, as before. This does not depend on GitHub.
+
+**Data repo.** Once GitHub access works and no usable data repo exists (default name `exp7-app-data`), Budget creates it, **private**, by itself; there is no create button (1.8.62). An existing repo the account owns and the key can see is used as it is, private or public, and is never overwritten or changed in visibility. From 1.8.71 the repo name box checks and creates only when the name is committed (Enter or leaving the box), so a half-typed name never creates a repo. If creation or access fails, the account menu says so with what GitHub reports (fine-grained keys need Administration write on all repositories to create one), and local saving continues. The managed key and transfer code below apply whether the repo is private or public.
 
 **Key.** A random 256-bit AES-GCM key is made on the device (`crypto.getRandomValues`) and kept in IndexedDB (`syncKey`). It is not shown or typed in normal use. A key is made only when there is no saved budget it would have to open.
 
@@ -190,4 +203,4 @@ On first open in 1.8.57 or later, a budget without `meta.selModel` is migrated o
 
 ## Where the sources are
 
-The platform file is built from the pinned base by ordered patches. From 1.8.62 the Budget scripts (`budget-rules`, `budget-flows`, `journal-views`, `eval`) and a new unit suite are delivered as a sidecar archive outside this repository, so a release PR stays within docs, the platform file, `release.json`, and the launchers. 1.8.63 keeps that layout and only renames the 44 pt typography constant so it cannot overwrite `hit()`. 1.8.64 updates those journal presentations to the study tokens and embeds Source Sans 3 for Budget journal text. 1.8.65 keeps that two-file release and extends the journal presentations to every remaining phone-study screen. 1.8.66 removes the legacy three-column Home and the Budget calendar, plan, timeline, and board frames so only the journal column remains at every width. 1.8.67 draws that column in a viewport-sized canvas on the shared JRViews device so a tall page cannot exceed Safari's 8192 px texture limit or take down the platform bar. 1.8.68 keeps that viewport canvas and fixes the journal itself: drawn chevron backs, no-overlap rows, a visible Add to <day> path, a reachable add-alternative and plan-switch review, a complete scrollable monthly ledger, Cash rows that open the as-of day, and CSS pt equal to design pt. 1.8.69 keeps that two-file release and makes the day schedule and the full Plan reachable from Home, places every form text overlay on the drawn field, and wires date/time pickers, Repeat, deductions, and debt fields so a saved item appears on the day. 1.8.70 keeps that two-file release and narrows Home so a day schedule opens only from a second tap on the selected mini-month day, expands date pickers inline, reflows Repeat subrows, uses 24-hour time, shows one Amount label and the long weekday date (Sunday, November 1), keeps Plan on Home with wrapped step text, and returns Back from a plan step's alternatives page to Home scrolled to that step. New alternatives and requirements have the same date, time, and repeat fields. The original 72 unit + 231 integration checks from 1.8.55–1.8.61 were delivered as a separate archive and are not in this repository.
+The platform file is built from the pinned base by ordered patches. From 1.8.62 the Budget scripts (`budget-rules`, `budget-flows`, `journal-views`, `eval`) and a new unit suite are delivered as a sidecar archive outside this repository, so a release PR stays within docs, the platform file, `release.json`, and the launchers. 1.8.63 keeps that layout and only renames the 44 pt typography constant so it cannot overwrite `hit()`. 1.8.64 updates those journal presentations to the study tokens and embeds Source Sans 3 for Budget journal text. 1.8.65 keeps that two-file release and extends the journal presentations to every remaining phone-study screen. 1.8.66 removes the legacy three-column Home and the Budget calendar, plan, timeline, and board frames so only the journal column remains at every width. 1.8.67 draws that column in a viewport-sized canvas on the shared JRViews device so a tall page cannot exceed Safari's 8192 px texture limit or take down the platform bar. 1.8.68 keeps that viewport canvas and fixes the journal itself: drawn chevron backs, no-overlap rows, a visible Add to <day> path, a reachable add-alternative and plan-switch review, a complete scrollable monthly ledger, Cash rows that open the as-of day, and CSS pt equal to design pt. 1.8.69 keeps that two-file release and makes the day schedule and the full Plan reachable from Home, places every form text overlay on the drawn field, and wires date/time pickers, Repeat, deductions, and debt fields so a saved item appears on the day. 1.8.71 keeps that two-file release (only the platform file, `release.json`, and docs change) and fixes the logic listed in the release table. Its unit checks (rules, the month cap, and the journal's save logic, run in Node on the scripts embedded in the shipped file) are kept outside the repository and reported in the pull request. 1.8.70 keeps that two-file release and narrows Home so a day schedule opens only from a second tap on the selected mini-month day, expands date pickers inline, reflows Repeat subrows, uses 24-hour time, shows one Amount label and the long weekday date (Sunday, November 1), keeps Plan on Home with wrapped step text, and returns Back from a plan step's alternatives page to Home scrolled to that step. New alternatives and requirements have the same date, time, and repeat fields. The original 72 unit + 231 integration checks from 1.8.55–1.8.61 were delivered as a separate archive and are not in this repository.
