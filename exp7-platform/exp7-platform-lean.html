@@ -14244,8 +14244,12 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     if(R==='add-alt-list'||R==='plan-b'){ var live=liveAltList(); if(live) return live; }
     if(R==='plan-c'){
       var choice=ui.choiceName||'New alternative', stepName=ui.stepName||'this step';
-      var reqs=ui.reqs||{}, keys=Object.keys(reqs), seeded=(ctx.atlas&&ctx.atlas.items&&ui.step&&ctx.atlas.items[ui.step]&&ctx.atlas.items[ui.step].jreq)||[];
-      var names=seeded.length?seeded.map(function(q,i){return (q&&(q.name||q.title))||('Requirement '+(i+1));}):['Needs from '+stepName];
+      /* 1.8.72: an atlas item's jreq is one ref string ('item:x' / 'bp:x'), not a list; it may also be a list, a JGroup-like {jgroup:[...]} or a record. Seed from every shape. */
+      var AT=ctx.atlas||{}, stepIt=(AT.items&&ui.step&&AT.items[ui.step])||null, rawReq=stepIt?stepIt.jreq:null;
+      var seeded=Array.isArray(rawReq)?rawReq:(rawReq&&typeof rawReq==='object'&&Array.isArray(rawReq.jgroup)?rawReq.jgroup:(rawReq?[rawReq]:[]));
+      var reqName=function(q,i){ if(typeof q==='string'){ var m=/^(item|bp|joy|comp):(.+)$/.exec(q), col=m?({item:'items',bp:'blueprints',joy:'joys',comp:'components'})[m[1]]:'items', t=(AT[col]||{})[m?m[2]:q]; return (t&&(t.name||t.title))||('Requirement '+(i+1)); } return (q&&typeof q==='object'&&(q.name||q.title))||('Requirement '+(i+1)); };
+      var reqs=ui.reqs||{}, keys=Object.keys(reqs);
+      var names=seeded.length?seeded.map(reqName):['Needs from '+stepName];
       (ui.reqItems||[]).forEach(function(r){ if(r&&r.name&&names.indexOf(r.name)<0) names.push(r.name); });
       if(!keys.length&&names.length){ /* still undecided */ }
       var parts=[{t:'bar',back:'New alternative',backAct:'add-alt:form'},{t:'title',text:'Requirements for '+choice,y:by(74.06,22),wrap:true},{t:'note',text:'Seeded from the current item JReqs.',y:by(103.52,15),size:15},{t:'note',text:'The current plan stays until you accept.',y:by(123.52,15),size:15}];
@@ -15591,7 +15595,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.71",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.72",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
