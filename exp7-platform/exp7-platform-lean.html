@@ -13950,7 +13950,10 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       if(route==='add-alt-category'){ draft.cname=name; this.route='add-alt-form'; if(this.status) this.status.textContent='Category named. Now add the alternative.'; return this.models?this.render():this.update(); }
       var step=ui.step, an=String(draft.aname||'').trim()||'New alternative', isPref=draft.preferred!==false; /* the star decides preferred */
       name=an;
-      addItem(repeatValues({type:'expense',flow:'out',amount:-amount,date:when}), null);
+      /* An alternative is charged the same way as the item it replaces (per occurrence for an activity), so its amount reads as typed. */
+      var sv=(step&&atlas.items&&atlas.items[step]&&atlas.items[step].values)||{}, sIn=sv.flow==='in';
+      var base={type:sv.type||'expense',flow:sIn?'in':'out',amount:(sIn?1:-1)*amount,date:when}; if(sv.consume!=null) base.consume=sv.consume; if(sv.charge) base.charge=sv.charge;
+      addItem(repeatValues(base), null);
       if(step&&atlas.items&&atlas.items[step]){
         var it=atlas.items[step];
         if(!it.alts){ var av={name:draft.cname||it.name,members:['item:'+step,'item:'+id]}; if(isPref) av.pref='item:'+id; ops.push({path:'items/'+step+'/alts',op:'set',value:av}); }
