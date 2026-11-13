@@ -2,7 +2,7 @@
   "format": "exp7-platform-release/1",
   "version": "1.8.74",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "181ab636184a31236564b80c321bf0cc11c1a0781c83819003523a59ad31e307",
+  "sha256": "e4b2705f7163f64994d2eb46b8c3045012c663601a180ee8f97b7d1246050669",
   "minLauncherMajor": 1,
   "contains": {
     "1.8.74": "Budget on a phone (section 1). The journal fills a 390 pt phone screen with no side margin; the Home mini month has a plain-words legend and the selected day's reason wraps; the month picker opens inline under the heading with drawn arrows and pushes the rows down, and the full-page month view is gone. The schedule page has a Home back row, an Add row and an All day section. Fields keep what was typed when you tap the next field, and the time grid opens on the same tap. Forms show empty values instead of blanks, and labels move with notes that wrap. Adding an alternative names the real item, the star decides preferred, the new alternative is charged like the item it replaces, and a new requirement starts empty. The switch review shows the person's own plan with Before and After stacked. Debt calculated rows are no longer tap targets. A long step or requirement name wraps and pushes the choices under it down instead of overlapping them.",

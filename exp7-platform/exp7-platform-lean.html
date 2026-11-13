@@ -14308,7 +14308,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         var key='r'+i, decided=reqs[key]||reqs[nm];
         parts.push({t:'h',text:nm,y:by(y,17)});
         parts.push({t:'text',text:decided==='own'?'Needs its own':(decided==='reuse'?'Reuse a copy':(decided==='none'?'Not needed':'Not decided')),x:0,y:by(y+1.5,15),size:15,align:'right',ink:'#4D4C57'});
-        y+=36;
+        y+=48; /* room between the requirement name and its first choice */
         parts.push({t:'row',text:'Needs its own',radio:true,on:decided==='own',top:y-31,h:44,act:'req:'+key+':own'}); y+=44;
         parts.push({t:'row',text:'Reuse a copy',radio:true,on:decided==='reuse',top:y-31,h:44,act:'req:'+key+':reuse'}); y+=44;
         parts.push({t:'row',text:'Not needed',radio:true,on:decided==='none',top:y-31,h:44,act:'req:'+key+':none'}); y+=52;
