@@ -13785,7 +13785,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:d, picking:'time'});
       return this.models?this.render():this.update();
     }
-    if(a==='req:add'){ if(this.closeField) this.closeField(false); var d=this.uiDraft(); d.rname=''; d.time=d.time||''; root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:d, picking:''}); this.route='add-req-form'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey()); return this.models?this.render():this.update(); }
+    if(a==='req:add'){ if(this.closeField) this.closeField(false); var d=this.uiDraft(); d.rname=''; d.time=''; d.amount=''; d.repeat='none'; /* a new requirement starts empty, on the same date */ root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:d, picking:''}); this.route='add-req-form'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey()); return this.models?this.render():this.update(); }
     if(a.indexOf('req:')===0){ var parts=a.slice(4).split(':'), reqs=Object.assign({},(root.__budgetUi||{}).reqs||{}); if(parts[0]){ reqs[parts[0]]=parts[1]||'own'; } root.__budgetUi=Object.assign({},root.__budgetUi||{},{reqs:reqs}); this.route='plan-c'; return this.models?this.render():this.update(); }
     if(a==='save'||a==='rightAct'){ return this.saveJournal(); }
     if(a==='accept'||a==='proposal:accept'||a==='proposal:after'){
@@ -13948,18 +13948,18 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       ops=BF.occOps(atlas,en,c,draft.recScope==='future'?'future':'once',day); name=en.name; when=day; }
     else if(route==='add-alt-form'||route==='add-alt-category'){
       if(route==='add-alt-category'){ draft.cname=name; this.route='add-alt-form'; if(this.status) this.status.textContent='Category named. Now add the alternative.'; return this.models?this.render():this.update(); }
-      var step=ui.step, an=String(draft.aname||draft.name||'').trim()||'New alternative';
+      var step=ui.step, an=String(draft.aname||'').trim()||'New alternative', isPref=draft.preferred!==false; /* the star decides preferred */
       name=an;
       addItem(repeatValues({type:'expense',flow:'out',amount:-amount,date:when}), null);
       if(step&&atlas.items&&atlas.items[step]){
         var it=atlas.items[step];
-        if(!it.alts){ ops.push({path:'items/'+step+'/alts',op:'set',value:{name:draft.cname||it.name,members:['item:'+step,'item:'+id],pref:'item:'+id}}); }
-        else { var mem=(it.alts.members||[]).concat(['item:'+id]); ops.push({path:'items/'+step+'/alts/members',op:'set',value:mem}); ops.push({path:'items/'+step+'/alts/pref',op:'ref',value:'item:'+id}); }
+        if(!it.alts){ var av={name:draft.cname||it.name,members:['item:'+step,'item:'+id]}; if(isPref) av.pref='item:'+id; ops.push({path:'items/'+step+'/alts',op:'set',value:av}); }
+        else { var mem=(it.alts.members||[]).concat(['item:'+id]); ops.push({path:'items/'+step+'/alts/members',op:'set',value:mem}); if(isPref) ops.push({path:'items/'+step+'/alts/pref',op:'ref',value:'item:'+id}); }
       }
-      ui.choice='item:'+id; ui.choiceName=an; ui.preferred=true; rememberPlan(ui);
+      ui.choice='item:'+id; ui.choiceName=an; ui.preferred=isPref; rememberPlan(ui);
     }
     else if(route==='add-req-form'){
-      var rname=String(draft.rname||draft.name||'').trim()||'New requirement';
+      var rname=String(draft.rname||'').trim()||'New requirement';
       var items=(ui.reqItems||planSession().reqItems||[]).slice();
       items.push({id:'req'+Date.now().toString(36), name:rname, date:when, time:formatTime24(draft.time)||'', repeat:draft.repeat||'none', every:draft.every, mdays:draft.mdays, amount:amount});
       root.__budgetUi=Object.assign({},ui,{reqItems:items, choiceName:ui.choiceName||planSession().choiceName, draft:Object.assign({},draft,{rname:''})});
@@ -14216,7 +14216,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       ];
       var y=145;
       if(isReq){
-        parts.push({t:'field',label:'Name',value:draft.rname||draft.name||'Add a name',y:by(y+40,17),box:'full',bold:true,act:'field:rname'}); y+=112;
+        parts.push({t:'field',label:'Name',value:draft.rname||'Add a name',y:by(y+40,17),box:'full',bold:true,act:'field:rname'}); y+=112;
       } else {
         parts.push({t:'field',label:'Name',value:draft.aname||'Add a name',y:by(y+40,17),box:'full',bold:true,act:'field:aname'}); y+=112;
         parts.push({t:'row',text:'Preferred',star:true,on:draft.preferred!==false,tag:'Star marks preferred',top:y,h:56,act:'pref:star'}); y+=64;
