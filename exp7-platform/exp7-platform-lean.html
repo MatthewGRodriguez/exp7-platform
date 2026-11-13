@@ -13864,7 +13864,8 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     var self=this;
     key=fieldKey(key);
     if(fieldKind(key)==='date') return this.openDateField(key,n);
-    /* Moving to another field keeps what was typed in the open one. */
+    /* Moving to another field keeps what was typed in the open one; redraw so it shows. */
+    if(this.fieldEl) this.pendingRender=true;
     this.closeField(true);
     var draft=this.uiDraft();
     if(key==='time'){
@@ -13888,6 +13889,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     this.fieldEl=inp; this.fieldKey=key; this.fieldLayout=this.fieldLayoutRect(n); this.fieldAct=(n&&n.vm&&n.vm.act)||null;
     var placed=this.placeFieldEl();
     inp.focus(); inp.select();
+    if(this.pendingRender&&!this.cvDown){ this.pendingRender=false; Promise.resolve(this.models?this.render():this.update()).then(function(){ if(self.fieldEl!==inp||self.dead) return; var act=self.fieldAct, t=act&&(self.targets||[]).find(function(q){return q.node&&q.node.vm&&q.node.vm.act===act;}); if(t&&t.rect) self.fieldLayout=t.rect.slice(); self.placeFieldEl(); inp.focus(); }); }
     if(key==='time'){
       inp.addEventListener('input',function(){
         var d=inp.value.replace(/[^0-9]/g,'').slice(0,4);
