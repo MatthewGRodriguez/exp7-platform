@@ -13407,6 +13407,11 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       var it=items[id]||{}, v=it.values||{}, when=v.date||v.asOf||'';
       if(when===day) out.push({id:id, name:it.name, values:v});
     });
+    /* A day row shows that day's occurrence: a recorded or changed amount or time, not only the item's usual one. */
+    var BF=root.BudgetFlows;
+    if(BF&&BF.entryOn) out=out.map(function(e){ var en=null; try{ en=atlas&&atlas.items&&atlas.items[e.id]?BF.entryOn(atlas,e.id,day):null; }catch(err){ en=null; }
+      if(!en) return e; var nv=Object.assign({},e.values||{}); if(en.charge!=null) nv.amount=en.charge; if(en.ex&&en.ex.time!=null){ nv.time=en.ex.time; if(en.ex.time) nv.allDay=false; }
+      return Object.assign({},e,{values:nv}); });
     return out;
   }
   function timedHours(entries){
@@ -14157,7 +14162,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         {t:'row',text:'Different cost',radio:true,on:rec==='diff',bold:rec==='diff',top:223-31,h:44,act:'rec:diff'}
       ];
       var y=260;
-      if(rec==='diff'){ parts.push({t:'field',label:'Actual amount (USD)',value:draft.actual||'',y:by(y,17),box:'amount',bold:true,act:'field:actual'}); y+=56; }
+      if(rec==='diff'){ y+=24; parts.push({t:'field',label:'Actual amount (USD)',value:draft.actual||'',y:by(y,17),box:'amount',bold:true,act:'field:actual'}); y+=56; }
       parts.push({t:'row',text:'Did not happen',radio:true,on:rec==='none',bold:rec==='none',top:y,h:44,act:'rec:none'}); y+=56;
       parts.push({t:'h',text:'Scope',y:by(y,17)}); y+=36;
       parts.push({t:'row',text:'This occurrence only',radio:true,on:scope==='one',bold:scope==='one',top:y,h:44,act:'scope:one'}); y+=44;
