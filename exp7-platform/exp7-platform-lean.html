@@ -13128,7 +13128,10 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     } else if(m.kind==='agenda') {
       var hl=m.heading||(m.day===budgetTodayKey()?'Today':(function(d){var t=dayTitle(d);return t.replace(/,\s*\d{4}$/,'');})(m.day));
       function fmtTime(tm){ return formatTime24(tm); }
-      function cadence(e){ var r=String((e.values||{}).repeat||(e.values||{}).cadence||''); if(/^every\s*14/i.test(r)||r==='every 14 days')return 'Every 14 days'; return r; }
+      function cadence(e){ var v=e.values||{}, r=String(v.repeat||v.cadence||''); if(/^every\s*14/i.test(r)||r==='every 14 days')return 'Every 14 days';
+        if(r==='once'||r==='none'||r==='')return ''; if(r==='every'){ var n=Math.floor(+v.every)||0; return n===1?'Daily':n===7?'Weekly':n>1?'Every '+n+' days':''; }
+        if(r==='monthdays'){ var on=(Array.isArray(v.on)?v.on:[]).join(', '); return on?'Monthly on '+on:'Monthly'; }
+        if(r==='monthly')return 'Monthly'; if(r==='daily')return 'Daily'; if(r==='weekly')return 'Weekly'; if(r==='dates')return 'Selected dates'; return r; }
       function rowAmt(e){ var a=(e.values||{}).amount; if(a==null||a==='')return ''; a=+a; if(a>0)return money(a,'+'); if(a<0)return money(a,'abs'); return money(a); }
       var untimed=[],timed={}; (m.entries||[]).forEach(function(e){var v=e.values||{}, t=String(v.time||''), match=/^(\d{1,2}):(\d{2})$/.exec(t);if(match&&+match[1]<24&&+match[2]<60){var h=+match[1];(timed[h]=timed[h]||[]).push(e);}else untimed.push(e);});
       if(m.standalone && !m.compact){
@@ -14036,7 +14039,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       parts.push({t:'h',text:'Repeat',y:by(y,17)}); y+=36;
       parts.push({t:'row',text:'Does not repeat',radio:true,on:pay.repeat==='none',bold:pay.repeat==='none',top:y,h:44,act:'repeat:none'}); y+=44;
       parts.push({t:'row',text:'Specific dates each month',radio:true,on:pay.repeat==='mdays',bold:pay.repeat==='mdays',top:y,h:44,act:'repeat:mdays'}); y+=44;
-      if(pay.repeat==='mdays'){ y+=44; parts.push({t:'field',label:'Days of the month',value:pay.mdays||'1, 15',y:by(y,17),line:true,act:'field:mdays'}); y+=56; }
+      if(pay.repeat==='mdays'){ y+=44; parts.push({t:'field',label:'Days of the month',value:pay.mdays||String(+String(pay.date||draft.date||day||'').slice(8)||''),y:by(y,17),line:true,act:'field:mdays'}); y+=56; }
       parts.push({t:'row',text:'Every '+(pay.every||'14')+' days',radio:true,on:pay.repeat==='every',bold:pay.repeat==='every',top:y,h:44,act:'repeat:every'}); y+=44;
       if(pay.repeat==='every'){ y+=44; parts.push({t:'every',value:String(pay.every||'14'),y:by(y,17),act:'field:every'}); y+=56; }
       y+=48;
@@ -14104,7 +14107,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       parts.push({t:'h',text:'Repeat',y:by(y,17)}); y+=36;
       parts.push({t:'row',text:'Does not repeat',radio:true,on:draft.repeat==='none',bold:draft.repeat==='none',top:y,h:44,act:'repeat:none'}); y+=44;
       parts.push({t:'row',text:'Specific dates each month',radio:true,on:draft.repeat==='mdays',bold:draft.repeat==='mdays',top:y,h:44,act:'repeat:mdays'}); y+=44;
-      if(draft.repeat==='mdays'){ y+=44; parts.push({t:'field',label:'Days of the month',value:draft.mdays||'1, 15',y:by(y,17),box:'full',act:'field:mdays'}); y+=56; }
+      if(draft.repeat==='mdays'){ y+=44; parts.push({t:'field',label:'Days of the month',value:draft.mdays||String(+String(draft.date||day||'').slice(8)||''),y:by(y,17),box:'full',act:'field:mdays'}); y+=56; }
       parts.push({t:'row',text:'Every '+(draft.every||'14')+' days',radio:true,on:draft.repeat==='every',bold:draft.repeat==='every',top:y,h:44,act:'repeat:every'}); y+=44;
       if(draft.repeat==='every'){ y+=44; parts.push({t:'every',value:String(draft.every||'14'),y:by(y,17),act:'field:every'}); y+=56; }
       y+=48;
@@ -14159,7 +14162,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       parts.push({t:'h',text:'Repeat',y:by(y,17)}); y+=36;
       parts.push({t:'row',text:'Does not repeat',radio:true,on:draft.repeat==='none',bold:draft.repeat==='none',top:y,h:44,act:'repeat:none'}); y+=44;
       parts.push({t:'row',text:'Specific dates each month',radio:true,on:draft.repeat==='mdays',bold:draft.repeat==='mdays',top:y,h:44,act:'repeat:mdays'}); y+=44;
-      if(draft.repeat==='mdays'){ y+=44; parts.push({t:'field',label:'Days of the month',value:draft.mdays||'1, 15',y:by(y,17),box:'full',act:'field:mdays'}); y+=56; }
+      if(draft.repeat==='mdays'){ y+=44; parts.push({t:'field',label:'Days of the month',value:draft.mdays||String(+String(draft.date||day||'').slice(8)||''),y:by(y,17),box:'full',act:'field:mdays'}); y+=56; }
       parts.push({t:'row',text:'Every '+(draft.every||'14')+' days',radio:true,on:draft.repeat==='every',bold:draft.repeat==='every',top:y,h:44,act:'repeat:every'}); y+=44;
       if(draft.repeat==='every'){ y+=44; parts.push({t:'every',value:String(draft.every||'14'),y:by(y,17),act:'field:every'}); y+=56; }
       y+=48;
