@@ -13143,10 +13143,14 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       function rowAmt(e){ var a=(e.values||{}).amount; if(a==null||a==='')return ''; a=+a; if(a>0)return money(a,'+'); if(a<0)return money(a,'abs'); return money(a); }
       var untimed=[],timed={}; (m.entries||[]).forEach(function(e){var v=e.values||{}, t=String(v.time||''), match=/^(\d{1,2}):(\d{2})$/.exec(t);if(match&&+match[1]<24&&+match[2]<60){var h=+match[1];(timed[h]=timed[h]||[]).push(e);}else untimed.push(e);});
       if(m.standalone && !m.compact){
-        text(node('ag-title'),"Today's schedule",inset,38,titleSz,C.ink,true,W-2*inset);
-        text(node('ag-date'),dayTitle(m.day),inset,64,sec,C.muted,false,W-2*inset);
-        text(node('ag-note'),'Amounts in USD.',inset,86,cap,C.caption,false,W-2*inset);
-        cursor=110;
+        /* Full day schedule: a back control to Home, the day named (not "Today" on another day), and its Add to <day> row. */
+        backBtn('ag-back','Home',0,16,180,tapSz,'nav:home');
+        var agToday=m.day===budgetTodayKey();
+        text(node('ag-title'),agToday?"Today's schedule":'Schedule',inset,16+tapSz+28,titleSz,C.ink,true,W-2*inset);
+        text(node('ag-date'),dayTitle(m.day),inset,16+tapSz+52,sec,C.muted,false,W-2*inset);
+        text(node('ag-note'),'Amounts in USD.',inset,16+tapSz+72,cap,C.caption,false,W-2*inset);
+        cursor=16+tapSz+84;
+        if(m.addLabel){ click('add-day',m.addLabel,0,cursor,W,tapSz,'add:item',false,body,true); rule('add-day-rule',cursor+tapSz-1,inset,W-2*inset,C.lineSoft); cursor+=tapSz+4; }
         if(untimed.length){
           text(node('allday-title'),'All day',inset,cursor+14,cap,C.muted,false,W-2*inset);
           cursor+=28;
@@ -13178,7 +13182,6 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
           });
           rule('hour-rule'+h,y+hh-1,inset,W-2*inset,C.lineSoft); cursor+=hh;
         }
-        text(node('ag-cap1'),'A short day context, not the full Home view.',inset,cursor+16,cap,C.caption,false,W-2*inset); cursor+=28;
         text(node('ag-cap2'),'Tap an item to change it or record what happened.',inset,cursor+16,cap,C.caption,false,W-2*inset); cursor+=28;
       } else {
         if(m.standalone){ backBtn('ag-back','Home',0,16,180,tapSz,'nav:home'); text(node('ag-title'),hl,inset,16+tapSz+28,titleSz,C.ink,true); cursor=16+tapSz+44; }
@@ -13197,7 +13200,9 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
             text(node('empty'),'Nothing is scheduled this day.',inset,cursor+20,body,C.muted,false,W-2*inset);
             cursor+=40;
           }
-          list.forEach(function(e){ drawEntry(e,cursor); cursor+=rowH; });
+          /* Untimed items (pay, debt, cash and owned) sit in an All day section at the top, as on the day schedule. */
+          if(untimed.length){ text(node('allday-h'),'All day',inset,cursor+16,cap,C.muted,false,W-2*inset); cursor+=24; }
+          list.forEach(function(e,i){ if(i===untimed.length&&untimed.length&&i<list.length){ rule('allday-end',cursor+2,inset,W-2*inset,C.line); cursor+=6; } drawEntry(e,cursor); cursor+=rowH; });
         } else {
           if(untimed.length){text(node('untimed-title'),'No time set',inset,cursor+16,cap,C.muted);cursor+=28;var ut=m.standalone?untimed:untimed.slice(0,4);ut.forEach(function(e){ drawEntry(e,cursor); cursor+=rowH; });if(!m.standalone&&untimed.length>4){text(node('more-untimed'),(untimed.length-4)+' more in the full day',inset+15,cursor+16,sec,C.muted);cursor+=28;}rule('untimed-rule',cursor);cursor+=17;}
           if(!m.entries.length){text(node('empty'),'No scheduled items on this day.',inset,cursor+20,body,C.muted,false,W-40);cursor+=tapSz;}
@@ -13244,7 +13249,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       }
     } else if(m.kind==='cash') {
       var cashH=SPACE.cash;
-      if(m.standalone){ backBtn('cash-back','Home',0,16,180,tapSz,'nav:home'); text(node('cash-title'),'Cash and owned items',inset,16+tapSz+28,titleSz,C.ink,true,W-2*inset); cursor=16+tapSz+44;
+      if(m.standalone){ backBtn('cash-back','Home',0,16,180,tapSz,'nav:home'); text(node('cash-title'),'Cash and owned items',inset,16+tapSz+28,titleSz,C.ink,true,W-2*inset); cursor=16+tapSz+54; /* room under the 22 pt title */
         text(node('cash-note'),'Cash is spendable. Owned items count',inset,cursor,sec,C.caption,false,W-2*inset);cursor+=20;
         text(node('cash-note1b'),'toward net worth only.',inset,cursor,sec,C.caption,false,W-2*inset);cursor+=24;
         text(node('cash-note2'),'Read-only. Add or update from a calendar day.',inset,cursor,sec,C.caption,false,W-2*inset);cursor+=28; }
