@@ -12914,7 +12914,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         } else if(p.t==='h'){
           text(node(k),p.text,inset,by(p,cursor)+flowShift,p.size||body,C.ink,true,W-2*inset);
         } else if(p.t==='text'){
-          text(node(k),p.text,p.x!=null?p.x:inset,by(p,cursor)+flowShift,p.size||body,p.ink||C.ink,!!p.bold,p.w||(p.align==='right'?0:W-2*inset),p.align||null);
+          text(node(k),p.text,p.x!=null?p.x:(p.align==='right'?W-inset:inset),by(p,cursor)+flowShift,p.size||body,p.ink||C.ink,!!p.bold,p.w||(p.align==='right'?0:W-2*inset),p.align||null);
         } else if(p.t==='field'){
           var fy=by(p,cursor)+flowShift, fn=node(k), box=p.box||(p.align==='right'?'amount':'full');
           if(p.line){
@@ -13848,6 +13848,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     var initial=draft[key];
     if(key.indexOf('deduct:')===0){ var i=+key.split(':')[1]; initial=draft.deductions&&draft.deductions[i]&&draft.deductions[i].value; }
     if(key==='time') initial=formatTime24(initial)||'';
+    if((initial==null||initial==='')&&key==='mdays'){ var dd=+String(draft.date||((root.__budgetUi||{}).day)||'').slice(8); if(dd) initial=String(dd); }
     if(initial==null||initial==='') initial=(key==='time'?'':(fieldKind(key)==='number'?'0.00':''));
     inp.value=String(initial);
     inp.setAttribute('aria-label',key);
@@ -14090,6 +14091,24 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         sch.rows.slice(1,4).forEach(function(r){ parts.push({t:'note',text:dateLabel(r.date||r.day||''),y:by(y,15),size:15}); y+=24; });
       }
       return scr(Math.max(844,y+40), parts);
+    }
+    /* The item page for a tapped entry: its own name, day, time, repeat and amount (never the sample item). */
+    if(R==='day-actions'){
+      if(!(ui&&ui.entry)||!draft.name) return null;
+      var rep=draft.repeat==='every'?'Every '+(draft.every||'14')+' days':draft.repeat==='mdays'?(draft.mdays?'Monthly on '+draft.mdays:'Monthly'):'';
+      var line=(formatTime24(draft.time)||'All day')+(rep?'  -  '+rep:'');
+      return scr(844,[
+        {t:'bar',back:'Today',backAct:'nav:agenda'},
+        {t:'title',text:draft.name,y:by(74.06,22),rightPad:110},
+        {t:'note',text:dateVal('date',dayLong),y:by(103.52,15),size:15},
+        {t:'text',text:line,y:by(123.52,15),size:15,ink:'#4D4C57'},
+        {t:'text',text:fmtMoney(parseMoney(draft.amount||'0')),y:by(74.06,17),align:'right',bold:true},
+        {t:'row',text:'Change',chev:true,top:169-31,h:56,act:'entry:change'},
+        {t:'row',text:'Alternatives and requirements',chev:true,top:225-31,h:56,act:'entry:alts'},
+        {t:'row',text:'Record what happened',chev:true,top:281-31,h:56,act:'entry:record'},
+        {t:'note',text:'Change edits the scheduled item.',y:by(331.52,15),size:15},
+        {t:'note',text:'Record says what happened on this day.',y:by(351.52,15),size:15}
+      ]);
     }
     if(R==='add-item-form'||R==='schedule-editor'){
       var edit=R==='schedule-editor';
@@ -14349,6 +14368,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       {t:'every',value:'14',y:by(777.04,17)},
       {t:'note',text:'Continue to the requirement review.',y:by(817.52,15),size:15}
     ]);
+    if(R==='day-actions'){ var liveItem=liveFormScreen(R, scr, by, day, dayLong, dayShort, draft, ui); if(liveItem) return liveItem; }
     if(R==='day-actions') return scr(844,[
       {t:'bar',back:'< Today',backAct:'nav:agenda'},
       {t:'title',text:'Take an Uber',y:by(74.06,22)},
