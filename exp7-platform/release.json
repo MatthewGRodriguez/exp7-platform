@@ -1,10 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.74",
+  "version": "1.8.75",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "a8f433ba423970dc054c06e13e5e923480c3f80897af697481356fc8acbf3527",
+  "sha256": "271bda584832183553eb023a214b549cbb3c4747037fd3639caed0bad0531437",
   "minLauncherMajor": 1,
   "contains": {
+    "1.8.75": "Fix: Accept on the plan switch review now switches the plan. Before, it only started a proposal and still said \"Plan updated\". The requirement answers are saved with the switch: Reuse a copy makes a separate copy for the new choice, starting when it does; Not needed and Needs its own are recorded; requirements added for the new choice are added. The plan changes only when the save is accepted, and says so; otherwise the current plan stays. Answers belong to one step and one choice, so the next alternative's review starts unanswered. The requirement status (Not decided, Needs its own...) now shows on the right instead of off screen, and the review says \"Carried over from the choice in use.\"",
     "1.8.74": "Budget on a phone (section 1). The journal fills a 390 pt phone screen with no side margin; the Home mini month has a plain-words legend and the selected day's reason wraps; the month picker opens inline under the heading with drawn arrows and pushes the rows down, and the full-page month view is gone. The schedule page has a Home back row, an Add row and an All day section. Fields keep what was typed when you tap the next field, and the time grid opens on the same tap. Forms show empty values instead of blanks, and labels move with notes that wrap. Adding an alternative names the real item, the star decides preferred, the new alternative is charged like the item it replaces, and a new requirement starts empty. The switch review shows the person's own plan with Before and After stacked. Debt calculated rows are no longer tap targets. A long step or requirement name wraps and pushes the choices under it down instead of overlapping them.",
     "1.8.73": "Fix: Home scrolls again after opening a plan step and going back. Returning to the plan step was re-applied on every scroll, so Home snapped back to it; it now runs once and ends at the first wheel, touch, pointer or key input, or after a moment.",
     "1.8.72": "Fix: Budget Home no longer stops with \"seeded.map is not a function\" when opening Requirements for a new alternative. An item's jreq is a single reference, not a list; the requirement list is now seeded from a reference, a list, a group or a record, and a reference shows the named item.",

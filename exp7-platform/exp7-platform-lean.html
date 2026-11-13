@@ -12355,12 +12355,12 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     if (w.meta && w.meta.planOwn) ops.push({ path: 'components/' + ((w.meta && w.meta.planId) || 'reqs') + '/items', op: 'add', value: 'item:' + rid }); return ops; }
   function reqDropOps(w, rid) { var ops = []; compsWith(w, 'item:' + rid).forEach(function (k) { ops.push({ path: 'components/' + k + '/items', op: 'remove', value: 'item:' + rid }); }); ops.push({ path: 'items/' + rid, op: 'drop' }); return ops; }
   /* a reused requirement is a separate copy for the new choice, starting when that choice does; the original is not touched */
-  function copyReq(w, V, rid, toId) { var R = w.items[rid], T = w.items[toId]; if (!R || !T) return null; var v = clone(R.values || {}), start = (T.values || {}).date || budgetTodayKey(); delete v.ex; delete v.then; delete v.replaces; v.forAlt = 'item:' + toId; v.copyOf = 'item:' + rid;
+  function copyReq(w, V, rid, toId, taken) { var R = w.items[rid], T = w.items[toId]; if (!R || !T) return null; var v = clone(R.values || {}), start = (T.values || {}).date || budgetTodayKey(); delete v.ex; delete v.then; delete v.replaces; v.forAlt = 'item:' + toId; v.copyOf = 'item:' + rid;
     if (v.date && String(v.date) < String(start)) { var rep = v.repeat || 'once';
       if (rep === 'every') { var n = Math.max(1, Math.floor(+v.every || 1)), gap = BR.dayDiff(v.date, start); v.date = BR.addDays(v.date, Math.ceil(gap / n) * n); }
       else if (rep === 'monthdays') v.date = firstMonthday(start, BR.monthDayList(v.on)) || start; else if (rep === 'monthly') v.date = firstMonthday(start, [BR.pdate(v.date).getDate()]) || start; else v.date = start; }
     if (v.until && String(v.until) < String(v.date)) delete v.until;
-    var id = uid(R.name + ' ' + T.name, V, []); return { id: id, ops: reqAddOps(w, id, R.name + ' (' + T.name + ')', v) }; }
+    var id = uid(R.name + ' ' + T.name, V, taken || []); return { id: id, ops: reqAddOps(w, id, R.name + ' (' + T.name + ')', v) }; }
 
   /* ---- the panel under an entry: its choices, their marks and requirements ---- */
   function reqBlock(V, w, xid) { var X = VM(), out = [], L = reqsOf(w, xid), x = w.items[xid] || {};
@@ -12452,6 +12452,26 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       var o3 = submitViews(ops3, 'prop:accept', V); refreshAll(); return o3; } }
   /* Home's inline choice of an alternative starts a proposal; it does not change the plan */
   function chooseFromHome(w, cat, ref) { var p = ensureProp(w, cat, ref, 'chosen', true); if (p) OPEN_PROP = p.id; return !!p; }
+  /* 1.8.75: Accept on the journal's switch review. The requirement answers are saved with the switch (a reused requirement becomes a
+     separate copy for the new choice, starting when it does), requirements written for the new choice are added, and the choice is
+     accepted with the same ops as prop:accept. Nothing is written here: the caller submits the ops and calls done() only after the
+     save is accepted, so a refused save leaves the plan as it was. */
+  function acceptChoice(w, V, cat, to, answers, extra) {
+    if (!w || !w.items || !w.items[cat]) return { ok: false, note: 'That step is no longer in the plan.' };
+    var tid = bare(to), T = w.items[tid], ref = 'item:' + tid, C0 = w.items[cat], cname = (C0.alts && C0.alts.name) || C0.name || cat;
+    if (!T || catMembers(w.items[cat]).indexOf(ref) < 0) return { ok: false, note: 'That choice is no longer one of the alternatives for ' + cname + '.' };
+    var cur = selectedRef(w, cat);
+    if (cur === ref) return { ok: true, ops: [], note: T.name + ' is already in use for ' + cname + '.', done: function () {} };
+    var p = propFor(w, cat, ref), ops = [], reviews = {}, taken = [];
+    (answers || []).forEach(function (a) { var rid = bare(a && a.id), d = a && a.d; if (!rid || !w.items[rid]) return;
+      if (d === 'reuse') { var c = copyReq(w, V, rid, tid, taken); if (c) { ops = ops.concat(c.ops); reviews[rid] = { d: 'reuse', ref: 'item:' + c.id }; } }
+      else if (d === 'own' || d === 'none') reviews[rid] = { d: d }; });
+    (extra || []).forEach(function (x) { if (!x || !String(x.name || '').trim()) return; var v = Object.assign({}, x.values || {}); v.forAlt = ref;
+      var id = uid(x.name + ' ' + T.name, V, taken); ops = ops.concat(reqAddOps(w, id, String(x.name).trim(), v)); });
+    ops = ops.concat(acceptOps(w, { cat: cat, to: ref, from: cur, reviews: Object.assign({}, (p && p.reviews) || {}, reviews) }));
+    return { ok: true, ops: ops, note: 'Plan updated: ' + cname + ' now uses ' + T.name + '.',
+      done: function () { allProps().forEach(function (q) { if (q.cat === cat) dropProp(q.id); }); if (p && OPEN_PROP === p.id) OPEN_PROP = null; refreshAll(); } };
+  }
 
 /* ---- D. Day resilience: colours worked out from the plan, with the reason ----
    Three set disruptions are tried on every day, automatically (there is nothing to configure or run):
@@ -12637,7 +12657,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   function submitForm(V) { var F = V && V.form; if (!F) return false; if (F.kind === 'fin') { finAct(V, 'fin:ok'); return true; } if (F.kind === 'occ') { occAct(V, 'occ:ok:once'); return true; } if (F.kind === 'alt2') { alt2Act(V, 'alt2:ok'); return true; } return false; }
   var api = { handles: handles, act: act, submitForm: submitForm, finFormVM: finFormVM, rowExtras: rowExtras, isCashAsset: isCashAsset, calRepeatVM: calRepeatVM, calRepeatPick: calRepeatPick, repeatValues: repeatValues, firstMonthday: firstMonthday, startLinks: startLinks, dayVM: dayVM, compareVM: compareVM, actionsVM: actionsVM, addChooserVM: addChooserVM, seedReqs: seedReqs, undatedItems: undatedItems, entryOn: entryOn, occOps: occOps, applyOpsTo: applyOpsTo,
     eff: typeof eff === 'function' ? eff : null, effHas: typeof effHas === 'function' ? effHas : null, planList: typeof planList === 'function' ? planList : null, planInfo: typeof planInfo === 'function' ? planInfo : null, selLabel: typeof selLabel === 'function' ? selLabel : null,
-    altPanelVM: typeof altPanelVM === 'function' ? altPanelVM : null, planAltsVM: typeof planAltsVM === 'function' ? planAltsVM : null, planTopVM: typeof planTopVM === 'function' ? planTopVM : null, chooseFromHome: typeof chooseFromHome === 'function' ? chooseFromHome : null,
+    altPanelVM: typeof altPanelVM === 'function' ? altPanelVM : null, planAltsVM: typeof planAltsVM === 'function' ? planAltsVM : null, planTopVM: typeof planTopVM === 'function' ? planTopVM : null, chooseFromHome: typeof chooseFromHome === 'function' ? chooseFromHome : null, acceptChoice: typeof acceptChoice === 'function' ? acceptChoice : null,
     proposals: typeof props === 'function' ? props : null, unresolved: typeof unresolved === 'function' ? unresolved : null, reqsOf: typeof reqsOf === 'function' ? reqsOf : null, afterAtlas: typeof afterAtlas === 'function' ? afterAtlas : null, handoffOf: typeof handoffOf === 'function' ? handoffOf : null,
     resilience: typeof resilience === 'function' ? resilience : null, resLabel: typeof resLabel === 'function' ? resLabel : null, resLetter: typeof resLetter === 'function' ? resLetter : null, RES_NOTE: typeof RES_NOTE === 'string' ? RES_NOTE : '' };
   root.BudgetFlows = api;
@@ -12921,7 +12941,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
           var nw=wrapPaint(node(k),p.text,inset,by(p,cursor)+flowShift,p.size||sec,p.ink?p.ink:C.caption,!!p.bold,W-2*inset); flowShift+=nw.extra;
         } else if(p.t==='h'){
           /* A long step or requirement name wraps and pushes the rows under it down, instead of running into them. */
-          var hw=wrapPaint(node(k),p.text,inset,by(p,cursor)+flowShift,p.size||body,C.ink,true,p.w||(W-2*inset)); if(p.wrap!==false) flowShift+=hw.extra;
+          var hw=wrapPaint(node(k),p.text,inset,by(p,cursor)+flowShift,p.size||body,C.ink,true,p.w||(W-(p.rightPad||2*inset))); if(p.wrap!==false) flowShift+=hw.extra;
         } else if(p.t==='text'){
           text(node(k),p.text,p.x!=null?p.x:(p.align==='right'?W-inset:inset),by(p,cursor)+flowShift,p.size||body,p.ink||C.ink,!!p.bold,p.w||(p.align==='right'?0:W-2*inset),p.align||null);
         } else if(p.t==='field'){
@@ -13799,7 +13819,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       return this.models?this.render():this.update();
     }
     if(a==='req:add'){ if(this.closeField) this.closeField(false); var d=this.uiDraft(); d.rname=''; d.time=''; d.amount=''; d.repeat='none'; /* a new requirement starts empty, on the same date */ root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:d, picking:''}); this.route='add-req-form'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey()); return this.models?this.render():this.update(); }
-    if(a.indexOf('req:')===0){ var parts=a.slice(4).split(':'), reqs=Object.assign({},(root.__budgetUi||{}).reqs||{}); if(parts[0]){ reqs[parts[0]]=parts[1]||'own'; } root.__budgetUi=Object.assign({},root.__budgetUi||{},{reqs:reqs}); this.route='plan-c'; return this.models?this.render():this.update(); }
+    if(a.indexOf('req:')===0){ var rq=a.slice(4), rcut=rq.lastIndexOf(':'), rk=rcut>0?rq.slice(0,rcut):rq, rv=rcut>0?rq.slice(rcut+1):'own', u0=restorePlan(root.__budgetUi||{}), reqs=Object.assign({},reqAnswers(u0)); if(rk){ reqs[rk]=(rv==='own'||rv==='reuse'||rv==='none')?rv:'own'; } root.__budgetUi=Object.assign({},u0,{reqs:reqs,reqsFor:reqCtx(u0)}); rememberPlan(root.__budgetUi); this.route='plan-c'; return this.models?this.render():this.update(); }
     if(a==='save'||a==='rightAct'){ return this.saveJournal(); }
     if(a==='accept'||a==='proposal:accept'||a==='proposal:after'){
       var rt=this.route||'home';
@@ -13815,8 +13835,23 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       root.__budgetUi=Object.assign({},root.__budgetUi||{},{month:next,day:next+'-01',pick:next});var cid=this.atlas.meta.calId,ops=[{path:'components/'+cid+'/view/month',op:'set',value:next}];await submitViews(ops,'calendar:month',this.context);return this.update();}
   };
   function planSession(){ root.__budgetPlanSession=root.__budgetPlanSession||{}; return root.__budgetPlanSession; }
-  function rememberPlan(ui){ var s=planSession(); if(!ui) return s; ['step','stepName','choice','choiceName','preferred','reqs','reqItems','draft','scrollPlanStep'].forEach(function(k){ if(ui[k]!=null) s[k]=ui[k]; }); return s; }
-  function restorePlan(ui){ var s=planSession(); ui=ui||{}; ['step','stepName','choice','choiceName','preferred','reqs','reqItems','scrollPlanStep'].forEach(function(k){ if(ui[k]==null&&s[k]!=null) ui[k]=s[k]; }); if(!ui.draft&&s.draft) ui.draft=s.draft; return ui; }
+  function rememberPlan(ui){ var s=planSession(); if(!ui) return s; ['step','stepName','choice','choiceName','preferred','reqs','reqsFor','reqItems','reqItemsFor','draft','scrollPlanStep'].forEach(function(k){ if(ui[k]!=null) s[k]=ui[k]; }); return s; }
+  function restorePlan(ui){ var s=planSession(); ui=ui||{}; ['step','stepName','choice','choiceName','preferred','reqs','reqsFor','reqItems','reqItemsFor','scrollPlanStep'].forEach(function(k){ if(ui[k]==null&&s[k]!=null) ui[k]=s[k]; }); if(!ui.draft&&s.draft) ui.draft=s.draft; return ui; }
+  /* 1.8.75: requirement answers and added requirements belong to one step and one choice, so the next alternative never opens already answered. */
+  function reqCtx(ui){ ui=ui||{}; return String(ui.step||'')+'>'+String(ui.choice||''); }
+  function reqAnswers(ui){ ui=ui||{}; return (ui.reqsFor&&ui.reqsFor===reqCtx(ui)&&ui.reqs)||{}; }
+  function reqAdded(ui){ ui=ui||{}; return (ui.reqItemsFor&&ui.reqItemsFor===reqCtx(ui)&&Array.isArray(ui.reqItems)&&ui.reqItems)||[]; }
+  /* The review's requirements: the step's JReqs (a ref, a list, {jgroup:[...]} or a record, as in 1.8.72), then those added for this choice.
+     Each has a stable key; an atlas item keeps its id so its answer can be saved with the switch. */
+  function reviewReqs(AT, ui){ AT=AT||{}; ui=ui||{}; var stepIt=(AT.items&&ui.step&&AT.items[ui.step])||null, raw=stepIt?stepIt.jreq:null, out=[], seen={};
+    var seeded=Array.isArray(raw)?raw:(raw&&typeof raw==='object'&&Array.isArray(raw.jgroup)?raw.jgroup:(raw?[raw]:[]));
+    seeded.forEach(function(q,i){ var id=null, nm=null;
+      if(typeof q==='string'){ var m=/^(item|bp|joy|comp):(.+)$/.exec(q), col=m?({item:'items',bp:'blueprints',joy:'joys',comp:'components'})[m[1]]:'items', key=m?m[2]:q, t=(AT[col]||{})[key]; nm=(t&&(t.name||t.title))||null; if(col==='items'&&t) id=key; }
+      else if(q&&typeof q==='object'){ nm=q.name||q.title||null; if(q.id&&AT.items&&AT.items[q.id]) id=q.id; }
+      var k=id?('i.'+id):('n'+i); if(seen[k]) return; seen[k]=1; out.push({key:k,name:nm||('Requirement '+(i+1)),id:id,added:null}); });
+    if(!out.length) out.push({key:'n0',name:'Needs from '+(ui.stepName||'this step'),id:null,added:null});
+    reqAdded(ui).forEach(function(r){ if(r&&r.name&&r.id&&!seen['a.'+r.id]){ seen['a.'+r.id]=1; out.push({key:'a.'+r.id,name:r.name,id:null,added:r}); } });
+    return out; }
   Home.prototype.uiDraft=function(){ root.__budgetUi=restorePlan(root.__budgetUi||{}); root.__budgetUi.draft=root.__budgetUi.draft||{}; return root.__budgetUi.draft; };
 
   Home.prototype.fieldLayoutRect=function(n){
@@ -13976,9 +14011,9 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     }
     else if(route==='add-req-form'){
       var rname=String(draft.rname||'').trim()||'New requirement';
-      var items=(ui.reqItems||planSession().reqItems||[]).slice();
+      var uiR=restorePlan(Object.assign({},ui)), items=reqAdded(uiR).slice();
       items.push({id:'req'+Date.now().toString(36), name:rname, date:when, time:formatTime24(draft.time)||'', repeat:draft.repeat||'none', every:draft.every, mdays:draft.mdays, amount:amount});
-      root.__budgetUi=Object.assign({},ui,{reqItems:items, choiceName:ui.choiceName||planSession().choiceName, draft:Object.assign({},draft,{rname:''})});
+      root.__budgetUi=Object.assign({},ui,{reqItems:items, reqItemsFor:reqCtx(uiR), choiceName:ui.choiceName||planSession().choiceName, draft:Object.assign({},draft,{rname:''})});
       rememberPlan(root.__budgetUi);
       this.route='plan-c';
       if(this.status) this.status.textContent='Requirement added.';
@@ -14005,15 +14040,34 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     return this.update();
   };
   Home.prototype.acceptPlanSwitch=async function(){
-    var ui=root.__budgetUi||{}, step=ui.step, ref=ui.choice;
-    if(root.BudgetFlows&&root.BudgetFlows.chooseFromHome&&this.atlas&&this.atlas.meta&&this.atlas.meta.budget&&step&&ref){
-      root.BudgetFlows.chooseFromHome(this.atlas,step,ref);
-    } else if(step&&ref&&typeof selectionOps==='function'&&typeof submitViews==='function'&&this.context){
-      var ops=selectionOps(this.atlas,step,ref);
-      if(ops&&ops.length) await submitViews(ops,'plan:select',this.context);
+    var ui=restorePlan(root.__budgetUi||{}), step=ui.step, ref=ui.choice, self=this, BF=root.BudgetFlows;
+    function say(m){ if(self.status) self.status.textContent=m; }
+    if(this._accepting) return;
+    if(BF&&BF.acceptChoice&&this.atlas&&this.atlas.meta&&this.atlas.meta.budget&&step&&ref){
+      /* 1.8.75: Accept saves the switch. The answers go with it; the plan changes only if the save is accepted. */
+      var RL=reviewReqs(this.atlas, ui), ans=reqAnswers(ui);
+      if(RL.some(function(q){ return !ans[q.key]; })){ say('Resolve every requirement before you accept.'); this.route='plan-c'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey()); return this.models?this.render():this.update(); }
+      var answers=RL.filter(function(q){ return q.id; }).map(function(q){ return {id:q.id,d:ans[q.key]}; });
+      var extra=RL.filter(function(q){ return q.added&&ans[q.key]!=='none'; }).map(function(q){ var r=q.added, d0=r.date||budgetDateKey();
+        return {name:r.name, values:journalRepeat({repeat:r.repeat,every:r.every,mdays:r.mdays,time:r.time},{type:'expense',flow:'out',consume:true,charge:'per',amount:-Math.abs(+r.amount||0),date:d0},d0)}; });
+      var res=null; try{ res=BF.acceptChoice(this.atlas,this.context,step,ref,answers,extra); }catch(e){ res={ok:false,note:'The switch could not be prepared: '+((e&&e.message)||e)}; }
+      if(!res||!res.ok){ say((res&&res.note)||'The switch was not saved. The current plan is unchanged.'); return; }
+      if(res.ops&&res.ops.length){
+        if(typeof submitViews!=='function'||!this.context){ say('The switch was not saved. The current plan is unchanged.'); return; }
+        var ent=null; this._accepting=true;
+        try{ ent=await submitViews(res.ops,'prop:accept',this.context); }catch(e){ ent=null; } finally{ this._accepting=false; }
+        if(!ent||ent.ok===false||(ent.r&&ent.r.ok===false)){ say('The switch was not saved. The current plan is unchanged.'); return; }
+      }
+      if(res.done) res.done();
+      root.__budgetUi=Object.assign({},root.__budgetUi||{},{reqs:{},reqsFor:'',reqItems:[],reqItemsFor:''}); rememberPlan(root.__budgetUi);
+      var back=this.returnHomeToPlanStep(); say(res.note||'Plan updated.'); return back;
     }
-    if(this.status) this.status.textContent='Plan updated. Current step preserved.';
-    return this.returnHomeToPlanStep();
+    if(step&&ref&&typeof selectionOps==='function'&&typeof submitViews==='function'&&this.context){
+      var ops=selectionOps(this.atlas,step,ref);
+      if(ops&&ops.length){ var e2=await submitViews(ops,'plan:select',this.context); if(!e2||e2.ok===false||(e2.r&&e2.r.ok===false)){ say('Selection was not accepted.'); return; } }
+      var back2=this.returnHomeToPlanStep(); say('Plan updated. Current step preserved.'); return back2;
+    }
+    say('The switch was not saved. The current plan is unchanged.');
   };
   Home.prototype._applyPlanStepScroll=function(y){
     if(!this.host||y==null) return 0;
@@ -14297,28 +14351,22 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     }
     if(R==='add-alt-list'||R==='plan-b'){ var live=liveAltList(); if(live) return live; }
     if(R==='plan-c'){
-      var choice=ui.choiceName||'New alternative', stepName=ui.stepName||'this step';
-      /* 1.8.72: an atlas item's jreq is one ref string ('item:x' / 'bp:x'), not a list; it may also be a list, a JGroup-like {jgroup:[...]} or a record. Seed from every shape. */
-      var AT=ctx.atlas||{}, stepIt=(AT.items&&ui.step&&AT.items[ui.step])||null, rawReq=stepIt?stepIt.jreq:null;
-      var seeded=Array.isArray(rawReq)?rawReq:(rawReq&&typeof rawReq==='object'&&Array.isArray(rawReq.jgroup)?rawReq.jgroup:(rawReq?[rawReq]:[]));
-      var reqName=function(q,i){ if(typeof q==='string'){ var m=/^(item|bp|joy|comp):(.+)$/.exec(q), col=m?({item:'items',bp:'blueprints',joy:'joys',comp:'components'})[m[1]]:'items', t=(AT[col]||{})[m?m[2]:q]; return (t&&(t.name||t.title))||('Requirement '+(i+1)); } return (q&&typeof q==='object'&&(q.name||q.title))||('Requirement '+(i+1)); };
-      var reqs=ui.reqs||{}, keys=Object.keys(reqs);
-      var names=seeded.length?seeded.map(reqName):['Needs from '+stepName];
-      (ui.reqItems||[]).forEach(function(r){ if(r&&r.name&&names.indexOf(r.name)<0) names.push(r.name); });
-      if(!keys.length&&names.length){ /* still undecided */ }
-      var parts=[{t:'bar',back:'New alternative',backAct:'add-alt:form'},{t:'title',text:'Requirements for '+choice,y:by(74.06,22),wrap:true},{t:'note',text:'Seeded from the current item JReqs.',y:by(103.52,15),size:15},{t:'note',text:'The current plan stays until you accept.',y:by(123.52,15),size:15}];
+      var choice=ui.choiceName||'New alternative';
+      /* 1.8.75: one list (reviewReqs) shared with the switch review; answers are kept for this step and choice only. */
+      var RL=reviewReqs(ctx.atlas, ui), reqs=reqAnswers(ui);
+      var parts=[{t:'bar',back:'New alternative',backAct:'add-alt:form'},{t:'title',text:'Requirements for '+choice,y:by(74.06,22),wrap:true},{t:'note',text:'Carried over from the choice in use.',y:by(103.52,15),size:15},{t:'note',text:'The current plan stays until you accept.',y:by(123.52,15),size:15}];
       var y=157;
-      names.forEach(function(nm,i){
-        var key='r'+i, decided=reqs[key]||reqs[nm];
-        parts.push({t:'h',text:nm,y:by(y,17)});
-        parts.push({t:'text',text:decided==='own'?'Needs its own':(decided==='reuse'?'Reuse a copy':(decided==='none'?'Not needed':'Not decided')),x:0,y:by(y+1.5,15),size:15,align:'right',ink:'#4D4C57'});
+      RL.forEach(function(q){
+        var key=q.key, decided=reqs[key];
+        parts.push({t:'h',text:q.name,y:by(y,17),rightPad:150});
+        parts.push({t:'text',text:decided==='own'?'Needs its own':(decided==='reuse'?'Reuse a copy':(decided==='none'?'Not needed':'Not decided')),y:by(y+1.5,15),size:15,align:'right',ink:'#4D4C57'});
         y+=48; /* room between the requirement name and its first choice */
         parts.push({t:'row',text:'Needs its own',radio:true,on:decided==='own',top:y-31,h:44,act:'req:'+key+':own'}); y+=44;
         parts.push({t:'row',text:'Reuse a copy',radio:true,on:decided==='reuse',top:y-31,h:44,act:'req:'+key+':reuse'}); y+=44;
         parts.push({t:'row',text:'Not needed',radio:true,on:decided==='none',top:y-31,h:44,act:'req:'+key+':none'}); y+=52;
       });
       parts.push({t:'link',text:'+ Add requirement',top:y-27,h:44,act:'req:add'}); y+=52;
-      var resolved=names.every(function(nm,i){ var key='r'+i; return !!(reqs[key]||reqs[nm]); });
+      var resolved=RL.every(function(q){ return !!reqs[q.key]; });
       parts.push({t:'accept',text:'Accept',enabled:resolved,act:'accept',top:y-22}); y+=48;
       if(!resolved){ parts.push({t:'note',text:'Accept is unavailable until every',y:by(y,15),size:15}); parts.push({t:'note',text:'requirement is resolved.',y:by(y+20,15),size:15}); }
       return scr(Math.max(844,y+80),parts);
@@ -14505,13 +14553,9 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       /* Live switch review: Before and After stacked on one phone page, from the person's own plan. */
       var prow=ctx.plan.rows, sid=ui.step, sr=prow.find(function(q){return q.id===sid;})||null;
       var inUse=function(r){ return (r.selectedName&&r.selectedName!=='No alternative')?r.selectedName:r.name; };
-      /* Same requirement names as the review page: jreq may be a ref string, a list, {jgroup:[...]} or a record. */
-      var SAT=ctx.atlas||{}, sraw=(SAT.items&&sid&&SAT.items[sid])?SAT.items[sid].jreq:null;
-      var sj=Array.isArray(sraw)?sraw:(sraw&&typeof sraw==='object'&&Array.isArray(sraw.jgroup)?sraw.jgroup:(sraw?[sraw]:[]));
+      /* Same requirements and answers as the review page (1.8.75). */
       var stepNm=(sr&&sr.name)||ui.stepName||'This step', fromNm=sr?inUse(sr):stepNm, toNm=ui.choiceName;
-      var rnames=sj.length?sj.map(function(q,i){ if(typeof q==='string'){ var m=/^(item|bp|joy|comp):(.+)$/.exec(q), col=m?({item:'items',bp:'blueprints',joy:'joys',comp:'components'})[m[1]]:'items', t=(SAT[col]||{})[m?m[2]:q]; return (t&&(t.name||t.title))||('Requirement '+(i+1)); } return (q&&typeof q==='object'&&(q.name||q.title))||('Requirement '+(i+1)); }):['Needs from '+(ui.stepName||'this step')];
-      (ui.reqItems||[]).forEach(function(q){ if(q&&q.name&&rnames.indexOf(q.name)<0) rnames.push(q.name); });
-      var sreqs=ui.reqs||{}, word={own:'Needs its own',reuse:'Reuse a copy',none:'Not needed'};
+      var SRL=reviewReqs(ctx.atlas, ui), sreqs=reqAnswers(ui), word={own:'Needs its own',reuse:'Reuse a copy',none:'Not needed'};
       var sparts=[{t:'bar',back:'Requirements',backAct:'nav:plan-c'},{t:'title',text:'Review the switch',y:by(74.06,22),wrap:true},
         {t:'note',text:stepNm+' switches from '+fromNm+' to '+toNm+' from '+dayLong+'.',y:by(105.52,15),size:15},
         {t:'note',text:'The current plan is unchanged until you accept.',y:by(129.52,15),size:15}];
@@ -14522,7 +14566,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
           var changed=r.id===sid, start=sy, at=sparts.length;
           sparts.push({t:'h',text:r.name,y:by(sy,17)}); sy+=24;
           sparts.push({t:'note',text:changed&&afterView?toNm:inUse(r),y:by(sy,15),size:15}); sy+=28;
-          if(changed&&afterView) rnames.forEach(function(nm,i){ var d=sreqs['r'+i]||sreqs[nm]||''; sparts.push({t:'note',text:nm+': '+(word[d]||'Not decided'),y:by(sy,15),size:15}); sy+=22; });
+          if(changed&&afterView) SRL.forEach(function(q){ var d=sreqs[q.key]||''; sparts.push({t:'note',text:q.name+': '+(word[d]||'Not decided'),y:by(sy,15),size:15}); sy+=22; });
           if(changed){ sparts.splice(at,0,{t:'wash',top:start-10,h:sy-start+6,color:afterView?C.mint:C.wash,until:true}); sparts.push({t:'washEnd',at:sy-4}); }
           sy+=12;
         });
@@ -15695,7 +15739,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.74",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.75",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
