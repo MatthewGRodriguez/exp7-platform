@@ -13547,7 +13547,10 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     cv.addEventListener('keydown',function(e){self.key(e);},{signal:this.abort.signal});
     /* A press on the page while a field is open: the field keeps its value and the redraw waits for the release, so the tap (Save, a row) still lands. */
     cv.addEventListener('pointerdown',function(){self.cvDown=true;},{capture:true,signal:this.abort.signal});
-    function cvUp(){ if(!self.cvDown)return; setTimeout(function(){ self.cvDown=false; if(self.pendingRender&&!self.dead){ self.pendingRender=false; if(!self.fieldEl) (self.models?self.render():self.update()); } },0); }
+    function cvUp(){ if(!self.cvDown)return; setTimeout(function(){ self.cvDown=false; if(self.pendingRender&&!self.dead){ self.pendingRender=false;
+      /* The tap that committed one field may have opened the next: redraw now (so the committed value shows and a time picker appears), then keep the open box on its drawn field. */
+      var r=self.models?self.render():self.update();
+      if(self.fieldEl) Promise.resolve(r).then(function(){ if(!self.fieldEl||self.dead) return; var act=self.fieldAct, t=act&&(self.targets||[]).find(function(q){return q.node&&q.node.vm&&q.node.vm.act===act;}); if(t&&t.rect) self.fieldLayout=t.rect.slice(); if(self.placeFieldEl) self.placeFieldEl(); }); } },0); }
     window.addEventListener('pointerup',cvUp,{signal:this.abort.signal}); window.addEventListener('pointercancel',cvUp,{signal:this.abort.signal});
     cv.addEventListener('pointermove',function(e){self.pointer(e);},{capture:true,signal:this.abort.signal});
     cv.addEventListener('pointerleave',function(){self.deferClose();},{signal:this.abort.signal});
@@ -13879,7 +13882,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     inp.setAttribute('data-budget-field',key);
     inp.style.cssText='position:fixed;box-sizing:border-box;font:17px "Source Sans 3","Source Sans Pro",sans-serif;border:1.5px solid #1A1A1A;border-radius:4px;padding:0 10px;background:#fff;color:#1A1A1A;caret-color:#1A1A1A;margin:0;';
     document.body.appendChild(inp);
-    this.fieldEl=inp; this.fieldKey=key; this.fieldLayout=this.fieldLayoutRect(n);
+    this.fieldEl=inp; this.fieldKey=key; this.fieldLayout=this.fieldLayoutRect(n); this.fieldAct=(n&&n.vm&&n.vm.act)||null;
     var placed=this.placeFieldEl();
     inp.focus(); inp.select();
     if(key==='time'){
