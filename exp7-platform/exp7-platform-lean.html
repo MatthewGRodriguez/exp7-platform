@@ -80,6 +80,8 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 #accountScrim{position:fixed;top:var(--bar-h);left:0;right:0;bottom:0;z-index:45;background:transparent}
 /* App content begins strictly below reserved bar */
 #appShell{position:fixed;top:var(--bar-h);left:var(--sa-l);right:var(--sa-r);bottom:var(--sa-b);padding:0;overflow:auto;isolation:isolate}
+/* Budget is phone-first: in a narrow window the journal column uses the whole width (390 pt on an iPhone); only real safe-area insets remain. */
+@media (max-width:500px){#appShell:has(#appSlot-budget.is-active){left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px)}}
 /* Keep WebGPU canvases laid out (Safari drops swapchain / marks renderer.hidden under display:none). */
 .appSlot{position:absolute;inset:0;min-height:100%;height:100%;overflow:auto;z-index:0}
 .appSlot.is-active{z-index:1;opacity:1;pointer-events:auto;visibility:visible}
@@ -12910,16 +12912,18 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
           var tw=wrapPaint(node(k),p.text,inset,ty,p.size||titleSz,C.ink,true,maxW);
           if(p.wrap!==false) flowShift+=tw.extra;
         } else if(p.t==='note'){
-          text(node(k),p.text,inset,by(p,cursor)+flowShift,p.size||sec,p.ink?p.ink:(p.size&&p.size<=13?C.caption:C.caption),!!p.bold,W-2*inset);
+          /* Notes wrap on a narrow phone and push what follows down, instead of being cut off. */
+          var nw=wrapPaint(node(k),p.text,inset,by(p,cursor)+flowShift,p.size||sec,p.ink?p.ink:C.caption,!!p.bold,W-2*inset); flowShift+=nw.extra;
         } else if(p.t==='h'){
-          text(node(k),p.text,inset,by(p,cursor)+flowShift,p.size||body,C.ink,true,W-2*inset);
+          text(node(k),p.text,inset,by(p,cursor)+flowShift,p.size||body,C.ink,true,p.w||(W-2*inset));
         } else if(p.t==='text'){
           text(node(k),p.text,p.x!=null?p.x:(p.align==='right'?W-inset:inset),by(p,cursor)+flowShift,p.size||body,p.ink||C.ink,!!p.bold,p.w||(p.align==='right'?0:W-2*inset),p.align||null);
         } else if(p.t==='field'){
           var fy=by(p,cursor)+flowShift, fn=node(k), box=p.box||(p.align==='right'?'amount':'full');
           if(p.line){
             if(p.label) text(node(k+'l'),p.label,inset,fy+(p.labelShift||1.28),sec,C.caption,false);
-            text(fn,p.value||'',rightX,fy,p.size||body,C.ink,!!p.bold,0,'right');
+            var lw=p.label?core.measure(fonts[0],sec,plain(p.label)):0;
+            text(fn,p.value||'',rightX,fy,p.size||body,C.ink,!!p.bold,Math.max(60,W-2*inset-lw-16),'right'); /* the value never runs over its label */
             rule('fr'+i,fy+16,inset,W-2*inset,C.line);
             hit(fn,0,fy-20,W,44,p.act||('field:'+(p.label||i)),p.label||p.value||'');
           } else {
@@ -13091,7 +13095,11 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
           cursor+=36;
         }
       }
-      if(m.risk&&m.risk[m.day]&&m.risk[m.day].reasons&&m.risk[m.day].reasons.length&&!stand){var why=node('reason');text(why,m.risk[m.day].reasons[0],inset,cursor+14,sec,C.muted,false,W-2*inset);cursor+=36;}
+      if(compact&&!stand){ /* Home's mini month: the plain-words legend (swatch + colour-blind mark) and the selected day's reason, wrapped, never cut off */
+        var lgs=[[C.calL,'L','Green: a surprise cost or late pay is absorbed.'],[C.calM,'M','Yellow: one would bite; there is room to recover.'],[C.calC,'C','Red: one would bite with no room to recover.']], ly=cursor+10;
+        lgs.forEach(function(L,i){ var n=node('mini-legend'+i); rect(n,inset,ly,18,18,L[0]); n.items.push(['border',inset,ly,18,18,0,1,color(C.lineSoft)]); if(L[1]==='L')markCircle(n,inset+9,ly+9); if(L[1]==='M')markBar(n,inset+9,ly+9); if(L[1]==='C')markTwoBars(n,inset+9,ly+9); var wl=wrapPaint(n,L[2],inset+28,ly+14,sec,C.caption,false,W-2*inset-28); ly+=Math.max(24,wl.height+6); });
+        cursor=ly+2; }
+      if(m.risk&&m.risk[m.day]&&m.risk[m.day].reasons&&m.risk[m.day].reasons.length&&!stand){var why=node('reason');var wr=wrapPaint(why,m.risk[m.day].reasons[0],inset,cursor+16,sec,C.muted,false,W-2*inset);cursor+=16+wr.height+8;}
     } else if(m.kind==='plan') {
       var pCompact=true;
       if(pCompact){
@@ -13257,18 +13265,19 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       cursor=dhY+tapSz+8;
       if(m.pick){
         var pm=m.pick,sel=m.day,py=cursor;
-        click('pick-prev','<',0,py,44,tapSz,'budget:pick:-1',false,titleSz);
-        click('pick-next','>',W-132,py,44,tapSz,'budget:pick:1',false,titleSz);
+        var pPrev=click('pick-prev','',0,py,44,tapSz,'budget:pick:-1',false,titleSz); pPrev.vm.label='Previous month'; chevronLeft(pPrev,20,py+tapSz/2,C.ink);
+        var pNext=click('pick-next','',W-132,py,44,tapSz,'budget:pick:1',false,titleSz); pNext.vm.label='Next month'; chevronRight(pNext,W-132+20,py+tapSz/2,C.ink);
         click('pick-today','Today',W-88,py,88,tapSz,'budget:pick:today',false,sec);
         text(node('pick-m'),monthTitle(pm),W/2-20,py+27,body,C.ink,true,0,'center');
         var topP=py+tapSz+22;
         cursor=drawMonthGrid({month:pm,sel:sel,risk:m.risk,ch:cellH,top:topP,prefix:'p',strokeToday:false,selW:1.5,actPrefix:'budget:pickday:'});
         cursor+=8;
-        click('dismiss','Dismiss',0,380,W,tapSz,'budget:date',false,body);
-        text(node('pick-n0'),'Today is Wednesday, November 11.',inset,432.88,sec,C.caption,false,W-2*inset);
-        text(node('pick-n1'),'The selected day is Thursday, November 19.',inset,452.88,sec,C.caption,false,W-2*inset);
-        text(node('pick-n2'),'The grid matches the mini month on Home.',inset,472.88,sec,C.caption,false,W-2*inset);
-        cursor=490;
+        click('dismiss','Dismiss',0,cursor,W,tapSz,'budget:date',false,body); cursor+=tapSz;
+        var tdy=budgetTodayKey();
+        text(node('pick-n0'),'Today is '+dateLabel(tdy)+'.',inset,cursor+20,sec,C.caption,false,W-2*inset);
+        if(sel!==tdy) text(node('pick-n1'),'The selected day is '+dateLabel(sel)+'.',inset,cursor+40,sec,C.caption,false,W-2*inset);
+        cursor+=sel!==tdy?52:32;
+        rule('pick-end',cursor,inset,W-2*inset,C.line); cursor+=4;
       }
       if((m.start||[]).length){text(node('start-label'),'Unfinished:',inset,cursor+16,sec,C.muted);cursor+=28;(m.start||[]).forEach(function(q,i){click('start'+i,q.label,0,cursor,W,tapSz,q.act,false,body);cursor+=tapSz;});cursor+=8;}
       var b1=node('divider1');(m.dividers||[]).forEach(function(x){rect(b1,x,56,1,Math.max(0,(m.height||cursor)-60),C.line);});
@@ -13372,7 +13381,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   function hostCssSize(host){
     var dpr=cssDpr();
     var r=host&&host.getBoundingClientRect?host.getBoundingClientRect():null;
-    var w=(r&&r.width)||(host&&host.clientWidth)||390, h=(r&&r.height)||(host&&host.clientHeight)||1;
+    var w=(host&&host.clientWidth)||(r&&r.width)||390, h=(r&&r.height)||(host&&host.clientHeight)||1; /* clientWidth: a visible scrollbar never covers the journal's right column */
     var vw=(typeof visualViewport!=='undefined'&&visualViewport&&visualViewport.width)||0;
     var sw=(window.screen&&screen.width)||0;
     if(dpr>1.2){
@@ -13573,6 +13582,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     var risk=((this.models.calendar&&this.models.calendar.kids&&this.models.calendar.kids[0]&&this.models.calendar.kids[0].risk)||(this.models.calendar&&this.models.calendar.risk)||{});
     var startLinks=root.BudgetFlows?root.BudgetFlows.startLinks(this.atlas):[];
     var route=this.route||'home';
+    if(route==='calendar') route=this.route='home'; /* no full-page month view: the mini month on Home is the only month calendar */
     root.__budgetUi=restorePlan(root.__budgetUi||{});
     if(route==='date-picker-open') pick=pick||budgetMonthKey();
     if(route==='date-picker-closed') pick='';
@@ -13588,17 +13598,15 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       var homeLinks=[{label:'Monthly expenses',act:'nav:ledger'},{label:'Cash and owned items',act:'nav:cash'}];
       var homeNotes=["Opens this month's expenses.","Opens cash and owned items.","Amounts in USD."];
       var links=layout({t:'journal',k:'home-links',kind:'links',links:homeLinks,notes:homeNotes},colW,this.core);
-      if(pick){
-        var heading=layout({t:'journal',k:'home-page',kind:'page',day:selDay,pick:pick,risk:risk,height:80,dividers:[],start:startLinks},colW,this.core);
-        H=Math.max(844, heading.H+40);
-        one('page',layout({t:'journal',k:'home-page',kind:'page',day:selDay,pick:pick,risk:risk,height:H,dividers:[],start:startLinks},colW,this.core),padX,0);
-      } else {
-        var ay=350, py, ly;
-        if(agenda.H<=210){ py=560; ly=756; H=940; }
-        else { py=350+agenda.H+18; ly=py+plan.H+18; H=Math.max(940, ly+links.H+24); }
-        one('page',layout({t:'journal',k:'home-page',kind:'page',day:selDay,pick:'',risk:risk,height:H,dividers:[],start:startLinks},colW,this.core),padX,0);
-        one('calendar',cal,padX,60); one('agenda',agenda,padX,ay); one('plan',plan,padX,py); one('links',links,padX,ly);
-      }
+      /* One column at every width. The open date picker is an inline expansion under the heading: it takes the mini month's
+       * place and pushes Today, Plan and the links down (never over them). Each block starts where the one above ends. */
+      var ay, py, ly;
+      if(pick){ var heading=layout({t:'journal',k:'home-page',kind:'page',day:selDay,pick:pick,risk:risk,height:80,dividers:[],start:startLinks},colW,this.core); ay=heading.H+12; }
+      else ay=Math.max(350, 60+cal.H+12);
+      py=ay+Math.max(agenda.H,192)+18; ly=py+plan.H+18; H=Math.max(pick?844:940, ly+links.H+24);
+      one('page',layout({t:'journal',k:'home-page',kind:'page',day:selDay,pick:pick||'',risk:risk,height:H,dividers:[],start:startLinks},colW,this.core),padX,0);
+      if(!pick) one('calendar',cal,padX,60);
+      one('agenda',agenda,padX,ay); one('plan',plan,padX,py); one('links',links,padX,ly);
     } else {
       var baseM=null, L=null;
       if(route==='cash-list'||route==='cash') baseM=Object.assign({},journalOf(this.models.cash||{}),{kind:'cash',standalone:true});
@@ -14093,7 +14101,8 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       parts.push({t:'field',label:'Payments remaining',value:draft.terms==null||draft.terms===''?'':String(draft.terms),y:by(y,17),line:true,act:'field:terms'}); y+=64;
       parts.push({t:'field',label:'Days between payments',value:draft.every==null||draft.every===''?'':String(draft.every),y:by(y,17),line:true,act:'field:every'}); y+=64;
       parts.push({t:'h',text:'Calculated',y:by(y,17)}); y+=36;
-      parts.push({t:'field',label:'Payment amount',value:sch&&sch.ok&&sch.payment!=null?fmtMoney(sch.payment):(sch&&sch.errors&&sch.errors[0]||'—'),y:by(y,17),line:true,bold:true}); y+=48;
+      parts.push({t:'field',label:'Payment amount',value:sch&&sch.ok&&sch.payment!=null?fmtMoney(sch.payment):'—',y:by(y,17),line:true,bold:true}); y+=48;
+      if(!(sch&&sch.ok)&&sch&&sch.errors&&sch.errors[0]){ parts.push({t:'note',text:sch.errors[0],y:by(y,15),size:15,ink:C.muted}); y+=28; }
       parts.push({t:'note',text:'This amount is calculated. It is not an editable field.',y:by(y,15),size:15}); y+=36;
       if(sch&&sch.ok&&sch.rows&&sch.rows.length){
         parts.push({t:'field',label:'First payment date',value:dateLabel(sch.rows[0].date||sch.first||''),y:by(y,17),line:true}); y+=48;
@@ -14546,7 +14555,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   function navigate(route, act){
     var A={
       'nav:home':'home','nav:back':'home','nav:cash':'cash-list','nav:ledger':'monthly',
-      'nav:plan':'home','req:add':'add-req-form','nav:plan-c':'plan-c','nav:calendar':'calendar','nav:agenda':'schedule','view:day':'schedule',
+      'nav:plan':'home','req:add':'add-req-form','nav:plan-c':'plan-c','nav:calendar':'home','nav:agenda':'schedule','view:day':'schedule',
       'journal:date':'date-picker-open','budget:date':'date-picker-closed',
       'cash:add':'cash-entry','picker:car':'add-alt-list','choose:tesla':'plan-c','nav:plan-c':'plan-c',
       'add:item':'add-item-choose','add:choose':'add-item-choose','add:activity':'add-item-form',
