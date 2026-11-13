@@ -50,7 +50,7 @@ Every substantive claim should carry an evidence class (see [EVIDENCE.md](./EVID
 | [decisions.md](./decisions.md) | Accepted / rejected / shipped decisions |
 | [version-lineage.md](./version-lineage.md) | Demo lean history + platform release lineage through 1.8.3 |
 | [distribution-launcher.md](./distribution-launcher.md) | Software vs data repos, launcher gate, handoff |
-| [budget-direction.md](./budget-direction.md) | **1.8.55–1.8.61 (branch, not merged):** what was built for `BUDGET_DIRECTION.md`, the rules and thresholds used, migration, evidence and what is unverified |
+| [budget-direction.md](./budget-direction.md) | **1.8.55 onward, on `main`** (1.8.55–1.8.61 merged in PR #92; current release 1.8.71): what was built for `BUDGET_DIRECTION.md`, the rules and thresholds used, migration, evidence and what is unverified |
 | [testing-provenance.md](./testing-provenance.md) | What was tested where; Mac vs box vs mock limits |
 | [mac-test-2026-11-09.md](./mac-test-2026-11-09.md) | 1.8.31 on Matthew’s Mac (Chromium in the Claude app): WebGPU, hits, parallax, frame time, launcher gate |
 | [known-issues-acceptance.md](./known-issues-acceptance.md) | Recurring failures and acceptance criteria |

@@ -22,7 +22,7 @@ Release format: `exp7-platform-release/1` with `version`, `file`, `sha256`, `min
 - **Key handoff:** in-memory same-window `postMessage`; platform accepts once, only if `e.source === window`, within ~15 s.  
 - **Allow** a key that can also write the software repo, with a note in the status line (since launcher change 2026-11-10; it used to refuse one). A key that can create the data repo usually has that access. The launcher reads the platform without the key, pinned to a commit and checked against `release.json`, so the key is never used on the software repo.
 
-## Launcher variants (branch `budget-direction`, 1.8.60; not merged) [REQ 2026-11-11]
+## Launcher variants (1.8.60; on `main` since PR #92) [REQ 2026-11-11]
 
 | File | Opens | Other apps reachable |
 |---|---|---|
