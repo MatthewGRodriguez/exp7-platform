@@ -1,10 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.72",
+  "version": "1.8.73",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "bdcf92a1789f8b3ef51c7d9de7f6631e3c357100e70c15039efc8fd2d3d1d631",
+  "sha256": "36e30e6c98769dadcaaf64cc5d66e3151cdf9a623091d3d9fa3cf500bb8659dc",
   "minLauncherMajor": 1,
   "contains": {
+    "1.8.73": "Fix: Home scrolls again after opening a plan step and going back. Returning to the plan step was re-applied on every scroll, so Home snapped back to it; it now runs once and ends at the first wheel, touch, pointer or key input, or after a moment.",
     "1.8.72": "Fix: Budget Home no longer stops with \"seeded.map is not a function\" when opening Requirements for a new alternative. An item's jreq is a single reference, not a list; the requirement list is now seeded from a reference, a list, a group or a record, and a reference shows the named item.",
     "1.8.71": "Calendar-first and data-repo fixes. The data repo is created private by itself once GitHub access works (no create button, never from a half-typed repo name, never overwritten) and every failure says what GitHub reports while local saving continues. Items with no date open their edit page with the date picker so they can be dated, and join the calendar once dated; Change applies to this occurrence or this and future without rewriting earlier ones; Record what happened is saved to the occurrence (this occurrence only unless chosen otherwise, with the item and its planned amount shown); a day row shows that day's recorded or changed amount; Specific dates each month repeats on those days, and the days box shows what will be saved (the date's day until changed); day rows say how an item repeats in words; a tap on Save or a row while a field is still open now lands on the first tap; tapping a calendar entry opens that item's own page (name, day, time, repeat, amount) instead of the sample item; the date and tab refresh keeps the tapped entry and a form's draft; real schedules no longer say their values are sample data; an amount entered on the calendar is the cost each time (not split across the month's dates); pay on the calendar is the take-home. Old Board asset, debt and pay entries open the selected calendar day; Budget has no what-if path; cash is never inferred from a name.",
     "1.8.70": "Home has one way to open a day's schedule (second tap on the selected mini-month day). Activity date pickers expand inline; Repeat subrows reflow; times are 24-hour; Amount has one label. Plan lives only on Home, with wrapped step text and a back stack to the step. New alternatives and new requirements share date/time/repeat fields.",

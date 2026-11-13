@@ -13530,7 +13530,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     if(viewH*dpr>maxPx) viewH=Math.max(1,Math.floor(maxPx/dpr));
     return {viewW:viewW,viewH:viewH,dpr:dpr,maxPx:maxPx,canvasPxW:Math.max(1,Math.round(viewW*dpr)),canvasPxH:Math.max(1,Math.round(viewH*dpr)),contentH:Math.max(viewH,Math.round(contentH||viewH))};
   }
-  function Home(opts) { this.o=opts;this.host=opts.host;this.atlas=opts.atlas;this.id=this.host.id;this.views={};this.popup=null;this.closeTimer=null;this.focusKey=null;this.chain=Promise.resolve();this.dead=false;this.serial=0;this.abort=new AbortController(); }
+  function Home(opts) { this.o=opts;this.host=opts.host;this.atlas=opts.atlas;this.id=this.host.id;this.views={};this.popup=null;this.closeTimer=null;this.focusKey=null;this.chain=Promise.resolve();this.dead=false;this.serial=0;this.abort=new AbortController();this._planArmed=true;this._planArmAt=0; }
   Home.prototype.init=async function(){var self=this;await JV.boot();if(this.dead)return;
     this.core=await JV.core();
     var gc=JV.gc();
@@ -13564,6 +13564,8 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     document.addEventListener('pointerdown',function(e){if(self.popup&&e.target!==cv)self.close();},{capture:true,signal:this.abort.signal});
     this.resize=new ResizeObserver(function(es){var w=Math.round(es[0].contentRect.width),h=Math.round(es[0].contentRect.height);if(w>0&&w!==self.measured){self.measured=w;self.measuredH=h;self.update();return;}if(h>0&&h!==self.measuredH&&self.layouts){self.measuredH=h;self.render();}});this.resize.observe(this.host);
     host.addEventListener('scroll',function(){self.placeScenes(); if(self.placeFieldEl) self.placeFieldEl();},{passive:true,signal:this.abort.signal});
+    /* 1.8.73: returning to the plan step is a one-time scroll; the person's own wheel, touch, pointer or key input ends it so Home scrolls again. */
+    ['wheel','touchstart','pointerdown','keydown'].forEach(function(ev){ host.addEventListener(ev,function(){ self._releasePlanScroll(); },{passive:true,capture:true,signal:self.abort.signal}); });
     return this.update(); };
   Home.prototype.update=function(A){if(A)this.atlas=A;var self=this,serial=++this.serial;
     this.chain=this.chain.catch(function(){}).then(async function(){if(self.dead||!self.r||serial!==self.serial)return;
@@ -13669,7 +13671,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   };
   Home.prototype.placeScenes=function(){if(this.dead||!this.r||!this.store||!this.drawOrder)return;
     var css=hostCssSize(this.host), scrollY=this.host.scrollTop||0, viewH=this.viewH||css.h, hostW=this.W||css.w, H=this.H, colW=this.colW, self=this, dpr=this.dpr||css.dpr;
-    if(this._pendingPlanY!=null&&this.route==='home'&&Math.abs(scrollY-this._pendingPlanY)>8){ if(this.wrap&&this.H){ this.wrap.style.minHeight=this.H+'px'; this.wrap.style.height=this.H+'px'; } void this.host.offsetHeight; this.host.scrollTop=this._pendingPlanY; scrollY=this.host.scrollTop||this._pendingPlanY; }
+    if(this._pendingPlanY!=null&&this.route==='home'&&this._planRestoreLive()&&Math.abs(scrollY-this._pendingPlanY)>8){ if(this.wrap&&this.H){ this.wrap.style.minHeight=this.H+'px'; this.wrap.style.height=this.H+'px'; } void this.host.offsetHeight; this.host.scrollTop=this._pendingPlanY; scrollY=this.host.scrollTop||this._pendingPlanY; }
     if(viewH!==(this.cv&&this.cv.clientHeight)){
       var metrics=viewMetrics(hostW,css.h||viewH,H,dpr,maxTexPx(this.r&&this.r.gc));
       this.viewH=viewH=metrics.viewH; this.cv.style.height=viewH+'px'; this.r.resize(metrics.viewW,viewH,metrics.dpr);
@@ -14021,7 +14023,10 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     this._planScrollMeta={step:this._pendingPlanStep,y:y,target:target,scrollTop:this.host.scrollTop,scrollHeight:this.host.scrollHeight,clientHeight:this.host.clientHeight,wrapH:this.wrap&&this.wrap.offsetHeight,H:this.H,max:max};
     return this.host.scrollTop||0;
   };
+  Home.prototype._planRestoreLive=function(){ if(!this._planArmed) return false; if(this._planArmAt&&Date.now()-this._planArmAt>1200){ this._releasePlanScroll(); return false; } return true; };
+  Home.prototype._releasePlanScroll=function(){ this._planArmed=false; this._pendingPlanY=null; this._planScrollGen=(this._planScrollGen||0)+1; };
   Home.prototype.scrollHomeToPlanStep=function(){
+    if(!this._planRestoreLive()) return false;
     var ui=restorePlan(root.__budgetUi||{}), step=ui.scrollPlanStep||ui.step||this._pendingPlanStep||planSession().step;
     if(!step||!this.host||(this.route&&this.route!=='home')) return false;
     var tHit=(this.targets||[]).find(function(q){ var act=(q.node&&q.node.vm&&q.node.vm.act)||(q.act)||''; return act==='picker:'+step || (q.node&&q.node.key&&String(q.node.key).indexOf('step:'+step)>=0); });
@@ -14029,9 +14034,10 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     var y=Math.max(0, tHit.rect[1]-24);
     this._pendingPlanStep=step;
     this._pendingPlanY=y;
+    if(!this._planArmAt) this._planArmAt=Date.now();
     this._applyPlanStepScroll(y);
     if(!this._planScrollGen) this._planScrollGen=0; var self=this, gen=++this._planScrollGen;
-    function again(){ if(self._planScrollGen!==gen||!self.host||self.route!=='home'||self._pendingPlanY==null) return; self._applyPlanStepScroll(self._pendingPlanY); if(self.placeScenes) self.placeScenes(); }
+    function again(){ if(self._planScrollGen!==gen||!self.host||self.route!=='home'||self._pendingPlanY==null||!self._planRestoreLive()) return; self._applyPlanStepScroll(self._pendingPlanY); if(self.placeScenes) self.placeScenes(); }
     if(typeof requestAnimationFrame==='function') requestAnimationFrame(function(){ again(); requestAnimationFrame(again); });
     [50,120,250,400].forEach(function(ms){ if(typeof setTimeout==='function') setTimeout(again, ms); });
     if(this.chain&&typeof this.chain.then==='function') this.chain.then(function(){ again(); });
@@ -14044,6 +14050,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     rememberPlan(ui);
     root.__budgetUi=ui;
     this.route='home';
+    this._planArmed=true; this._planArmAt=0;
     this._pendingPlanStep=step||this._pendingPlanStep||'';
     if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey());
     var out=this.models?this.render():this.update();
@@ -15678,7 +15685,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.72",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.73",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
