@@ -13526,6 +13526,10 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     this.r.ondevicelost=function(e){self.error=String(e.message||e);if(self.o.onError)self.o.onError(e);};this.r.attach();this.status=document.createElement('div');this.status.setAttribute('role','status');this.status.setAttribute('aria-live','polite');this.status.style.cssText='position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)';this.host.appendChild(this.status);
     window.__exp7ViewsPropose=window.__exp7ViewsPropose||{};this.proposalHook=this.o.onPropose;window.__exp7ViewsPropose[this.id]=this.proposalHook;
     cv.addEventListener('keydown',function(e){self.key(e);},{signal:this.abort.signal});
+    /* A press on the page while a field is open: the field keeps its value and the redraw waits for the release, so the tap (Save, a row) still lands. */
+    cv.addEventListener('pointerdown',function(){self.cvDown=true;},{capture:true,signal:this.abort.signal});
+    function cvUp(){ if(!self.cvDown)return; setTimeout(function(){ self.cvDown=false; if(self.pendingRender&&!self.dead){ self.pendingRender=false; if(!self.fieldEl) (self.models?self.render():self.update()); } },0); }
+    window.addEventListener('pointerup',cvUp,{signal:this.abort.signal}); window.addEventListener('pointercancel',cvUp,{signal:this.abort.signal});
     cv.addEventListener('pointermove',function(e){self.pointer(e);},{capture:true,signal:this.abort.signal});
     cv.addEventListener('pointerleave',function(){self.deferClose();},{signal:this.abort.signal});
     cv.addEventListener('pointerdown',function(e){if(!self.popup)return;var xy=self.point(e),p=self.popup,q=p.rect;
@@ -13865,7 +13869,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     function commit(){ if(committed||self.fieldEl!==inp)return; committed=true; self.closeField(true); if(self.status) self.status.textContent=key+' set'; return self.models?self.render():self.update(); }
     function cancel(){ if(committed||self.fieldEl!==inp)return; committed=true; self.closeField(false); }
     inp.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); commit(); } if(e.key==='Escape'){ e.preventDefault(); cancel(); } });
-    inp.addEventListener('blur',function(){ setTimeout(function(){ if(self.fieldEl===inp) commit(); }, 0); });
+    inp.addEventListener('blur',function(){ setTimeout(function(){ if(self.fieldEl!==inp) return; if(self.cvDown&&!committed){ committed=true; self.closeField(true); if(self.status) self.status.textContent=key+' set'; self.pendingRender=true; return; } commit(); }, 0); });
     return placed;
   };
   Home.prototype.saveJournal=async function(){
