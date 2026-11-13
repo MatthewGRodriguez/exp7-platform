@@ -13684,7 +13684,10 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     else {var cur=root.__budgetUi||{}, month=budgetMonthKey();root.__budgetUi=Object.assign({},cur,{pick:cur.pick? '':month});this.render();}
     this.status.textContent='Choose a date.';};
   Home.prototype.close=function(){this.cancelClose();if(this.popup&&this.popup.kind==='date'&&root.__budgetUi)root.__budgetUi.pick='';this.popup=null;this.paintOverlay();};
-  Home.prototype.dateAct=async function(a){var p=this.popup;if(!p||p.kind!=='date')return;
+  Home.prototype.dateAct=async function(a){var p=this.popup;
+    /* Inline picker (phone-first, no popup): previous / next browse the month shown in the expansion. */
+    if((!p||p.kind!=='date')&&/^budget:pick:-?1$/.test(a)){var ui0=root.__budgetUi||{},cur=ui0.pick||String(ui0.day||budgetDateKey()).slice(0,7),nm=budgetShiftMonth(cur,+a.split(':').pop());root.__budgetUi=Object.assign({},ui0,{pick:nm});if(this.status)this.status.textContent=monthTitle(nm);return this.models?this.render():this.update();}
+    if(!p||p.kind!=='date')return;
     if(/^budget:pick:-?1$/.test(a)){var old=p.month;p.month=budgetShiftMonth(old,+a.split(':').pop());p.cursor=p.month+'-01';root.__budgetUi=Object.assign({},root.__budgetUi||{},{pick:old});
       if(root.__budgetChromeAct)root.__budgetChromeAct(a);else root.__budgetUi.pick=p.month;this.paintOverlay();this.status.textContent=monthTitle(p.month);return;}
     var d=a==='budget:pick:today'?budgetTodayKey():a.slice('budget:pickday:'.length);if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return;
