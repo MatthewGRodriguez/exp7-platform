@@ -43,6 +43,7 @@ Every substantive claim should carry an evidence class (see [EVIDENCE.md](./EVID
 | [views-vector-model.md](./views-vector-model.md) | **1.8.37–1.8.40:** atlas → vector model → JRender; options, skin, tokens; motion; JRender dl-index |
 | [jrender-paint-stroke.md](./jrender-paint-stroke.md) | **1.8.42:** JRender gradient paints and stroked paths: wire format, rendering, JS and Exp7VM API |
 | [ranking-jfengine.md](./ranking-jfengine.md) | **1.8.33–1.8.34:** JFEngine ranking replaces `Best()`; JFactor kernel |
+| [design-system.md](./design-system.md) | **Proposed 2026-11-14:** the Exp7 design system: Verse-style fail first with no fallbacks, bound driven with shrink to fit, art swappable everywhere; bounds, tokens, components, art slots, tests, migration |
 | [views-jrender-standard.md](./views-jrender-standard.md) | **Direction:** universal views, one JRender everywhere |
 | [platform-chrome-jrender.md](./platform-chrome-jrender.md) | **Implementation:** bar / apps / Budget tabs on JRViews + Exp7Slabs (1.8.3) |
 | [artist-coordination-brief.md](./artist-coordination-brief.md) | **Ash handoff:** authorized art workflow + profile image render (2026-11-08) |
