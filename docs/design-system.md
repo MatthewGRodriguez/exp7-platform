@@ -1,6 +1,6 @@
 # Exp7 design system
 
-**Status:** proposed spec, 2026-11-14. Nothing here is implemented yet. It applies to Budget first and then to every Exp7 app, the platform chrome and the universal Calendar, Board and Plan views. Matthew answered the first eight questions on 2026-11-14; he answered the two follow-up questions (N1, N2) the same day. Every answer is written into the section it settles and listed in [Decisions](#11-decisions). No questions are open for him.
+**Status:** spec, 2026-11-14. Phase 1 is built in 1.8.77 (see [Migration](#10-migration)); later phases are not implemented yet. It applies to Budget first and then to every Exp7 app, the platform chrome and the universal Calendar, Board and Plan views. Matthew answered the first eight questions on 2026-11-14; he answered the two follow-up questions (N1, N2) the same day. Every answer is written into the section it settles and listed in [Decisions](#11-decisions). No questions are open for him.
 
 Evidence labels follow [EVIDENCE.md](./EVIDENCE.md). The three rules in section 1 are Matthew's own words **[REQ 2026-11-14]**.
 
@@ -464,6 +464,12 @@ Each phase ships as ordinary release pull requests that Matthew merges. One scre
 - The test harness in exp7-jrender with layers 1 and 2.
 - Budget Home on components: Page, DateHeading, MiniMonth, Legend, Row, LinkRow, inside failure contexts.
 - Gate: layers 1 and 2 green, and Home at 390 and wide shows 0 changed pixels against 1.8.76, or every difference is listed and Matthew approves it.
+
+*Phase 1 as built (1.8.77).* Two small changes to this spec came out of building it:
+- The colour token `caption` is named `captionInk`, because `caption` is also the caption type size in section 5.2 and one set can't hold both.
+- `lineHeight` is one value per type role (`title 28`, `body 21`, `secondary 19`, `caption 16`): 1.25 times the size, rounded to whole pixels, as the journal draws it today. Text that shrinks scales its line height with it.
+
+Fallbacks removed: the text width estimate (length x size x 0.55) in `JRViews` and in `Exp7VM.layout`, the DejaVu substitute for the journal's Source Sans 3, the ellipsis on Home's entry rows (a long name now wraps), and the `||` defaults in Home's layout. Fixed in passing: a bold run used to sit 0.1 x its size below a regular run on the same baseline; both now sit on the baseline from `core.metrics`. The parity check in exp7-jrender (`tests/parity.mjs`) lists every text that moved against 1.8.76; nothing else moved.
 
 **Phase 2: the rest of Budget off `paintScreen`.** Day schedule, day item, add an item, the four forms (with Field, Choice, Toggle, DatePicker, TimePicker, PrimaryBand, BackBar), plan and alternatives, requirements, the switch review (BeforeAfter), monthly expenses, cash and owned. Every action becomes a failure context with its fail logic. Then delete `paintScreen`, the fixed coordinates, `flowShift`, and the static study screens. Gate per screen as in phase 1, plus layer 3 rollback checks and layer 5 journeys.
 
