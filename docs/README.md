@@ -44,6 +44,7 @@ Every substantive claim should carry an evidence class (see [EVIDENCE.md](./EVID
 | [jrender-paint-stroke.md](./jrender-paint-stroke.md) | **1.8.42:** JRender gradient paints and stroked paths: wire format, rendering, JS and Exp7VM API |
 | [ranking-jfengine.md](./ranking-jfengine.md) | **1.8.33–1.8.34:** JFEngine ranking replaces `Best()`; JFactor kernel |
 | [design-system.md](./design-system.md) | **Proposed 2026-11-14:** the Exp7 design system: Verse-style fail first with no fallbacks, bound driven with shrink to fit, art swappable everywhere; bounds, tokens, components, art slots, tests, migration |
+| [fonts.md](./fonts.md) | The four embedded fonts, what characters each has (the journal's Source Sans 3 has Latin-1 and Latin Extended-A from 1.8.78), where they come from and their licence |
 | [views-jrender-standard.md](./views-jrender-standard.md) | **Direction:** universal views, one JRender everywhere |
 | [platform-chrome-jrender.md](./platform-chrome-jrender.md) | **Implementation:** bar / apps / Budget tabs on JRViews + Exp7Slabs (1.8.3) |
 | [artist-coordination-brief.md](./artist-coordination-brief.md) | **Ash handoff:** authorized art workflow + profile image render (2026-11-08) |
@@ -51,7 +52,7 @@ Every substantive claim should carry an evidence class (see [EVIDENCE.md](./EVID
 | [decisions.md](./decisions.md) | Accepted / rejected / shipped decisions |
 | [version-lineage.md](./version-lineage.md) | Demo lean history + platform release lineage through 1.8.3 |
 | [distribution-launcher.md](./distribution-launcher.md) | Software vs data repos, launcher gate, handoff |
-| [budget-direction.md](./budget-direction.md) | **1.8.55 onward, on `main`** (1.8.55–1.8.61 merged in PR #92; current release 1.8.77): what was built for `BUDGET_DIRECTION.md`, the rules and thresholds used, migration, evidence and what is unverified |
+| [budget-direction.md](./budget-direction.md) | **1.8.55 onward, on `main`** (1.8.55–1.8.61 merged in PR #92; current release 1.8.78): what was built for `BUDGET_DIRECTION.md`, the rules and thresholds used, migration, evidence and what is unverified |
 | [testing-provenance.md](./testing-provenance.md) | What was tested where; Mac vs box vs mock limits |
 | [mac-test-2026-11-09.md](./mac-test-2026-11-09.md) | 1.8.31 on Matthew’s Mac (Chromium in the Claude app): WebGPU, hits, parallax, frame time, launcher gate |
 | [known-issues-acceptance.md](./known-issues-acceptance.md) | Recurring failures and acceptance criteria |
