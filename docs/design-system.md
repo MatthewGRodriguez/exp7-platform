@@ -1,6 +1,6 @@
 # Exp7 design system
 
-**Status:** proposed spec, 2026-11-14. Nothing here is implemented yet. It applies to Budget first and then to every Exp7 app, the platform chrome and the universal Calendar, Board and Plan views. Questions only Matthew can answer are marked **Q1** to **Q8** (Q3 is settled) and collected in [Open questions](#11-open-questions-for-matthew).
+**Status:** proposed spec, 2026-11-14. Nothing here is implemented yet. It applies to Budget first and then to every Exp7 app, the platform chrome and the universal Calendar, Board and Plan views. Matthew answered the first eight questions on 2026-11-14; his answers are written into the sections they settle and listed in [Decisions and open questions](#11-decisions-and-open-questions). Two new questions that his answers raise are **N1** and **N2**.
 
 Evidence labels follow [EVIDENCE.md](./EVIDENCE.md). The three rules in section 1 are Matthew's own words **[REQ 2026-11-14]**.
 
@@ -13,10 +13,10 @@ Evidence labels follow [EVIDENCE.md](./EVIDENCE.md). The three rules in section 
 5. [Tokens](#5-tokens)
 6. [Components](#6-components)
 7. [Art slots](#7-art-slots)
-8. [Failing first](#8-failing-first)
+8. [Failing first, as in Verse](#8-failing-first-as-in-verse)
 9. [Tests](#9-tests)
 10. [Migration](#10-migration)
-11. [Open questions for Matthew](#11-open-questions-for-matthew)
+11. [Decisions and open questions](#11-decisions-and-open-questions)
 12. [Needs Ash](#12-needs-ash)
 
 ---
@@ -31,7 +31,9 @@ These three rules govern every Exp7 app. Nothing else in this spec may contradic
 
 A fallback is anything that quietly stands in for a missing or broken piece so the failure is hidden: a default colour, a default size, a guessed text width, a second font, placeholder art, study sample data shown as if it were the person's own, a default skin, or a `try`/`catch` that carries on drawing. None of these are allowed.
 
-Instead, a missing or broken piece stops with a named error ([section 8](#8-failing-first)) at the earliest stage that can see it: when art is authored, when tests run, when a screen is built, and only last when it draws. The tests in [section 9](#9-tests) are what keep those errors from reaching a release.
+Fail first works the way Verse's `<decides>` does **[REQ 2026-11-14]**: "it'll work or not, no exception based control flow, at the fail point it'll exit to where it would work before that point and carry on. Errors are not allowed in verse to propagate outside the things marked with decides, same thing here." Failing is conditional logic: a failable step either succeeds or fails, a failure undoes everything since the last point where things worked, and the logic written for the fail case runs next. [Section 8](#8-failing-first-as-in-verse) defines it. Failures are found first by the tests in [section 9](#9-tests), so they rarely reach a release.
+
+The difference from a fallback: a fallback pretends the work happened by drawing a substitute. A failure leaves the app exactly as it was before the work began, and the code after it knows the work didn't happen.
 
 Two things are not fallbacks and stay:
 
@@ -42,13 +44,13 @@ Two things are not fallbacks and stay:
 
 > "bounds even though art is changeable that allows sizes to be systematically accounted for we will use that to be structurally sound and the rest of the app aware of the sizes of everything even if not fixed in size; it'll be bound driven." **[REQ 2026-11-14]**
 
-Every piece declares its bounds: the smallest and largest size it can take, and how it sizes itself inside them. Layout resolves those bounds before anything draws, and the resolved sizes are readable by the rest of the app. A piece may grow, such as a row whose name wraps to three lines, but its size is always computed, never guessed, and everything after it knows the new size. [Section 4](#4-bounds) defines the model.
+Every piece declares its bounds: the smallest and largest size it can take, and how it sizes itself inside them. Layout resolves those bounds before anything draws, and the resolved sizes are readable by the rest of the app. A piece may grow up to its largest size, such as a row whose name wraps to more lines, but its size is always computed, never guessed, and everything after it knows the new size. Past its largest size, content shrinks to stay inside: "Shrink to stay within bounds… just like how text will shrink to fit, so will art, this is a universal bounds concept" **[REQ 2026-11-14]**. [Section 4](#4-bounds) defines the model.
 
 ### Rule 3: art swappable everywhere
 
 > "art be swappable everywhere, it's a universal concept" **[REQ 2026-11-14]**, following "without having parts of it replaceable with art (some svg animation) design is limited".
 
-Every visual part of every component that is not live text is an art slot: backgrounds, frames, rules, marks, chevrons, checkboxes, the star, the page edge, the mini-month tints. Art is SVG, animated or still, and swapping it never moves layout or text, because the slot's bounds come from the component, not from the art. [Section 7](#7-art-slots) is the contract.
+Every visual part of every component that is not live text is an art slot: backgrounds, frames, rules, marks, chevrons, checkboxes, the star, the page edge, the mini-month tints. Art is SVG, animated or still, and swapping it never moves layout or text, because the slot's bounds come from the component, not from the art; art bigger than its slot shrinks to fit. Art can be swapped for a whole app, for one screen, or for a single item on a screen. [Section 7](#7-art-slots) is the contract.
 
 ### Rules this spec keeps as they are
 
@@ -57,6 +59,7 @@ Every visual part of every component that is not live text is an art slot: backg
 - Budget's approved journal style and layout, with the journal at full phone width. This spec changes how screens are built, not how they look. **[REQ]**
 - New artwork goes through the art workflow: references, Matthew's agreement, then drawing, one piece at a time ([botnotes.md](https://github.com/MatthewGRodriguez/exp7-budget-studies/blob/main/botnotes.md), "Art workflow"). This spec defines the slot contract, not any artwork. **[REQ]**
 - Studies are drawn in DesignCraft on Matthew's Mac, and keeping them in sync with the app is second priority to the app. **[REQ]**
+- No second renderer without WebGPU: the shell's plain error with diagnostics stays, because at first boot there is no earlier working point to return to. **[REQ]** ([views-jrender-standard.md](./views-jrender-standard.md))
 
 ---
 
@@ -70,7 +73,7 @@ Grouped by cause, the fixes fall into four kinds:
 |---|---|---|
 | Sizes and overlap | 1.8.11 Apps card sizes, 1.8.35 Board scale, 1.8.45 safe area, 1.8.67 canvas size limit, 1.8.68 no-overlap rows, 1.8.74 long names wrap | Bounds (section 4), bounds tests (section 9) |
 | Material drawn in code, pass after pass | 1.8.13 to 1.8.20: contact shadow, penumbra, lip, top light, pressed edge, glass body, ground shadow | Art slots (section 7) |
-| Blank screens and boot | 1.8.5 to 1.8.7 blank after switch, 1.8.63 boot error | Failing first (section 8) |
+| Blank screens and boot | 1.8.5 to 1.8.7 blank after switch, 1.8.63 boot error | Failing first with rollback (section 8): a failed switch leaves the last working screen up |
 | Wiring and state | 1.8.38 selection counter, 1.8.73 Home scroll, 1.8.75 Accept didn't switch | Flow tests (section 9). A design system alone doesn't prevent these. |
 
 What the code does today, read on `main` at `a0c638a` (1.8.76) **[MEAS, code read]**:
@@ -109,10 +112,11 @@ Everything ships inside the lean HTML as shared scripts, so the two-file rule ho
 | `design-bounds` | The bounds protocol and layout (grows out of `Exp7VM.layout`) |
 | `design-components` | The component catalog |
 | `design-art` | Slot registry, art packs (encoded like the fonts), the art validator's runtime half |
+| `design-fail` | Failable steps, failure contexts and rollback (section 8) |
 
 `exp7-vm` keeps its role as the view-model builder; its node kinds become components. `journal-views` shrinks to Budget's screen compositions and loses `paintScreen`. Art sources (SVG, DesignCraft files) live outside exp7-platform, with the studies; only compiled packs ship.
 
-"Light" is measured, not assumed: each script and each art pack has a byte budget recorded in `release.json`, and a test fails when a release exceeds it (**Q7**).
+There is no byte limit on scripts or art packs **[REQ 2026-11-14]**. Light comes from having one layout path, no fallback code and no duplicate material passes.
 
 ---
 
@@ -144,7 +148,7 @@ Two passes, the same for every component:
 1. **Measure.** A parent offers each child constraints `{ minW, maxW, minH, maxH }`. The child returns one size inside them. Measure is pure: the same model, tokens and constraints always give the same size, so results are cached by key.
 2. **Place.** The parent assigns each child a rect inside its own. Children never place themselves.
 
-If a child's `min` is larger than the offered `max`, the bounds can't be satisfied and layout stops with `BOUNDS_UNSAT` naming both pieces. Nothing is clipped or shrunk to make it fit.
+Measuring and placing are failable steps (section 8). Content that is too big for its node shrinks to stay inside it (text in 4.5, art in 7.4). A node's own box never shrinks below its `min`, so hit targets keep their 44. If a child's `min` is larger than the offered `max`, the bounds can't be satisfied: the step fails with `BOUNDS_UNSAT` naming both pieces, and the layout rolls back. Nothing is clipped or drawn half-fitted.
 
 ### 4.4 Everyone can read the sizes
 
@@ -169,11 +173,16 @@ This is what "the rest of the app aware of the sizes of everything" means in cod
 
 ### 4.5 Text
 
-- Text is measured only by JRender: `core.measure` for one line, `core.wrap` for a box, with the real font id. There is no estimate. If the font isn't loaded or a glyph is missing (`jrd_has_glyph`), layout stops with `FONT_MISSING` or `GLYPH_MISSING`.
+- Text is measured only by JRender: `core.measure` for one line, `core.wrap` for a box, with the real font id. There is no estimate. If the font isn't loaded or a glyph is missing (`jrd_has_glyph`), the step fails with `FONT_MISSING` or `GLYPH_MISSING`.
 - Baselines come from `core.metrics` (ascent and descent per font), not from per-size offsets.
 - Line height is a token (1.25 × size today).
-- A text node declares `lines: { min, max }`. Its height is `lines × lineHeight` for the lines it wraps to. Where a component has a fixed height, such as a 48 pt mini-month cell, text that needs more lines than fit is `TEXT_OVERFLOW`.
-- How a person's own long text behaves (a 200-character item name) is **Q2**: wrap without limit, or stop at a line limit.
+- A text node declares `lines: { min, max }` and a size range `size: { max, min }` (its role's size, and how far it may shrink).
+- **Fitting** is one failable step, `fit(text, box)`, for every text run, including a person's own long text **[REQ 2026-11-14]**:
+  1. Wrap at the role's size. If it fits in `lines.max` lines and inside the node's `max` height, done; the node takes that height.
+  2. Otherwise shrink: find the largest size, down to `size.min`, at which the text fits. JRender measures each try.
+  3. If it still doesn't fit at `size.min`, the step fails with `TEXT_OVERFLOW`, and the screen's layout rolls back.
+- There is no "…" cut-off. Shrinking keeps all the text.
+- How far text may shrink against the phone floors (body 17, secondary 15, captions 13) is **N2**.
 
 ### 4.6 Width classes
 
@@ -184,9 +193,9 @@ The page column is computed from the host width, as `journal-views` does today, 
 | phone | ≤ 420 | the full host width (journal at full phone width **[REQ]**) |
 | wide | > 420 | `min(520, max(390, host − 48))`, centred |
 
-Device bounds are inputs too: the safe-area insets (1.8.45) and the largest canvas the device allows (1.8.67). A layout that needs more than those stops; it never draws a cut-off screen.
+Wide screens keep the single journal column on every screen **[REQ 2026-11-14]**. Nothing goes two columns, including the plan switch review, whose Before and After always stack.
 
-A component can choose its arrangement from the width it's offered. The plan switch review shows this: Before and After go side by side when the offered width fits two columns at their minimum width plus a gap, and stack otherwise. Whether wide screens should allow that is **Q6**.
+Device bounds are inputs too: the safe-area insets (1.8.45) and the largest canvas the device allows (1.8.67). A layout that needs more than those fails and rolls back; it never draws a cut-off screen.
 
 ---
 
@@ -196,7 +205,7 @@ Tokens are every number and colour a component uses. Component code reads tokens
 
 ### 5.1 Complete or nothing
 
-Each app declares one complete token set. At mount it is checked against the schema; a missing or unknown key is `TOKEN_MISSING` or `TOKEN_UNKNOWN`. There is no chain that fills gaps from defaults. That replaces today's `Exp7VM` token chain (base, then the component's theme, then the atlas, then the mount), which fills any gap from the layer before. An app may still be built from another set explicitly (`tokens: extend(EXP7_LIGHT, { ... })`), but the result is checked as a whole.
+Each app declares one complete token set. At mount it is checked against the schema; a missing or unknown key fails the mount with `TOKEN_MISSING` or `TOKEN_UNKNOWN`, and the app doesn't open. There is no chain that fills gaps from defaults. That replaces today's `Exp7VM` token chain (base, then the component's theme, then the atlas, then the mount), which fills any gap from the layer before. An app may still be built from another set explicitly (`tokens: extend(EXP7_LIGHT, { ... })`), but the result is checked as a whole.
 
 ### 5.2 Schema
 
@@ -214,7 +223,7 @@ These are the values the journal already uses, so moving to tokens changes nothi
 
 ### 5.3 Floors are tokens too
 
-Matthew's phone rules (body ≥ 17, secondary ≥ 15, captions 13 only, targets ≥ 44) are written as floors in the schema. A token set that goes below a floor is rejected, so no app can shrink type or targets to fit.
+Matthew's phone rules (body ≥ 17, secondary ≥ 15, captions 13 only, targets ≥ 44) are written as floors in the schema. A token set that goes below a floor is rejected. Targets never shrink. How far shrink-to-fit text may go below its role's size is **N2**.
 
 ---
 
@@ -243,13 +252,13 @@ Components are the only way a screen is built. Each one is registered with its b
 | **Legend** (swatch and words) | fill | hug | `legend.swatch` | idle |
 | **DatePicker** (inline: month browse, MiniMonth, Today, Dismiss) | fill | hug | `nav.prev`, `nav.next` plus MiniMonth's | idle, hover, pressed |
 | **TimePicker** (hour grid of 6, minute grid of 4) | fill, cell ≥ `target` | hug | `time.cell` | idle, selected, pressed |
-| **BeforeAfter** (stacked or side by side by offered width) | fill | hug | `before.wash`, `after.wash` | idle |
+| **BeforeAfter** (Before and After, always stacked) | fill | hug | `before.wash`, `after.wash` | idle |
 | **Note** (caption or secondary text that wraps) | fill | hug | none | idle |
 
 Examples of bounds that become checks instead of offsets:
 
-- MiniMonth needs `7 × target = 308` px of width. On a 390 px phone each cell is 55.7 px wide, as in the studies. Offered less than 308, it stops with `BOUNDS_UNSAT`.
-- A Row with a long name wraps, its height grows by whole lines, and the rows under it move by exactly that much because they are placed after it.
+- MiniMonth needs `7 × target = 308` px of width. On a 390 px phone each cell is 55.7 px wide, as in the studies. Offered less than 308, it fails with `BOUNDS_UNSAT`.
+- A Row with a long name wraps, its height grows by whole lines up to its `max`, and the rows under it move by exactly that much because they are placed after it. Past its `max`, the name shrinks.
 - A Field's live text field is placed from the Field's rect, so it can't drift from the drawn field.
 
 ### 6.2 Platform and universal views (phase 4)
@@ -261,7 +270,7 @@ Examples of bounds that become checks instead of offsets:
 | **Avatar** (JRDI image) | fixed, inside the TopBar |
 | Calendar **Day**, Board **Row**, **Chip**, **Button**, **Table**, **Popover** | the existing `Exp7VM` node kinds, each given declared bounds and slots |
 
-Account, key and share panels stay DOM, so the personal access token never enters the canvas **[REQ]**. They take the same tokens; whether they take art slots is **Q8**.
+Account, key and share panels stay DOM, so the personal access token never enters the canvas **[REQ]**. For now they are left untouched and run on their own, outside this design system **[REQ 2026-11-14]**.
 
 ### 6.3 Studies map to components
 
@@ -277,11 +286,11 @@ A slot is a named visual part of a component, such as `row.background` or `star.
 
 ### 7.2 Art packs
 
-An app's look is its art pack: art for every slot of every component the app uses, in every state that component declares. A pack is complete or it doesn't load (`ART_MISSING`, naming slot and state). There is no default art.
+An app's look is its art pack: art for every slot of every component the app uses, in every state that component declares. A pack is complete or loading it fails (`ART_MISSING`, naming slot and state). There is no default art. A swap that fails leaves the art that was there before.
 
 Budget's first pack draws today's journal look (white page, thin rules, chevrons, tints, the mint band) as SVG, so switching to slots changes nothing on screen. That pack is assigned to Budget explicitly; it isn't a default for anything else. Later art replaces pieces of it through the art workflow, one approved piece at a time.
 
-Where art can be swapped (**Q3, settled**): at three explicit levels, the app's pack, then a screen's override, then one component instance's override, because art is "swappable everywhere, it's a universal concept" **[REQ 2026-11-14]**. Every level is written down, and the validator resolves the art for every slot on every screen and fails on any gap.
+Where art can be swapped: at three explicit levels, the app's pack, then a screen's override, then one component instance's override, because art is "swappable everywhere, it's a universal concept" **[REQ 2026-11-14]**. Every level is written down, and the validator resolves the art for every slot on every screen and fails on any gap.
 
 ### 7.3 Format
 
@@ -309,6 +318,7 @@ Every art piece carries:
   "fit": "nine",            // stretch | nine | fit | tile
   "insets": [4, 4, 4, 4],   // nine only: corners that keep their size
   "supports": { "w": [44, 520], "h": [44, 400] },
+  "minScale": 0.5,          // how far the art may shrink to fit before the fit fails
   "states": { "idle": "…", "hover": "…", "pressed": "…", "selected": "…", "disabled": "…", "focus": "…" },
   "motion": { "loop": null, "transitions": "state-table" },
   "references": ["…"]       // the approved references for this piece
@@ -316,7 +326,8 @@ Every art piece carries:
 ```
 
 - `fit` says how art follows a size it wasn't drawn at: `stretch` scales each axis, `nine` keeps the corners and stretches the edges and middle, `fit` scales evenly and centres (and declares the aspect range it accepts), `tile` repeats.
-- `supports` must cover the component's declared bounds. A Row can grow to many lines, so its background must support that height, or the pack fails.
+- **Art shrinks to fit, like text** **[REQ 2026-11-14]**. When the slot is smaller than the art's `supports` range (or a `fit` piece's drawn size), the art scales down evenly, centred, until it fits. It never grows past what `supports` allows and never spills out of the slot. If fitting needs a scale below `minScale`, the fit fails (`ART_OVERFLOW`) and the art that was there before stays.
+- `supports` should cover the component's declared bounds. A Row can grow to many lines, so its background should support that height.
 - A state can be an explicit alias of another (`"pressed": "=hover"`). That is a written choice, checked like any other, not a fallback.
 
 ### 7.5 Animation
@@ -330,11 +341,10 @@ Every art piece carries:
 
 For each piece, at the slot's minimum, maximum and typical sizes, in every state and at sampled animation frames:
 
-- geometry stays inside the slot rect (`ART_OVERFLOW`)
+- after shrink-to-fit, geometry stays inside the slot rect, at a scale no lower than `minScale` (`ART_OVERFLOW`)
 - every state the component declares is present (`ART_MISSING`)
 - text drawn over the art keeps at least 4.5:1 contrast against the art's pixels under it, using the text's token colour (`CONTRAST_LOW`)
 - strokes stay at or above one device pixel at the smallest size
-- the compiled record stays inside the pack's byte budget
 
 It runs when art is compiled, in the test suite, and at pack load in the app.
 
@@ -344,42 +354,77 @@ Once a component's art is in slots, the procedural light and shadow passes for i
 
 ---
 
-## 8. Failing first
+## 8. Failing first, as in Verse
 
-### 8.1 The error
+Matthew's model is Verse's `<decides>` **[REQ 2026-11-14]**: a step works or it doesn't; there is no exception-based control flow; at the fail point the work returns to where it last worked and carries on; failures never travel outside the places marked as able to fail; and failing is a condition that logic can follow.
 
-Every failure is one shape:
+### 8.1 Three parts
+
+**Failable steps.** A step that can fail is marked failable, like a `<decides>` function. It either returns its value or fails. These are the failable steps in the design system:
+
+| Step | Fails when | Code |
+|---|---|---|
+| `token(name)` | the app's token set has no such key | `TOKEN_MISSING` |
+| `font(role)`, `glyphs(text)` | the font isn't loaded, or a glyph is missing | `FONT_MISSING`, `GLYPH_MISSING` |
+| `fit(text, box)` | the text doesn't fit even at its smallest size (4.5) | `TEXT_OVERFLOW` |
+| `measure(node, offered)`, `place(node, rect)` | a `min` is larger than the offered `max`, or a hit is under 44 | `BOUNDS_UNSAT`, `TARGET_TOO_SMALL` |
+| `art(slot, state)`, `fitArt(art, rect)` | no art resolved for the slot and state, or it can't shrink to fit (7.4) | `ART_MISSING`, `ART_OVERFLOW` |
+| `field(model, key)` | the view model lacks a value the component needs, such as an item with no name | `DATA_MISSING` |
+
+**Failure contexts.** A failable step can only be used inside a failure context, the way a `<decides>` call can only sit in an `if`, a `for` filter or another `<decides>` function. A failure ends its context and goes no further: code outside the context only sees that the context failed. These are the contexts in Exp7, each with the point it returns to:
+
+| Context | On failure, returns to | Then runs |
+|---|---|---|
+| A person's action (a tap, a committed field, Back) | the screen, view-local state and atlas exactly as they were before the action | that action's fail logic |
+| Opening a screen | the screen they were on | that screen's fail logic |
+| Re-laying out a screen after data changes | the last layout and draw list that worked, still on screen | that screen's fail logic |
+| Opening an app | the Apps picker, with the app not opened | the shell's fail logic |
+| Swapping art (app, screen or item) | the art that was there before | the swap's fail logic |
+| Saving a change to the atlas | the atlas as it was; the proposal is not applied | the save's fail logic |
+
+**Rollback.** Everything a context does is held until the whole context succeeds, as Verse rolls back `<transacts>` effects: layout table writes, view-local state, draw-list patches, art changes and atlas proposals. On success they are applied together. On failure they are dropped, so nothing half-done ever shows. Effects that can't be undone (network, sync, the DOM text fields, storage) are not allowed inside a context; they run only after it succeeds, like Verse's `<no_rollback>` effects.
+
+### 8.2 Fail logic is written, never automatic
+
+Every context declares what runs when it fails, the way an `if` has an `else`. A static test fails if a context has no fail logic. Fail logic may record the failure, keep the person where they are, or offer a different action. It may not draw a substitute version of what failed (that would be a fallback), and it may not contain failable steps outside a context of its own.
+
+Whether the person is told anything when their action rolls back is **N1**. Until Matthew decides, the proposal is that the action's fail logic records the failure and nothing else changes on screen.
+
+### 8.3 No exceptions in design code
+
+JavaScript has no built-in failure contexts, so the `design-fail` script provides them with plain return values, not `throw`:
 
 ```
-DesignError {
-  code,        // BOUNDS_UNSAT, TEXT_OVERFLOW, TARGET_TOO_SMALL, TOKEN_MISSING, TOKEN_UNKNOWN,
-               // ART_MISSING, ART_OVERFLOW, ART_FORMAT, CONTRAST_LOW, FONT_MISSING,
-               // GLYPH_MISSING, DATA_MISSING, BUDGET_EXCEEDED
+const FAIL = Fail.FAIL                         // one frozen value
+function fit(text, box) { ...; return ok ? sized : Fail.with('TEXT_OVERFLOW', { ... }) }
+
+Fail.context('open:day-item', (tx) => {        // a failure context with its rollback journal tx
+  const name = field(item, 'name');   if (name === FAIL) return FAIL
+  const size = fit(name, rowBox);     if (size === FAIL) return FAIL
+  tx.stage(layout, patch)                      // applied only if the context succeeds
+}, (failure) => { Fail.record(failure) })      // this context's fail logic
+```
+
+- Design code contains no `throw` and no `try`/`catch`; a static test checks it. The one `try`/`catch` is in the shell, around code outside the design system that may still throw, and it treats a throw as that context failing.
+- Every failable result is checked where it is used; the static test also checks that.
+
+### 8.4 Failure records
+
+Every failure produces one record:
+
+```
+Failure {
+  code, context,                         // which step, inside which context
   app, screen, component, slot, state,   // whichever apply
-  id,          // the node's stable id
-  offered, needed,                        // sizes, where they apply
+  id,                                    // the node's stable id
+  offered, needed,                       // sizes, where they apply
   detail
 }
 ```
 
-`DATA_MISSING` covers a view model without a field the component needs, such as an item with no name. The screen stops; it never shows study data in its place (review finding 4).
+Records go to an in-memory list that tests read and that a debug view in the exp7-jrender test page shows. Tests treat any record from a fixture as a failed test, so failures are found before a release, not by a person using the app.
 
-### 8.2 When each is caught
-
-| Stage | Catches | Who sees it |
-|---|---|---|
-| Art compile | ART_FORMAT, ART_OVERFLOW, ART_MISSING, CONTRAST_LOW | the artist or bot authoring it |
-| Test suite | everything, on fixtures at every width | the bot, before a pull request |
-| Mount | TOKEN_*, ART_MISSING, FONT_MISSING | anyone loading that build |
-| Layout | BOUNDS_UNSAT, TEXT_OVERFLOW, TARGET_TOO_SMALL, GLYPH_MISSING, DATA_MISSING | anyone on that screen |
-
-The aim is that only real data the fixtures didn't anticipate can reach the layout stage in a release.
-
-### 8.3 What a person sees
-
-There is one `try`/`catch`, at the shell boundary. The screen does not draw. The shell shows its existing plain error (the `.jrerr` pattern) with the code and the component path, plus Back. Whether that is right, and whether a failure stops the screen or the whole app, is **Q1**.
-
-### 8.4 Fallbacks already in the code
+### 8.5 Fallbacks already in the code
 
 Each migration phase removes the fallbacks in the code it touches, and the static test lists any left ([section 9](#9-tests)). The 29 mentions in the lean file today are the starting inventory. Not every one is a visual fallback (some are in ranking or sync code), and those are reviewed separately, since rule 1 is project-wide.
 
@@ -387,16 +432,16 @@ Each migration phase removes the fallbacks in the code it touches, and the stati
 
 ## 9. Tests
 
-Tests replace fallbacks. A pull request that changes UI states its results by layer, with evidence labels. A red layer means no pull request.
+Tests are where failures are found first. A pull request that changes UI states its results by layer, with evidence labels. A red layer means no pull request. The structural tests (layers 1 to 3) carry the weight; Matthew hopes screenshots won't be relied on **[REQ 2026-11-14]**, so they are a short final check.
 
 ### 9.1 Layers
 
 | Layer | Runs where | Checks |
 |---|---|---|
-| **1. Static** | Node, no GPU | Every component registered with bounds, slots, states and fixtures. Every app's tokens complete and above the floors. No literal colours or sizes and no `||` defaults in component code. Art packs complete for every app. Byte budgets. Remaining fallbacks listed. |
-| **2. Bounds** | Node with the real `jrender.wasm` Core (zero imports, so it runs in Node), for real text measurement | Every screen, from fixtures, at widths 320, 375, 390, 430, 768, 1024 and 1440: no sibling overlap; every child inside its parent; every hit ≥ 44 × 44 and equal to its rect; every text run inside its node; nothing outside the column or the safe area; scroll height equals content height; the same input lays out to the same rects twice. |
-| **3. Art** | Node, tessellating with the real Core | Section 7.6, for every pack. |
-| **4. Screenshots** | Chrome with WebGPU on Matthew's Mac, through the exp7-jrender test page; Safari is Matthew's | Each screen at phone 390 × 844 and wide 1280 × 800 against a stored image, plus `Exp7Slabs.verify` GPU parity. A changed image needs Matthew's approval before it replaces the stored one (**Q5** covers tolerance). |
+| **1. Static** | Node, no GPU | Every component registered with bounds, slots, states and fixtures. Every app's tokens complete and above the floors. No literal colours or sizes, no `||` defaults, no `throw` or `try`/`catch` in design code. Every failable result checked; every failure context has fail logic. Art packs complete for every app. Remaining fallbacks listed. |
+| **2. Bounds** | Node with the real `jrender.wasm` Core (zero imports, so it runs in Node), for real text measurement | Every screen, from fixtures, at widths 320, 375, 390, 430, 768, 1024 and 1440: zero failure records; no sibling overlap; every child inside its parent; every hit ≥ 44 × 44 and equal to its rect; every text run inside its node and no smaller than its `size.min`; nothing outside the column or the safe area; scroll height equals content height; the same input lays out to the same rects twice. |
+| **3. Art and rollback** | Node, tessellating with the real Core | Section 7.6 for every pack. Fault injection: for each context in 8.1, force each of its failable steps to fail and check that the state afterwards equals the state before, byte for byte, and that its fail logic ran. |
+| **4. Screenshots** | Chrome with WebGPU on Matthew's Mac, through the exp7-jrender test page; Safari is Matthew's | A few screens at phone 390 × 844 and wide 1280 × 800, with 0 changed pixels against the stored image **[REQ 2026-11-14]**, plus `Exp7Slabs.verify` GPU parity. A changed image needs Matthew's approval before it replaces the stored one. Kept small so the structural layers carry the testing. |
 | **5. Flows** | Node and Chrome on Matthew's Mac | The existing 72 unit and 231 integration tests, plus journeys driven by real taps and typing: add an item from a day, change and record, switch an alternative and Accept, reload and check the day, the mini month and Home. These catch wiring bugs, which bounds can't. |
 
 ### 9.2 Fixtures
@@ -405,7 +450,7 @@ Fixtures are made-up data in files, never Matthew's real data, and they include 
 
 ### 9.3 Where the tests live
 
-They can't live in exp7-platform (no sidecar folders). Where they go is **Q4**, the question already open since 2026-11-13. The proposal is exp7-jrender: it is private, its test page already loads the real views from an exp7-platform checkout and draws them with the real renderer, and its tools already run the wasm in Node.
+In exp7-jrender **[REQ 2026-11-14]**, which is private, already has a test page that loads the real views from an exp7-platform checkout and draws them with the real renderer, and already runs the wasm in Node. The 72 unit and 231 integration tests and the `budget-rules` and `budget-flows` sources move there too, which settles the question open since 2026-11-13. exp7-platform keeps its two-file rule.
 
 ---
 
@@ -413,20 +458,20 @@ They can't live in exp7-platform (no sidecar folders). Where they go is **Q4**, 
 
 Each phase ships as ordinary release pull requests that Matthew merges. One screen per pull request, so a failure is small. Each pull request names the fallbacks it removed.
 
-**Phase 0: agree.** This spec merged, and answers to the open questions.
+**Phase 0: agree.** This spec merged, and answers to N1 and N2.
 
 **Phase 1: foundations, nothing changes on screen.**
-- `design-tokens` with Budget's journal set and the Exp7 light set; `design-bounds` from `Exp7VM.layout` with the measure and place passes and the readable rect table; `DesignError` and the shell's error page.
+- `design-fail` (failable steps, contexts, rollback, records), `design-tokens` with Budget's journal set and the Exp7 light set, and `design-bounds` from `Exp7VM.layout` with the measure and place passes, shrink-to-fit text and the readable rect table.
 - Text through `core.measure`, `core.wrap` and `core.metrics` only. Remove the width estimate and the DejaVu fallback in the journal.
-- Test layers 1 and 2 running where Q4 decides.
-- Budget Home on components: Page, DateHeading, MiniMonth, Legend, Row, LinkRow.
-- Gate: Home screenshots at 390 and wide match 1.8.76, or every difference is listed and Matthew approves it.
+- The test harness in exp7-jrender with layers 1 and 2.
+- Budget Home on components: Page, DateHeading, MiniMonth, Legend, Row, LinkRow, inside failure contexts.
+- Gate: layers 1 and 2 green, and Home at 390 and wide shows 0 changed pixels against 1.8.76, or every difference is listed and Matthew approves it.
 
-**Phase 2: the rest of Budget off `paintScreen`.** Day schedule, day item, add an item, the four forms (with Field, Choice, Toggle, DatePicker, TimePicker, PrimaryBand, BackBar), plan and alternatives, requirements, the switch review (BeforeAfter), monthly expenses, cash and owned. Then delete `paintScreen`, the fixed coordinates, `flowShift`, and the static study screens. Gate per screen as in phase 1, plus layer 5 journeys.
+**Phase 2: the rest of Budget off `paintScreen`.** Day schedule, day item, add an item, the four forms (with Field, Choice, Toggle, DatePicker, TimePicker, PrimaryBand, BackBar), plan and alternatives, requirements, the switch review (BeforeAfter), monthly expenses, cash and owned. Every action becomes a failure context with its fail logic. Then delete `paintScreen`, the fixed coordinates, `flowShift`, and the static study screens. Gate per screen as in phase 1, plus layer 3 rollback checks and layer 5 journeys.
 
-**Phase 3: art slots live.** `design-art`, the validator (layer 3), and Budget's first pack drawn as today's look, so nothing changes on screen. Remove the procedural material for each component as its art arrives. After that, new art for Budget only through the art workflow.
+**Phase 3: art slots live.** `design-art`, the validator with shrink-to-fit art (layer 3), and Budget's first pack drawn as today's look, so nothing changes on screen. Remove the procedural material for each component as its art arrives. After that, new art for Budget only through the art workflow.
 
-**Phase 4: platform and universal views.** TopBar, Apps picker, and the Calendar, Board and Plan node kinds onto components, tokens and slots. The Exp7 demo follows.
+**Phase 4: platform and universal views.** TopBar, Apps picker, and the Calendar, Board and Plan node kinds onto components, tokens and slots. The Exp7 demo follows. The account, key and share panels stay as they are.
 
 **Phase 5: new apps.** A new Exp7 app is its atlas, a complete token set, a complete art pack and screens built from the catalog. Nothing else.
 
@@ -434,16 +479,25 @@ Studies, as second priority: when a screen moves to components, its study (if an
 
 ---
 
-## 11. Open questions for Matthew
+## 11. Decisions and open questions
 
-- **Q1. When something fails at runtime, what does a person see?** Proposal: that screen doesn't draw, and the shell shows its plain error with the code and Back; the rest of the app keeps working. The alternative is stopping the whole app.
-- **Q2. A person's own very long text** (say a 200-character item name): wrap without a limit so the page grows, or set a line limit and treat going over it as a failure? Cutting it off with "…" would be a fallback, so it isn't offered.
-- **Q3. Where art can be swapped.** Settled by Matthew's rule "art be swappable everywhere, it's a universal concept": for each app, for a screen, and for a single item on a screen (section 7.2).
-- **Q4. Where the tests live:** exp7-jrender (proposed), exp7-budget-studies, or a new private repo?
-- **Q5. Screenshot matching:** exactly 0 changed pixels, or a small tolerance for anti-aliasing between machines?
-- **Q6. Wide screens:** keep the single 390 to 520 px journal column on every screen, or let some screens (the switch review) go two columns when there's room?
-- **Q7. Byte budgets:** should each script and art pack have a size limit that fails the release, and do you have numbers in mind?
-- **Q8. Account, key and share panels** stay DOM for safety. Should they take only the tokens, or art slots too?
+### Decided by Matthew, 2026-11-14
+
+| # | Question | His answer | Where it's written in |
+|---|---|---|---|
+| Q1 | What happens when something fails | Verse-style failure: works or fails, no exceptions, roll back to where it last worked and carry on, failures stay inside failable contexts, fail logic follows | Rule 1, section 8 |
+| Q2 | A person's very long text | Shrink to stay within bounds; art shrinks too, a universal bounds concept | 4.5, 7.4 |
+| Q3 | Where art can be swapped | Everywhere: for an app, a screen and a single item | 7.2 |
+| Q4 | Where tests live | exp7-jrender | 9.3 |
+| Q5 | Screenshot matching | 0 changed pixels, and screenshots shouldn't be relied on | 9.1 |
+| Q6 | Wide screens | Single column | 4.6 |
+| Q7 | Byte budgets | No size limit | 3 |
+| Q8 | Account, key and share panels | Left untouched for now; they run on their own temporarily | 6.2 |
+
+### Open
+
+- **N1. When a person's action fails and rolls back, should they see anything?** The screen stays exactly as it was before the tap. Options: nothing changes at all, or the action's fail logic shows one quiet line (for example "That didn't go through") in a designed component. Proposal: the quiet line, since a tap that does nothing at all is hard to tell from a missed tap.
+- **N2. How far may text shrink to fit?** The phone rules say body ≥ 17, secondary ≥ 15, captions 13, and the Budget prompt says not to shrink type to fit a phone. Options: no text shrinks below its role's floor (so a long body name past its row's line limit fails instead), or any text may shrink as far as the 13 pt caption floor. Proposal: shrink as far as 13 pt, never below; targets never shrink either way.
 
 ## 12. Needs Ash
 
