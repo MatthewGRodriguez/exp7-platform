@@ -8543,7 +8543,7 @@ async function core(){ if(!CORE){ if(typeof WebAssembly!=='object') throw new Er
 function boot(){ if(BOOT) return BOOT; BOOT=(async()=>{ await core(); GC=await GPUContext.create();
   GC.dev.addEventListener('uncapturederror',e=>{ INITERR='WebGPU error: '+e.error.message; console.warn(INITERR); try{ if(window.__exp7Dbg) window.__exp7Dbg.push('gpu-error', INITERR); }catch(_){} }); GC.dev.lost.then(i=>{ INITERR='WebGPU device lost: '+i.message; try{ if(window.__exp7Dbg) window.__exp7Dbg.push('gpu-lost', INITERR); }catch(_){} }); })(); return BOOT; }
 /* text measure (wasm, cached) */
-const MC=new Map(); function tw(t,sz,f){ const font=f==null?FONT:f; const k=font+'|'+sz+'|'+t; let v=MC.get(k); if(v===undefined){ v=CORE.measure(font,sz,t); if(!(v>=0)) v=t.length*sz*0.55; MC.set(k,v); } return v; }
+const MC=new Map(); function tw(t,sz,f){ const font=f==null?FONT:f; const k=font+'|'+sz+'|'+t; let v=MC.get(k); if(v===undefined){ v=CORE.measure(font,sz,t); if(!(v>=0)) throw new Error('JRViews: text measure failed, font '+font+' is not loaded'); MC.set(k,v); } return v; }
 /* colours: [r,g,b,a] arrays */
 const U=c=>rgba(c[0],c[1],c[2],c[3]==null?255:c[3]);
 function col(s,dflt){ if(!s) return dflt; s=s.trim(); let m=s.match(/^#([0-9a-f]{3,8})$/i); if(m){ let h=m[1]; if(h.length<=4) h=h.split('').map(c=>c+c).join(''); return [0,2,4,6].map(i=>i<h.length?parseInt(h.substr(i,2),16):255); }
@@ -9851,7 +9851,7 @@ window.x7 = window.x7 || function (t) {
   var CORE = null, FONT = 0, FONTB = 0, GID = JV.GID;
   function fnv(s) { var h = 0x811c9dc5; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h; }
   var MC = new Map();
-  function tw(t, sz, bold) { var f = bold ? FONTB : FONT, k = f + '|' + sz + '|' + t, v = MC.get(k); if (v === undefined) { v = CORE.measure(f, sz, t); if (!(v >= 0)) v = t.length * sz * 0.55; if (MC.size > 20000) MC.clear(); MC.set(k, v); } return v; }
+  function tw(t, sz, bold) { var f = bold ? FONTB : FONT, k = f + '|' + sz + '|' + t, v = MC.get(k); if (v === undefined) { v = CORE.measure(f, sz, t); if (!(v >= 0)) throw new Error('Exp7VM.layout: text measure failed, font ' + f + ' is not loaded'); if (MC.size > 20000) MC.clear(); MC.set(k, v); } return v; }
 
   /* layout(model, W) -> { nodes:[{key,id,flags,items,hit,act,vm,base,hov,tf,ph,pop,slabKind,slabKey,slabOwner,mo}], H, ... } */
   function layout(model, width) {
@@ -12666,6 +12666,593 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
 })(typeof window !== 'undefined' ? window : globalThis);
 
 </script>
+<script data-exp7-shared="design-fail">
+/* Exp7 design system: failing first, as in Verse (docs/design-system.md section 8).
+ * A failable step returns its value or Fail.FAIL. It never throws. A failure context runs its body with a rollback
+ * journal: everything the body stages is applied only when the whole context succeeds, and dropped when it fails, so
+ * nothing half-done ever shows. Every context declares its fail logic, the way an if has an else. No throw, no try/catch.
+ * Effects that can't be undone (network, storage, DOM text fields) go in tx.after: they run only after success. */
+(function (root) {
+  'use strict';
+  var FAIL = Object.freeze({ fail: true });
+  var CODES = Object.freeze(['TOKEN_MISSING', 'TOKEN_UNKNOWN', 'TOKEN_FLOOR', 'TOKEN_TYPE', 'FONT_MISSING', 'GLYPH_MISSING', 'BOX_EMPTY',
+    'BOUNDS_UNSAT', 'TARGET_TOO_SMALL', 'ART_MISSING', 'DATA_MISSING', 'COMPONENT_INVALID', 'CONTEXT_FAILED', 'FORCED']);
+  var records = [], stack = [], forced = {};
+  /* an optional part of a failure record: the value, or null when the step had none to give */
+  function given(v) { return v == null ? null : v; }
+
+  /* The failure that ends the current step. The innermost context keeps it, so its fail logic can read it. */
+  function withFailure(code, detail) {
+    var d = detail == null ? {} : detail, f = { code: CODES.indexOf(code) >= 0 ? code : 'CONTEXT_FAILED', context: stack.length ? stack[stack.length - 1].name : null,
+      app: given(d.app), screen: given(d.screen), component: given(d.component), slot: given(d.slot), state: given(d.state),
+      id: given(d.id), offered: given(d.offered), needed: given(d.needed), detail: given(d.detail) };
+    if (code !== f.code) f.detail = 'unknown failure code ' + code;
+    if (stack.length) { var top = stack[stack.length - 1]; if (!top.failure) top.failure = f; }
+    else records.push(Object.assign({}, f, { context: null, detail: 'failable step used outside a failure context: ' + (f.detail == null ? '' : f.detail) }));
+    return FAIL;
+  }
+
+  function Tx(name) { this.name = name; this.staged = []; this.afterFns = []; this.failure = null; }
+  /* staged work is applied in order, only if the whole context succeeds */
+  Tx.prototype.stage = function (fn) { this.staged.push(fn); };
+  /* effects that can't be rolled back, run only after success (Verse <no_rollback>) */
+  Tx.prototype.after = function (fn) { this.afterFns.push(fn); };
+
+  /* Fail.context(name, body(tx), onFail(failure)) -> body's value, or FAIL. A failure goes no further than its context:
+   * the caller sees FAIL and nothing else. A nested context that succeeds hands its staged work to the context around it. */
+  function context(name, body, onFail) {
+    if (typeof onFail !== 'function') { records.push({ code: 'CONTEXT_FAILED', context: name, detail: 'context has no fail logic' }); return FAIL; }
+    var tx = new Tx(name), parent = stack.length ? stack[stack.length - 1] : null;
+    stack.push(tx);
+    var value = forced[name] ? withFailure('FORCED', { detail: 'context forced to fail by a test' }) : body(tx);
+    stack.pop();
+    if (value === FAIL) {
+      var failure = tx.failure !== null ? tx.failure : { code: 'CONTEXT_FAILED', context: name, detail: 'a step failed without a failure record' };
+      if (failure.context === null) failure.context = name;
+      records.push(failure);
+      onFail(failure);
+      return FAIL;
+    }
+    if (parent) { tx.staged.forEach(function (fn) { parent.staged.push(fn); }); tx.afterFns.forEach(function (fn) { parent.afterFns.push(fn); }); }
+    else { tx.staged.forEach(function (fn) { fn(); }); tx.afterFns.forEach(function (fn) { fn(); }); }
+    return value;
+  }
+
+  /* checked use of a failable result, for readability: if (Fail.no(x)) return FAIL */
+  function no(v) { return v === FAIL; }
+  /* step(name): a failable step that a test can force to fail (fault injection, docs section 9 layer 3) */
+  function step(name, detail) { return forced[name] ? withFailure('FORCED', Object.assign({ detail: 'step ' + name + ' forced to fail by a test' }, detail == null ? {} : detail)) : true; }
+
+  root.Exp7Fail = Object.freeze({
+    FAIL: FAIL, CODES: CODES, with: withFailure, context: context, no: no, step: step,
+    record: function (f) { if (f && records.indexOf(f) < 0) records.push(f); },
+    records: function () { return records.slice(); },
+    clear: function () { records.length = 0; },
+    active: function () { return stack.length ? stack[stack.length - 1].name : null; },
+    /* tests only: force a named context or step to fail */
+    force: function (name, on) { if (on === false) delete forced[name]; else forced[name] = true; },
+    unforce: function () { Object.keys(forced).forEach(function (k) { delete forced[k]; }); }
+  });
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script data-exp7-shared="design-tokens">
+/* Exp7 design system: tokens (docs/design-system.md section 5).
+ * Every number and colour a component uses is a token, read by name. Each app declares one complete set; it is checked
+ * against the schema as a whole: a missing key fails with TOKEN_MISSING, an unknown key with TOKEN_UNKNOWN, a wrong type
+ * with TOKEN_TYPE, a value under a floor with TOKEN_FLOOR. Nothing fills gaps from defaults. An app may build its set from
+ * another one explicitly with extend(base, over), and the result is checked as a whole. No throw, no try/catch. */
+(function (root) {
+  'use strict';
+  var F = root.Exp7Fail, FAIL = F.FAIL;
+
+  /* kind: colour (#rrggbb), number, font (a font resource name), roles (one number per type role) */
+  var SCHEMA = Object.freeze({
+    /* Colour. The spec's caption colour is captionInk here, since caption is also the caption type size. */
+    ink: 'colour', muted: 'colour', captionInk: 'colour', line: 'colour', lineSoft: 'colour', divider: 'colour', page: 'colour',
+    desk: 'colour', pageEdge: 'colour', wash: 'colour', accent: 'colour', mint: 'colour', mintInk: 'colour',
+    calLow: 'colour', calModerate: 'colour', calCritical: 'colour',
+    /* Type. lineHeight is per role: 1.25 x size, rounded to whole px, as the journal draws it today. */
+    font: 'font', fontStrong: 'font', title: 'number', body: 'number', secondary: 'number', caption: 'number', lineHeight: 'roles',
+    /* Space */
+    inset: 'number', groupGap: 'number', labelGap: 'number', controlGap: 'number',
+    /* Size */
+    target: 'number', row: 'number', link: 'number', cell: 'number', field: 'number', rule: 'number',
+    /* Width (section 4.6) */
+    phoneMax: 'number', columnMin: 'number', columnMax: 'number', columnMargin: 'number',
+    /* Motion */
+    edgeMs: 'number', clickPathMax: 'number',
+    /* Contrast */
+    textContrastMin: 'number', captionMin: 'number',
+    /* Shape: the drawn glyphs' geometry until phase 3 moves them to art slots */
+    chevronW: 'number', chevronH: 'number', chevronStroke: 'number', markR: 'number', markStroke: 'number', markBarW: 'number',
+    markBarGap: 'number', selectedStroke: 'number', selectedInset: 'number', pageRadius: 'number', swatch: 'number',
+    /* Page and block flow on Home */
+    pageTop: 'number', pageMin: 'number', pagePickMin: 'number', pageBottom: 'number', blockGap: 'number', sectionGap: 'number',
+    monthTop: 'number', dayTop: 'number', dayMin: 'number', viewPad: 'number', viewMin: 'number', headingDrop: 'number',
+    dateChevronGap: 'number', dateChevronMargin: 'number', controlInset: 'number', chevronMargin: 'number', chevronRoom: 'number',
+    /* MiniMonth */
+    gridTop: 'number', dowRise: 'number', dayNumberDrop: 'number', trailNumberDrop: 'number', markRise: 'number',
+    /* Legend and reason */
+    legendTop: 'number', legendTextGap: 'number', legendDrop: 'number', legendStepMin: 'number', legendStepPad: 'number',
+    legendEnd: 'number', reasonDrop: 'number', reasonEnd: 'number',
+    /* Day list */
+    noteDrop: 'number', emptyStep: 'number', captionDrop: 'number', captionStep: 'number', groupRuleGap: 'number', groupRuleStep: 'number',
+    rowDrop: 'number', timeWidth: 'number', timeIndent: 'number', cadenceGap: 'number', cadenceRoom: 'number', amountPad: 'number',
+    labelMin: 'number',
+    /* Plan */
+    planNameShare: 'number', planNameRoom: 'number', planChevron: 'number', planGap: 'number', planEnd: 'number', planWrapTop: 'number',
+    planWrapGap: 'number', planWrapEnd: 'number', planWrapNameDrop: 'number', planSelectedRise: 'number',
+    /* Links and notes */
+    notesGap: 'number', noteStep: 'number',
+    /* Headings and the inline date picker */
+    ruleGap: 'number', pageHeadEnd: 'number', dateChevronDrop: 'number', planChevronRoom: 'number', planWrapRoom: 'number',
+    pickTitleDrop: 'number', pickGridGap: 'number', pickGridEnd: 'number', pickNotesEnd: 'number'
+  });
+  /* Matthew's phone floors (section 5.3): role sizes and targets only, never text shrunk to fit */
+  var FLOORS = Object.freeze({ body: 17, secondary: 15, caption: 13, target: 44, row: 44, link: 44, cell: 44, field: 44, captionMin: 13, textContrastMin: 4.5 });
+  var ROLES = Object.freeze(['title', 'body', 'secondary', 'caption']);
+
+  function kindOk(kind, v) {
+    if (kind === 'colour') return typeof v === 'string' && /^#[0-9A-Fa-f]{6}$/.test(v);
+    if (kind === 'number') return typeof v === 'number' && isFinite(v);
+    if (kind === 'font') return typeof v === 'string' && v.length > 0;
+    if (kind === 'roles') return !!v && typeof v === 'object' && ROLES.every(function (r) { return typeof v[r] === 'number' && v[r] > 0; }) && Object.keys(v).length === ROLES.length;
+    return false;
+  }
+
+  /* check(name, set) -> the frozen set, or FAIL. Failable: use it inside a context. */
+  function check(name, set) {
+    if (!set || typeof set !== 'object') return F.with('TOKEN_MISSING', { app: name, detail: 'no token set' });
+    var keys = Object.keys(SCHEMA);
+    for (var i = 0; i < keys.length; i++) if (!Object.prototype.hasOwnProperty.call(set, keys[i])) return F.with('TOKEN_MISSING', { app: name, detail: keys[i] });
+    var own = Object.keys(set);
+    for (var j = 0; j < own.length; j++) if (!Object.prototype.hasOwnProperty.call(SCHEMA, own[j])) return F.with('TOKEN_UNKNOWN', { app: name, detail: own[j] });
+    for (var k = 0; k < keys.length; k++) if (!kindOk(SCHEMA[keys[k]], set[keys[k]])) return F.with('TOKEN_TYPE', { app: name, detail: keys[k] + ' must be a ' + SCHEMA[keys[k]] });
+    var fl = Object.keys(FLOORS);
+    for (var m = 0; m < fl.length; m++) if (set[fl[m]] < FLOORS[fl[m]]) return F.with('TOKEN_FLOOR', { app: name, detail: fl[m] + ' ' + set[fl[m]] + ' is under the floor ' + FLOORS[fl[m]] });
+    return Object.freeze(Object.assign({ __name: name }, set, { lineHeight: Object.freeze(Object.assign({}, set.lineHeight)) }));
+  }
+  /* get(set, name) -> value or FAIL (TOKEN_MISSING) */
+  function get(set, name) {
+    if (!set || !Object.prototype.hasOwnProperty.call(SCHEMA, name) || !Object.prototype.hasOwnProperty.call(set, name)) return F.with('TOKEN_MISSING', { app: set && set.__name, detail: name });
+    return set[name];
+  }
+  /* extend(base, over): an explicit copy with some values replaced; it still has to pass check() as a whole */
+  function extend(base, over) { return Object.assign({}, base, over); }
+
+  /* Budget's journal set: the values the journal draws today (the approved phone studies' SPEC.md). */
+  var BUDGET_JOURNAL = Object.freeze({
+    ink: '#24232B', muted: '#4D4C57', captionInk: '#5C5B66', line: '#DCDCE3', lineSoft: '#ECECF1', divider: '#E3E3EA', page: '#FFFFFF',
+    desk: '#F3F3F5', pageEdge: '#D6D6DC', wash: '#ECEAF3', accent: '#7D74A8', mint: '#DDF0E6', mintInk: '#1E5640',
+    calLow: '#DDF0E6', calModerate: '#F3EFD8', calCritical: '#F3E6E8',
+    font: 'jr-font-ss3', fontStrong: 'jr-font-ss3-semibold', title: 22, body: 17, secondary: 15, caption: 13,
+    lineHeight: { title: 28, body: 21, secondary: 19, caption: 16 },
+    inset: 20, groupGap: 28, labelGap: 20, controlGap: 18,
+    target: 44, row: 56, link: 44, cell: 48, field: 44, rule: 1,
+    phoneMax: 420, columnMin: 390, columnMax: 520, columnMargin: 48,
+    edgeMs: 0, clickPathMax: 120, textContrastMin: 4.5, captionMin: 13,
+    chevronW: 4, chevronH: 10, chevronStroke: 1.4, markR: 3.2, markStroke: 1.1, markBarW: 8, markBarGap: 1.6,
+    selectedStroke: 1.5, selectedInset: 1, pageRadius: 4, swatch: 18,
+    pageTop: 16, pageMin: 940, pagePickMin: 844, pageBottom: 24, blockGap: 12, sectionGap: 18,
+    monthTop: 60, dayTop: 350, dayMin: 192, viewPad: 8, viewMin: 40, headingDrop: 31,
+    dateChevronGap: 10, dateChevronMargin: 18, controlInset: 8, chevronMargin: 11, chevronRoom: 28,
+    gridTop: 32, dowRise: 6, dayNumberDrop: 20.4, trailNumberDrop: 20.2, markRise: 11.25,
+    legendTop: 10, legendTextGap: 10, legendDrop: 14, legendStepMin: 24, legendStepPad: 6, legendEnd: 2, reasonDrop: 16, reasonEnd: 8,
+    noteDrop: 20, emptyStep: 40, captionDrop: 16, captionStep: 24, groupRuleGap: 2, groupRuleStep: 6,
+    rowDrop: 31, timeWidth: 88, timeIndent: 60, cadenceGap: 12, cadenceRoom: 90, amountPad: 8, labelMin: 40,
+    planNameShare: 0.48, planNameRoom: 80, planChevron: 18, planGap: 16, planEnd: 8, planWrapTop: 16, planWrapGap: 8, planWrapEnd: 14,
+    planWrapNameDrop: 13.6, planSelectedRise: 30,
+    notesGap: 19, noteStep: 20,
+    ruleGap: 4, pageHeadEnd: 8, dateChevronDrop: 18, planChevronRoom: 16, planWrapRoom: 24,
+    pickTitleDrop: 27, pickGridGap: 22, pickGridEnd: 8, pickNotesEnd: 32
+  });
+
+  /* The Exp7 light set, for apps that start from the platform theme: EXP7_LIGHT_THEME colours, DejaVu, type at the floors. */
+  var L = root.EXP7_LIGHT_THEME;
+  var EXP7_LIGHT = Object.freeze(Object.assign({}, BUDGET_JOURNAL, {
+    ink: L.text.toUpperCase(), muted: L.muted.toUpperCase(), captionInk: L.muted.toUpperCase(), line: L.border.toUpperCase(),
+    lineSoft: L.subtle.toUpperCase(), divider: L.border.toUpperCase(), page: L.surface.toUpperCase(), desk: L.subtle.toUpperCase(),
+    pageEdge: L.border.toUpperCase(), wash: L.subtle.toUpperCase(), accent: L.accent.toUpperCase(), mint: L.low.toUpperCase(),
+    mintInk: L.lowText.toUpperCase(), calLow: L.low.toUpperCase(), calModerate: L.moderate.toUpperCase(), calCritical: L.critical.toUpperCase(),
+    font: 'jr-font', fontStrong: 'jr-font-bold'
+  }));
+
+  root.Exp7Tokens = Object.freeze({ SCHEMA: SCHEMA, FLOORS: FLOORS, ROLES: ROLES, check: check, get: get, extend: extend,
+    BUDGET_JOURNAL: BUDGET_JOURNAL, EXP7_LIGHT: EXP7_LIGHT });
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script data-exp7-shared="design-bounds">
+/* Exp7 design system: bounds (docs/design-system.md section 4).
+ * Every piece declares bounds { w:{mode,min,max}, h:{mode,min,max} } with mode fixed | fill | hug. Layout is two passes:
+ * measure (a parent offers { minW, maxW, minH, maxH }, the child returns one size inside them) and place (the parent gives
+ * each child a rect). Both are failable steps. Text is measured only by JRender (core.measure, core.wrap, core.metrics):
+ * there is no estimate. Text too big for its box shrinks to fit, with no lower limit; a box never shrinks below its min.
+ * After layout every rect is readable from one table, keyed by the node's stable id. No throw, no try/catch, no defaults. */
+(function (root) {
+  'use strict';
+  var F = root.Exp7Fail, FAIL = F.FAIL, Q = 64; /* coordinates are rounded to 1/64 px, the draw list's quantum */
+  function q(v) { return Math.round(v * Q) / Q; }
+  function fnv(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0; return h; }
+
+  /* the readable rect table (section 4.4) */
+  function Table() { this.rects = new Map(); }
+  Table.prototype.put = function (id, rect, bounds, kids, view) { this.rects.set(id, { rect: rect.slice(), bounds: bounds, kids: kids.slice(), view: view }); };
+  Table.prototype.rect = function (id) { var e = this.rects.get(id); return e ? { x: e.rect[0], y: e.rect[1], w: e.rect[2], h: e.rect[3] } : null; };
+  Table.prototype.bounds = function (id) { var e = this.rects.get(id); return e ? e.bounds : null; };
+  Table.prototype.children = function (id) { var e = this.rects.get(id); return e ? e.kids.slice() : []; };
+  Table.prototype.extent = function (id) { var e = this.rects.get(id); if (!e) return null; var r = e.rect.slice(), self = this;
+    e.kids.forEach(function (k) { var x = self.extent(k); if (!x) return; var x2 = Math.max(r[0] + r[2], x.x + x.w), y2 = Math.max(r[1] + r[3], x.y + x.h); r[0] = Math.min(r[0], x.x); r[1] = Math.min(r[1], x.y); r[2] = x2 - r[0]; r[3] = y2 - r[1]; });
+    return { x: r[0], y: r[1], w: r[2], h: r[3] }; };
+  Table.prototype.ids = function () { return Array.from(this.rects.keys()); };
+  /* rects offset into page coordinates once a view is placed on the page */
+  Table.prototype.shift = function (view, dx, dy) { this.rects.forEach(function (e) { if (e.view === view) { e.rect[0] += dx; e.rect[1] += dy; } }); };
+
+  /* A view collects the JRViews node/item contract (the same one journal layouts emit) for one record of the view store. */
+  function View(S, key, W) { this.S = S; this.key = key; this.W = W; this.nodes = []; this.used = new Set([0, root.JRViews.GID]); this.texts = []; this.byKey = {}; }
+  View.prototype.node = function (k, vm) { var s = this.key + ':' + k, h = fnv(s); while (!h || this.used.has(h) || h === 0xffffffff) h = (h + 1) >>> 0; this.used.add(h);
+    var n = { key: s, id: h, flags: 0, items: [], hit: null, vm: vm == null ? null : vm, act: null, mo: 'cell' }; this.nodes.push(n); this.byKey[k] = n; return n; };
+  View.prototype.hit = function (n, r, act, label) { n.flags = root.JRender.NF.HIT; n.hit = r.slice(); n.act = 'vm'; n.vm = Object.assign(n.vm == null ? {} : n.vm, { act: act, label: label == null ? act : label }); };
+  View.prototype.finish = function (contentH, pad) { var H = Math.max(Math.ceil(contentH + pad), 1);
+    return { nodes: this.nodes, H: H, W: this.W, items: 0, rows: 0, glyphs: this.texts.reduce(function (s, t) { return s + t.text.length; }, 0),
+      hits: this.nodes.filter(function (n) { return n.flags & root.JRender.NF.HIT; }).length, tboxes: this.texts, texts: this.texts, notdef: [], vm: true, enter: [], design: true }; };
+
+  /* A layout session: one app's tokens and fonts, one table. Every getter is a failable step. */
+  function Session(o) { this.core = o.core; this.tokens = o.tokens; this.fontIds = o.fonts; this.table = new Table(); this.app = o.app; this.screen = o.screen; this.wraps = new Map(); }
+  Session.prototype.token = function (name) { return root.Exp7Tokens.get(this.tokens, name); };
+  Session.prototype.color = function (name) { var v = this.token(name); return v === FAIL ? FAIL : root.JRender.hex(v); };
+  /* font(role): the token names a font resource, which must be loaded into the Core */
+  Session.prototype.font = function (bold) { var res = this.token(bold ? 'fontStrong' : 'font'); if (res === FAIL) return FAIL;
+    var id = this.fontIds[res]; if (!(id >= 0)) return F.with('FONT_MISSING', { app: this.app, screen: this.screen, detail: res }); return id; };
+  Session.prototype.glyphs = function (font, text, where) { var s = String(text);
+    for (var ch of s) { var cp = ch.codePointAt(0); if (cp >= 32 && !/\s/.test(ch) && !this.core.hasGlyph(font, cp)) return F.with('GLYPH_MISSING', Object.assign({ app: this.app, screen: this.screen, detail: 'U+' + cp.toString(16).toUpperCase().padStart(4, '0') + ' in ' + JSON.stringify(s) }, where == null ? {} : where)); }
+    return true; };
+  Session.prototype.metrics = function (font) { var m = this.core.metrics(font); return { asc: m.asc / m.upm, desc: m.desc / m.upm }; };
+  Session.prototype.measureText = function (font, size, text) { return this.core.measure(font, size, String(text)); };
+  Session.prototype.wrap = function (font, size, text, maxW) { var k = font + '|' + size + '|' + maxW + '|' + text, w = this.wraps.get(k); if (!w) { w = this.core.wrap(font, size, String(text), maxW); this.wraps.set(k, w); } return w; };
+
+  /* Text (section 4.5). A run is { text, role, bold, ink }: role names a type size token, ink a colour token. The run is
+   * measured by JRender only. Its baseline is a position in the layout; its box above and below the baseline comes from the
+   * font's ascent and descent (core.metrics), so bold and regular runs on one baseline sit on the same line.
+   * fit(run, box) is the one failable fitting step: wrap at the role's size; if the lines fit in lines.max and inside the box,
+   * done; otherwise shrink to the largest size that fits, with no lower limit. It fails only when the box has no width or
+   * height to shrink into (BOX_EMPTY). There is no ellipsis: shrinking keeps all the text. */
+  Session.prototype.fit = function (run, box, where) {
+    var font = this.font(!!run.bold); if (font === FAIL) return FAIL;
+    if (this.glyphs(font, run.text, where) === FAIL) return FAIL;
+    var role = this.token(run.role); if (role === FAIL) return FAIL;
+    var lhs = this.token('lineHeight'); if (lhs === FAIL) return FAIL;
+    var ink = this.color(run.ink); if (ink === FAIL) return FAIL;
+    if (!(box.w > 0) || !(box.h > 0)) return F.with('BOX_EMPTY', Object.assign({ app: this.app, screen: this.screen, offered: { w: box.w, h: box.h }, detail: JSON.stringify(String(run.text)) }, where == null ? {} : where));
+    var lhRole = lhs[run.role], maxLines = run.lines ? run.lines.max : Infinity, single = maxLines === 1, self = this, text = String(run.text);
+    function at(size) {
+      var lh = lhRole * size / role, lines;
+      if (single) lines = [{ text: text, width: self.measureText(font, size, text) }];
+      else lines = self.wrap(font, size, text, box.w).lines.map(function (l) { return { text: l.text.replace(/\s+$/, ''), width: l.width }; });
+      var width = lines.reduce(function (m, l) { return Math.max(m, l.width); }, 0), n = Math.max(1, lines.length);
+      return { size: size, lh: lh, lines: lines, n: n, h: n * lh, w: width, fits: n <= maxLines && n * lh <= box.h + 1e-6 && width <= box.w + 1e-6 };
+    }
+    var r = at(role); if (r.fits) return Object.assign(r, { font: font, ink: ink, bold: !!run.bold, shrunk: false });
+    var lo = 0, hi = role, best = null;
+    for (var i = 0; i < 24; i++) { var mid = (lo + hi) / 2, t = at(mid); if (t.fits) { best = t; lo = mid; } else hi = mid; }
+    if (!best) return F.with('BOX_EMPTY', Object.assign({ app: this.app, screen: this.screen, offered: { w: box.w, h: box.h }, detail: 'no size fits ' + JSON.stringify(text) }, where == null ? {} : where));
+    return Object.assign(best, { font: font, ink: ink, bold: !!run.bold, shrunk: true });
+  };
+  /* the ascent and descent of a fitted run, in px */
+  Session.prototype.ascent = function (f) { return this.metrics(f.font).asc * f.size; };
+  Session.prototype.descent = function (f) { return -this.metrics(f.font).desc * f.size; };
+  /* the baseline that centres a fitted line's ascent and descent in a box of height h starting at y */
+  Session.prototype.centre = function (f, y, h) { var m = this.metrics(f.font); return y + h / 2 + (m.asc + m.desc) / 2 * f.size; };
+  /* paint a fitted run: the first line on baseline, later lines lh apart. x is the start, the centre or the end of the
+   * line per align. Every line goes in the view's text table with the box it must stay inside. */
+  Session.prototype.paint = function (V, n, f, x, baseline, align, box) {
+    var asc = this.ascent(f), self = this;
+    f.lines.forEach(function (ln, i) { if (!ln.text) return;
+      var w = self.measureText(f.font, f.size, ln.text), px = align === 'center' ? x - w / 2 : align === 'end' ? x - w : x, base = baseline + i * f.lh;
+      if (f.bold) n.items.push(['rich', q(px), q(base - asc), [{ text: ln.text, size: f.size, color: f.ink, bold: true }], 0, 1.25]);
+      else n.items.push(['text', q(px), q(base), f.size, f.ink, ln.text, 0, f.font]);
+      V.texts.push({ text: ln.text, x: px, y: base, size: f.size, width: w, max: 0, top: base - asc, bottom: base + self.descent(f), box: box, node: n.key, shrunk: f.shrunk });
+    });
+    return f;
+  };
+  /* line(): one line of text on a baseline, in at most maxW (it shrinks past that). align start | center | end. */
+  Session.prototype.line = function (V, n, run, x, baseline, maxW, align, where) {
+    var f = this.fit(Object.assign({ lines: { min: 1, max: 1 } }, run), { w: maxW, h: Infinity }, where); if (f === FAIL) return FAIL;
+    var bx = align === 'center' ? x - maxW / 2 : align === 'end' ? x - maxW : x;
+    return this.paint(V, n, f, x, baseline, align, [bx, baseline - this.ascent(f), maxW, this.ascent(f) + this.descent(f)]);
+  };
+  /* para(): text that wraps in maxW from a first baseline; returns the fitted run (its n lines and lh) */
+  Session.prototype.para = function (V, n, run, x, baseline, maxW, maxH, where) {
+    var f = this.fit(Object.assign({ lines: { min: 1, max: Infinity } }, run), { w: maxW, h: maxH }, where); if (f === FAIL) return FAIL;
+    return this.paint(V, n, f, x, baseline, 'start', [x, baseline - this.ascent(f), maxW, (f.n - 1) * f.lh + this.ascent(f) + this.descent(f)]);
+  };
+  /* centred(): one line centred on its metrics in the box [x, y, w, h], starting at tx */
+  Session.prototype.centred = function (V, n, run, rect, tx, maxW, where) {
+    var f = this.fit(Object.assign({ lines: { min: 1, max: 1 } }, run), { w: maxW, h: rect[3] }, where); if (f === FAIL) return FAIL;
+    return this.paint(V, n, f, tx, this.centre(f, rect[1], rect[3]), 'start', rect.slice());
+  };
+
+  /* resolve(bounds, offered): the size a node takes on one axis, or BOUNDS_UNSAT */
+  function axis(b, offMin, offMax, want, where) {
+    var min = b.min, max = b.max;
+    if (min > offMax + 1e-6) return F.with('BOUNDS_UNSAT', Object.assign({ offered: { min: offMin, max: offMax }, needed: { min: min, max: max } }, where));
+    if (b.mode === 'fixed') return min;
+    var v = b.mode === 'fill' ? offMax : want;
+    v = Math.max(min, Math.min(max, v));
+    return Math.max(offMin, Math.min(offMax, v));
+  }
+
+  root.Exp7Bounds = Object.freeze({ Session: Session, View: View, Table: Table, axis: axis, q: q, fnv: fnv,
+    session: function (o) { return new Session(o); } });
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script data-exp7-shared="design-components">
+/* Exp7 design system: components (docs/design-system.md section 6). Components are the only way a screen is built.
+ * Each one is registered with its bounds, slots, states and test fixtures; registration fails if any is missing.
+ * A component draws into a View (the JRViews node/item contract) at a rect its parent gives it: place(name, S, V, props,
+ * x, y, w) returns the height it took, or FAIL. measure(name, S, props, offer) returns the size without drawing anywhere
+ * that shows. Every size and colour comes from the app's tokens, read by name. No throw, no try/catch, no defaults.
+ * Phase 1 holds the set Budget Home needs: Page, Heading, DateHeading, DatePicker, MiniMonth, Legend, Note, Row, LinkRow. */
+(function (root) {
+  'use strict';
+  var F = root.Exp7Fail, B = root.Exp7Bounds, FAIL = F.FAIL, q = B.q;
+  var WEEK = 7, HALF = 2, NO_ROOM = 0;
+  var registry = new Map();
+
+  /* tokens(S, names): every named token, or FAIL */
+  function tokens(S, names) { var o = {}; for (var i = 0; i < names.length; i++) { var v = S.token(names[i]); if (v === FAIL) return FAIL; o[names[i]] = v; } return o; }
+  function colours(S, names) { var o = {}; for (var i = 0; i < names.length; i++) { var v = S.color(names[i]); if (v === FAIL) return FAIL; o[names[i]] = v; } return o; }
+  /* field(props, key): a value the component needs from its model, or DATA_MISSING */
+  function field(props, key, where) { return props != null && props[key] != null ? props[key] : F.with('DATA_MISSING', Object.assign({ detail: key }, where == null ? {} : where)); }
+
+  /* Glyphs: two-line chevrons (never Unicode arrows) and the calendar's colour-blind marks. Phase 3 moves them to art slots. */
+  function glyphs(S) { var t = tokens(S, ['chevronW', 'chevronH', 'chevronStroke', 'markR', 'markStroke', 'markBarW', 'markBarGap']); if (t === FAIL) return FAIL;
+    var c = colours(S, ['mintInk', 'muted']); if (c === FAIL) return FAIL;
+    var w = t.chevronW, h = t.chevronH, st = { width: t.chevronStroke, join: 'miter', cap: 'butt' };
+    function bar(n, cx, cy) { n.items.push(['stroke', [['M', cx - t.markBarW / HALF, cy], ['L', cx + t.markBarW / HALF, cy]], c.muted, { width: t.chevronStroke, cap: 'butt' }]); }
+    return {
+      right: function (n, x, y, ink) { n.items.push(['stroke', [['M', x, y - h / HALF], ['L', x + w, y], ['L', x, y + h / HALF]], ink, st]); },
+      left: function (n, x, y, ink) { n.items.push(['stroke', [['M', x + w, y - h / HALF], ['L', x, y], ['L', x + w, y + h / HALF]], ink, st]); },
+      down: function (n, x, y, ink) { n.items.push(['stroke', [['M', x, y], ['L', x + h / HALF, y + w], ['L', x + h, y]], ink, st]); },
+      up: function (n, x, y, ink) { n.items.push(['stroke', [['M', x, y + w], ['L', x + h / HALF, y], ['L', x + h, y + w]], ink, st]); },
+      mark: function (n, level, cx, cy) {
+        if (level === 'L') n.items.push(['border', cx - t.markR, cy - t.markR, t.markR * HALF, t.markR * HALF, t.markR, t.markStroke, c.mintInk]);
+        if (level === 'M') bar(n, cx, cy);
+        if (level === 'C') { bar(n, cx, cy - t.markBarGap); bar(n, cx, cy + t.markBarGap); }
+      },
+      chevronH: h };
+  }
+  /* rule(): a hairline in its own node */
+  function rule(S, V, k, x, y, w, colour) { var t = tokens(S, ['rule']); if (t === FAIL) return FAIL; var c = S.color(colour); if (c === FAIL) return FAIL;
+    var n = V.node(k); n.items.push(['rect', x, y, w, t.rule, c]); return n; }
+  /* hit(): the node's hit is its rect, at least target on both axes */
+  function hit(S, V, n, rect, act, label, where) { var t = S.token('target'); if (t === FAIL) return FAIL;
+    if (rect[2] < t || rect[3] < t) return F.with('TARGET_TOO_SMALL', Object.assign({ id: n.id, offered: { w: rect[2], h: rect[3] }, needed: { w: t, h: t } }, where == null ? {} : where));
+    V.hit(n, rect, act, label); S.table.put(n.id, rect, null, [], V.key); return n; }
+  /* control(): a tappable band with a label centred on its metrics and an optional chevron (LinkRow and its kin) */
+  function control(S, V, p, x, y, w, h) {
+    var t = tokens(S, ['inset', 'controlInset', 'chevronRoom', 'chevronMargin']); if (t === FAIL) return FAIL;
+    var c = colours(S, ['page', 'wash', 'ink', 'captionInk']); if (c === FAIL) return FAIL;
+    var G = glyphs(S); if (G === FAIL) return FAIL;
+    var n = V.node(p.key); n.items.push(['rect', x, y, w, h, c.page]); n.base = c.page; n.hov = c.wash;
+    if (hit(S, V, n, [x, y, w, h], p.act, p.label === '' ? p.act : p.label, { component: p.component }) === FAIL) return FAIL;
+    var tx = x + (w >= V.W - 1 ? t.inset : t.controlInset), room = w - (p.chevron ? t.chevronRoom : t.controlInset * HALF) - (tx - x);
+    if (p.label !== '' && S.centred(V, n, { text: p.label, role: p.role, bold: !!p.bold, ink: 'ink' }, [x, y, w, h], tx, room, { component: p.component, id: n.id }) === FAIL) return FAIL;
+    if (p.chevron) G.right(n, x + w - t.chevronMargin, y + h / HALF, c.captionInk);
+    return n;
+  }
+
+  /* ---------- the registry ---------- */
+  function register(def) {
+    return F.context('design.register:' + (def && def.name), function () {
+      var need = ['name', 'bounds', 'slots', 'states', 'fixtures', 'draw'];
+      for (var i = 0; i < need.length; i++) if (def[need[i]] == null) return F.with('COMPONENT_INVALID', { component: def.name == null ? null : def.name, detail: 'missing ' + need[i] });
+      if (!def.slots.length && def.slots !== NONE) return F.with('COMPONENT_INVALID', { component: def.name, detail: 'no slots' });
+      if (!def.states.length || !def.fixtures.length) return F.with('COMPONENT_INVALID', { component: def.name, detail: 'no states or fixtures' });
+      registry.set(def.name, Object.freeze(def)); return true;
+    }, function (failure) { F.record(failure); });
+  }
+  var NONE = Object.freeze([]);
+  /* place(): check the width against the component's bounds, draw, check the height, record the rect */
+  function place(name, S, V, props, x, y, w) {
+    var def = registry.get(name); if (!def) return F.with('COMPONENT_INVALID', { component: name, detail: 'not registered' });
+    var b = def.bounds(S, props); if (b === FAIL) return FAIL;
+    var where = { component: name, screen: S.screen, app: S.app };
+    if (B.axis(b.w, w, w, w, where) === FAIL) return FAIL;
+    var before = V.nodes.length, h = def.draw(S, V, props, x, y, w); if (h === FAIL) return FAIL;
+    if (h < b.h.min - 1e-6 || h > b.h.max + 1e-6) return F.with('BOUNDS_UNSAT', Object.assign({ offered: { h: h }, needed: { min: b.h.min, max: b.h.max } }, where));
+    var kids = V.nodes.slice(before).map(function (n) { return n.id; }), id = B.fnv(V.key + ':' + name + ':' + (props.key == null ? name : props.key) + ':' + x + ',' + y);
+    S.table.put(id, [x, y, w, h], b, kids, V.key);
+    return h;
+  }
+  /* measure(): the size a component takes in an offer, drawn into a view nobody sees */
+  function measure(name, S, props, offer) { var V = new B.View(S, 'measure:' + name, offer.maxW), h = place(name, S, V, props, 0, 0, offer.maxW); if (h === FAIL) return FAIL; return { w: offer.maxW, h: h }; }
+
+  function fill(S, minName, factor) { var v = S.token(minName); if (v === FAIL) return FAIL; return { mode: 'fill', min: v * factor, max: Infinity }; }
+  function hug(S, minName, maxH) { var v = minName ? S.token(minName) : NO_ROOM; if (v === FAIL) return FAIL; return { mode: 'hug', min: v, max: maxH }; }
+  function bounds(w, h) { return w === FAIL || h === FAIL ? FAIL : { w: w, h: h }; }
+
+  /* ---------- Page: the paper, its edge ---------- */
+  register({ name: 'Page', slots: ['page.background', 'page.edge'], states: ['idle'],
+    fixtures: [{ key: 'paper', height: 940 }],
+    bounds: function (S) { return bounds(fill(S, 'target', 1), hug(S, null, Infinity)); },
+    draw: function (S, V, p, x, y, w) { var t = tokens(S, ['pageRadius', 'viewMin']); if (t === FAIL) return FAIL;
+      var c = colours(S, ['page', 'pageEdge']); if (c === FAIL) return FAIL;
+      var H = field(p, 'height', { component: 'Page' }); if (H === FAIL) return FAIL;
+      var n = V.node(p.key); n.items.push(['rect', x, y, w, H, c.page]);
+      if (H > t.viewMin) n.items.push(['border', x, y, w, H, t.pageRadius, 1, c.pageEdge]);
+      return H; } });
+
+  /* ---------- Heading: a block's title on its baseline ---------- */
+  register({ name: 'Heading', slots: NONE, states: ['idle'],
+    fixtures: [{ key: 'ag-h', text: 'Today' }, { key: 'plan-h', text: 'A heading long enough to have to shrink to fit inside a phone column' }],
+    bounds: function (S) { var t = S.token('target'), g = S.token('ruleGap'); if (t === FAIL || g === FAIL) return FAIL; return bounds(fill(S, 'target', 1), { mode: 'fixed', min: t + g, max: t + g }); },
+    draw: function (S, V, p, x, y, w) { var t = tokens(S, ['inset', 'headingDrop', 'target', 'ruleGap']); if (t === FAIL) return FAIL;
+      var text = field(p, 'text', { component: 'Heading' }); if (text === FAIL) return FAIL;
+      if (S.line(V, V.node(p.key), { text: text, role: 'body', bold: true, ink: 'ink' }, x + t.inset, y + t.headingDrop, w - t.inset * HALF, 'start', { component: 'Heading' }) === FAIL) return FAIL;
+      return t.target + t.ruleGap; } });
+
+  /* ---------- Note: caption or secondary text that wraps, from its first baseline ---------- */
+  register({ name: 'Note', slots: NONE, states: ['idle'],
+    fixtures: [{ key: 'n', text: 'Nothing is scheduled this day.', role: 'body', ink: 'muted', drop: 'noteDrop' }],
+    bounds: function (S) { return bounds(fill(S, 'target', 1), hug(S, null, Infinity)); },
+    /* p: { key, text, role, ink, drop (the token for the first baseline below y), step (the token for the height it takes, or none to hug its lines) } */
+    draw: function (S, V, p, x, y, w) { var t = tokens(S, ['inset', p.drop]); if (t === FAIL) return FAIL;
+      var text = field(p, 'text', { component: 'Note' }); if (text === FAIL) return FAIL;
+      var f = S.para(V, V.node(p.key), { text: text, role: p.role, ink: p.ink }, x + t.inset, y + t[p.drop], w - t.inset * HALF, Infinity, { component: 'Note' }); if (f === FAIL) return FAIL;
+      if (p.step) { var s = S.token(p.step); return s === FAIL ? FAIL : s; }
+      return t[p.drop] + f.n * f.lh; } });
+
+  /* ---------- LinkRow: a destination band with an optional chevron ---------- */
+  register({ name: 'LinkRow', slots: ['link.background', 'link.chevron'], states: ['idle', 'hover', 'pressed', 'focus'],
+    fixtures: [{ key: 'link0', label: 'Monthly expenses', act: 'nav:ledger', chevron: true, height: 'link', role: 'body' }, { key: 'add-day', label: 'Add to today', act: 'add:item', chevron: true, height: 'row', role: 'body' }],
+    bounds: function (S) { return bounds(fill(S, 'target', 1), hug(S, 'link', Infinity)); },
+    /* p: { key, label, act, chevron, height (a size token), role (a type size token), bold } */
+    draw: function (S, V, p, x, y, w) { var h = S.token(p.height); if (h === FAIL) return FAIL;
+      var n = control(S, V, { key: p.key, label: p.label, act: p.act, chevron: p.chevron, role: p.role, bold: p.bold, component: 'LinkRow' }, x, y, w, h); if (n === FAIL) return FAIL;
+      if (p.hoverDate) n.vm.hoverDate = true;
+      return h; } });
+
+  /* ---------- DateHeading: the day, bold, with the chevron that opens the shared picker, and the rule under it ---------- */
+  register({ name: 'DateHeading', slots: ['heading.chevron', 'heading.background'], states: ['idle', 'hover', 'pressed', 'focus'],
+    fixtures: [{ key: 'date-heading', title: 'Saturday, November 14, 2026', open: false }, { key: 'date-heading', title: 'Wednesday, September 30, 2026', open: true }],
+    bounds: function (S) { var t = S.token('target'); if (t === FAIL) return FAIL; return bounds(fill(S, 'target', 1), { mode: 'fixed', min: t, max: t }); },
+    draw: function (S, V, p, x, y, w) { var t = tokens(S, ['target', 'inset', 'dateChevronGap', 'dateChevronMargin', 'dateChevronDrop', 'controlInset']); if (t === FAIL) return FAIL;
+      var c = colours(S, ['captionInk']); if (c === FAIL) return FAIL; var G = glyphs(S); if (G === FAIL) return FAIL;
+      var title = field(p, 'title', { component: 'DateHeading' }); if (title === FAIL) return FAIL;
+      var n = control(S, V, { key: p.key, label: title, act: 'journal:date', chevron: false, role: 'body', bold: true, component: 'DateHeading' }, x, y, w, t.target); if (n === FAIL) return FAIL;
+      n.vm.hoverDate = true;
+      var drawn = V.texts[V.texts.length - 1], cx = Math.min(x + w - t.dateChevronMargin, x + t.inset + drawn.width + t.dateChevronGap);
+      if (p.open) G.up(n, cx, y + t.dateChevronDrop, c.captionInk); else G.down(n, cx, y + t.dateChevronDrop, c.captionInk);
+      if (rule(S, V, 'page-rule', x + t.inset, y + t.target, w - t.inset * HALF, 'line') === FAIL) return FAIL;
+      return t.target; } });
+
+  /* ---------- MiniMonth: the 7-column grid with tints, colour-blind marks and the selected day ---------- */
+  register({ name: 'MiniMonth', slots: ['day.background', 'day.mark', 'day.today', 'day.selected'], states: ['idle', 'hover', 'pressed', 'selected', 'disabled'],
+    fixtures: [{ key: 'm', month: '2026-08', sel: '2026-08-01', today: '2026-08-14', days: ['2026-08-01', '2026-08-02', '2026-08-03', '2026-08-04', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09', '2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14', '2026-08-15', '2026-08-16', '2026-08-17', '2026-08-18', '2026-08-19', '2026-08-20', '2026-08-21', '2026-08-22', '2026-08-23', '2026-08-24', '2026-08-25', '2026-08-26', '2026-08-27', '2026-08-28', '2026-08-29', '2026-08-30', '2026-08-31'], risk: { '2026-08-03': { c: 'L' }, '2026-08-04': { c: 'M' }, '2026-08-05': { c: 'C' } }, prefix: '', act: 'budget:pickday:', strokeToday: false, gridTop: 'gridTop' }],
+    bounds: function (S) { return bounds(fill(S, 'target', WEEK), hug(S, 'cell', Infinity)); },
+    /* p: { month, sel, today, days (ISO dates), risk ({ date: { c: 'L'|'M'|'C' } }), prefix, act, strokeToday, gridTop (the token for
+     * the grid's top below y; the weekday row sits above the grid, inside this rect) } */
+    draw: function (S, V, p, x, y0, w) {
+      var gt = S.token(p.gridTop); if (gt === FAIL) return FAIL; var y = y0 + gt;
+      var t = tokens(S, ['cell', 'dowRise', 'dayNumberDrop', 'trailNumberDrop', 'markRise', 'selectedStroke', 'selectedInset']); if (t === FAIL) return FAIL;
+      var c = colours(S, ['page', 'wash', 'lineSoft', 'accent', 'calLow', 'calModerate', 'calCritical']); if (c === FAIL) return FAIL;
+      var G = glyphs(S); if (G === FAIL) return FAIL;
+      var month = field(p, 'month', { component: 'MiniMonth' }); if (month === FAIL) return FAIL;
+      var days = field(p, 'days', { component: 'MiniMonth' }); if (days === FAIL) return FAIL;
+      var cw = w / WEEK, ch = t.cell, start = new Date(month + '-01T12:00:00').getDay(), names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], tint = { C: c.calCritical, M: c.calModerate, L: c.calLow };
+      for (var i = 0; i < WEEK; i++) if (S.line(V, V.node(p.prefix + 'dow' + i), { text: names[i], role: 'secondary', ink: 'captionInk' }, x + i * cw + cw / HALF, y - t.dowRise, cw, 'center', { component: 'MiniMonth' }) === FAIL) return FAIL;
+      for (var di = 0; di < days.length; di++) {
+        var d = days[di], ix = start + di, cx0 = x + (ix % WEEK) * cw, cy0 = y + Math.floor(ix / WEEK) * ch, n = V.node(p.prefix + 'day:' + d);
+        var level = p.risk[d] && p.risk[d].c ? p.risk[d].c : '', bg = tint[level] != null ? tint[level] : c.page, isSel = d === p.sel, isToday = d === p.today;
+        n.items.push(['rect', cx0, cy0, cw, ch, bg]); n.base = bg; n.hov = c.wash; n.items.push(['border', cx0, cy0, cw, ch, 0, 1, c.lineSoft]);
+        if (S.line(V, n, { text: String(+d.slice(8)), role: 'body', bold: isSel || isToday, ink: 'ink' }, cx0 + cw / HALF, cy0 + t.dayNumberDrop, cw, 'center', { component: 'MiniMonth', state: isSel ? 'selected' : 'idle' }) === FAIL) return FAIL;
+        if (isSel) n.items.push(['border', cx0 + t.selectedInset, cy0 + t.selectedInset, cw - t.selectedInset * HALF, ch - t.selectedInset * HALF, 0, t.selectedStroke, c.accent]);
+        else if (isToday && p.strokeToday) n.items.push(['border', cx0 + t.selectedInset, cy0 + t.selectedInset, cw - t.selectedInset * HALF, ch - t.selectedInset * HALF, 0, t.selectedStroke, c.accent]);
+        G.mark(n, level, cx0 + cw / HALF, cy0 + ch - t.markRise);
+        if (hit(S, V, n, [cx0, cy0, cw, ch], p.act + d, d, { component: 'MiniMonth' }) === FAIL) return FAIL;
+      }
+      var filled = start + days.length, trail = (WEEK - filled % WEEK) % WEEK;
+      for (var ti = 0; ti < trail; ti++) { var jx = filled + ti, tx0 = x + (jx % WEEK) * cw, ty0 = y + Math.floor(jx / WEEK) * ch, m = V.node(p.prefix + 'trail' + ti);
+        m.items.push(['rect', tx0, ty0, cw, ch, c.page]); m.items.push(['border', tx0, ty0, cw, ch, 0, 1, c.lineSoft]);
+        if (S.line(V, m, { text: String(ti + 1), role: 'secondary', ink: 'captionInk' }, tx0 + cw / HALF, ty0 + t.trailNumberDrop, cw, 'center', { component: 'MiniMonth' }) === FAIL) return FAIL; }
+      return gt + Math.ceil((filled + trail) / WEEK) * ch; } });
+
+  /* ---------- Legend: swatch, mark and plain words, wrapped ---------- */
+  register({ name: 'Legend', slots: ['legend.swatch'], states: ['idle'],
+    fixtures: [{ key: 'mini-legend', items: [['calLow', 'L', 'Green: a surprise cost or late pay is absorbed.'], ['calModerate', 'M', 'Yellow: one would bite; there is room to recover.'], ['calCritical', 'C', 'Red: one would bite with no room to recover.']] }],
+    bounds: function (S) { return bounds(fill(S, 'target', 1), hug(S, null, Infinity)); },
+    draw: function (S, V, p, x, y, w) {
+      var t = tokens(S, ['inset', 'swatch', 'legendTop', 'legendTextGap', 'legendDrop', 'legendStepMin', 'legendStepPad', 'legendEnd']); if (t === FAIL) return FAIL;
+      var c = colours(S, ['lineSoft']); if (c === FAIL) return FAIL; var G = glyphs(S); if (G === FAIL) return FAIL;
+      var items = field(p, 'items', { component: 'Legend' }); if (items === FAIL) return FAIL;
+      var ly = y + t.legendTop, tx = x + t.inset + t.swatch + t.legendTextGap, room = w - t.inset * HALF - t.swatch - t.legendTextGap;
+      for (var i = 0; i < items.length; i++) { var L = items[i], n = V.node(p.key + i), sw = S.color(L[0]); if (sw === FAIL) return FAIL;
+        n.items.push(['rect', x + t.inset, ly, t.swatch, t.swatch, sw]); n.items.push(['border', x + t.inset, ly, t.swatch, t.swatch, 0, 1, c.lineSoft]);
+        G.mark(n, L[1], x + t.inset + t.swatch / HALF, ly + t.swatch / HALF);
+        var f = S.para(V, n, { text: L[2], role: 'secondary', ink: 'captionInk' }, tx, ly + t.legendDrop, room, Infinity, { component: 'Legend' }); if (f === FAIL) return FAIL;
+        ly += Math.max(t.legendStepMin, f.n * f.lh + t.legendStepPad); }
+      return ly + t.legendEnd - y; } });
+
+  /* ---------- Row: one item of a list. layout 'entry' (a day's item: time, name, cadence, amount) or 'choice'
+   * (a plan step: name and the item in use, with the chevron that opens its alternatives; stacked when it doesn't fit) ---------- */
+  register({ name: 'Row', slots: ['row.background', 'row.rule', 'row.leading', 'row.chevron'], states: ['idle', 'hover', 'pressed', 'selected', 'disabled', 'focus'],
+    fixtures: [{ key: 'entry:a', layout: 'entry', id: 'a', name: 'Lunch out with a very long name that has to wrap or shrink', time: '13:30', amount: '1,234,567.00', cadence: 'Every 14 days' },
+      { key: 'step:s', layout: 'choice', id: 's', name: 'Commute', selected: 'Bus pass', choices: 2 },
+      { key: 'step:t', layout: 'choice', id: 't', name: 'A plan step with a name long enough to stack', selected: 'An alternative with a long name too', choices: 0 }],
+    bounds: function (S) { return bounds(fill(S, 'target', HALF), hug(S, 'row', Infinity)); },
+    draw: function (S, V, p, x, y, w) { return p.layout === 'entry' ? entryRow(S, V, p, x, y, w) : choiceRow(S, V, p, x, y, w); } });
+
+  function entryRow(S, V, p, x, y, w) {
+    var t = tokens(S, ['inset', 'row', 'rowDrop', 'timeWidth', 'timeIndent', 'cadenceGap', 'cadenceRoom', 'amountPad', 'labelMin', 'controlInset']); if (t === FAIL) return FAIL;
+    var name = field(p, 'name', { component: 'Row' }); if (name === FAIL) return FAIL;
+    var n = V.node(p.key), right = x + w - t.inset, base = y + t.rowDrop, labelX = x + t.inset, where = { component: 'Row', id: n.id };
+    if (p.time) { if (S.line(V, n, { text: p.time, role: 'secondary', ink: 'captionInk' }, x + t.inset, base, t.timeWidth, 'start', where) === FAIL) return FAIL; labelX = x + t.inset + t.timeIndent; }
+    var aw = 0;
+    if (p.amount) { var fa = S.line(V, n, { text: p.amount, role: 'body', ink: 'ink' }, right, base, w - t.inset * HALF, 'end', where); if (fa === FAIL) return FAIL; aw = V.texts[V.texts.length - 1].width; }
+    if (p.cadence && S.line(V, n, { text: p.cadence, role: 'secondary', ink: 'captionInk' }, right - aw - (aw ? t.cadenceGap : 0), base, Math.max(t.labelMin, w - t.inset * HALF - aw), 'end', where) === FAIL) return FAIL;
+    /* the name wraps; each further line makes the row one line taller */
+    var fn = S.para(V, n, { text: name, role: 'body', ink: 'ink' }, labelX, base, Math.max(t.labelMin, x + w - labelX - aw - (p.cadence ? t.cadenceRoom : t.controlInset * HALF) - t.inset), Infinity, where); if (fn === FAIL) return FAIL;
+    var rh = t.row + (fn.n - 1) * fn.lh;
+    if (hit(S, V, n, [x, y, w, rh], 'entry:' + p.id, name, where) === FAIL) return FAIL;
+    if (rule(S, V, 'erule:' + p.id, x + t.inset, y + rh - 1, w - t.inset * HALF, 'lineSoft') === FAIL) return FAIL;
+    return rh;
+  }
+  function choiceRow(S, V, p, x, y, w) {
+    var t = tokens(S, ['inset', 'row', 'rowDrop', 'body', 'secondary', 'lineHeight', 'planNameShare', 'planNameRoom', 'planChevron', 'planGap', 'planEnd', 'planChevronRoom',
+      'planWrapRoom', 'planWrapTop', 'planWrapGap', 'planWrapEnd', 'planWrapNameDrop', 'planSelectedRise', 'labelMin', 'chevronH']); if (t === FAIL) return FAIL;
+    var c = colours(S, ['captionInk']); if (c === FAIL) return FAIL; var G = glyphs(S); if (G === FAIL) return FAIL;
+    var name = field(p, 'name', { component: 'Row' }); if (name === FAIL) return FAIL;
+    var selected = field(p, 'selected', { component: 'Row' }); if (selected === FAIL) return FAIL;
+    var regular = S.font(false); if (regular === FAIL) return FAIL;
+    var n = V.node('step:' + p.id), right = x + w - t.inset, where = { component: 'Row', id: n.id }, rh;
+    var nameMax = Math.min(w * t.planNameShare, w - t.inset - t.planNameRoom), nameW = S.measureText(regular, t.body, name), selW = S.measureText(regular, t.body, selected);
+    var inline = nameW <= nameMax && (t.inset + nameW + t.planGap + selW + t.planChevron + t.planEnd) <= w, a;
+    if (inline) {
+      rh = t.row;
+      if (S.line(V, n, { text: name, role: 'body', ink: 'ink' }, x + t.inset, y + t.rowDrop, nameMax, 'start', where) === FAIL) return FAIL;
+      if (p.choices) { a = V.node('item:' + p.id);
+        if (S.line(V, a, { text: selected, role: 'body', ink: 'ink' }, right - t.planChevronRoom, y + t.rowDrop, Math.max(t.labelMin, w - t.inset - Math.min(nameW, nameMax) - t.planGap - t.planChevron - t.planEnd), 'end', where) === FAIL) return FAIL; }
+      else if (S.line(V, n, { text: selected, role: 'secondary', ink: 'muted' }, right, y + t.planSelectedRise, Math.max(t.labelMin, w / HALF - t.planChevronRoom), 'end', where) === FAIL) return FAIL;
+    } else {
+      var room = w - t.inset - t.planWrapRoom - t.planChevron, ny = y + t.planWrapTop + t.planWrapNameDrop;
+      var fn = S.para(V, n, { text: name, role: 'body', ink: 'ink' }, x + t.inset, ny, room, Infinity, where); if (fn === FAIL) return FAIL;
+      var nameH = fn.n * fn.lh, sy = ny + nameH + t.planWrapGap, target = p.choices ? (a = V.node('item:' + p.id)) : n;
+      var fs = S.para(V, target, { text: selected, role: 'secondary', ink: p.choices ? 'ink' : 'muted' }, x + t.inset, sy, room, Infinity, where); if (fs === FAIL) return FAIL;
+      rh = Math.max(t.row, t.planWrapTop + nameH + t.planWrapGap + fs.n * fs.lh + t.planWrapEnd);
+    }
+    if (p.choices) { G.down(a, right - t.chevronH, y + rh / HALF, c.captionInk);
+      if (hit(S, V, a, [x, y, w, rh], 'picker:' + p.id, name + ' | ' + selected, where) === FAIL) return FAIL; a.vm.step = p.id; }
+    if (rule(S, V, 'step-rule:' + p.id, x + t.inset, y + rh - 1, w - t.inset * HALF, 'line') === FAIL) return FAIL;
+    return rh;
+  }
+
+  /* ---------- DatePicker: the inline picker under the DateHeading: month browse, Today, the month, Dismiss, notes ---------- */
+  register({ name: 'DatePicker', slots: ['nav.prev', 'nav.next', 'day.background', 'day.mark', 'day.today', 'day.selected'], states: ['idle', 'hover', 'pressed'],
+    fixtures: [{ key: 'picker', month: '2026-02', monthTitle: 'February 2026', sel: '2026-02-04', today: '2026-02-14', days: ['2026-02-01', '2026-02-02', '2026-02-03', '2026-02-04', '2026-02-05', '2026-02-06', '2026-02-07', '2026-02-08', '2026-02-09', '2026-02-10', '2026-02-11', '2026-02-12', '2026-02-13', '2026-02-14', '2026-02-15', '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20', '2026-02-21', '2026-02-22', '2026-02-23', '2026-02-24', '2026-02-25', '2026-02-26', '2026-02-27', '2026-02-28'], risk: {}, todayNote: 'Today is Saturday, February 14.', selNote: 'The selected day is Wednesday, February 4.' }],
+    bounds: function (S) { return bounds(fill(S, 'target', WEEK), hug(S, 'target', Infinity)); },
+    draw: function (S, V, p, x, y, w) {
+      var t = tokens(S, ['target', 'inset', 'pickTitleDrop', 'pickGridGap', 'pickGridEnd', 'pickNotesEnd', 'noteDrop', 'noteStep', 'ruleGap']); if (t === FAIL) return FAIL;
+      var c = colours(S, ['ink']); if (c === FAIL) return FAIL; var G = glyphs(S); if (G === FAIL) return FAIL;
+      var prev = control(S, V, { key: 'pick-prev', label: '', act: 'budget:pick:-1', role: 'title', component: 'DatePicker' }, x, y, t.target, t.target); if (prev === FAIL) return FAIL;
+      prev.vm.label = 'Previous month'; G.left(prev, x + t.inset, y + t.target / HALF, c.ink);
+      var nx = x + w - t.target * (HALF + 1), next = control(S, V, { key: 'pick-next', label: '', act: 'budget:pick:1', role: 'title', component: 'DatePicker' }, nx, y, t.target, t.target); if (next === FAIL) return FAIL;
+      next.vm.label = 'Next month'; G.right(next, nx + t.inset, y + t.target / HALF, c.ink);
+      if (control(S, V, { key: 'pick-today', label: 'Today', act: 'budget:pick:today', role: 'secondary', component: 'DatePicker' }, x + w - t.target * HALF, y, t.target * HALF, t.target) === FAIL) return FAIL;
+      if (S.line(V, V.node('pick-m'), { text: p.monthTitle, role: 'body', bold: true, ink: 'ink' }, x + w / HALF - t.inset, y + t.pickTitleDrop, w - t.target * HALF * (HALF + 1) + t.inset * HALF, 'center', { component: 'DatePicker' }) === FAIL) return FAIL;
+      var gh = place('MiniMonth', S, V, { key: 'pmonth', month: p.month, sel: p.sel, today: p.today, days: p.days, risk: p.risk, prefix: 'p', act: 'budget:pickday:', strokeToday: false, gridTop: 'pickGridGap' }, x, y + t.target, w); if (gh === FAIL) return FAIL;
+      var cur = y + t.target + gh + t.pickGridEnd;
+      var dh = place('LinkRow', S, V, { key: 'dismiss', label: 'Dismiss', act: 'budget:date', chevron: false, height: 'target', role: 'body' }, x, cur, w); if (dh === FAIL) return FAIL;
+      cur += dh;
+      if (place('Note', S, V, { key: 'pick-n0', text: p.todayNote, role: 'secondary', ink: 'captionInk', drop: 'noteDrop', step: 'noteDrop' }, x, cur, w) === FAIL) return FAIL;
+      if (p.selNote && place('Note', S, V, { key: 'pick-n1', text: p.selNote, role: 'secondary', ink: 'captionInk', drop: 'noteDrop', step: 'noteDrop' }, x, cur + t.noteStep, w) === FAIL) return FAIL;
+      cur += t.pickNotesEnd + (p.selNote ? t.noteStep : 0);
+      if (rule(S, V, 'pick-end', x + t.inset, cur, w - t.inset * HALF, 'line') === FAIL) return FAIL;
+      return cur + t.ruleGap - y; } });
+
+  root.Exp7Components = Object.freeze({ register: register, place: place, measure: measure, get: function (name) { return registry.has(name) ? registry.get(name) : null; },
+    names: function () { return Array.from(registry.keys()); }, tokens: tokens, colours: colours, field: field });
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
 <script data-exp7-shared="journal-views">
 /* Reusable journal presentations of the existing Exp7 Calendar, Plan and Board.
  * Emits the same JRViews layout / JRDL used by the standard views. No alternate renderer.
@@ -12692,21 +13279,17 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     riskCBg:C.calC,radius:4,ctlRadius:0,shadow:0,text:17,density:1,body:17,secondary:15,caption:13,target:44,
     desk:C.desk,pageEdge:C.pageEdge,wash:C.wash,mint:C.mint,groupGap:28,labelGap:20,controlGap:18,rowH:56,cellH:48};
   function rgba(s){return J.hex(s);}
+  /* The journal's two fonts, Source Sans 3 Regular and Semibold, loaded into the JRender Core. There is no substitute font:
+   * asked for before the Core has booted, it records FONT_MISSING and returns Exp7Fail.FAIL. */
   function journalFonts(){
     if(journalFonts.ids) return journalFonts.ids;
-    var fallback=[JV.font(), JV.fontBold?JV.fontBold():JV.font()];
-    try{
-      if(root.__jrJournalFonts&&root.__jrJournalFonts.regular){
-        journalFonts.ids=[root.__jrJournalFonts.regular,root.__jrJournalFonts.bold||root.__jrJournalFonts.regular];
-        return journalFonts.ids;
-      }
-      var core=(JV.__core&&JV.__core())||null, emb=J&&J.embedded;
-      if(!core||!emb) return (journalFonts.ids=fallback);
-      var r=core.font(emb('jr-font-ss3')), b=core.font(emb('jr-font-ss3-semibold'));
-      journalFonts.ids=[r,b];
-      root.__jrJournalFonts={regular:r,bold:b,family:'Source Sans 3'};
-      return journalFonts.ids;
-    }catch(e){ return (journalFonts.ids=fallback); }
+    if(root.__jrJournalFonts&&root.__jrJournalFonts.regular&&root.__jrJournalFonts.bold){ journalFonts.ids=[root.__jrJournalFonts.regular,root.__jrJournalFonts.bold]; return journalFonts.ids; }
+    var core=JV.__core&&JV.__core();
+    if(!core){ root.Exp7Fail.record({code:'FONT_MISSING',context:null,app:'budget',screen:null,component:null,slot:null,state:null,id:null,offered:null,needed:null,detail:'journal fonts asked for before the JRender core booted'}); return root.Exp7Fail.FAIL; }
+    var r=core.font(J.embedded('jr-font-ss3')), b=core.font(J.embedded('jr-font-ss3-semibold'));
+    journalFonts.ids=[r,b];
+    root.__jrJournalFonts={regular:r,bold:b,family:'Source Sans 3'};
+    return journalFonts.ids;
   }
   /* Study glyphs: two-line chevrons (not Unicode), open-circle / bar calendar marks, outline star, radio, checkbox. */
   function chevronRight(n,x,y,c){ /* 4 x 10 pt, stroke 1.4, ink3 */
@@ -12878,6 +13461,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     if(!m)throw Error('Missing journal model');
     core=core||JV.__core&&JV.__core(); if(!core)throw Error('JRender core not ready');
     var ns=[], used=new Set([0,JV.GID]), fonts=journalFonts(), cursor=0, rows=0, texts=[];
+    if(fonts===root.Exp7Fail.FAIL)throw Error('Journal fonts are not loaded');
     var body=TYPE.body, sec=TYPE.secondary, cap=TYPE.caption, titleSz=TYPE.title, tapSz=TYPE.target, rowH=SPACE.row, cellH=SPACE.cell, groupGap=SPACE.group;
     var inset=20, rightX=W-inset;
     function node(k,vm) {var s=m.k+':'+k,h=2166136261; for(var i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619)>>>0; while(!h||used.has(h)||h===0xffffffff)h=(h+1)>>>0; used.add(h);
@@ -13562,6 +14146,92 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     if(viewH*dpr>maxPx) viewH=Math.max(1,Math.floor(maxPx/dpr));
     return {viewW:viewW,viewH:viewH,dpr:dpr,maxPx:maxPx,canvasPxW:Math.max(1,Math.round(viewW*dpr)),canvasPxH:Math.max(1,Math.round(viewH*dpr)),contentH:Math.max(viewH,Math.round(contentH||viewH))};
   }
+  /* ---------- Budget Home on design components (docs/design-system.md, phase 1) ----------
+   * homeLayout(o) is a failable step: it lays out Home's five views (page, calendar, agenda, plan, links) from the app's
+   * checked tokens and returns { Ls, positions, H, colW, padX, table }, or FAIL. It never draws a substitute: Home.render
+   * runs it inside a failure context and keeps the last layout that worked when it fails. */
+  var DAY_HOURS=24, HOUR_MINUTES=60;
+  /* an entry's cadence and amount labels; homeLayout has already checked that the entry has values */
+  function entryCadence(e){ var v=e.values, r=v.repeat!=null&&v.repeat!==''?String(v.repeat):v.cadence!=null?String(v.cadence):''; if(/^every\s*14/i.test(r)||r==='every 14 days')return 'Every 14 days';
+    if(r==='once'||r==='none'||r==='')return ''; if(r==='every'){ var n=Math.floor(+v.every); if(!(n>0)) return ''; return n===1?'Daily':n===7?'Weekly':n>1?'Every '+n+' days':''; }
+    if(r==='monthdays'){ var on=(Array.isArray(v.on)?v.on:[]).join(', '); return on?'Monthly on '+on:'Monthly'; }
+    if(r==='monthly')return 'Monthly'; if(r==='daily')return 'Daily'; if(r==='weekly')return 'Weekly'; if(r==='dates')return 'Selected dates'; return r; }
+  function entryAmount(e){ var a=e.values.amount; if(a==null||a==='')return ''; a=+a; if(a>0)return money(a,'+'); if(a<0)return money(a,'abs'); return money(a); }
+  var HOME_LEGEND=[['calLow','L','Green: a surprise cost or late pay is absorbed.'],['calModerate','M','Yellow: one would bite; there is room to recover.'],['calCritical','C','Red: one would bite with no room to recover.']];
+  var HOME_LINKS=[{label:'Monthly expenses',act:'nav:ledger'},{label:'Cash and owned items',act:'nav:cash'}];
+  var HOME_NOTES=[["Opens this month's expenses.",'secondary'],['Opens cash and owned items.','secondary'],['Amounts in USD.','caption']];
+  /* o: { hostW, core, fonts:[regular,bold], day, today, pick, risk, calendar (journal model), entries, plan (journal model), start, keys } */
+  function homeLayout(o){
+    var D=root.Exp7Components, BD=root.Exp7Bounds, TK=root.Exp7Tokens, FL=root.Exp7Fail, FAIL=FL.FAIL;
+    var tokens=TK.check('budget',TK.BUDGET_JOURNAL); if(tokens===FAIL) return FAIL;
+    var fonts={}; fonts[tokens.font]=o.fonts[0]; fonts[tokens.fontStrong]=o.fonts[1];
+    var S=BD.session({core:o.core,tokens:tokens,fonts:fonts,app:'budget',screen:'home'});
+    var t=D.tokens(S,['phoneMax','columnMin','columnMax','columnMargin','monthTop','dayTop','dayMin','blockGap','sectionGap','pageBottom','pageMin','pagePickMin','pageTop','pageHeadEnd','viewPad','viewMin','groupGap','captionDrop','notesGap','noteStep','ruleGap','gridTop']); if(t===FAIL) return FAIL;
+    var hostW=o.hostW, colW=hostW<=t.phoneMax?hostW:Math.min(t.columnMax,Math.max(t.columnMin,hostW-t.columnMargin)), padX=Math.max(0,Math.round((hostW-colW)/2));
+    var Ls={}, positions={};
+    function view(key){ return new BD.View(S,key,colW); }
+    function finish(V,cursor){ return V.finish(Math.max(t.viewMin-t.viewPad,cursor),t.viewPad); }
+    function at(V,name,props,y){ return D.place(name,S,V,props,0,y,colW); }
+    /* the calendar block: the mini month, its legend and the selected day's reason */
+    var cal=null;
+    if(!o.pick){ var CV=view(o.keys.calendar), cm=o.calendar;
+      var month=D.field(cm,'month',{screen:'home'}); if(month===FAIL) return FAIL;
+      var gh=at(CV,'MiniMonth',{key:'month',month:month,sel:o.day,today:o.today,days:root.JAtlasEval.monthDays(month),risk:o.risk,prefix:'',act:'budget:pickday:',strokeToday:false,gridTop:'gridTop'},0); if(gh===FAIL) return FAIL;
+      var cur=gh, lh=at(CV,'Legend',{key:'mini-legend',items:HOME_LEGEND},cur); if(lh===FAIL) return FAIL; cur+=lh;
+      var why=o.risk[o.day]&&o.risk[o.day].reasons&&o.risk[o.day].reasons[0];
+      if(why){ var rt=D.tokens(S,['reasonDrop','reasonEnd','lineHeight']); if(rt===FAIL) return FAIL;
+        var rh=at(CV,'Note',{key:'reason',text:plain(why),role:'secondary',ink:'muted',drop:'reasonDrop'},cur); if(rh===FAIL) return FAIL;
+        cur+=Math.max(rh,rt.reasonDrop+rt.lineHeight.secondary)+rt.reasonEnd; }
+      cal=finish(CV,cur); }
+    /* the selected day: heading, Add to <day>, the day's items (All day first) */
+    var AV=view(o.keys.agenda), ac=0, short=o.day===o.today?'today':dateLabel(o.day);
+    var ah=at(AV,'Heading',{key:'ag-h',text:plain(o.day===o.today?'Today':dateLabel(o.day))},ac); if(ah===FAIL) return FAIL; ac+=ah;
+    var add=at(AV,'LinkRow',{key:'add-day',label:plain('Add to '+short),act:'add:item',chevron:true,height:'row',role:'body'},ac); if(add===FAIL) return FAIL; ac+=add;
+    var entries=D.field(o,'entries',{screen:'home'}); if(entries===FAIL) return FAIL;
+    for(var vi=0;vi<entries.length;vi++){ if(D.field(entries[vi],'values',{screen:'home',component:'Row'})===FAIL) return FAIL; if(D.field(entries[vi],'name',{screen:'home',component:'Row'})===FAIL) return FAIL; }
+    var untimed=[], timed={}; entries.forEach(function(e){ var v=e.values, s=v.time==null?'':String(v.time), mt=/^(\d{1,2}):(\d{2})$/.exec(s); if(mt&&+mt[1]<DAY_HOURS&&+mt[2]<HOUR_MINUTES){ var h=+mt[1]; if(!timed[h]) timed[h]=[]; timed[h].push(e); } else untimed.push(e); });
+    var list=untimed.slice(); Object.keys(timed).map(Number).sort(function(a,b){return a-b;}).forEach(function(h){ list=list.concat(timed[h]); });
+    if(!list.length){ var eh=at(AV,'Note',{key:'empty',text:'Nothing is scheduled this day.',role:'body',ink:'muted',drop:'noteDrop',step:'emptyStep'},ac); if(eh===FAIL) return FAIL; ac+=eh; }
+    if(untimed.length){ var ch=at(AV,'Note',{key:'allday-h',text:'All day',role:'caption',ink:'muted',drop:'captionDrop',step:'captionStep'},ac); if(ch===FAIL) return FAIL; ac+=ch; }
+    for(var i=0;i<list.length;i++){ var e=list[i];
+      if(i===untimed.length&&untimed.length){ var gt=D.tokens(S,['groupRuleGap','groupRuleStep','inset','rule']); if(gt===FAIL) return FAIL; var lc=S.color('line'); if(lc===FAIL) return FAIL;
+        AV.node('allday-end').items.push(['rect',gt.inset,ac+gt.groupRuleGap,colW-gt.inset*2,gt.rule,lc]); ac+=gt.groupRuleStep; }
+      var rh2=at(AV,'Row',{key:'entry:'+e.id,layout:'entry',id:e.id,name:plain(e.name),time:formatTime24(e.values.time),amount:entryAmount(e),cadence:entryCadence(e)},ac); if(rh2===FAIL) return FAIL; ac+=rh2; }
+    var agenda=finish(AV,ac);
+    /* the plan: heading and one Row per step */
+    var PV=view(o.keys.plan), pc=0, rows=D.field(o.plan,'rows',{screen:'home',component:'Row'}); if(rows===FAIL) return FAIL;
+    var ph=at(PV,'Heading',{key:'plan-h',text:'Plan'},pc); if(ph===FAIL) return FAIL; pc+=ph;
+    if(!rows.length){ var pe=at(PV,'Note',{key:'empty',text:'No plan steps yet.',role:'body',ink:'muted',drop:'noteDrop',step:'target'},pc); if(pe===FAIL) return FAIL; pc+=pe; }
+    for(var j=0;j<rows.length;j++){ var r=rows[j];
+      var sr=at(PV,'Row',{key:'step:'+r.id,layout:'choice',id:r.id,name:plain(r.name),selected:plain(r.selectedName?r.selectedName:'No alternative'),choices:r.choices?r.choices.length:0},pc); if(sr===FAIL) return FAIL; pc+=sr; }
+    var plan=finish(PV,pc);
+    /* the links and their notes */
+    var LV=view('home-links'), lc2=0;
+    for(var k=0;k<HOME_LINKS.length;k++){ var lr=at(LV,'LinkRow',{key:'link'+k,label:HOME_LINKS[k].label,act:HOME_LINKS[k].act,chevron:true,height:'target',role:'body'},lc2); if(lr===FAIL) return FAIL; lc2+=lr; }
+    for(var m=0;m<HOME_NOTES.length;m++){ var nt=at(LV,'Note',{key:'link-note'+m,text:HOME_NOTES[m][0],role:HOME_NOTES[m][1],ink:'captionInk',drop:'notesGap',step:'noteStep'},lc2); if(nt===FAIL) return FAIL; lc2+=nt; }
+    lc2+=t.notesGap;
+    var links=finish(LV,lc2);
+    /* the page: the date heading, the inline picker when open, the Unfinished links; the paper goes under them once the
+     * page's height is known, so the page is laid out once */
+    var GV=view('home-page'), gc=0;
+    var dh=D.place('DateHeading',S,GV,{key:'date-heading',title:plain(dayTitle(o.day)),open:!!o.pick},0,t.pageTop,colW); if(dh===FAIL) return FAIL;
+    gc=t.pageTop+dh+t.pageHeadEnd;
+    if(o.pick){ var pk=at(GV,'DatePicker',{key:'picker',month:o.pick,monthTitle:plain(monthTitle(o.pick)),sel:o.day,today:o.today,days:root.JAtlasEval.monthDays(o.pick),risk:o.risk,
+        todayNote:plain('Today is '+dateLabel(o.today)+'.'),selNote:o.day!==o.today?plain('The selected day is '+dateLabel(o.day)+'.'):''},gc); if(pk===FAIL) return FAIL; gc+=pk; }
+    var start=D.field(o,'start',{screen:'home'}); if(start===FAIL) return FAIL;
+    if(start.length){ var sl=at(GV,'Note',{key:'start-label',text:'Unfinished:',role:'secondary',ink:'muted',drop:'captionDrop',step:'groupGap'},gc); if(sl===FAIL) return FAIL; gc+=sl;
+      for(var s=0;s<start.length;s++){ var st=at(GV,'LinkRow',{key:'start'+s,label:plain(start[s].label),act:start[s].act,chevron:false,height:'target',role:'body'},gc); if(st===FAIL) return FAIL; gc+=st; }
+      gc+=t.pageHeadEnd; }
+    var page=finish(GV,gc);
+    var ay=o.pick?page.H+t.blockGap:Math.max(t.dayTop,t.monthTop+cal.H+t.blockGap);
+    var py=ay+Math.max(agenda.H,t.dayMin)+t.sectionGap, ly=py+plan.H+t.sectionGap, H=Math.max(o.pick?t.pagePickMin:t.pageMin,ly+links.H+t.pageBottom);
+    if(at(GV,'Page',{key:'paper',height:H},0)===FAIL) return FAIL;
+    GV.nodes.unshift(GV.nodes.pop());
+    function one(key,vkey,L,y){ Ls[key]=L; positions[key]=[padX,y,L.W,L.H]; S.table.shift(vkey,padX,y); }
+    one('page','home-page',page,0); if(cal) one('calendar',o.keys.calendar,cal,t.monthTop);
+    one('agenda',o.keys.agenda,agenda,ay); one('plan',o.keys.plan,plan,py); one('links','home-links',links,ly);
+    return {Ls:Ls,positions:positions,H:H,colW:colW,padX:padX,table:S.table};
+  }
   function Home(opts) { this.o=opts;this.host=opts.host;this.atlas=opts.atlas;this.id=this.host.id;this.views={};this.popup=null;this.closeTimer=null;this.focusKey=null;this.chain=Promise.resolve();this.dead=false;this.serial=0;this.abort=new AbortController();this._planArmed=true;this._planArmAt=0; }
   Home.prototype.init=async function(){var self=this;await JV.boot();if(this.dead)return;
     this.core=await JV.core();
@@ -13634,23 +14304,15 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     function one(key,L,x,y){ Ls[key]=L; positions[key]=[x,y,L.W||colW,L.H]; }
     var selDay=budgetDateKey();
     if(route==='home'||route==='add-item-home'||route==='date-picker-open'||route==='date-picker-closed'){
-      var calModel=Object.assign({},journalOf(this.models.calendar),{compact:true,day:selDay});
-      var agModel=Object.assign({},journalOf(this.models.agenda),{compact:true,day:selDay,entries:entriesForDay(this.atlas, selDay, journalOf(this.models.agenda).entries)});
-      var planModelC=Object.assign({},journalOf(this.models.plan),{compact:true,presentation:'compact'});
-      (function(){ var today=(typeof budgetTodayKey==='function'?budgetTodayKey():selDay); var short=selDay===today?'today':dayTitle(selDay).replace(/,\s*\d{4}$/,''); agModel.day=selDay; if(selDay!==today) agModel.heading=dayTitle(selDay).replace(/,\s*\d{4}$/,''); agModel.addLabel='Add to '+short; })();
-      var cal=layout(calModel,colW,this.core), agenda=layout(agModel,colW,this.core), plan=layout(planModelC,colW,this.core);
-      var homeLinks=[{label:'Monthly expenses',act:'nav:ledger'},{label:'Cash and owned items',act:'nav:cash'}];
-      var homeNotes=["Opens this month's expenses.","Opens cash and owned items.","Amounts in USD."];
-      var links=layout({t:'journal',k:'home-links',kind:'links',links:homeLinks,notes:homeNotes},colW,this.core);
-      /* One column at every width. The open date picker is an inline expansion under the heading: it takes the mini month's
-       * place and pushes Today, Plan and the links down (never over them). Each block starts where the one above ends. */
-      var ay, py, ly;
-      if(pick){ var heading=layout({t:'journal',k:'home-page',kind:'page',day:selDay,pick:pick,risk:risk,height:80,dividers:[],start:startLinks},colW,this.core); ay=heading.H+12; }
-      else ay=Math.max(350, 60+cal.H+12);
-      py=ay+Math.max(agenda.H,192)+18; ly=py+plan.H+18; H=Math.max(pick?844:940, ly+links.H+24);
-      one('page',layout({t:'journal',k:'home-page',kind:'page',day:selDay,pick:pick||'',risk:risk,height:H,dividers:[],start:startLinks},colW,this.core),padX,0);
-      if(!pick) one('calendar',cal,padX,60);
-      one('agenda',agenda,padX,ay); one('plan',plan,padX,py); one('links',links,padX,ly);
+      /* Home is laid out from design components in one failure context. On failure nothing changes: the last layout that
+       * worked stays on screen. The first open has none, so its fail logic tells the shell (the Apps picker is phase 4). */
+      var FL=root.Exp7Fail, home=this, built=null, calJ=journalOf(this.models.calendar), agJ=journalOf(this.models.agenda), plJ=journalOf(this.models.plan);
+      var homeIn={hostW:hostW,core:this.core,fonts:journalFonts(),day:selDay,today:budgetTodayKey(),pick:pick||'',risk:risk,calendar:calJ,
+        entries:entriesForDay(this.atlas,selDay,agJ.entries),plan:plJ,start:startLinks,keys:{calendar:calJ.k,agenda:agJ.k,plan:plJ.k}};
+      var laid=FL.context('budget.home.layout',function(tx){ var r=homeLayout(homeIn); if(r===FL.FAIL) return FL.FAIL; tx.stage(function(){ built=r; }); return true; },
+        function(failure){ home.lastFailure=failure; if(!home.painted&&home.o.onError) home.o.onError(Error('Budget Home could not be laid out: '+failure.code+(failure.detail?' ('+failure.detail+')':''))); });
+      if(laid===FL.FAIL) return;
+      Ls=built.Ls; positions=built.positions; H=built.H; this.layoutTable=built.table;
     } else {
       var baseM=null, L=null;
       if(route==='cash-list'||route==='cash') baseM=Object.assign({},journalOf(this.models.cash||{}),{kind:'cash',standalone:true});
@@ -14750,7 +15412,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     };
   }
 
-  var api={journalRepeat:journalRepeat,journalRepeatDraft:journalRepeatDraft,journalApplyOps:journalApplyOps,bindFullDate:bindFullDate,routeModel:routeModel,navigate:navigate,session:session,tokens:journalTokens,type:TYPE,space:SPACE,fullModel:fullModel,datePicker:datePicker,calendarModel:calendarModel,planModel:planModel,ledgerModel:ledgerModel,cashModel:cashModel,selectionOps:selectionOps,layout:layout,overlay:overlay,model:model,viewMetrics:viewMetrics,maxTexPx:maxTexPx,Home:Home,colors:C,fonts:journalFonts,overlayRect:overlayRect,overlayCorrection:overlayCorrection,journalCalId:journalCalId,journalWhen:journalWhen,formPickerHeight:formPickerHeight,formatTime24:formatTime24,dateLabel:dateLabel,hourLabel24:hourLabel24,fieldKey:fieldKey,fieldKind:fieldKind,payDraft:payDraft,glyphs:{chevronRight:chevronRight,chevronDown:chevronDown,chevronUp:chevronUp,chevronLeft:chevronLeft,markCircle:markCircle,markBar:markBar,markTwoBars:markTwoBars,starOutline:starOutline,radio:radio,checkbox:checkbox,acceptBand:acceptBand},hostCssSize:hostCssSize,mount:function(o){var h=new Home(o);h.ready=h.init();return h;}};
+  var api={journalRepeat:journalRepeat,journalRepeatDraft:journalRepeatDraft,journalApplyOps:journalApplyOps,bindFullDate:bindFullDate,routeModel:routeModel,navigate:navigate,session:session,tokens:journalTokens,type:TYPE,space:SPACE,fullModel:fullModel,datePicker:datePicker,calendarModel:calendarModel,planModel:planModel,ledgerModel:ledgerModel,cashModel:cashModel,selectionOps:selectionOps,layout:layout,homeLayout:homeLayout,overlay:overlay,model:model,viewMetrics:viewMetrics,maxTexPx:maxTexPx,Home:Home,colors:C,fonts:journalFonts,overlayRect:overlayRect,overlayCorrection:overlayCorrection,journalCalId:journalCalId,journalWhen:journalWhen,formPickerHeight:formPickerHeight,formatTime24:formatTime24,dateLabel:dateLabel,hourLabel24:hourLabel24,fieldKey:fieldKey,fieldKind:fieldKind,payDraft:payDraft,glyphs:{chevronRight:chevronRight,chevronDown:chevronDown,chevronUp:chevronUp,chevronLeft:chevronLeft,markCircle:markCircle,markBar:markBar,markTwoBars:markTwoBars,starOutline:starOutline,radio:radio,checkbox:checkbox,acceptBand:acceptBand},hostCssSize:hostCssSize,mount:function(o){var h=new Home(o);h.ready=h.init();return h;}};
   root.Exp7Journal=api;root.Exp7Views.journal=api;
 })(typeof window!=='undefined'?window:globalThis);
 
@@ -15792,7 +16454,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.76",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.77",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
