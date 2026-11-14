@@ -76,7 +76,7 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 #appButtons button.appPick[aria-current="true"]{outline:2px solid #246}
 #accountMenu{position:fixed;top:calc(var(--bar-h) + 4px);left:calc(8px + var(--sa-l));z-index:50;width:min(26rem,calc(100vw - 16px - var(--sa-l) - var(--sa-r)));max-height:calc(100vh - var(--bar-h) - 16px);overflow:auto;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;box-shadow:0 8px 28px rgba(20,30,50,.12)}
 #accountMenu[hidden],#appsOverlay[hidden]{display:none!important}
-#vault{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:10px 0}#vault legend{font-weight:600;padding:0 4px}#vault input{width:100%;box-sizing:border-box}
+#vault{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:10px 0}#vault legend{font-weight:600;padding:0 4px}#vault input{width:100%;box-sizing:border-box}#vaultClearAsk{border-top:1px solid var(--line);margin-top:6px;padding-top:4px}
 #accountScrim{position:fixed;top:var(--bar-h);left:0;right:0;bottom:0;z-index:45;background:transparent}
 /* App content begins strictly below reserved bar */
 #appShell{position:fixed;top:var(--bar-h);left:var(--sa-l);right:var(--sa-r);bottom:var(--sa-b);padding:0;overflow:auto;isolation:isolate}
@@ -149,15 +149,16 @@ input[type=text],input[type=password],textarea{font:inherit;width:100%;max-width
 <label class="na" for="shareOut">Share / invite (no secrets)</label>
 <textarea id="shareOut" readonly rows="3"></textarea>
 <p id="shareStat" class="na" aria-live="polite"></p>
+<button type="button" id="clr">Sign out</button>
+</div>
 <fieldset id="vault"><legend>Budget data</legend>
 <p id="vaultStat" class="na" aria-live="polite">Saved on this device as you make changes.</p>
 <div id="vaultNeed" hidden></div>
-<p class="row"><button type="button" id="vaultSyncNow">Sync now</button> <button type="button" id="vaultCopy">Copy transfer code</button></p>
+<p class="row"><button type="button" id="vaultSyncNow">Sync now</button> <button type="button" id="vaultCopy">Copy transfer code</button> <button type="button" id="vaultClear">Clear data</button></p>
+<div id="vaultClearAsk" hidden role="alertdialog" aria-label="Clear Budget data"></div>
 <input type="text" id="vaultCode" readonly hidden aria-label="Transfer code">
 <p class="na">With GitHub connected, the budget is encrypted on this device and synced by itself. The key stays in this browser. To open the budget on another device, copy the transfer code here and enter it there once. If every device loses the key, the saved copy cannot be opened; there is no recovery service.</p>
 </fieldset>
-<button type="button" id="clr">Sign out</button>
-</div>
 <p id="offinfo" class="na"></p>
 <div id="profiles" aria-label="Saved accounts (no keys)"></div>
 <p id="pkginfo" class="na"></p>
@@ -15455,6 +15456,41 @@ async function bsCopyCode(){await bsLoadKey();if(!BS.key){const L=S.cfg;if(BS.ne
  if(!ok){const o=$("vaultCode");if(o){o.value=code;o.hidden=false;o.focus();o.select();setTimeout(()=>{o.value="";o.hidden=true},60000)}}
  bsMsg(ok?"Transfer code copied. Paste it once on your other device. Anyone who has it and the saved file can read the budget, so share it only with your own devices.":"Copy the code below within a minute and paste it once on your other device. Share it only with your own devices.")}
 async function bsBoot(){try{const c=await budgetKv("get","syncConflict");if(c&&c.remote){BS.conflict={local:Object.assign({hash:""},c.local),remote:c.remote,remoteSha:c.remoteSha,rhash:c.rhash};bsMsg("This device and the saved copy were both changed. Both are kept. Choose which to continue with below.",true)}else bsMsg("Saved on this device as you make changes.")}catch{}bsRender()}
+/* 1.8.76: Clear data, for a fresh start. It clears Budget's own data and nothing else: every entry in this browser's Budget store
+   (budget-app-v1) except this device's sync key and device name, and, with GitHub connected, the sealed copy in the data repo
+   (exp7-app-v1/budget/atlas.sealed.json). Other Exp7 apps and their data are not touched. It asks first, in this menu, naming the repo.
+   The repo copy is deleted first; if that fails nothing is cleared here, so the saved copy cannot come back over a cleared device.
+   GitHub keeps the deleted file in the repo's history. */
+const BS_KEEP=new Set(["syncKey","syncDevice"]);
+async function bsWipeLocal(){const d=await budgetDb();return new Promise((res,rej)=>{const t=d.transaction("kv","readwrite"),st=t.objectStore("kv");let n=0;
+  const q=st.getAllKeys();q.onsuccess=()=>{(q.result||[]).forEach(k=>{if(!BS_KEEP.has(k)){st.delete(k);n++}})};
+  t.oncomplete=()=>{d.close();res(n)};t.onerror=()=>{d.close();rej(t.error)};t.onabort=()=>{d.close();rej(t.error||new Error("abort"))}})}
+async function bsWipeRemote(L){const P="/repos/"+L.owner+"/"+L.repo+"/contents/"+VAULT_PATH;
+ for(let i=0;i<2;i++){const meta=await gh(P+"?ref="+encodeURIComponent(L.branch),{tok:L.tok});
+  if(meta.status===404)return{ok:true,gone:false};
+  if(!meta.ok||!meta.sha)return{ok:false,status:meta.status};
+  const w=await gh(P,{method:"DELETE",tok:L.tok,body:{message:"exp7 budget data cleared",sha:meta.sha,branch:L.branch}});
+  if(w.ok)return{ok:true,gone:true};
+  if(w.status!==409&&w.status!==422)return{ok:false,status:w.status}}
+ return{ok:false,status:409}}
+function bsClearTarget(){const L=S.cfg;return L?L.owner+"/"+L.repo:""}
+function bsClearClose(){const box=$("vaultClearAsk");if(box){box.hidden=true;box.textContent=""}BS.clearFor=null}
+function bsClearAsk(){const box=$("vaultClearAsk");if(!box)return;box.textContent="";const t=bsClearTarget();BS.clearFor=t;
+ box.appendChild(bsEl("p",t?"Clear Budget data? This deletes the budget on this device and the copy saved in "+t+" on GitHub.":"Clear Budget data? This deletes the budget on this device. GitHub is not connected, so the copy saved there is not cleared and comes back the next time you sign in."));
+ box.appendChild(bsEl("p","Other Exp7 apps are not touched. "+(t?"GitHub keeps the old copy in the repo's history, and another device that still has this budget saves it again when it syncs. ":"")+"This cannot be undone here.",{class:"na"}));
+ const row=bsEl("p",null,{class:"row"}),yes=bsEl("button",t?"Yes, clear here and on GitHub":"Yes, clear this device",{type:"button",id:"vaultClearYes"}),no=bsEl("button","Cancel",{type:"button",id:"vaultClearNo"});
+ yes.onclick=lock(bsClear);no.onclick=()=>{if(!busy)bsClearClose()};row.appendChild(yes);row.appendChild(no);box.appendChild(row);box.hidden=false;try{no.focus()}catch(e){}}
+async function bsClear(){const box=$("vaultClearAsk"),L=S.cfg,t=bsClearTarget();if(!box||box.hidden||BS.clearFor==null)return;
+ if(t!==BS.clearFor){bsMsg("The GitHub connection changed since Clear data was chosen. Nothing was cleared; check and confirm again.",true);bsClearAsk();return}
+ for(let i=0;i<100&&BS.running;i++)await new Promise(r=>setTimeout(r,100));
+ if(BS.running){bsMsg("Sync is still running. Nothing was cleared; try again in a moment.",true);return}
+ clearTimeout(BS.deb);BS.pending=false;
+ if(L){bsMsg("Clearing the copy saved in "+t+"…");const r=await bsWipeRemote(L);
+  if(!r.ok){bsMsg("Nothing was cleared. The copy saved in "+t+" could not be deleted ("+(r.status?classify(r.status):"GitHub cannot be reached")+"). This device's budget is unchanged.",true);rec("budget_clear","fail",{status:r.status||0});return}}
+ let n=0;try{n=await bsWipeLocal()}catch(e){bsMsg((L?"The copy saved in "+t+" was deleted, but this device's budget could not be cleared: ":"This device's budget could not be cleared: ")+String(e&&e.message||e),true);rec("budget_clear","fail","local");return}
+ BS.cache=null;BS.conflict=null;BS.need=null;BS.replaceArmed=false;BS.last=null;BS.pending=false;clearTimeout(BS.deb);bsClearClose();bsRender();
+ if(UI.mountedAppId==="budget"){clearSlot("budget");await mountAppFresh("budget")}
+ bsMsg(L?"Budget data cleared on this device and in "+t+".":"Budget data cleared on this device. The copy saved on GitHub was not touched.");rec("budget_clear","pass",{repo:!!L,local:n})}
 window.__budgetSync={sync:bsSync,state:()=>({need:BS.need&&BS.need.kind,conflict:!!BS.conflict,note:BS.note,keyId:BS.keyId}),code:bsCode};
 
 async function putCreate(L,wc,path,text,label){
@@ -15756,7 +15792,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.75",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.76",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
@@ -15967,7 +16003,7 @@ window.__platformChromeAct=function(a){
  if(a==="plat:avatar"){$("btnAvatar").click();return}
  if(a&&a.indexOf("plat:app:")===0){const id=a.slice(9);hideAppsOverlay();openApp(id,{fromPicker:true});return}
 };
-$("btnAdd").onclick=lock(addUser);$("btnShare").onclick=lock(shareInvite);$("vaultSyncNow").onclick=lock(async()=>{if(!S.cfg){bsMsg("Saved on this device. Sign in with a GitHub key to sync it.");return}await bsSync()});$("vaultCopy").onclick=lock(bsCopyCode);{const bb=$("budgetSyncBar");if(bb)bb.onclick=()=>{const a=$("btnAvatar");if(a)a.click()}}bsBoot();
+$("btnAdd").onclick=lock(addUser);$("btnShare").onclick=lock(shareInvite);$("vaultSyncNow").onclick=lock(async()=>{if(!S.cfg){bsMsg("Saved on this device. Sign in with a GitHub key to sync it.");return}await bsSync()});$("vaultCopy").onclick=lock(bsCopyCode);$("vaultClear").onclick=()=>{if(!busy)bsClearAsk()};{const bb=$("budgetSyncBar");if(bb)bb.onclick=()=>{const a=$("btnAvatar");if(a)a.click()}}bsBoot();
 $("imp").onclick=lock(importPkg);$("act").onclick=lock(activateTrial);$("keep").onclick=lock(keep);$("rev").onclick=lock(async()=>{await revert("user");await pkgStatus()});
 
 (async()=>{try{
