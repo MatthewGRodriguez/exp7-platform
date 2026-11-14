@@ -1,6 +1,6 @@
 # Exp7 design system
 
-**Status:** proposed spec, 2026-11-14. Nothing here is implemented yet. It applies to Budget first and then to every Exp7 app, the platform chrome and the universal Calendar, Board and Plan views. Matthew answered the first eight questions on 2026-11-14; his answers are written into the sections they settle and listed in [Decisions and open questions](#11-decisions-and-open-questions). Two new questions that his answers raise are **N1** and **N2**.
+**Status:** proposed spec, 2026-11-14. Nothing here is implemented yet. It applies to Budget first and then to every Exp7 app, the platform chrome and the universal Calendar, Board and Plan views. Matthew answered the first eight questions on 2026-11-14; he answered the two follow-up questions (N1, N2) the same day. Every answer is written into the section it settles and listed in [Decisions](#11-decisions). No questions are open for him.
 
 Evidence labels follow [EVIDENCE.md](./EVIDENCE.md). The three rules in section 1 are Matthew's own words **[REQ 2026-11-14]**.
 
@@ -16,7 +16,7 @@ Evidence labels follow [EVIDENCE.md](./EVIDENCE.md). The three rules in section 
 8. [Failing first, as in Verse](#8-failing-first-as-in-verse)
 9. [Tests](#9-tests)
 10. [Migration](#10-migration)
-11. [Decisions and open questions](#11-decisions-and-open-questions)
+11. [Decisions](#11-decisions)
 12. [Needs Ash](#12-needs-ash)
 
 ---
@@ -176,13 +176,13 @@ This is what "the rest of the app aware of the sizes of everything" means in cod
 - Text is measured only by JRender: `core.measure` for one line, `core.wrap` for a box, with the real font id. There is no estimate. If the font isn't loaded or a glyph is missing (`jrd_has_glyph`), the step fails with `FONT_MISSING` or `GLYPH_MISSING`.
 - Baselines come from `core.metrics` (ascent and descent per font), not from per-size offsets.
 - Line height is a token (1.25 × size today).
-- A text node declares `lines: { min, max }` and a size range `size: { max, min }` (its role's size, and how far it may shrink).
+- A text node declares `lines: { min, max }` and its role's size. There is no smallest size: "everything that can shrink can shrink infinitely" **[REQ 2026-11-14]**.
 - **Fitting** is one failable step, `fit(text, box)`, for every text run, including a person's own long text **[REQ 2026-11-14]**:
   1. Wrap at the role's size. If it fits in `lines.max` lines and inside the node's `max` height, done; the node takes that height.
-  2. Otherwise shrink: find the largest size, down to `size.min`, at which the text fits. JRender measures each try.
-  3. If it still doesn't fit at `size.min`, the step fails with `TEXT_OVERFLOW`, and the screen's layout rolls back.
+  2. Otherwise shrink: find the largest size at which the text fits, with no lower limit. JRender measures each try.
+  3. The step fails only if the box has no width or height to shrink into (`BOX_EMPTY`), and the screen's layout rolls back.
 - There is no "…" cut-off. Shrinking keeps all the text.
-- How far text may shrink against the phone floors (body 17, secondary 15, captions 13) is **N2**.
+- The phone floors (body 17, secondary 15, captions 13) apply to role sizes in tokens, not to text shrunk to fit.
 
 ### 4.6 Width classes
 
@@ -223,7 +223,7 @@ These are the values the journal already uses, so moving to tokens changes nothi
 
 ### 5.3 Floors are tokens too
 
-Matthew's phone rules (body ≥ 17, secondary ≥ 15, captions 13 only, targets ≥ 44) are written as floors in the schema. A token set that goes below a floor is rejected. Targets never shrink. How far shrink-to-fit text may go below its role's size is **N2**.
+Matthew's phone rules (body ≥ 17, secondary ≥ 15, captions 13 only, targets ≥ 44) are written as floors in the schema. A token set that goes below a floor is rejected. Targets never shrink. Shrink-to-fit text may go below its role's size, and below the floors, without limit **[REQ 2026-11-14]**; the floors check token values only.
 
 ---
 
@@ -318,7 +318,6 @@ Every art piece carries:
   "fit": "nine",            // stretch | nine | fit | tile
   "insets": [4, 4, 4, 4],   // nine only: corners that keep their size
   "supports": { "w": [44, 520], "h": [44, 400] },
-  "minScale": 0.5,          // how far the art may shrink to fit before the fit fails
   "states": { "idle": "…", "hover": "…", "pressed": "…", "selected": "…", "disabled": "…", "focus": "…" },
   "motion": { "loop": null, "transitions": "state-table" },
   "references": ["…"]       // the approved references for this piece
@@ -326,7 +325,7 @@ Every art piece carries:
 ```
 
 - `fit` says how art follows a size it wasn't drawn at: `stretch` scales each axis, `nine` keeps the corners and stretches the edges and middle, `fit` scales evenly and centres (and declares the aspect range it accepts), `tile` repeats.
-- **Art shrinks to fit, like text** **[REQ 2026-11-14]**. When the slot is smaller than the art's `supports` range (or a `fit` piece's drawn size), the art scales down evenly, centred, until it fits. It never grows past what `supports` allows and never spills out of the slot. If fitting needs a scale below `minScale`, the fit fails (`ART_OVERFLOW`) and the art that was there before stays.
+- **Art shrinks to fit, like text** **[REQ 2026-11-14]**. When the slot is smaller than the art's `supports` range (or a `fit` piece's drawn size), the art scales down evenly, centred, until it fits. It never grows past what `supports` allows and never spills out of the slot. There is no smallest scale, so art always fits; the fit fails only if the slot has no width or height (`BOX_EMPTY`).
 - `supports` should cover the component's declared bounds. A Row can grow to many lines, so its background should support that height.
 - A state can be an explicit alias of another (`"pressed": "=hover"`). That is a written choice, checked like any other, not a fallback.
 
@@ -341,10 +340,9 @@ Every art piece carries:
 
 For each piece, at the slot's minimum, maximum and typical sizes, in every state and at sampled animation frames:
 
-- after shrink-to-fit, geometry stays inside the slot rect, at a scale no lower than `minScale` (`ART_OVERFLOW`)
+- after shrink-to-fit, geometry stays inside the slot rect (`ART_OUTSIDE`)
 - every state the component declares is present (`ART_MISSING`)
 - text drawn over the art keeps at least 4.5:1 contrast against the art's pixels under it, using the text's token colour (`CONTRAST_LOW`)
-- strokes stay at or above one device pixel at the smallest size
 
 It runs when art is compiled, in the test suite, and at pack load in the app.
 
@@ -366,9 +364,9 @@ Matthew's model is Verse's `<decides>` **[REQ 2026-11-14]**: a step works or it 
 |---|---|---|
 | `token(name)` | the app's token set has no such key | `TOKEN_MISSING` |
 | `font(role)`, `glyphs(text)` | the font isn't loaded, or a glyph is missing | `FONT_MISSING`, `GLYPH_MISSING` |
-| `fit(text, box)` | the text doesn't fit even at its smallest size (4.5) | `TEXT_OVERFLOW` |
+| `fit(text, box)` | the box has no width or height to shrink into (4.5) | `BOX_EMPTY` |
 | `measure(node, offered)`, `place(node, rect)` | a `min` is larger than the offered `max`, or a hit is under 44 | `BOUNDS_UNSAT`, `TARGET_TOO_SMALL` |
-| `art(slot, state)`, `fitArt(art, rect)` | no art resolved for the slot and state, or it can't shrink to fit (7.4) | `ART_MISSING`, `ART_OVERFLOW` |
+| `art(slot, state)`, `fitArt(art, rect)` | no art resolved for the slot and state, or the slot has no width or height (7.4) | `ART_MISSING`, `BOX_EMPTY` |
 | `field(model, key)` | the view model lacks a value the component needs, such as an item with no name | `DATA_MISSING` |
 
 **Failure contexts.** A failable step can only be used inside a failure context, the way a `<decides>` call can only sit in an `if`, a `for` filter or another `<decides>` function. A failure ends its context and goes no further: code outside the context only sees that the context failed. These are the contexts in Exp7, each with the point it returns to:
@@ -386,9 +384,9 @@ Matthew's model is Verse's `<decides>` **[REQ 2026-11-14]**: a step works or it 
 
 ### 8.2 Fail logic is written, never automatic
 
-Every context declares what runs when it fails, the way an `if` has an `else`. A static test fails if a context has no fail logic. Fail logic may record the failure, keep the person where they are, or offer a different action. It may not draw a substitute version of what failed (that would be a fallback), and it may not contain failable steps outside a context of its own.
+Every context declares what runs when it fails, the way an `if` has an `else`. A static test fails if a context has no fail logic. Fail logic may record the failure and keep the person where they are. It may not draw a substitute version of what failed (that would be a fallback), and it may not contain failable steps outside a context of its own.
 
-Whether the person is told anything when their action rolls back is **N1**. Until Matthew decides, the proposal is that the action's fail logic records the failure and nothing else changes on screen.
+When a person's action fails, they are told nothing: the screen just rolls back to exactly how it was before the tap, with no message **[REQ 2026-11-14]**. The fail logic records the failure, and tests find it from that record.
 
 ### 8.3 No exceptions in design code
 
@@ -396,7 +394,7 @@ JavaScript has no built-in failure contexts, so the `design-fail` script provide
 
 ```
 const FAIL = Fail.FAIL                         // one frozen value
-function fit(text, box) { ...; return ok ? sized : Fail.with('TEXT_OVERFLOW', { ... }) }
+function fit(text, box) { ...; return ok ? sized : Fail.with('BOX_EMPTY', { ... }) }
 
 Fail.context('open:day-item', (tx) => {        // a failure context with its rollback journal tx
   const name = field(item, 'name');   if (name === FAIL) return FAIL
@@ -439,7 +437,7 @@ Tests are where failures are found first. A pull request that changes UI states 
 | Layer | Runs where | Checks |
 |---|---|---|
 | **1. Static** | Node, no GPU | Every component registered with bounds, slots, states and fixtures. Every app's tokens complete and above the floors. No literal colours or sizes, no `||` defaults, no `throw` or `try`/`catch` in design code. Every failable result checked; every failure context has fail logic. Art packs complete for every app. Remaining fallbacks listed. |
-| **2. Bounds** | Node with the real `jrender.wasm` Core (zero imports, so it runs in Node), for real text measurement | Every screen, from fixtures, at widths 320, 375, 390, 430, 768, 1024 and 1440: zero failure records; no sibling overlap; every child inside its parent; every hit ≥ 44 × 44 and equal to its rect; every text run inside its node and no smaller than its `size.min`; nothing outside the column or the safe area; scroll height equals content height; the same input lays out to the same rects twice. |
+| **2. Bounds** | Node with the real `jrender.wasm` Core (zero imports, so it runs in Node), for real text measurement | Every screen, from fixtures, at widths 320, 375, 390, 430, 768, 1024 and 1440: zero failure records; no sibling overlap; every child inside its parent; every hit ≥ 44 × 44 and equal to its rect; every text run inside its node; nothing outside the column or the safe area; scroll height equals content height; the same input lays out to the same rects twice. |
 | **3. Art and rollback** | Node, tessellating with the real Core | Section 7.6 for every pack. Fault injection: for each context in 8.1, force each of its failable steps to fail and check that the state afterwards equals the state before, byte for byte, and that its fail logic ran. |
 | **4. Screenshots** | Chrome with WebGPU on Matthew's Mac, through the exp7-jrender test page; Safari is Matthew's | A few screens at phone 390 × 844 and wide 1280 × 800, with 0 changed pixels against the stored image **[REQ 2026-11-14]**, plus `Exp7Slabs.verify` GPU parity. A changed image needs Matthew's approval before it replaces the stored one. Kept small so the structural layers carry the testing. |
 | **5. Flows** | Node and Chrome on Matthew's Mac | The existing 72 unit and 231 integration tests, plus journeys driven by real taps and typing: add an item from a day, change and record, switch an alternative and Accept, reload and check the day, the mini month and Home. These catch wiring bugs, which bounds can't. |
@@ -458,7 +456,7 @@ In exp7-jrender **[REQ 2026-11-14]**, which is private, already has a test page 
 
 Each phase ships as ordinary release pull requests that Matthew merges. One screen per pull request, so a failure is small. Each pull request names the fallbacks it removed.
 
-**Phase 0: agree.** This spec merged, and answers to N1 and N2.
+**Phase 0: agree.** This spec merged.
 
 **Phase 1: foundations, nothing changes on screen.**
 - `design-fail` (failable steps, contexts, rollback, records), `design-tokens` with Budget's journal set and the Exp7 light set, and `design-bounds` from `Exp7VM.layout` with the measure and place passes, shrink-to-fit text and the readable rect table.
@@ -479,7 +477,7 @@ Studies, as second priority: when a screen moves to components, its study (if an
 
 ---
 
-## 11. Decisions and open questions
+## 11. Decisions
 
 ### Decided by Matthew, 2026-11-14
 
@@ -493,11 +491,8 @@ Studies, as second priority: when a screen moves to components, its study (if an
 | Q6 | Wide screens | Single column | 4.6 |
 | Q7 | Byte budgets | No size limit | 3 |
 | Q8 | Account, key and share panels | Left untouched for now; they run on their own temporarily | 6.2 |
-
-### Open
-
-- **N1. When a person's action fails and rolls back, should they see anything?** The screen stays exactly as it was before the tap. Options: nothing changes at all, or the action's fail logic shows one quiet line (for example "That didn't go through") in a designed component. Proposal: the quiet line, since a tap that does nothing at all is hard to tell from a missed tap.
-- **N2. How far may text shrink to fit?** The phone rules say body ≥ 17, secondary ≥ 15, captions 13, and the Budget prompt says not to shrink type to fit a phone. Options: no text shrinks below its role's floor (so a long body name past its row's line limit fails instead), or any text may shrink as far as the 13 pt caption floor. Proposal: shrink as far as 13 pt, never below; targets never shrink either way.
+| N1 | Telling the person when their action fails | No: the screen just rolls back, with no message | 8.2 |
+| N2 | How far text and art may shrink | "Everything that can shrink can shrink infinitely"; tap targets still never shrink | 4.5, 5.3, 7.4 |
 
 ## 12. Needs Ash
 
