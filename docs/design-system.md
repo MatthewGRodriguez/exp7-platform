@@ -1,6 +1,6 @@
 # Exp7 design system
 
-**Status:** proposed spec, 2026-11-14. Nothing here is implemented yet. It applies to Budget first and then to every Exp7 app, the platform chrome and the universal Calendar, Board and Plan views. Questions only Matthew can answer are marked **Q1** to **Q8** and collected in [Open questions](#11-open-questions-for-matthew).
+**Status:** proposed spec, 2026-11-14. Nothing here is implemented yet. It applies to Budget first and then to every Exp7 app, the platform chrome and the universal Calendar, Board and Plan views. Questions only Matthew can answer are marked **Q1** to **Q8** (Q3 is settled) and collected in [Open questions](#11-open-questions-for-matthew).
 
 Evidence labels follow [EVIDENCE.md](./EVIDENCE.md). The three rules in section 1 are Matthew's own words **[REQ 2026-11-14]**.
 
@@ -281,7 +281,7 @@ An app's look is its art pack: art for every slot of every component the app use
 
 Budget's first pack draws today's journal look (white page, thin rules, chevrons, tints, the mint band) as SVG, so switching to slots changes nothing on screen. That pack is assigned to Budget explicitly; it isn't a default for anything else. Later art replaces pieces of it through the art workflow, one approved piece at a time.
 
-Where art can be swapped (**Q3**): the proposal is three explicit levels, the app's pack, then a screen's override, then one component instance's override. Every level is written down, and the validator resolves the art for every slot on every screen and fails on any gap.
+Where art can be swapped (**Q3, settled**): at three explicit levels, the app's pack, then a screen's override, then one component instance's override, because art is "swappable everywhere, it's a universal concept" **[REQ 2026-11-14]**. Every level is written down, and the validator resolves the art for every slot on every screen and fails on any gap.
 
 ### 7.3 Format
 
@@ -438,7 +438,7 @@ Studies, as second priority: when a screen moves to components, its study (if an
 
 - **Q1. When something fails at runtime, what does a person see?** Proposal: that screen doesn't draw, and the shell shows its plain error with the code and Back; the rest of the app keeps working. The alternative is stopping the whole app.
 - **Q2. A person's own very long text** (say a 200-character item name): wrap without a limit so the page grows, or set a line limit and treat going over it as a failure? Cutting it off with "…" would be a fallback, so it isn't offered.
-- **Q3. Where art can be swapped:** for each app, for a screen, and for a single item on a screen? Or a narrower set?
+- **Q3. Where art can be swapped.** Settled by Matthew's rule "art be swappable everywhere, it's a universal concept": for each app, for a screen, and for a single item on a screen (section 7.2).
 - **Q4. Where the tests live:** exp7-jrender (proposed), exp7-budget-studies, or a new private repo?
 - **Q5. Screenshot matching:** exactly 0 changed pixels, or a small tolerance for anti-aliasing between machines?
 - **Q6. Wide screens:** keep the single 390 to 520 px journal column on every screen, or let some screens (the switch review) go two columns when there's room?
