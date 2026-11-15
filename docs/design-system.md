@@ -1,6 +1,6 @@
 # Exp7 design system
 
-**Status:** spec, 2026-11-14. Phase 1 is built in 1.8.77, phase 2 in 1.8.79, phase 3 in 1.8.80, the views half of phase 4 in 1.8.81, the TopBar and Apps picker in 1.8.82 and the journal's plan, ledger and cash views and Home's focus ring in 1.8.83, and the Exp7 demo's frame, Atlas, Proposal console and About on canvas in 1.8.84 (see [Migration](#10-migration)); the rest of the Exp7 demo (parts 4b and 4c of phase 4) and phase 5 are not implemented yet. It applies to Budget first and then to every Exp7 app, the platform chrome and the universal Calendar, Board and Plan views. Matthew answered the first eight questions on 2026-11-14; he answered the two follow-up questions (N1, N2) the same day. Every answer is written into the section it settles and listed in [Decisions](#11-decisions). No questions are open for him.
+**Status:** spec, 2026-11-14. Phase 1 is built in 1.8.77, phase 2 in 1.8.79, phase 3 in 1.8.80, the views half of phase 4 in 1.8.81, the TopBar and Apps picker in 1.8.82 and the journal's plan, ledger and cash views and Home's focus ring in 1.8.83, the Exp7 demo's frame, Atlas, Proposal console and About on canvas in 1.8.84, and its Two writers, Storage and Circuit in 1.8.85 (see [Migration](#10-migration)); the rest of the Exp7 demo (part 4c of phase 4) and phase 5 are not implemented yet. It applies to Budget first and then to every Exp7 app, the platform chrome and the universal Calendar, Board and Plan views. Matthew answered the first eight questions on 2026-11-14; he answered the two follow-up questions (N1, N2) the same day. Every answer is written into the section it settles and listed in [Decisions](#11-decisions). No questions are open for him.
 
 Evidence labels follow [EVIDENCE.md](./EVIDENCE.md). The three rules in section 1 are Matthew's own words **[REQ 2026-11-14]**.
 
@@ -593,6 +593,35 @@ Tests: `tests/layer4-demo.mjs` in exp7-jrender (95 checks): the demo boots and r
 The check in Chrome on Matthew's Mac (Browser 1, dpr 2), with the release loaded in a test frame at 390 and 1024 and the Exp7 app mounted by the shell: the demo reported ready (in 40 to 110 ms) with no failure records and no page errors; both screens drew at the width inside their boxes; real taps picked, preferred and ruled out an alternative and stepped a joy; real typing into the console's value field and "+ add op" built the batch; the console, an example and About drew at both widths with no failure. That check found three things, fixed in this release before the pull request: the frame was drawn at its box's outer width and ran 20 px past the slot (a screen is now drawn at its box's content width); redrawing inside the ResizeObserver made Chrome report a loop error, which the early boot script showed as a boot error (a resize now redraws in the next frame); and characters the drawing fonts lack (★ ⊘ → ↔ ✓ Δ) drew as boxes (the demo now fails with `GLYPH_MISSING` for them, and its own text uses words). Pixels are not compared, as everything that moved is listed above. The test frame, its storage on the test page (example.com) and the tab are cleaned up.
 
 Not in part 4a: Two writers, Storage and Circuit (4b), Paths and the views' side panels (4c), and phase 5.
+
+*Phase 4 as built, part 4b: Two writers, Storage and Circuit on canvas (1.8.85).* Matthew's go-ahead, 2026-11-15: "Yes, build the rest". The demo's body screen now draws six tabs on canvas: Atlas, Proposal console, Two writers, Storage, Circuit and About. The DOM sections `t-sync`, `t-storage` and `t-circuit` are gone; Paths and the Calendar, Board and Plan tabs are still DOM under the canvas frame (4c).
+
+- **Two writers**: the collaboration card (the replicated notes, label and task order of Alice and Bob, with append, delete, label, move, undo and exchange), the controls (network on or off, Sync now, auto-sync, Scenario, reset, and a converged or diverged chip), Alice's and Bob's cards (their edits as buttons, a trip-name field, their entries with owner and revision), the merge order, the diff between the two replicas, the path inspector, and a card that shows or hides each replica's Plan and Board views. Those views are still JRViews views drawn into their own hosts, which now sit under the screen (`demoReplicas`), not inside each writer's card.
+- **Storage**: the batch log (a table), the 5000-op test (JSON and atlas/1 sizes, the round trip and the time) and the per-path statistics.
+- **Circuit**: the rule source in a multiline field that parses as you type, the parse result, a chip per rule, the event arguments field, Run rule and Run demo sequence, what fired, the canonical print, its round trip, and the scores with a graph you show or hide.
+
+Fail first: an edit a writer doesn't have fails with `COMPONENT_INVALID`; anything the collaboration engine refuses (its policy or its checker) is recorded as `CONTEXT_FAILED` in the `demo.collab:<action>` context and shown in a bad note with the engine's reason, where it was a status line only; a delete range that isn't whole numbers shows a note and changes nothing; Circuit's event arguments that aren't JSON show "args must be JSON" and fire nothing; a source that doesn't parse shows the line and the message and keeps the last good rules.
+
+Fallbacks and dead code removed: the lean's Doc and Panel helper script (`Exp7Experiments`), the collaboration demo's DOM script and the try and catch around it, `renderSync`, `renderLog`, `renderScores`, `renderSyncDiff`, `renderPathStats` and `renderInspector`, the three HTML sections, and the `.writer`, `.hash`, `.big`, `.toggle`, `.on-line` and `.off-line` styles. Submitting a batch, booting, `replaceW` and `applyCheckedProposal` now redraw the canvas instead of calling `renderLog`. `window.exp7` keeps `edit`, `sync`, `replica`, `rank`, `bestRank`, `selectedAlt`, `scorer`, `setNet` and `WR`.
+
+The list of changes, for Matthew to approve:
+- Two writers, Storage and Circuit are drawn on canvas with the design system's components instead of HTML, in one column (Q6).
+- The replicas' Plan and Board views are drawn under the Two writers screen, with a Show or Hide button for each and a line saying whether the view drew, instead of inside each writer's card.
+- Checkboxes are toggle buttons (auto-sync, hold offline); menus are chips (the writer, the task, move before, the rules).
+- The delete range's number inputs are text fields with a whole-number check.
+- Tables merge columns to fit a phone: the log has five (number, batch, ops, JSON bytes, atlas/1 bytes), with the kind, the writer and the ops in one; the per-path "by op" counts read like "set x3".
+- Folding sections are Show and Hide buttons (each replica's path writes, the score graph).
+- Characters the fonts lack are words or "x": arrows, "≠" and "×".
+- The collaboration table is part of the screen and takes its colours from the design tokens instead of its own.
+- The engine's refusals are now failure records (`Exp7Fail.records()`, in Copy diagnostics) as well as a note.
+
+Kept as they are, still for Matthew to decide (from 1.8.84): the views' 13 px text and 30 px buttons under the phone floors, and the JRViews measure and draw font mismatch, as its own change.
+
+Tests: `tests/layer4-demo.mjs` in exp7-jrender (161 checks, was 95): all six canvas tabs lay out at 320, 390 and 1024 with every control inside the width, every button the view's button height and no character a font lacks; every act has a handler; each writer's edits, a name, sync with the network off and on, auto-sync, the scenario and reset do what the DOM did, and the replica views draw and hide; the collaboration card appends, deletes, labels, moves, undoes and exchanges, refuses a range that isn't whole numbers, and records an engine refusal (a locked shared scope) with its reason; Storage shows the log, the 5000-op test and the per-path statistics; Circuit parses, shows a parse error and parses again, fires a rule, refuses arguments that aren't JSON, runs the demo sequence and shows the graph; nothing removed is still reachable. Every other layer passes unchanged.
+
+CHROME_CHECK_4B
+
+Not in part 4b: Paths and the side panels of the Calendar, Board and Plan tabs (4c), and phase 5.
 
 **Phase 5: new apps.** A new Exp7 app is its atlas, a complete token set, a complete art pack and screens built from the catalog. Nothing else.
 
