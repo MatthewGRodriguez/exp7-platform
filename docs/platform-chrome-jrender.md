@@ -1,6 +1,7 @@
 # Platform chrome on JRender (1.8.7)
 
 **Status:** Implementation reference for the shipped lean tip **1.8.7** **[MEAS]** (JRDI + UX states; app-slot reveal).  
+**Since 1.8.82:** the bar and the Apps picker are design system components (`design-chrome`, art pack `exp7-chrome`); `PlatformChromeJR` builds models for `Exp7Chrome.layout` instead of HTML. See [design-system.md](./design-system.md), phase 4 part 2. The HTML path below is how 1.8.7 to 1.8.81 drew them.  
 **Direction doc:** [views-jrender-standard.md](./views-jrender-standard.md).  
 **Evidence:** JRDI + PlatformChromeJR profile path packed into `exp7-platform/exp7-platform-lean.html`; Mac parallax/LIVE-GPU still **[USER-HW][OPEN]**. See [api/IMAGE-ABI.md](./api/IMAGE-ABI.md) and [design/state-table.md](./design/state-table.md).
 
