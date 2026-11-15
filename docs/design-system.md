@@ -543,10 +543,12 @@ The gate (`tests/layer4-journal.mjs` in exp7-jrender): against 1.8.82, every jou
 - A text 1.8.82 cut off at its edge now wraps to more lines, and everything under it moves down (in the fixtures: 60 ledger row names on narrow widths, and the cash note at 320 and 390). A single line shrinks to fit instead.
 - The ledger's heading text, which the month band drew over so it never showed, is gone.
 - A view's navigation tap area covers the view's height; it was 900 px whatever the view's height.
-- Positions round to 1/64 px (under a pixel; nothing visible moved in the 0-px check).
+- Text positions now round to 1/64 px, the draw list's quantum (1.8.82 kept the raw fractions). In Chrome on Matthew's Mac (dpr 2) this moves glyph-edge antialiasing: 36 to 489 pixels per view differ, by at most 55 in one channel, spread across the text, with nothing that moves to the eye. With 1.8.82's text rounded the same way, 36 of the 42 views checked are 0 px.
 - A row name keeps at least `labelMin` (40 px) before the amount; 1.8.82's floor was 20 px.
 - Calendar and agenda journal kinds fail, and a cash row with no amount fails.
 - A row's tap label is its plain text (no markup).
+
+The 0-px check in Chrome on Matthew's Mac (Browser 1, dpr 2), 1.8.82 against 1.8.83, made-up fixtures: 42 journal views (ordinary and stress; ledger, plan and cash; 320, 390 and 1024) and the date band hover on three ledgers at three widths. Raw, every view differs only in glyph-edge antialiasing (the rounding above). With 1.8.82's text rounded to 1/64 px, the ledger heading text left out and its cut-off text allowed to run, 36 views are 0 px and the hovers are 0 px (the hover itself changes 67,489 px, so it was drawn). The other 6 are the listed wraps, whose heights change (ordinary and stress asset board at 320 and 390, 264 to 283 px; stress expense board at 320 and 390, 2144 to 2732 and 2438 px). Home's focus ring: 111 rings (every target and no focus, at three widths) draw the same bytes in Chrome in both releases, which run the same renderer.
 
 Kept as they are, for Matthew to decide: two focus ring looks (Home's `FocusFrame`, 1.5 px accent just outside the target, and the full views' `FocusRing` from part 1, 1.2 px inside it, whose SVG names its colour instead of a token).
 
