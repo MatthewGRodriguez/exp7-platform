@@ -675,7 +675,7 @@ The mismatch: the views measured their text in DejaVu Sans (`jr-font`) and drew 
 Fallbacks and dead code removed: the JRViews core's `try`/`catch` that used the regular font for bold when the bold font failed to load, and the one that ignored a journal font that failed to load; the `window.__jrJournalFonts` global (set by the core and by Budget, read when drawing); the drawing code's default to the journal font, then `jr-font`, for a text or rich item, and its fixed `jr-font` for wrapped text; `JRViews.font()` and `JRViews.fontBold()`; `Exp7VM`'s and the chrome's fonts taken from them, with `FONTB = FONT` when there was no bold; the views host's and the demo's field font taken from `JRViews.font()` (a field's font comes with its style from the view tokens); and the demo's own walk over its screens for characters the fonts lack, with its guess at the fonts JRViews drew in (`Exp7VM` itself now fails such a screen).
 
 The list of changes, for Matthew to approve:
-- The platform look (the stock Calendar, Board and Plan views, the top bar and Apps picker, and the Exp7 demo) draws its text in DejaVu Sans, the font it was always measured in; 1.8.86 drew it in Source Sans 3. Letters change shape; where text sits and where it wraps does not, because it was measured in DejaVu Sans already. (The other way, measuring and drawing the platform look in Source Sans 3, would keep the letters and move and rewrap the text instead; say if you would rather have that.)
+- The platform look (the stock Calendar, Board and Plan views, the top bar and Apps picker, and the Exp7 demo) draws its text in DejaVu Sans, the font it was always measured in; 1.8.86 drew it in Source Sans 3. Letters change shape; where text sits and where it wraps does not, because it was measured in DejaVu Sans already. Matthew kept DejaVu Sans for the platform look, 2026-11-15: "DejaVu Sans is fine/ no extra work needed there".
 - Budget's views measure their text in Source Sans 3, the font they draw in, so widths, wraps and "…" cuts match what is drawn. Source Sans 3 is narrower, so some texts that wrapped or were cut now fit, and what follows them moves up or left.
 - Marks are drawn as art instead of from a font (above): their shapes change, and a mark's place is 0.9 em wide, so text after one moves: under a pixel after most marks at 13 px, and about 5 px after ▸ and ▾, which were half an em wide. The Plan view's ▸ no longer draws as a box.
 - Letters from Latin Extended-A draw in the platform look, where 1.8.86 failed the view with `GLYPH_MISSING`.
@@ -720,6 +720,7 @@ Studies, as second priority: when a screen moves to components, its study (if an
 | The views' 13 px text and 30 px buttons under the phone floors | Keep them: "shrink to fit always applies" | 10, 1.8.87 |
 | The views' measure and draw font mismatch | "2 fix", as its own release | 10, 1.8.87 |
 | The views' marks (arrows, ticks, triangles, stars, dots) | "Art": every mark is swappable art | 6.2, 10, 1.8.87 |
+| The platform look's font: DejaVu Sans or Source Sans 3 | "DejaVu Sans is fine/ no extra work needed there" | 10, 1.8.87 |
 
 ## 12. Needs Ash
 
