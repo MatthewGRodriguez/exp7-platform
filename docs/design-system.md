@@ -651,8 +651,9 @@ The list of changes, for Matthew to approve:
 - Board's ranking history joins the orders with "then" and includes the current order; the HTML lagged one draw behind.
 - A proposal's result is a note under its buttons.
 
+Decided by Matthew, 2026-11-15: Paths shows the whole atlas ("Keep it whole"). It lays out in about 210 ms in Chrome on his Mac and is about 145,000 px tall at 390; the first letter typed in the search took 213 ms (the full tree to the matches), the next ones 11 to 53 ms.
+
 Still for Matthew to decide:
-- Paths shows the whole atlas, which lays out in about 210 ms in Chrome on his Mac and is about 145,000 px tall at 390. The first letter typed in the search took 213 ms (the full tree to the matches), the next ones 11 to 53 ms. It is kept whole; showing the first part with a "show more" would make it faster.
 - From 1.8.84, still open: the views' 13 px text and 30 px buttons under the phone floors, and the JRViews measure and draw font mismatch (the Plan view's ▸ draws as a box), as its own change.
 
 Tests: `tests/layer4-demo.mjs` in exp7-jrender (249 checks, was 167): every tab is canvas and lays out at 320, 390 and 1024 with every control inside the width and no character a font lacks; Paths shows every path once and every node, in order, closes and opens a node, collapses and expands all, the flat list, the prefix and the search, says "1 path", shows the last proposal's tones and last change and the note for a path not in the atlas, refuses an unknown mode, puts type and owner under the row, and keeps its copy buttons as wide at 390 as at 1024 (this check fails on the release before the fix); the three views are set up at boot and each tab shows its own; Calendar's proposal moves the date with a conflict, the views redraw, the deep paths put the touched ones first and the next proposal restores it; an unknown proposal fails; a view's error shows; Board's ranking and history and Plan's what-if show; the host's notes have no arrow; nothing removed is still reachable. Every other layer passes unchanged.
