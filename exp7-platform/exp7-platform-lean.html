@@ -11503,14 +11503,17 @@ window.x7 = window.x7 || function (t) {
 
     /* table: columns sized from content; rows may carry a full-width sub block (alternatives) */
     function table(nm, key, x, y, w, owner) { var cols = nm.cols || [], nc = cols.length, P = T.tablePad * D, sz = FS, hs = FS - 2; if (!nc) return 0;
-      var mn = cols.map(function (c) { return tw(c.label, hs) + P; }), pf = mn.slice();
+      var mn = cols.map(function (c) { return tw(c.label, hs) + P; }), pf = mn.slice(), fx = cols.map(function () { return false; });
       /* a cell { btn, act } is a button in the cell, as wide as its label */
       var btnOf = function (c, k) { return { t: 'btn', k: k, label: String(c.btn), act: c.act, kind: 'ghost' }; };
-      (nm.rows || []).forEach(function (r) { (r.cells || []).forEach(function (cell, i) { if (i >= nc) return; if (cell && cell.btn != null) { var bw0 = atomW(btnOf(cell)) + P; mn[i] = Math.max(mn[i], bw0); pf[i] = Math.max(pf[i], bw0); return; }
+      (nm.rows || []).forEach(function (r) { (r.cells || []).forEach(function (cell, i) { if (i >= nc) return; if (cell && cell.btn != null) { var bw0 = atomW(btnOf(cell)) + P; mn[i] = Math.max(mn[i], bw0); pf[i] = Math.max(pf[i], bw0); fx[i] = true; return; }
         var t = String(cell && cell.text != null ? cell.text : cell || '');
         mn[i] = Math.max(mn[i], Math.min(T.columnCap, Math.max.apply(null, t.split(' ').map(function (q) { return tw(q, sz); }).concat([0]))) + P); pf[i] = Math.max(pf[i], tw(t, sz) + P); }); });
       var smn = mn.reduce(function (a, b) { return a + b; }, 0), spf = pf.reduce(function (a, b) { return a + b; }, 0), cw;
-      if (spf <= w) cw = pf.map(function (v) { return v + (w - spf) * v / spf; }); else if (smn >= w) cw = mn.map(function (v) { return v * w / smn; }); else cw = mn.map(function (v, i) { return v + (w - smn) * (pf[i] - v) / (spf - smn); });
+      if (spf <= w) cw = pf.map(function (v) { return v + (w - spf) * v / spf; });
+      else { /* squeezed: a button column keeps its button's width; the text columns share what is left */
+        var F = 0; fx.forEach(function (f, i) { if (f) F += pf[i]; }); var w2 = w - F, tmn = 0, tpf = 0; mn.forEach(function (v, i) { if (!fx[i]) { tmn += v; tpf += pf[i]; } });
+        cw = mn.map(function (v, i) { return fx[i] ? pf[i] : tmn >= w2 ? v * w2 / tmn : v + (w2 - tmn) * (pf[i] - v) / (tpf - tmn); }); }
       var cy = y, lhC = Math.max(sz * 1.4, T.lineGap * D);
       function cellsRow(rk, cells, header, st, vm) { var rn = nd(rk, vm, owner), rh = 0, cx = x, texts = [];
         cells.forEach(function (cell, i) { if (i >= nc) return; var c = cell && typeof cell === 'object' ? cell : { text: cell };
