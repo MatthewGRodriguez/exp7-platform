@@ -11748,7 +11748,9 @@ window.x7 = window.x7 || function (t) {
       while (used.has(id) || id === 0xffffffff || reserved(id >>> 28)) { if (id === 0xffffffff || reserved(id >>> 28)) id = ((id & 0xf0000000) + 0x10000000) >>> 0 || 1; else id = (id + 1) >>> 0 || 1; }
       used.add(id); n = { key: key, id: id, flags: 0, items: [], hit: null, el: null, act: null, vm: vm || null, slabOwner: slabOwner || null }; NM.set(key, n); nodes.push(n); return n; }
     function textItem(n, x, base, sz, c, s, maxw, bold) { s = String(s == null ? '' : s).replace(/\s+$/, ''); if (!s) return; counts.glyphs += s.replace(/\s/g, '').length;
-      if (bold) n.items.push(['rich', x, base - sz * 0.92, [{ text: s, size: sz, color: U(c), bold: true }], maxw || 0, 1.25, FONT, FONTB]);
+      if (bold) { /* shrink to fit: a bold label wider than its room gets smaller and stays on one line, never wraps out of its box */
+        var bw = maxw ? tw(s, sz, true) : 0, bs = bw > maxw ? sz * maxw / bw : sz;
+        n.items.push(['rich', x, base - bs * 0.92, [{ text: s, size: bs, color: U(c), bold: true }], bs < sz ? 0 : maxw || 0, 1.25, FONT, FONTB]); }
       else n.items.push(['text', x, base, sz, U(c), s, maxw || 0, FONT]); }
     function wrapH(s, sz, w, lh) { return CORE.wrap(FONT, sz, placed(s), Math.max(8, w), { lineHeight: lh }).height; }
     function size(s) { return s === 'title' ? FS + 3 : s === 'h' ? FS + 1 : s === 'small' || s === 'muted' ? FS - 2 : s === 'tiny' ? FS - 3 : s === 'code' ? FS - 1 : FS; }
