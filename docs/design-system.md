@@ -1,6 +1,6 @@
 # Exp7 design system
 
-**Status:** spec, 2026-11-14. Phase 1 is built in 1.8.77, phase 2 in 1.8.79, phase 3 in 1.8.80, the views half of phase 4 in 1.8.81, the TopBar and Apps picker in 1.8.82 and the journal's plan, ledger and cash views and Home's focus ring in 1.8.83, the Exp7 demo's frame, Atlas, Proposal console and About on canvas in 1.8.84, its Two writers, Storage and Circuit in 1.8.85, and its Paths, Calendar, Board and Plan tabs in 1.8.86, so the whole demo is on canvas (see [Migration](#10-migration)); phase 5 is not implemented yet. It applies to Budget first and then to every Exp7 app, the platform chrome and the universal Calendar, Board and Plan views. Matthew answered the first eight questions on 2026-11-14; he answered the two follow-up questions (N1, N2) the same day. Every answer is written into the section it settles and listed in [Decisions](#11-decisions). No questions are open for him.
+**Status:** spec, 2026-11-14. Phase 1 is built in 1.8.77, phase 2 in 1.8.79, phase 3 in 1.8.80, the views half of phase 4 in 1.8.81, the TopBar and Apps picker in 1.8.82 and the journal's plan, ledger and cash views and Home's focus ring in 1.8.83, the Exp7 demo's frame, Atlas, Proposal console and About on canvas in 1.8.84, its Two writers, Storage and Circuit in 1.8.85, and its Paths, Calendar, Board and Plan tabs in 1.8.86, so the whole demo is on canvas, and in 1.8.87 every text is drawn in the font it is measured in and the views' marks are art (see [Migration](#10-migration)); phase 5 is not implemented yet. It applies to Budget first and then to every Exp7 app, the platform chrome and the universal Calendar, Board and Plan views. Matthew answered the first eight questions on 2026-11-14; he answered the two follow-up questions (N1, N2) the same day. Every answer is written into the section it settles and listed in [Decisions](#11-decisions). No questions are open for him.
 
 Evidence labels follow [EVIDENCE.md](./EVIDENCE.md). The three rules in section 1 are Matthew's own words **[REQ 2026-11-14]**.
 
@@ -269,6 +269,7 @@ Examples of bounds that become checks instead of offsets:
 | **AppCard** (Apps picker, two lines) | ≥ 220 × 70 |
 | **Avatar** (JRDI image) | fixed, inside the TopBar |
 | Calendar **Day**, Board **Row**, **Chip**, **Button**, **Table**, **Popover** | the existing `Exp7VM` node kinds, each given declared bounds and slots |
+| **Mark** (1.8.87: ← → ▸ ▾ ✓ ✗ ★ ☆ ⚠ ⟳ ● ○ in a view's text) | one 0.9 em square per mark, in the text's line; slot `mark.glyph`, variant `<mark>-<tone>` |
 
 Account, key and share panels stay DOM, so the personal access token never enters the canvas **[REQ]**. For now they are left untouched and run on their own, outside this design system **[REQ 2026-11-14]**.
 
@@ -662,6 +663,28 @@ The check in Chrome on Matthew's Mac (Browser 1), with the release loaded in a t
 
 Not in part 4c: phase 5.
 
+*1.8.87: one font for measuring and drawing, and marks as art.* Matthew's answers to the questions left open since 1.8.84, 2026-11-15: keep the views' 13 px text and 30 px buttons ("shrink to fit always applies"); fix the font mismatch as its own release ("2 fix"); and draw the views' marks as art ("Art").
+
+The mismatch: the views measured their text in DejaVu Sans (`jr-font`) and drew it in whatever font the journal had loaded, Source Sans 3. A character only one of them had drew as a box (the Plan view's ▸), and text was placed for widths it did not have. Now:
+
+- **Every text names its font.** A view token set, the Budget journal's tokens and the chrome tokens each name two fonts, `font` and `fontStrong`, by their embedded name: the platform look `jr-font` and `jr-font-bold` (DejaVu Sans), Budget `jr-font-ss3` and `jr-font-ss3-semibold` (Source Sans 3). Every text, wrapped text and rich text a layout makes carries the font it was measured in, and JRViews draws it in that font. JRViews loads the four embedded fonts at boot, in one order, and `JRViews.fontId(name)` gives a font's id; there is no default font.
+- **Fail first.** A token set that names a font that is not embedded fails with `FONT_MISSING`; a character an item's font has no glyph for fails the layout with `GLYPH_MISSING` (no box is drawn); JRViews refuses to draw a text item that names no font.
+- **Marks are art.** The marks a view text uses (← → ▸ ▾ ✓ ✗ ★ ☆ ⚠ ⟳ ● ○) are the `Mark` component (6.2). In the text each one holds a blank place 0.9 em wide (U+FFFC, which all four fonts have as an empty glyph), so measuring, wrapping and cutting with "…" treat it like a letter; the layout then draws the Mark art in that place, 0.9 em square on the text's middle, in the variant `<mark>-<tone>`. The tone is the view token whose colour the text is in: `ink`, `muted`, `onAccent`, `accent`, `danger` or `select`. Text in a colour no tone has fails with `TOKEN_UNKNOWN`, naming the tokens with that colour. A mark cut off by "…" is not drawn. Each look's pack draws them: the platform look in rounded 1.3 strokes in its view tokens' colours, Budget in thin square-ended 1 px strokes like its date chevron, in the colours of its view tokens. Swapping the `Mark` piece for an app, a screen or one view swaps every mark there.
+- **Fonts.** DejaVu Sans Regular and Bold gain Latin Extended-A (U+0100 to U+017F, 128 letters such as Ł, ě, Đ, Ŝ), so a name with them no longer stops a platform view; the four fonts gain the blank U+FFFC. Every old glyph is kept byte for byte ([fonts.md](./fonts.md)). The DejaVu licence travels in the lean in the `font-licence-dejavu` block.
+
+Fallbacks and dead code removed: the JRViews core's `try`/`catch` that used the regular font for bold when the bold font failed to load, and the one that ignored a journal font that failed to load; the `window.__jrJournalFonts` global (set by the core and by Budget, read when drawing); the drawing code's default to the journal font, then `jr-font`, for a text or rich item, and its fixed `jr-font` for wrapped text; `JRViews.font()` and `JRViews.fontBold()`; `Exp7VM`'s and the chrome's fonts taken from them, with `FONTB = FONT` when there was no bold; the views host's and the demo's field font taken from `JRViews.font()` (a field's font comes with its style from the view tokens); and the demo's own walk over its screens for characters the fonts lack, with its guess at the fonts JRViews drew in (`Exp7VM` itself now fails such a screen).
+
+The list of changes, for Matthew to approve:
+- The platform look (the stock Calendar, Board and Plan views, the top bar and Apps picker, and the Exp7 demo) draws its text in DejaVu Sans, the font it was always measured in; 1.8.86 drew it in Source Sans 3. Letters change shape; where text sits and where it wraps does not, because it was measured in DejaVu Sans already. (The other way, measuring and drawing the platform look in Source Sans 3, would keep the letters and move and rewrap the text instead; say if you would rather have that.)
+- Budget's views measure their text in Source Sans 3, the font they draw in, so widths, wraps and "…" cuts match what is drawn. Source Sans 3 is narrower, so some texts that wrapped or were cut now fit, and what follows them moves up or left.
+- Marks are drawn as art instead of from a font (above): their shapes change, and a mark's place is 0.9 em wide, so text after one moves: under a pixel after most marks at 13 px, and about 5 px after ▸ and ▾, which were half an em wide. The Plan view's ▸ no longer draws as a box.
+- Letters from Latin Extended-A draw in the platform look, where 1.8.86 failed the view with `GLYPH_MISSING`.
+- In the DOM layout of the Calendar, Board and Plan views, a bold label draws bold, as it was measured; it drew regular.
+
+Kept as they are, decided by Matthew: the views' 13 px text and 30 px buttons.
+
+Tests in exp7-jrender: `tests/layer4-views.mjs` now gates against 1.8.86 (`43637a4`): every platform view state with no mark and no Latin Extended-A letter lays out the same apart from the fonts the items name; every other state is listed by the change above that explains it; the mark characters are the ones it knows, no text draws a mark character, every mark is drawn as Mark art in a tone the view tokens have, and Budget's Mark art draws each tone in the colour its view tokens give it; a mark in a colour no tone has fails with `TOKEN_UNKNOWN`, and a character no font has with `GLYPH_MISSING`. `tests/layer4-chrome.mjs` compares the chrome with 1.8.80's capture apart from the fonts and checks its text is in the chrome tokens' fonts. `tests/layer4-demo.mjs` checks the Plan tab's marks are Mark art. Every other layer passes unchanged.
+
 **Phase 5: new apps.** A new Exp7 app is its atlas, a complete token set, a complete art pack and screens built from the catalog. Nothing else.
 
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
@@ -684,6 +707,16 @@ Studies, as second priority: when a screen moves to components, its study (if an
 | Q8 | Account, key and share panels | Left untouched for now; they run on their own temporarily | 6.2 |
 | N1 | Telling the person when their action fails | No: the screen just rolls back, with no message | 8.2 |
 | N2 | How far text and art may shrink | "Everything that can shrink can shrink infinitely"; tap targets still never shrink | 4.5, 5.3, 7.4 |
+
+### Decided by Matthew, 2026-11-15
+
+| Question | His answer | Where it's written in |
+|---|---|---|
+| The demo's scope | "Move it to canvas" | 10, part 4a |
+| Paths: the whole atlas or a part | "Keep it whole" | 10, part 4c |
+| The views' 13 px text and 30 px buttons under the phone floors | Keep them: "shrink to fit always applies" | 10, 1.8.87 |
+| The views' measure and draw font mismatch | "2 fix", as its own release | 10, 1.8.87 |
+| The views' marks (arrows, ticks, triangles, stars, dots) | "Art": every mark is swappable art | 6.2, 10, 1.8.87 |
 
 ## 12. Needs Ash
 
