@@ -11695,8 +11695,10 @@ window.x7 = window.x7 || function (t) {
     return { app: model.app, screen: 'views', tokens: VT,
       token: function (name) { return Object.prototype.hasOwnProperty.call(VT, name) ? VT[name] : F.with('TOKEN_MISSING', { app: model.app, screen: 'views', detail: name }); },
       color: function (name) { var v = this.token(name); return v === F.FAIL ? v : J.hex(v); } }; }
-  /* hovers(L): each node whose art draws differently on hover keeps its hover items (JRViews patches them in) */
-  function hovers(L) { var A = root.Exp7Art; L.nodes.forEach(function (n) { if (!n.art) return; var hv = A.hover(n); if (hv) n.hovItems = hv; else delete n.hovItems; }); return L; }
+  /* hovers(L): each node whose art draws differently on hover keeps its hover items (JRViews patches them in), and its look in
+     each state input puts it in (1.8.90: Budget's Home draws them live) */
+  function hovers(L) { var A = root.Exp7Art; L.nodes.forEach(function (n) { if (!n.art) return; var hv = A.hover(n); if (hv) n.hovItems = hv; else delete n.hovItems;
+    var lk = A.looks(n); if (Object.keys(lk).length) n.looks = lk; else delete n.looks; }); return L; }
   /* JRender TextField options from the layout's tokens (L.tokens): a live field matches the resting box the InputBox art draws */
   function fieldStyle(T) { return { font: JV.fontId(T.font), radius: T.fieldRadius, pad: T.fieldPad, size: T.fieldSize, color: U(T.ink), bg: U(T.surface), border: U(T.fieldLine), focusBorder: U(T.accent), caretColor: U(T.ink), placeholderColor: U(T.muted) }; }
 
@@ -15120,6 +15122,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     return null; }
   /* a state's drawing: its items, or the items of the state it is an explicit alias of ("=hover") */
   function drawing(variant, state) { var d = variant[state]; if (typeof d === 'string' && d.charAt(0) === '=') { d = variant[d.slice(1)]; if (typeof d === 'string') return null; } return Array.isArray(d) ? d : null; }
+  /* the state whose drawing a state uses: itself, or the state it is an alias of (1.8.90) */
+  function resolved(variant, state) { var d = variant[state]; return typeof d === 'string' && d.charAt(0) === '=' ? d.slice(1) : state; }
 
   function checkPiece(p) {
     if (!p || typeof p.component !== 'string' || typeof p.slot !== 'string') return invalid(p, 'a piece needs its component and slot');
@@ -15274,29 +15278,44 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       var col = typeof c === 'string' ? root.JRender.hex(c) : S.color(c.token); if (col === FAIL) return FAIL; it[ci] = col; }
     return items; }
 
-  /* draw(S, n, component, slot, variant, rect, at): the slot's art in node n, in every state the component declares. The idle
-   * drawing goes in n.items (at the end, or at index at); the node keeps every state's drawing per slot, for hover and the
-   * contrast check. Only idle and hover show today: hover is applied live from the hover drawing (JRViews and Home). */
+  /* draw(S, n, component, slot, variant, rect, at): the slot's art in node n, in every state the component declares. The node
+   * rests in n.rest: idle, or a state its component put it in from data before drawing it (selected, disabled), which the
+   * component must declare (COMPONENT_INVALID). The rest state's drawing goes in n.items (at the end, or at index at). The node
+   * keeps every state's drawing per slot and which drawing each state uses (shows), for its looks (look, looks) and the
+   * contrast check. 1.8.90: every state is drawn live: the rest from data, hover, pressed and focus from input (Home). */
   function draw(S, n, component, slot, variant, rect, at) {
     var def = root.Exp7Components.get(component); if (!def) return F.with('COMPONENT_INVALID', { component: component, detail: 'not registered' });
     if (!has(def.slots, slot) || def.slots[slot].indexOf(variant) < 0) return F.with('COMPONENT_INVALID', { component: component, slot: slot, detail: 'variant ' + variant + ' is not declared for the slot' });
+    /* a node no component has put in another state rests in idle */
+    if (!has(n, 'rest')) n.rest = 'idle';
+    if (def.states.indexOf(n.rest) < 0) return F.with('COMPONENT_INVALID', { component: component, id: n.id, state: n.rest, detail: 'the node rests in a state the component does not declare' });
     var where = { component: component, id: n.id }, p = art(S, component, slot, n.key); if (p === FAIL) return FAIL;
-    var drawn = {}, fills = {};
+    var drawn = {}, fills = {}, shows = {};
     for (var i = 0; i < def.states.length; i++) { var st = def.states[i], d = fitArt(S, p, variant, st, rect, where); if (d === FAIL) return FAIL; drawn[st] = d;
+      shows[st] = resolved(p.variants[variant], st);
       fills[st] = drawing(p.variants[variant], st).map(function (it) { var c = it[0] === 'path' || it[0] === 'stroke' ? it[2] : it[it.length - 1]; return typeof c === 'string' ? c : S.token(c.token); }); }
     var idle = drawn.idle; if (!idle) return F.with('COMPONENT_INVALID', { component: component, detail: 'no idle state' });
-    if (at == null) Array.prototype.push.apply(n.items, idle); else n.items.splice.apply(n.items, [at, 0].concat(idle));
+    var rest = drawn[n.rest];
+    if (at == null) Array.prototype.push.apply(n.items, rest); else n.items.splice.apply(n.items, [at, 0].concat(rest));
     if (!n.art) n.art = [];
-    n.art.push({ slot: slot, variant: variant, rect: rect.slice(), idle: idle, hover: drawn.hover ? drawn.hover : idle, own: Array.isArray(p.variants[variant].hover), drawn: drawn, fills: fills });
-    return idle; }
-  /* hover(n): the node's items in its hover state, or null when no slot's art draws a hover of its own (its variant's hover is
-   * '=idle'). A hover drawing that happens to match idle still counts: the node is hoverable, as the art says. */
-  function hover(n) {
-    if (!n.art || !n.art.some(function (s) { return s.own; })) return null;
+    n.art.push({ slot: slot, variant: variant, rect: rect.slice(), idle: idle, hover: drawn.hover ? drawn.hover : idle, own: Array.isArray(p.variants[variant].hover), drawn: drawn, fills: fills, shows: shows });
+    return rest; }
+  /* the states input puts a node in, drawn live over its rest (1.8.90) */
+  var LIVE = ['hover', 'pressed', 'focus'];
+  /* look(n, state): the node's items with each slot drawn in state, or null when the node looks in that state as it does at
+   * rest: no slot's art draws the state with another drawing than its rest one (an alias of the rest state, such as
+   * '=idle'), or the component does not declare the state. A drawing that happens to match the rest still counts, as the art
+   * says. */
+  function look(n, state) {
+    if (!n.art || !n.art.some(function (s) { return has(s.shows, state) && s.shows[state] !== s.shows[n.rest]; })) return null;
     var out = [];
-    n.items.forEach(function (it) { for (var i = 0; i < n.art.length; i++) { var s = n.art[i], k = s.idle.indexOf(it);
-      if (k === 0) { Array.prototype.push.apply(out, s.hover); return; } if (k > 0) return; } out.push(it); });
+    n.items.forEach(function (it) { for (var i = 0; i < n.art.length; i++) { var s = n.art[i], k = s.drawn[n.rest].indexOf(it);
+      if (k === 0) { Array.prototype.push.apply(out, has(s.drawn, state) ? s.drawn[state] : s.drawn[n.rest]); return; } if (k > 0) return; } out.push(it); });
     return out; }
+  /* looks(n): the node's look in each state input puts it in (hover, pressed, focus), where it differs from its rest */
+  function looks(n) { var out = {}; LIVE.forEach(function (st) { var l = look(n, st); if (l) out[st] = l; }); return out; }
+  /* hover(n): the node's hover look, or null */
+  function hover(n) { return look(n, 'hover'); }
 
   /* ---------- text over art keeps its contrast (7.6) ---------- */
   function lum(hex) { var v = [1, 3, 5].map(function (i) { var c = parseInt(hex.substr(i, 2), 16) / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); });
@@ -15320,6 +15339,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     return true; }
 
   root.Exp7Art = Object.freeze({ load: load, assign: assign, override: override, clear: clear, art: art, fitArt: fitArt, draw: draw, hover: hover,
+    look: look, looks: looks, live: LIVE.slice(),
     contrast: contrast, check: checkPiece, place: place, extent: extent, ratio: ratio,
     pack: function (app) { var a = apps.get(app); return a ? a.pack : null; },
     components: function (app) { var a = apps.get(app); return a ? a.components.slice() : null; }, apps: function () { return Array.from(apps.keys()); } });
@@ -15339,6 +15359,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
  * TimePicker, FieldDatePicker, HourRow, AmountRow, MonthHeading, BeforeAfter.
  * Phase 4 adds the journal views' pieces (ViewHead, DateBand, Label, MoneyRow, TotalRow) and Home's FocusFrame.
  * Phase 5 adds LiveField, the box of the field being typed in, and liveStyle, how its typed text is drawn.
+ * 1.8.90: a node rests in the selected or disabled state its data says (n.rest, set before its art is drawn) and keeps
+ * its look in each state input puts it in (n.looks: hover, pressed, focus), drawn live by Home.
  * Phase 3: every visual that isn't live text is art (design-art). A component declares its slots and the variants it draws
  * in each ({ slot: [variant] }); it places each slot's art at a rect it computes from tokens, and the art for the slot comes
  * from the app's pack or an override. Hover comes from the art's hover drawing, not from a recolour in code. */
@@ -15400,9 +15422,11 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if (B.axis(b.w, w, w, w, where) === FAIL) return FAIL;
     var before = V.nodes.length, texts = V.texts.length, h = def.draw(S, V, props, x, y, w); if (h === FAIL) return FAIL;
     if (h < b.h.min - 1e-6 || h > b.h.max + 1e-6) return F.with('BOUNDS_UNSAT', Object.assign({ offered: { h: h }, needed: { min: b.h.min, max: b.h.max } }, where));
-    /* text over art keeps its contrast; a node whose art draws differently on hover keeps its hover items */
+    /* text over art keeps its contrast; a node whose art draws differently on hover keeps its hover items, and its look in each
+       state input puts it in (1.8.90) */
     if (A.contrast(S, V, V.texts.slice(texts)) === FAIL) return FAIL;
-    V.nodes.slice(before).forEach(function (n) { var hv = A.hover(n); if (hv) n.hovItems = hv; else delete n.hovItems; });
+    V.nodes.slice(before).forEach(function (n) { var hv = A.hover(n); if (hv) n.hovItems = hv; else delete n.hovItems;
+      var lk = A.looks(n); if (Object.keys(lk).length) n.looks = lk; else delete n.looks; });
     var kids = V.nodes.slice(before).map(function (n) { return n.id; }), id = B.fnv(V.key + ':' + name + ':' + (props.key == null ? name : props.key) + ':' + x + ',' + y);
     S.table.put(id, [x, y, w, h], b, kids, V.key);
     return h;
@@ -15484,6 +15508,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       for (var di = 0; di < days.length; di++) {
         var d = days[di], ix = start + di, cx0 = x + (ix % WEEK) * cw, cy0 = y + Math.floor(ix / WEEK) * ch, n = V.node(p.prefix + 'day:' + d);
         var level = p.risk[d] && p.risk[d].c ? p.risk[d].c : '', marked = LEVELS[level] === 1, isSel = d === p.sel, isToday = d === p.today;
+        if (isSel) n.rest = 'selected';
         if (art(S, n, 'MiniMonth', 'day.background', marked ? level : 'plain', [cx0, cy0, cw, ch]) === FAIL) return FAIL;
         if (S.line(V, n, { text: String(+d.slice(8)), role: 'body', bold: isSel || isToday, ink: 'ink' }, cx0 + cw / HALF, cy0 + t.dayNumberDrop, cw, 'center', { component: 'MiniMonth', state: isSel ? 'selected' : 'idle' }) === FAIL) return FAIL;
         if (isSel ? art(S, n, 'MiniMonth', 'day.selected', 'on', [cx0, cy0, cw, ch]) === FAIL : isToday && p.strokeToday && art(S, n, 'MiniMonth', 'day.today', 'on', [cx0, cy0, cw, ch]) === FAIL) return FAIL;
@@ -15691,6 +15716,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       var right = p.tag ? t.tagRoom : p.chevron ? t.chevronRoom : t.inset, ink = p.quiet ? 'captionInk' : 'ink', lh0 = S.fit({ text: text, role: 'body', bold: !!p.bold, ink: ink, lines: { min: 1, max: 1 } }, { w: Infinity, h: h0 }, where); if (lh0 === FAIL) return FAIL;
       var base = S.centre(lh0, y, h0), f = S.para(V, n, { text: text, role: 'body', bold: !!p.bold, ink: ink }, tx, base, x + w - right - tx, Infinity, where); if (f === FAIL) return FAIL;
       var rh = h0 + (f.n - 1) * f.lh, cy = y + h0 / HALF;
+      if (marked && p.on) n.rest = 'selected';
       if (art(S, n, 'Choice', 'choice.background', 'plain', [x, y, w, rh], 0) === FAIL) return FAIL;
       if (marked && glyph(S, n, 'Choice', 'choice.mark', p.mark + (p.on ? '-on' : '-off'), x + t.inset + t.markSize / HALF, cy, 'markBox') === FAIL) return FAIL;
       if (p.tag && S.line(V, V.node(p.key + ':tag'), { text: p.tag, role: 'secondary', ink: p.tagInk ? p.tagInk : 'captionInk' }, x + w - t.inset, base, t.tagRoom - t.controlInset, 'end', where) === FAIL) return FAIL;
@@ -15722,6 +15748,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     draw: function (S, V, p, x, y, w) { var t = tokens(S, ['toggleW', 'toggleH', 'target', 'controlInset']); if (t === FAIL) return FAIL;
       var top = y + (t.target - t.toggleH) / HALF, sides = [['left', p.left, p.leftAct], ['right', p.right, p.rightAct]];
       for (var i = 0; i < sides.length; i++) { var sx = x + i * t.toggleW, on = p.on === sides[i][0], n = V.node(p.key + ':' + sides[i][0]);
+        if (on) n.rest = 'selected';
         if (art(S, n, 'Toggle', 'toggle.segment', on ? 'on' : 'off', [sx, top, t.toggleW, t.toggleH]) === FAIL) return FAIL;
         if (S.centred(V, n, { text: sides[i][1], role: 'secondary', bold: on, ink: 'ink' }, [sx, top, t.toggleW, t.toggleH], sx + t.controlInset, t.toggleW - t.controlInset * HALF, { component: 'Toggle', id: n.id }) === FAIL) return FAIL;
         var drawn = V.texts[V.texts.length - 1], dx = (t.toggleW - drawn.width) / HALF - t.controlInset; n.items[n.items.length - 1][1] += dx; drawn.x += dx;
@@ -15755,6 +15782,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     draw: function (S, V, p, x, y, w) { var t = tokens(S, ['inset', 'target', 'controlInset']); if (t === FAIL) return FAIL;
       var label = field(p, 'label', { component: 'PrimaryBand' }); if (label === FAIL) return FAIL;
       var n = V.node(p.key), bx = x + t.inset, bw = w - t.inset * HALF, where = { component: 'PrimaryBand', id: n.id };
+      if (!p.enabled) n.rest = 'disabled';
       if (art(S, n, 'PrimaryBand', 'primary.background', p.enabled ? 'enabled' : 'disabled', [bx, y, bw, t.target]) === FAIL) return FAIL;
       var f = S.fit({ text: label, role: 'body', bold: true, ink: p.enabled ? 'ink' : 'captionInk', lines: { min: 1, max: 1 } }, { w: bw - t.controlInset * HALF, h: t.target }, where); if (f === FAIL) return FAIL;
       S.paint(V, n, f, bx + bw / HALF, S.centre(f, y, t.target), 'center', [bx, y, bw, t.target]);
@@ -15772,6 +15800,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       if (S.line(V, V.node(p.key + ':hl'), { text: 'Hour', role: 'secondary', ink: 'captionInk' }, x + t.inset, y + t.timeLabelDrop, gw, 'start', where) === FAIL) return FAIL;
       var top = y + t.timeLabelH;
       for (var h = 0; h < DAY_HOURS; h++) { var cx = x + t.inset + (h % t.timeCols) * cw, cy = top + Math.floor(h / t.timeCols) * t.target, lab = String(h).padStart(HALF, '0'), on = h === hh, n = V.node(p.key + ':h' + lab);
+        if (on) n.rest = 'selected';
         if (art(S, n, 'TimePicker', 'time.cell', on ? 'on' : 'off', [cx, cy, cw, t.target]) === FAIL) return FAIL;
         if (S.centred(V, n, { text: lab, role: 'secondary', bold: on, ink: 'ink' }, [cx, cy, cw, t.target], cx, cw, where) === FAIL) return FAIL;
         var d = V.texts[V.texts.length - 1], dx = (cw - d.width) / HALF; n.items[n.items.length - 1][1] += dx; d.x += dx;
@@ -15780,6 +15809,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       if (S.line(V, V.node(p.key + ':ml'), { text: 'Minute', role: 'secondary', ink: 'captionInk' }, x + t.inset, my + t.timeLabelDrop, gw, 'start', where) === FAIL) return FAIL;
       my += t.timeLabelH;
       for (var i = 0; i < quarters.length; i++) { var qx = x + t.inset + i * qw, qon = quarters[i] === mm, m = V.node(p.key + ':m' + quarters[i]);
+        if (qon) m.rest = 'selected';
         if (art(S, m, 'TimePicker', 'time.cell', qon ? 'on' : 'off', [qx, my, qw, t.target]) === FAIL) return FAIL;
         if (S.centred(V, m, { text: quarters[i], role: 'body', bold: qon, ink: 'ink' }, [qx, my, qw, t.target], qx, qw, where) === FAIL) return FAIL;
         var e = V.texts[V.texts.length - 1], ex = (qw - e.width) / HALF; m.items[m.items.length - 1][1] += ex; e.x += ex;
@@ -15821,7 +15851,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
         var aw = 0; if (e.amount !== '') { if (S.line(V, n, { text: e.amount, role: 'body', bold: on, ink: 'ink' }, right, base, w / HALF - t.inset, 'end', where) === FAIL) return FAIL; aw = V.texts[V.texts.length - 1].width + t.cadenceGap; }
         var cw = 0; if (e.cadence !== '') { if (S.line(V, n, { text: e.cadence, role: 'secondary', ink: 'captionInk' }, right - aw, base, Math.max(t.labelMin, w - t.hourNameX - aw - t.inset - t.labelMin), 'end', where) === FAIL) return FAIL; cw = V.texts[V.texts.length - 1].width + t.cadenceGap; }
         var f = S.para(V, n, { text: e.name, role: 'body', bold: on, ink: 'ink' }, x + t.hourNameX, base, Math.max(t.labelMin, right - aw - cw - x - t.hourNameX), Infinity, where); if (f === FAIL) return FAIL;
-        var rh = t.row + (f.n - 1) * f.lh; if (art(S, n, 'HourRow', 'row.background', on ? 'on' : 'off', [x, cur, w, rh], 0) === FAIL) return FAIL;
+        var rh = t.row + (f.n - 1) * f.lh; if (on) n.rest = 'selected';
+        if (art(S, n, 'HourRow', 'row.background', on ? 'on' : 'off', [x, cur, w, rh], 0) === FAIL) return FAIL;
         if (hit(S, V, n, [x, cur, w, rh], 'entry:' + e.id, e.name, where) === FAIL) return FAIL;
         cur += rh; }
       if (rule(S, V, p.key + ':rule', 'HourRow', 'row.rule', 'lineSoft', x + t.inset, cur - 1, w - t.inset * HALF) === FAIL) return FAIL;
@@ -17163,9 +17194,11 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     this.store=new root.Exp7ViewStore.Store(cat,function(rec){return blobs[rec.dl.file];},J);this.store.bindResources(this.core,{regular:jf[0],bold:jf[1]});this.blobs=blobs;
     var list=[];order.forEach(function(k){var rec=self.store.record('exp7.journal.'+k),v=self.views[k];if(!v){v=self.store.create(rec.id,{renderer:self.r});self.views[k]=v;}else{v.record=rec;v.scene.load(self.store.dl(rec.id));}
       var p=positions[k]||[0,0,colW,H];v.scene.onevent=function(e){var nodes=k==='selector'?self.overlayNodes:Ls[k].nodes,n=nodes.find(function(q){return q.id===e.id;});if(!n)return;
-        if((e.kind===J.EV.ENTER||e.kind===J.EV.LEAVE)&&n.hovItems){var on=e.kind===J.EV.ENTER;v.scene.patch(new J.Patch().replace(n.id,function(b){JV.items(b,{items:on?n.hovItems:n.items,hit:n.hit,flags:n.flags});}));self.r.draw();}else if((e.kind===J.EV.ENTER||e.kind===J.EV.LEAVE)&&n.hov!=null){v.scene.patch(new J.Patch().colorItem(n.id,0,e.kind===J.EV.ENTER?n.hov:n.base));self.r.draw();}if(e.kind===J.EV.CLICK&&n.vm)Promise.resolve(self.act(n.vm.act,k,n)).catch(function(err){self.status.textContent='Selection failed: '+String(err.message||err);});
+        if(n.looks){self.pointer(k,n,e.kind);}else if((e.kind===J.EV.ENTER||e.kind===J.EV.LEAVE)&&n.hov!=null){v.scene.patch(new J.Patch().colorItem(n.id,0,e.kind===J.EV.ENTER?n.hov:n.base));self.r.draw();}if(e.kind===J.EV.CLICK&&n.vm)Promise.resolve(self.act(n.vm.act,k,n)).catch(function(err){self.status.textContent='Selection failed: '+String(err.message||err);});
       };list.push([v,p[0],p[1]-(self.scrollY||0),p[2],p[3]]);});
     this.drawOrder=order;this.entries=this.store.compose(this.r,list);
+    /* every scene was loaded at rest: the pointer is over and down on nothing new, and the focused target draws its focus look */
+    this.over=null;this.down=null;var ft=this.focused();if(ft&&ft.node.looks)this.drawState(ft.kind,ft.node);
     if(this.live) this.attachLive(built.live,liveSel);
     this.r.draw();this.painted=true;this.error='';
   };
@@ -17186,7 +17219,29 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   Home.prototype.focus=function(key){ if(this.dead||!this.views.selector) return; var self=this, FL=root.Exp7Fail;
     var ov=FL.context('budget.focus',function(){ return overlay(self.W,self.H,key,self.targets); },function(failure){ self.lastFailure=failure; });
     if(ov===FL.FAIL) return FL.FAIL;
-    this.focusKey=key; this.overlayNodes=ov.nodes; this.blobs.selector=ov.dl.bytes(); this.views.selector.scene.load(ov.dl); this.placeScenes(); return true; };
+    var was=this.focused();
+    this.focusKey=key; this.overlayNodes=ov.nodes; this.blobs.selector=ov.dl.bytes(); this.views.selector.scene.load(ov.dl); this.placeScenes();
+    /* the target that lost the focus draws its rest again, the one that has it draws its focus look (1.8.90) */
+    [was,this.focused()].forEach(function(t){ if(t&&t.node.looks) self.drawState(t.kind,t.node); });
+    return true; };
+  /* 1.8.90: every art state drawn live. A node is drawn pressed while the pointer is down on it, hover while the pointer is over
+     it, focus while the keyboard focus is on it, and otherwise at its rest (idle, or the selected or disabled state its
+     component gave it from data). n.looks holds the states whose art draws differently from the rest (Exp7Art.looks); a state
+     with no look is drawn as the rest, as its art says ('=idle'). */
+  Home.prototype.pointer=function(k,n,kind){ var EV=J.EV, at={k:k,n:n};
+    if(kind===EV.ENTER) this.over=at;
+    else if(kind===EV.DOWN) this.down=at;
+    else if(kind===EV.UP){ if(this.down&&this.down.n===n) this.down=null; }
+    else if(kind===EV.LEAVE||kind===EV.CANCEL){ if(this.over&&this.over.n===n) this.over=null; if(this.down&&this.down.n===n) this.down=null; }
+    else return false;
+    return this.drawState(k,n); };
+  /* focused(): the keyboard focus's target, or null when nothing has the focus */
+  Home.prototype.focused=function(){ var key=this.focusKey; if(key==null) return null; var t=this.targets.find(function(q){return q.key===key;}); return t?t:null; };
+  /* artState(n): the state n is drawn in now; itemsOf(n): its items in that state */
+  Home.prototype.artState=function(n){ if(this.down&&this.down.n===n) return 'pressed'; if(this.over&&this.over.n===n) return 'hover'; var f=this.focused(); return f&&f.node===n?'focus':n.rest; };
+  Home.prototype.itemsOf=function(n){ var st=this.artState(n); return n.looks[st]?n.looks[st]:n.items; };
+  Home.prototype.drawState=function(k,n){ var items=this.itemsOf(n);
+    this.views[k].scene.patch(new J.Patch().replace(n.id,function(b){JV.items(b,{items:items,hit:n.hit,flags:n.flags});})); this.r.draw(); return true; };
   Home.prototype.point=function(e){var r=this.cv.getBoundingClientRect(),vh=this.viewH||r.height||this.H;return [(e.clientX-r.left)*this.W/r.width,(e.clientY-r.top)*vh/r.height+(this.scrollY||0)];};
   Home.prototype.openDate=function(n,hover){if(hover)return; /* phone-first: the picker is an inline expansion, not a hover popup */
     var t=this.targets.find(function(t){return t.node===n;});if(t)this.focusKey=t.key;
@@ -18665,7 +18720,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.89",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.90",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
