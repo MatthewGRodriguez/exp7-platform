@@ -2,7 +2,7 @@
   "format": "exp7-platform-release/1",
   "version": "1.8.85",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "2677c4fb8cbf87aeb8ee2862cba850d0074f817a69a2d8a2b06799b37afe6b75",
+  "sha256": "05a668f595825bf365c33ab2307641a045845b441aa855956cd2ebb44f0bcb99",
   "minLauncherMajor": 1,
   "contains": {
     "1.8.85": "Design system phase 4, part 4b: the Exp7 demo's Two writers, Storage and Circuit on canvas. Two writers (the collaboration card, the network and sync controls, Alice's and Bob's edits and entries, the merge order, the diff, the path inspector and Show or Hide for each replica's Plan and Board views), Storage (the batch log, the 5000-op test and the per-path statistics) and Circuit (the rule source parsed as you type, the rules, the event arguments, what fired, the canonical print and the scores) are Exp7VM models drawn by Exp7DemoUI. Checkboxes are toggle buttons, menus are chips, folding sections are Show and Hide buttons, and tables merge columns to fit a phone. The collaboration engine's refusals are recorded in Exp7Fail. Removed: the lean's Doc and Panel helper script (Exp7Experiments), the collaboration DOM script, renderSync, renderLog, renderScores, renderSyncDiff, renderPathStats, renderInspector, the three DOM sections and their styles. Budget unchanged.",
