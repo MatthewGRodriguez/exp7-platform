@@ -304,6 +304,8 @@ Authored as SVG within the subset the existing tools already handle:
 
 Each piece compiles to a view-store record (`exp7-view-record/1`, JRDL v1), the format the shell already loads. An SVG outside the subset fails at compile time with the element and line.
 
+*As built in 1.8.80:* pieces compile to JRViews items (`rect`, `rrect`, `border`, `path`, `stroke`) in the piece's own coordinates, with colours as `#rrggbb` or a colour token, and a pack is one `exp7-art-pack/1` JSON block embedded in the lean (`art-budget-journal`). The view-store compiler is in no repository (section 12), and items draw byte for byte what the components drew, which is the phase 3 gate. The compiler (`tools/art/compile.mjs` in exp7-jrender) takes `svg`, `g` (with `transform`), `rect`, `circle` and `path` (`M L H V Q C Z` and their relative forms; arcs fail), solid fills and strokes with width, join, cap, miter limit and dash. The validator bounds a curve by its control points, so a curve whose control point leaves the box fails ART_OUTSIDE even where the drawn curve would fit. Gradients, `defs` and `use` and the `tile` fit are not built yet: nothing in Budget's first pack needs them, and each fails at compile time until it is. Colour tokens keep the light set (`EXP7_LIGHT`) working with the same art.
+
 ### 7.4 The slot manifest
 
 Every art piece carries:
@@ -329,6 +331,8 @@ Every art piece carries:
 - `supports` should cover the component's declared bounds. A Row can grow to many lines, so its background should support that height.
 - A state can be an explicit alias of another (`"pressed": "=hover"`). That is a written choice, checked like any other, not a fallback.
 
+*As built in 1.8.80:* a piece has `variants`, each with every state (`"variants": { "right": { "idle": [...], "hover": "=idle" } }`), because one slot can draw different things picked from data: a chevron's direction, a day cell's tint (L, M, C), a mark's kind and whether it is on. A component declares its slots as `{ slot: [variants] }` and a pack must cover every variant in every state. A `fit` piece's `viewBox` is centred on 0,0 and it is drawn about an anchor the component gives (the centre of a `glyphBox` or `markBox` square), so a glyph shrinks about its own centre.
+
 ### 7.5 Animation
 
 - State changes animate between that state's drawings on the state table's timings, through ViewStates. Clicks run first; the click path stays at or under 120 ms.
@@ -346,9 +350,13 @@ For each piece, at the slot's minimum, maximum and typical sizes, in every state
 
 It runs when art is compiled, in the test suite, and at pack load in the app.
 
+*As built in 1.8.80:* a malformed piece (an unknown item kind, a colour that is neither `#rrggbb` nor a colour token, an alias to a state the piece doesn't draw) fails with `ART_INVALID`. Stroke extents count half the width, square caps and miter tips. The contrast check runs as each component is placed: each text against the topmost art fill under its centre in the same node, in every state, not against rendered pixels. Every ink over every fill in Budget's pack passes (the lowest is 5.5:1, `captionInk` over `calCritical`). There is no animation yet, so no frames are sampled. Only idle and hover are drawn live today: hover is the piece's hover drawing, swapped in by JRViews and Home; `pressed` is written as an alias of hover and `focus`, `selected` and `disabled` as aliases of idle until something draws them.
+
 ### 7.7 Replacing material code
 
 Once a component's art is in slots, the procedural light and shadow passes for it in `jrviews-ux-states` are removed in the same change, so the two never stack (the rule already written in [design/overlay-view-store.md](./design/overlay-view-store.md)).
+
+*As built in 1.8.80:* `jrviews-ux-states` only decorates nodes that come from an element (`n.el`), which no design component makes, so it never drew on Budget's components. The procedural material that phase 3 removes is the drawing code in `design-components` itself (section 10).
 
 ---
 
@@ -367,6 +375,8 @@ Matthew's model is Verse's `<decides>` **[REQ 2026-11-14]**: a step works or it 
 | `fit(text, box)` | the box has no width or height to shrink into (4.5) | `BOX_EMPTY` |
 | `measure(node, offered)`, `place(node, rect)` | a `min` is larger than the offered `max`, or a hit is under 44 | `BOUNDS_UNSAT`, `TARGET_TOO_SMALL` |
 | `art(slot, state)`, `fitArt(art, rect)` | no art resolved for the slot and state, or the slot has no width or height (7.4) | `ART_MISSING`, `BOX_EMPTY` |
+| `check(piece)`, `load(pack)`, `assign(app, pack)`, `override(...)` | a piece is malformed, draws outside its slot, or a pack misses a slot, variant or state (7.6) | `ART_INVALID`, `ART_OUTSIDE`, `ART_MISSING` |
+| `contrast(texts)` | text over art under `textContrastMin` (7.6) | `CONTRAST_LOW` |
 | `field(model, key)` | the view model lacks a value the component needs, such as an item with no name | `DATA_MISSING` |
 
 **Failure contexts.** A failable step can only be used inside a failure context, the way a `<decides>` call can only sit in an `if`, a `for` filter or another `<decides>` function. A failure ends its context and goes no further: code outside the context only sees that the context failed. These are the contexts in Exp7, each with the point it returns to:
@@ -485,6 +495,12 @@ Tests in exp7-jrender: layer 2 for 31 screen states on three fixtures at seven w
 
 **Phase 3: art slots live.** `design-art`, the validator with shrink-to-fit art (layer 3), and Budget's first pack drawn as today's look, so nothing changes on screen. Remove the procedural material for each component as its art arrives. After that, new art for Budget only through the art workflow.
 
+*Phase 3 as built (1.8.80).* New shared script `design-art` (`Exp7Art`): pack loading and the validator, `assign(app, pack)` for the app level, `override(app, screen, nodeKey, piece)` for a screen or one instance, and `art()` resolving instance, then screen, then app. Budget's first pack, `budget-journal`, is 43 pieces drawn in SVG with the studies (exp7-budget-studies `art/budget-journal/`), compiled by `tools/art/compile.mjs` in exp7-jrender and embedded in the lean as the `art-budget-journal` block. It is assigned to Budget once when journal-views loads, in its own failure context; every Budget layout starts by checking it is there (`ART_MISSING` if not). Every component now places art in its slots instead of drawing: page and paper edge, chevrons, rules, day cells with their tints, today and selected outlines, the L, M and C marks, legend swatches, field boxes, radio, check box and star marks, toggle segments, the mint band, time cells, the selected hour's bar and the switch review's tint. Hover comes from each piece's hover drawing (`n.hovItems`) instead of a recolour of item 0 (`n.base`, `n.hov`).
+
+Changes from this spec: the compiled format (7.3), variants and anchored fit pieces (7.4), only idle and hover live (7.6). Two components changed their props: Legend items are `[level, text]` (the art draws the swatch), and Divider names the tokens for its gap and height, so Home's line between All day and timed items is now a Divider instead of a rect drawn in `homeLayout`. New tokens `glyphBox` (12) and `markBox` (24); 19 tokens only the drawing code used are removed (`chevronStroke`, the `mark*`, `check*`, `star*`, `selected*` and `select*` sizes, `pageRadius`, `fieldRadius`): those sizes live in the art now.
+
+Fallbacks removed: the glyph and mark drawing code (`glyphs()`, `marks()`), the tint table that drew an unknown risk level as plain paper, and the hover colours set in code. Nothing changes on screen: the gate is draw-list bytes, view by view, for Home in six states at seven widths on two fixtures and every other screen at 320, 390 and 1024, against 1.8.79, and every node's hover against 1.8.79's recolour (`tests/layer-art.mjs` in exp7-jrender). One difference that draws nothing: a selected time cell or hour row (already wash) had a wash hover in 1.8.79; its art has no hover drawing, so hovering it no longer patches the node.
+
 **Phase 4: platform and universal views.** TopBar, Apps picker, and the Calendar, Board and Plan node kinds onto components, tokens and slots. The Exp7 demo follows. The account, key and share panels stay as they are.
 
 **Phase 5: new apps.** A new Exp7 app is its atlas, a complete token set, a complete art pack and screens built from the catalog. Nothing else.
@@ -514,7 +530,7 @@ Studies, as second priority: when a screen moves to components, its study (if an
 
 Questions for the renderer side, to settle in botnotes.md, not decisions for Matthew:
 
-- Confirm view-store records (JRDL v1) as the compiled art format, and JRB as legacy only.
+- Confirm view-store records (JRDL v1) as the compiled art format, and JRB as legacy only. 1.8.80 compiles art to JRViews items in an `exp7-art-pack/1` block instead (7.3); moving to view-store records later changes the compiler and `design-art`, not the components or the SVG sources.
 - The SVG compiler for the view store (`tools/build_store.mjs` in the overlay packet) isn't in any repo. It, or a replacement, is needed in exp7-jrender for the art validator.
 - A GPU-side node transform, so looping slot animations don't re-tessellate (the overlay note measured about 1.3 ms per frame for one overlay).
 - Whether `core.wrap` can return each line's baseline so text placement uses no arithmetic outside JRender.

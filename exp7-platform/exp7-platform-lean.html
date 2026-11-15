@@ -10323,10 +10323,11 @@ function items(b,n){ for(const it of n.items){ const k=it[0];
     else if(k==='rich'){ const jf=window.__jrJournalFonts; b.richText(it[1],it[2],it[3],{maxw:it[4],lineHeight:it[5],font:(jf&&jf.regular)||FONT,boldFont:(jf&&jf.bold)||FONTB}); } }
   if(n.hit&&(n.flags&NF.HIT)) b.hit(n.hit[0],n.hit[1],n.hit[2],n.hit[3]); }
 /* item 0 back to its drawn fill: a colour is recoloured in place; a gradient fill (an object) is re-emitted, since colorItem is solid only */
-const restoreFill=(p,n)=>{ if(n.base&&typeof n.base==='object') p.replace(n.id,b=>items(b,n)); else p.colorItem(n.id,0,n.base); };
+const restoreFill=(p,n)=>{ if(n.hovItems||(n.base&&typeof n.base==='object')) p.replace(n.id,b=>items(b,n)); else p.colorItem(n.id,0,n.base); };
 /* item 0 in its hover colour: a number recolours in place; a gradient re-emits the node with item 0's colour swapped */
 const colAt=it=>it[0]==='stroke'?2:it.length-1;
-const hoverFill=(p,n)=>{ if(n.hov&&typeof n.hov==='object'){ const i0=n.items[0].slice(); i0[colAt(i0)]=n.hov; p.replace(n.id,b=>items(b,{items:[i0].concat(n.items.slice(1)),hit:n.hit,flags:n.flags})); } else p.colorItem(n.id,0,n.hov); };
+/* a design node's hover is its art's hover drawing (n.hovItems, from Exp7Art): the node is re-emitted with those items */
+const hoverFill=(p,n)=>{ if(n.hovItems){ p.replace(n.id,b=>items(b,{items:n.hovItems,hit:n.hit,flags:n.flags})); } else if(n.hov&&typeof n.hov==='object'){ const i0=n.items[0].slice(); i0[colAt(i0)]=n.hov; p.replace(n.id,b=>items(b,{items:[i0].concat(n.items.slice(1)),hit:n.hit,flags:n.flags})); } else p.colorItem(n.id,0,n.hov); };
 const emit=(b,n)=>{ b.node(n.id,n.flags); items(b,n); };
 const sig=n=>n.flags+'|'+JSON.stringify(n.items)+'|'+(n.hit||'');
 function fullDL(L,W,VH){ const d=new DL(); d.group(GID,GF.SCROLL_Y,0,0,W,VH,W,L.H); L.nodes.forEach(n=>emit(d,n)); d.end(); return d; }
@@ -10363,11 +10364,11 @@ View.prototype.show=async function(canvas,root,W,opt){ opt=opt||{};
   if(!this.s||opt.rebuild){ if(this.s){ this.s.free(); } this.r.resize(W,VH,dpr); this.s=this.r.createScene(W,VH); this.s.dragThreshold(4); this.s.load(fullDL(L,W,VH)); this.placeScenes(W,VH); this.r.attach(); /* idempotent; cursor and touch-action handled by JRender */ this.wire(); this.loads++; mode='load'; this.patchOps=null; }
   else { if(this.hov){ const hp=new Patch(); restoreFill(hp,this.hov); this.s.patch(hp); } /* restore the hovered fill so the diff starts from the drawn base state */ const keepScroll=this.s.scrollPos(GID); const {p,ops}=diff(this.L,L,W,VH); if(this.L.VH!==VH||this.L.W!==W){ this.r.resize(W,VH,dpr); this.placeScenes(W,VH); }
     if(ops.n) this.s.patch(p); this.s.scroll(GID,keepScroll[0],keepScroll[1]); this.patches++; this.patchOps=ops; mode='patch'; }
-  const hid=this.hov&&this.hov.id; this.hov=null; this.L=L; this.byId=new Map(L.nodes.map(n=>[n.id,n])); const hn=hid&&this.byId.get(hid); if(hn&&hn.hov!=null) this.setHover(hn); /* pointer still over the same id: keep its hover */ this.r.draw(); this.ms=performance.now()-t0;
+  const hid=this.hov&&this.hov.id; this.hov=null; this.L=L; this.byId=new Map(L.nodes.map(n=>[n.id,n])); const hn=hid&&this.byId.get(hid); if(hn&&(hn.hov!=null||hn.hovItems)) this.setHover(hn); /* pointer still over the same id: keep its hover */ this.r.draw(); this.ms=performance.now()-t0;
   return {ms:this.ms,mode,px:[canvas.width,canvas.height],L,VH,ops:this.patchOps,handle:this.s.h}; };
 View.prototype.wire=function(){ const s=this.s; if(!s) return; s.dragThreshold(4);
   s.onevent=e=>{ if(e.kind===EV.SCROLL&&this.fields&&this.fields.length){ this.fields.forEach(f=>{ try{ if(f.place) f.place(); }catch(err){} }); } const n=e.id!=null&&this.byId&&this.byId.get(e.id); if(!n) return;
-    if(e.kind===EV.ENTER&&n.hov!=null){ this.setHover(n); } else if(e.kind===EV.LEAVE&&this.hov===n){ this.setHover(null); }
+    if(e.kind===EV.ENTER&&(n.hov!=null||n.hovItems)){ this.setHover(n); } else if(e.kind===EV.LEAVE&&this.hov===n){ this.setHover(null); }
     else if(e.kind===EV.CLICK&&n.act&&this.onact){ this.onact(n.el,n.act,n,modsOf(e),e); }
     else if((e.kind===EV.DRAGSTART||e.kind===EV.DRAG||e.kind===EV.DRAGEND)&&this.ondrag){ this.ondrag(e.kind===EV.DRAGSTART?'start':e.kind===EV.DRAGEND?'end':'move',n,modsOf(e),e); }
   }; };
@@ -14199,7 +14200,8 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   'use strict';
   var FAIL = Object.freeze({ fail: true });
   var CODES = Object.freeze(['TOKEN_MISSING', 'TOKEN_UNKNOWN', 'TOKEN_FLOOR', 'TOKEN_TYPE', 'FONT_MISSING', 'GLYPH_MISSING', 'BOX_EMPTY',
-    'BOUNDS_UNSAT', 'TARGET_TOO_SMALL', 'ART_MISSING', 'DATA_MISSING', 'COMPONENT_INVALID', 'CONTEXT_FAILED', 'FORCED']);
+    'BOUNDS_UNSAT', 'TARGET_TOO_SMALL', 'ART_MISSING', 'ART_OUTSIDE', 'ART_INVALID', 'CONTRAST_LOW', 'DATA_MISSING', 'COMPONENT_INVALID',
+    'CONTEXT_FAILED', 'FORCED']);
   var records = [], stack = [], forced = {};
   /* an optional part of a failure record: the value, or null when the step had none to give */
   function given(v) { return v == null ? null : v; }
@@ -14286,9 +14288,8 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     edgeMs: 'number', clickPathMax: 'number',
     /* Contrast */
     textContrastMin: 'number', captionMin: 'number',
-    /* Shape: the drawn glyphs' geometry until phase 3 moves them to art slots */
-    chevronW: 'number', chevronH: 'number', chevronStroke: 'number', markR: 'number', markStroke: 'number', markBarW: 'number',
-    markBarGap: 'number', selectedStroke: 'number', selectedInset: 'number', pageRadius: 'number', swatch: 'number',
+    /* Art boxes: where a component places its glyph art (the drawing itself is art, section 7) */
+    chevronW: 'number', chevronH: 'number', swatch: 'number', glyphBox: 'number', markBox: 'number',
     /* Page and block flow on Home */
     pageTop: 'number', pageMin: 'number', pagePickMin: 'number', pageBottom: 'number', blockGap: 'number', sectionGap: 'number',
     monthTop: 'number', dayTop: 'number', dayMin: 'number', viewPad: 'number', viewMin: 'number', headingDrop: 'number',
@@ -14316,18 +14317,16 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     dividerTop: 'number', dividerH: 'number',
     /* Fields */
     fieldLineH: 'number', fieldLineDrop: 'number', fieldLineHit: 'number', fieldRuleDrop: 'number', fieldValueGap: 'number',
-    fieldLabelDrop: 'number', fieldBoxTop: 'number', fieldBoxEnd: 'number', fieldPad: 'number', fieldRadius: 'number', amountW: 'number',
+    fieldLabelDrop: 'number', fieldBoxTop: 'number', fieldBoxEnd: 'number', fieldPad: 'number', amountW: 'number',
     /* Choices and their marks */
-    markIndent: 'number', markSize: 'number', markLine: 'number', checkRadius: 'number', checkStroke: 'number', checkX1: 'number',
-    checkY1: 'number', checkX2: 'number', checkY2: 'number', checkX3: 'number', checkY3: 'number', starR: 'number', starInner: 'number',
-    tagRoom: 'number',
+    markIndent: 'number', markSize: 'number', tagRoom: 'number',
     /* Every n days, the Percent | Fixed toggle and name-value pairs */
     everyH: 'number', everyBoxX: 'number', everyBoxW: 'number', everyAfter: 'number', toggleW: 'number', toggleH: 'number',
     pairValueW: 'number', pairH: 'number', deductionH: 'number',
     /* Time picker and a form's date picker */
     timeCols: 'number', timeLabelDrop: 'number', timeLabelH: 'number', timeGap: 'number', pickNavW: 'number',
     /* Day schedule, ledger and cash rows, the switch review */
-    hourTimeX: 'number', hourNameX: 'number', selectBar: 'number', selectInset: 'number', leadW: 'number', subRise: 'number',
+    hourTimeX: 'number', hourNameX: 'number', leadW: 'number', subRise: 'number',
     ledgerRow: 'number', cashRow: 'number', stepTop: 'number', stepGap: 'number', stepEnd: 'number'
   });
   /* Matthew's phone floors (section 5.3): role sizes and targets only, never text shrunk to fit */
@@ -14373,8 +14372,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     target: 44, row: 56, link: 44, cell: 48, field: 44, rule: 1,
     phoneMax: 420, columnMin: 390, columnMax: 520, columnMargin: 48,
     edgeMs: 0, clickPathMax: 120, textContrastMin: 4.5, captionMin: 13,
-    chevronW: 4, chevronH: 10, chevronStroke: 1.4, markR: 3.2, markStroke: 1.1, markBarW: 8, markBarGap: 1.6,
-    selectedStroke: 1.5, selectedInset: 1, pageRadius: 4, swatch: 18,
+    chevronW: 4, chevronH: 10, swatch: 18, glyphBox: 12, markBox: 24,
     pageTop: 16, pageMin: 940, pagePickMin: 844, pageBottom: 24, blockGap: 12, sectionGap: 18,
     monthTop: 60, dayTop: 350, dayMin: 192, viewPad: 8, viewMin: 40, headingDrop: 31,
     dateChevronGap: 10, dateChevronMargin: 18, controlInset: 8, chevronMargin: 11, chevronRoom: 28,
@@ -14391,14 +14389,12 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     titleDrop: 32, titleEnd: 4, titleRightRoom: 120, sectionDrop: 24, sectionEnd: 12, statusRoom: 130,
     dividerTop: 8, dividerH: 17,
     fieldLineH: 64, fieldLineDrop: 40, fieldLineHit: 20, fieldRuleDrop: 16, fieldValueGap: 16,
-    fieldLabelDrop: 16, fieldBoxTop: 26, fieldBoxEnd: 10, fieldPad: 10, fieldRadius: 4, amountW: 128,
-    markIndent: 28, markSize: 16, markLine: 1.25, checkRadius: 2, checkStroke: 1.6, checkX1: 4,
-    checkY1: 8.5, checkX2: 7, checkY2: 12, checkX3: 13, checkY3: 4.5, starR: 7.5, starInner: 0.38,
-    tagRoom: 80,
+    fieldLabelDrop: 16, fieldBoxTop: 26, fieldBoxEnd: 10, fieldPad: 10, amountW: 128,
+    markIndent: 28, markSize: 16, tagRoom: 80,
     everyH: 56, everyBoxX: 80, everyBoxW: 48, everyAfter: 12, toggleW: 58, toggleH: 28,
     pairValueW: 88, pairH: 40, deductionH: 56,
     timeCols: 6, timeLabelDrop: 16, timeLabelH: 24, timeGap: 8, pickNavW: 72,
-    hourTimeX: 76, hourNameX: 88, selectBar: 2, selectInset: 8, leadW: 58, subRise: 18,
+    hourTimeX: 76, hourNameX: 88, leadW: 58, subRise: 18,
     ledgerRow: 48, cashRow: 64, stepTop: 24, stepGap: 22, stepEnd: 14
   });
 
@@ -14486,11 +14482,11 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       var width = lines.reduce(function (m, l) { return Math.max(m, l.width); }, 0), n = Math.max(1, lines.length);
       return { size: size, lh: lh, lines: lines, n: n, h: n * lh, w: width, fits: n <= maxLines && n * lh <= box.h + 1e-6 && width <= box.w + 1e-6 };
     }
-    var r = at(role); if (r.fits) return Object.assign(r, { font: font, ink: ink, bold: !!run.bold, shrunk: false });
+    var r = at(role); if (r.fits) return Object.assign(r, { font: font, ink: ink, inkName: run.ink, bold: !!run.bold, shrunk: false });
     var lo = 0, hi = role, best = null;
     for (var i = 0; i < 24; i++) { var mid = (lo + hi) / 2, t = at(mid); if (t.fits) { best = t; lo = mid; } else hi = mid; }
     if (!best) return F.with('BOX_EMPTY', Object.assign({ app: this.app, screen: this.screen, offered: { w: box.w, h: box.h }, detail: 'no size fits ' + JSON.stringify(text) }, where == null ? {} : where));
-    return Object.assign(best, { font: font, ink: ink, bold: !!run.bold, shrunk: true });
+    return Object.assign(best, { font: font, ink: ink, inkName: run.ink, bold: !!run.bold, shrunk: true });
   };
   /* the ascent and descent of a fitted run, in px */
   Session.prototype.ascent = function (f) { return this.metrics(f.font).asc * f.size; };
@@ -14505,7 +14501,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       var w = self.measureText(f.font, f.size, ln.text), px = align === 'center' ? x - w / 2 : align === 'end' ? x - w : x, base = baseline + i * f.lh;
       if (f.bold) n.items.push(['rich', q(px), q(base - asc), [{ text: ln.text, size: f.size, color: f.ink, bold: true }], 0, 1.25]);
       else n.items.push(['text', q(px), q(base), f.size, f.ink, ln.text, 0, f.font]);
-      V.texts.push({ text: ln.text, x: px, y: base, size: f.size, width: w, max: 0, top: base - asc, bottom: base + self.descent(f), box: box, node: n.key, shrunk: f.shrunk });
+      V.texts.push({ text: ln.text, x: px, y: base, size: f.size, width: w, max: 0, top: base - asc, bottom: base + self.descent(f), box: box, node: n.key, ink: f.inkName, shrunk: f.shrunk });
     });
     return f;
   };
@@ -14540,6 +14536,246 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     session: function (o) { return new Session(o); } });
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
+<script data-exp7-shared="design-art">
+/* Exp7 design system: art slots (docs/design-system.md section 7). Every visual of a component that isn't live text is art,
+ * drawn into a named slot of the component in the component's state. An app's look is its art pack: a piece for every slot
+ * of every component, in every variant the component draws and every state it declares. Packs are authored as SVG with the
+ * studies, compiled by exp7-jrender tools/art (exp7-art-pack/1) and embedded here as data. A piece's items are the JRViews
+ * item contract (rect, rrect, border, path, stroke) in the piece's own coordinates; colours are a colour token or #rrggbb.
+ * load(pack) checks every piece (ART_INVALID, ART_OUTSIDE). assign(app, pack) checks the pack is complete for every
+ * registered component (ART_MISSING). Art swaps at three levels, each a failure context that leaves the art that was there
+ * when it fails: the app's pack, a screen's override, one component instance's override. fitArt(piece, rect) places a piece
+ * in a slot rect: stretch scales each axis, nine keeps the insets and stretches the middle, fit draws at its drawn size about
+ * its anchor (the rect's centre); art shrinks evenly to fit and never spills out of its slot (BOX_EMPTY only with no room).
+ * No throw, no try/catch, no defaults. */
+(function (root) {
+  'use strict';
+  var F = root.Exp7Fail, FAIL = F.FAIL, HALF = 2, EPS = 1e-6, BIG = 65536;
+  var FITS = ['stretch', 'nine', 'fit'], KINDS = { rect: 6, rrect: 7, border: 8, path: 3, stroke: 4 }, CMD = { M: 2, L: 2, Q: 4, C: 6, Z: 0 };
+  var apps = new Map(); /* app -> { pack, screens: Map(screen -> Map(id -> piece)), instances: Map(screen + '|' + nodeKey -> Map(id -> piece)) } */
+
+  function pid(component, slot) { return component + '/' + slot; }
+  function has(o, k) { return o != null && typeof o === 'object' && Object.prototype.hasOwnProperty.call(o, k); }
+  function num(v) { return typeof v === 'number' && isFinite(v); }
+  function invalid(p, detail) { return F.with('ART_INVALID', { component: p && p.component, slot: p && p.slot, detail: detail }); }
+
+  /* ---------- checking a piece ---------- */
+  function colourOk(c) { if (typeof c === 'string') return /^#[0-9A-Fa-f]{6}$/.test(c);
+    return has(c, 'token') && Object.keys(c).length === 1 && root.Exp7Tokens.SCHEMA[c.token] === 'colour'; }
+  function cmdsOk(cmds) { if (!Array.isArray(cmds) || !cmds.length || cmds[0][0] !== 'M') return false;
+    for (var i = 0; i < cmds.length; i++) { var k = cmds[i]; if (!Array.isArray(k) || !has(CMD, k[0]) || k.length !== CMD[k[0]] + 1) return false;
+      for (var j = 1; j < k.length; j++) if (!num(k[j])) return false; }
+    return true; }
+  function itemOk(it) { if (!Array.isArray(it) || !has(KINDS, it[0]) || it.length !== KINDS[it[0]]) return 'item ' + JSON.stringify(it);
+    var k = it[0], c = k === 'path' || k === 'stroke' ? it[2] : it[it.length - 1];
+    if (!colourOk(c)) return 'colour ' + JSON.stringify(c) + ' is neither #rrggbb nor a colour token';
+    if (k === 'path' || k === 'stroke') { if (!cmdsOk(it[1])) return k + ' commands'; if (k === 'stroke') { var o = it[3]; if (!o || !num(o.width) || !(o.width > 0)) return 'stroke width'; } return null; }
+    for (var i = 1; i < it.length - 1; i++) if (!num(it[i])) return k + ' geometry';
+    if (it[3] < 0 || it[4] < 0) return k + ' size';
+    return null; }
+  /* a state's drawing: its items, or the items of the state it is an explicit alias of ("=hover") */
+  function drawing(variant, state) { var d = variant[state]; if (typeof d === 'string' && d.charAt(0) === '=') { d = variant[d.slice(1)]; if (typeof d === 'string') return null; } return Array.isArray(d) ? d : null; }
+
+  function checkPiece(p) {
+    if (!p || typeof p.component !== 'string' || typeof p.slot !== 'string') return invalid(p, 'a piece needs its component and slot');
+    if (FITS.indexOf(p.fit) < 0) return invalid(p, 'fit ' + p.fit + ' is not one of ' + FITS.join(', ') + ' (tile is not built yet)');
+    var vb = p.viewBox; if (!Array.isArray(vb) || vb.length !== 4 || !vb.every(num) || !(vb[2] > 0) || !(vb[3] > 0)) return invalid(p, 'viewBox');
+    if (p.fit === 'nine') { var ins = p.insets; if (!Array.isArray(ins) || ins.length !== 4 || !ins.every(function (v) { return num(v) && v >= 0; }) || ins[1] + ins[3] >= vb[2] || ins[0] + ins[2] >= vb[3]) return invalid(p, 'nine needs insets [top, right, bottom, left] smaller than the viewBox'); }
+    if (p.fit === 'fit' && (Math.abs(vb[0] + vb[2] / HALF) > EPS || Math.abs(vb[1] + vb[3] / HALF) > EPS)) return invalid(p, 'a fit piece is drawn about its anchor: its viewBox is centred on 0,0');
+    var s = p.supports; if (!s || !['w', 'h'].every(function (a) { return Array.isArray(s[a]) && s[a].length === 2 && num(s[a][0]) && s[a][1] >= s[a][0] && s[a][0] > 0; })) return invalid(p, 'supports { w: [min, max], h: [min, max] }');
+    if (p.fit === 'nine' && (s.w[0] < p.insets[1] + p.insets[3] || s.h[0] < p.insets[0] + p.insets[2])) return invalid(p, 'supports must not go under the nine insets');
+    if (!p.variants || typeof p.variants !== 'object' || !Object.keys(p.variants).length) return invalid(p, 'no variants');
+    var names = Object.keys(p.variants);
+    for (var i = 0; i < names.length; i++) { var v = p.variants[names[i]], st = v && typeof v === 'object' ? Object.keys(v) : []; if (!st.length) return invalid(p, 'variant ' + names[i] + ' has no states');
+      for (var j = 0; j < st.length; j++) { var d = drawing(v, st[j]); if (d === null) return invalid(p, names[i] + '/' + st[j] + ' is neither a drawing nor an alias of one');
+        for (var k = 0; k < d.length; k++) { var bad = itemOk(d[k]); if (bad) return invalid(p, names[i] + '/' + st[j] + ': ' + bad); } } }
+    /* geometry stays inside the slot at the smallest, largest and drawn sizes, in every variant and state (7.6) */
+    var sizes = [[s.w[0], s.h[0]], [s.w[1], s.h[1]], [Math.min(Math.max(vb[2], s.w[0]), s.w[1]), Math.min(Math.max(vb[3], s.h[0]), s.h[1])]];
+    for (var a = 0; a < names.length; a++) { var va = p.variants[names[a]], sts = Object.keys(va);
+      for (var b = 0; b < sts.length; b++) for (var z = 0; z < sizes.length; z++) {
+        var box = [0, 0, sizes[z][0], sizes[z][1]], out = place(p, drawing(va, sts[b]), box);
+        if (outside(out, box, p, names[a], sts[b]) === FAIL) return FAIL; } }
+    return true;
+  }
+
+  /* ---------- placing a piece in a slot rect (7.4) ---------- */
+  /* one axis: a coordinate u (from the viewBox's start) of a drawing V long, insets i0 and i1 kept, into r0 .. r0 + R */
+  function axis(V, i0, i1, r0, R) {
+    var k = (R - i0 - i1) / (V - i0 - i1);
+    function pos(u) { return u <= i0 ? r0 + u : u >= V - i1 ? (r0 + R) - (V - u) : r0 + i0 + (u - i0) * k; }
+    function span(a, b) { if (a <= i0 && b >= V - i1) return (R - a) - (V - b); if (b <= i0 || a >= V - i1) return b - a; return pos(b) - pos(a); }
+    return { pos: pos, span: span };
+  }
+  /* the transform for a piece in box [x, y, w, h]: map(px, py), span(a, b) on each axis, and the even scale s for widths and radii */
+  /* box: [x, y, w, h] or, for a fit piece, [x, y, w, h, cx, cy] with its anchor given exactly */
+  function frame(p, box) {
+    var vb = p.viewBox, ins = p.fit === 'nine' ? p.insets : [0, 0, 0, 0];
+    if (p.fit === 'fit') { var s0 = Math.min(1, box[2] / vb[2], box[3] / vb[3]), cx = box.length > 4 ? box[4] : box[0] + box[2] / HALF, cy = box.length > 5 ? box[5] : box[1] + box[3] / HALF;
+      return { x: function (u) { return cx + u * s0; }, y: function (u) { return cy + u * s0; }, w: function (a, b) { return (b - a) * s0; }, h: function (a, b) { return (b - a) * s0; }, s: s0 }; }
+    /* stretch and nine: drawn in the box when it is inside what the piece supports; otherwise at the nearest supported size, scaled evenly and centred */
+    var dw = Math.min(Math.max(box[2], p.supports.w[0]), p.supports.w[1]), dh = Math.min(Math.max(box[3], p.supports.h[0]), p.supports.h[1]);
+    if (dw === box[2] && dh === box[3]) { var X = axis(vb[2], ins[3], ins[1], box[0], box[2]), Y = axis(vb[3], ins[0], ins[2], box[1], box[3]);
+      return { x: function (u) { return X.pos(u - vb[0]); }, y: function (u) { return Y.pos(u - vb[1]); }, w: function (a, b) { return X.span(a - vb[0], b - vb[0]); }, h: function (a, b) { return Y.span(a - vb[1], b - vb[1]); }, s: 1 }; }
+    var s = Math.min(1, box[2] / dw, box[3] / dh), ox = box[0] + (box[2] - dw * s) / HALF, oy = box[1] + (box[3] - dh * s) / HALF;
+    var Xd = axis(vb[2], ins[3], ins[1], 0, dw), Yd = axis(vb[3], ins[0], ins[2], 0, dh);
+    return { x: function (u) { return ox + Xd.pos(u - vb[0]) * s; }, y: function (u) { return oy + Yd.pos(u - vb[1]) * s; },
+      w: function (a, b) { return Xd.span(a - vb[0], b - vb[0]) * s; }, h: function (a, b) { return Yd.span(a - vb[1], b - vb[1]) * s; }, s: s };
+  }
+  function cmdsAt(T, cmds) { return cmds.map(function (k) { var o = [k[0]]; for (var i = 1; i < k.length; i += HALF) o.push(T.x(k[i]), T.y(k[i + 1])); return o; }); }
+  /* items of one drawing placed in box; colours stay as the piece wrote them */
+  function place(p, items, box) {
+    var T = frame(p, box);
+    return items.map(function (it) { var k = it[0];
+      if (k === 'rect') return ['rect', T.x(it[1]), T.y(it[2]), T.w(it[1], it[1] + it[3]), T.h(it[2], it[2] + it[4]), it[5]];
+      if (k === 'rrect') return ['rrect', T.x(it[1]), T.y(it[2]), T.w(it[1], it[1] + it[3]), T.h(it[2], it[2] + it[4]), it[5] * T.s, it[6]];
+      if (k === 'border') return ['border', T.x(it[1]), T.y(it[2]), T.w(it[1], it[1] + it[3]), T.h(it[2], it[2] + it[4]), it[5] * T.s, it[6] * T.s, it[7]];
+      if (k === 'path') return ['path', cmdsAt(T, it[1]), it[2]];
+      var o = Object.assign({}, it[3]); o.width = o.width * T.s; if (o.dash) o.dash = o.dash.map(function (d) { return d * T.s; });
+      return ['stroke', cmdsAt(T, it[1]), it[2], o]; });
+  }
+
+  /* ---------- the extent of drawn items, strokes included (ART_OUTSIDE) ---------- */
+  function points(cmds) { var pts = []; cmds.forEach(function (k) { for (var i = 1; i < k.length; i += HALF) pts.push([k[i], k[i + 1]]); }); return pts; }
+  /* how far a stroke reaches past its path: half the width, more at a miter join (up to the miter limit), at a square cap */
+  function reach(cmds, o) {
+    var half = o.width / HALF, cap = o.cap === 'square' ? half * Math.SQRT2 : half, out = [];
+    var pts = points(cmds), lim = o.miterLimit == null ? 10 : o.miterLimit, closed = cmds[cmds.length - 1][0] === 'Z';
+    pts.forEach(function (q) { out.push([q[0], q[1], cap]); });
+    if ((o.join == null || o.join === 'miter') && cmds.every(function (k) { return k[0] === 'M' || k[0] === 'L' || k[0] === 'Z'; })) {
+      var n = pts.length;
+      for (var i = 0; i < n; i++) { if (!closed && (i === 0 || i === n - 1)) continue;
+        var a = pts[(i - 1 + n) % n], b = pts[i], c = pts[(i + 1) % n], ux = a[0] - b[0], uy = a[1] - b[1], vx = c[0] - b[0], vy = c[1] - b[1];
+        var lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy); if (!lu || !lv) continue;
+        var cos = Math.max(-1, Math.min(1, (ux * vx + uy * vy) / (lu * lv))), sinHalf = Math.sqrt((1 - cos) / HALF);
+        if (sinHalf > EPS && 1 / sinHalf <= lim) out.push([b[0], b[1], half / sinHalf]); } }
+    return out;
+  }
+  function extent(items) { var e = [Infinity, Infinity, -Infinity, -Infinity];
+    function add(x, y, r) { e[0] = Math.min(e[0], x - r); e[1] = Math.min(e[1], y - r); e[2] = Math.max(e[2], x + r); e[3] = Math.max(e[3], y + r); }
+    items.forEach(function (it) { var k = it[0];
+      if (k === 'rect' || k === 'rrect' || k === 'border') { add(it[1], it[2], 0); add(it[1] + it[3], it[2] + it[4], 0); }
+      else if (k === 'path') points(it[1]).forEach(function (q) { add(q[0], q[1], 0); });
+      else reach(it[1], it[3]).forEach(function (q) { add(q[0], q[1], q[2]); }); });
+    return e; }
+  function outside(items, box, p, variant, state) {
+    if (!items.length) return true; var e = extent(items);
+    if (e[0] < box[0] - EPS || e[1] < box[1] - EPS || e[2] > box[0] + box[2] + EPS || e[3] > box[1] + box[3] + EPS)
+      return F.with('ART_OUTSIDE', { component: p.component, slot: p.slot, state: state, offered: { x: box[0], y: box[1], w: box[2], h: box[3] },
+        needed: { x: e[0], y: e[1], w: e[2] - e[0], h: e[3] - e[1] }, detail: 'variant ' + variant });
+    return true; }
+
+  /* ---------- packs and swaps ---------- */
+  /* load(pack): a compiled pack (exp7-art-pack/1) with every piece checked, or FAIL */
+  function load(json) {
+    if (!json || json.format !== 'exp7-art-pack/1' || typeof json.pack !== 'string' || !Array.isArray(json.pieces)) return invalid(null, 'not an exp7-art-pack/1 pack');
+    var pieces = new Map();
+    for (var i = 0; i < json.pieces.length; i++) { var p = json.pieces[i]; if (checkPiece(p) === FAIL) return FAIL;
+      if (pieces.has(pid(p.component, p.slot))) return invalid(p, 'two pieces for one slot'); pieces.set(pid(p.component, p.slot), Object.freeze(p)); }
+    return Object.freeze({ name: json.pack, version: json.version, pieces: pieces });
+  }
+  /* complete(pack, components): every slot of every component, in every variant it draws and every state it declares (ART_MISSING) */
+  function needs(def) { var out = []; Object.keys(def.slots).forEach(function (slot) { def.slots[slot].forEach(function (variant) { def.states.forEach(function (state) { out.push([slot, variant, state]); }); }); }); return out; }
+  function covers(piece, def, slot, variant, state) {
+    var v = piece && piece.variants[variant];
+    if (!v || drawing(v, state) === null) return F.with('ART_MISSING', { component: def.name, slot: slot, state: state, detail: piece ? 'variant ' + variant : 'no piece' });
+    return true; }
+  function complete(pieces, names) { var C = root.Exp7Components;
+    for (var i = 0; i < names.length; i++) { var def = C.get(names[i]), list = needs(def);
+      for (var j = 0; j < list.length; j++) if (covers(pieces.get(pid(def.name, list[j][0])), def, list[j][0], list[j][1], list[j][2]) === FAIL) return FAIL; }
+    return true; }
+  /* assign(app, pack): the app's pack, complete for every registered component; a failed swap keeps the pack it had */
+  function assign(app, pack) {
+    return F.context('art.assign:' + app, function (tx) {
+      if (pack === FAIL || !pack || !pack.pieces) return invalid(null, 'no pack to assign to ' + app);
+      if (complete(pack.pieces, root.Exp7Components.names()) === FAIL) return FAIL;
+      tx.stage(function () { var cur = apps.get(app); apps.set(app, { pack: pack, screens: cur ? cur.screens : new Map(), instances: cur ? cur.instances : new Map() }); });
+      return true;
+    }, function (failure) { F.record(failure); });
+  }
+  /* override(app, screen, nodeKey, piece): a screen's piece for one component slot (nodeKey null), or one instance's (the node key
+   * the component draws that slot into). The piece is checked and must cover every variant and state the component needs. */
+  function override(app, screen, nodeKey, piece) {
+    return F.context('art.override:' + app + ':' + screen + (nodeKey == null ? '' : ':' + nodeKey), function (tx) {
+      var a = apps.get(app); if (!a) return F.with('ART_MISSING', { app: app, screen: screen, detail: 'the app has no pack to override' });
+      if (checkPiece(piece) === FAIL) return FAIL;
+      var def = root.Exp7Components.get(piece.component); if (!def) return F.with('COMPONENT_INVALID', { component: piece.component, detail: 'not registered' });
+      if (!has(def.slots, piece.slot)) return invalid(piece, piece.component + ' has no slot ' + piece.slot);
+      var vs = def.slots[piece.slot]; for (var i = 0; i < vs.length; i++) for (var j = 0; j < def.states.length; j++) if (covers(piece, def, piece.slot, vs[i], def.states[j]) === FAIL) return FAIL;
+      var p = Object.freeze(piece), map = nodeKey == null ? a.screens : a.instances, k = nodeKey == null ? screen : screen + '|' + nodeKey;
+      tx.stage(function () { if (!map.has(k)) map.set(k, new Map()); map.get(k).set(pid(p.component, p.slot), p); });
+      return true;
+    }, function (failure) { F.record(failure); });
+  }
+  /* clear(app, screen, nodeKey): drop a screen's or an instance's overrides (tests and the art workflow) */
+  function clear(app, screen, nodeKey) { var a = apps.get(app); if (!a) return false; return nodeKey == null ? a.screens.delete(screen) : a.instances.delete(screen + '|' + nodeKey); }
+
+  /* art(S, component, slot, nodeKey): the piece in force for a slot: the instance's, else the screen's, else the app pack's */
+  function art(S, component, slot, nodeKey) {
+    var a = apps.get(S.app); if (!a) return F.with('ART_MISSING', { app: S.app, screen: S.screen, component: component, slot: slot, detail: 'no pack assigned to the app' });
+    var id = pid(component, slot), inst = a.instances.get(S.screen + '|' + nodeKey), scr = a.screens.get(S.screen);
+    var p = inst && inst.has(id) ? inst.get(id) : scr && scr.has(id) ? scr.get(id) : a.pack.pieces.get(id);
+    if (!p) return F.with('ART_MISSING', { app: S.app, screen: S.screen, component: component, slot: slot, detail: 'no piece' });
+    return p; }
+  /* fitArt(S, piece, variant, state, rect): the drawing placed in the rect with its colours resolved, or FAIL */
+  function fitArt(S, p, variant, state, rect, where) {
+    if (!(rect[2] > 0) || !(rect[3] > 0)) return F.with('BOX_EMPTY', Object.assign({ app: S.app, screen: S.screen, slot: p.slot, offered: { w: rect[2], h: rect[3] } }, where));
+    var v = p.variants[variant], d = v ? drawing(v, state) : null;
+    if (d === null) return F.with('ART_MISSING', Object.assign({ app: S.app, screen: S.screen, component: p.component, slot: p.slot, state: state, detail: 'variant ' + variant }, where));
+    var items = place(p, d, rect); if (outside(items, rect, p, variant, state) === FAIL) return FAIL;
+    for (var i = 0; i < items.length; i++) { var it = items[i], ci = it[0] === 'path' || it[0] === 'stroke' ? 2 : it.length - 1, c = it[ci];
+      var col = typeof c === 'string' ? root.JRender.hex(c) : S.color(c.token); if (col === FAIL) return FAIL; it[ci] = col; }
+    return items; }
+
+  /* draw(S, n, component, slot, variant, rect, at): the slot's art in node n, in every state the component declares. The idle
+   * drawing goes in n.items (at the end, or at index at); the node keeps every state's drawing per slot, for hover and the
+   * contrast check. Only idle and hover show today: hover is applied live from the hover drawing (JRViews and Home). */
+  function draw(S, n, component, slot, variant, rect, at) {
+    var def = root.Exp7Components.get(component); if (!def) return F.with('COMPONENT_INVALID', { component: component, detail: 'not registered' });
+    if (!has(def.slots, slot) || def.slots[slot].indexOf(variant) < 0) return F.with('COMPONENT_INVALID', { component: component, slot: slot, detail: 'variant ' + variant + ' is not declared for the slot' });
+    var where = { component: component, id: n.id }, p = art(S, component, slot, n.key); if (p === FAIL) return FAIL;
+    var drawn = {}, fills = {};
+    for (var i = 0; i < def.states.length; i++) { var st = def.states[i], d = fitArt(S, p, variant, st, rect, where); if (d === FAIL) return FAIL; drawn[st] = d;
+      fills[st] = drawing(p.variants[variant], st).map(function (it) { var c = it[0] === 'path' || it[0] === 'stroke' ? it[2] : it[it.length - 1]; return typeof c === 'string' ? c : S.token(c.token); }); }
+    var idle = drawn.idle; if (!idle) return F.with('COMPONENT_INVALID', { component: component, detail: 'no idle state' });
+    if (at == null) Array.prototype.push.apply(n.items, idle); else n.items.splice.apply(n.items, [at, 0].concat(idle));
+    if (!n.art) n.art = [];
+    n.art.push({ slot: slot, variant: variant, rect: rect.slice(), idle: idle, hover: drawn.hover ? drawn.hover : idle, drawn: drawn, fills: fills });
+    return idle; }
+  /* hover(n): the node's items in its hover state, or null when hover draws what idle draws */
+  function hover(n) {
+    if (!n.art || !n.art.some(function (s) { return JSON.stringify(s.hover) !== JSON.stringify(s.idle); })) return null;
+    var out = [];
+    n.items.forEach(function (it) { for (var i = 0; i < n.art.length; i++) { var s = n.art[i], k = s.idle.indexOf(it);
+      if (k === 0) { Array.prototype.push.apply(out, s.hover); return; } if (k > 0) return; } out.push(it); });
+    return out; }
+
+  /* ---------- text over art keeps its contrast (7.6) ---------- */
+  function lum(hex) { var v = [1, 3, 5].map(function (i) { var c = parseInt(hex.substr(i, 2), 16) / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); });
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; }
+  function ratio(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  /* contrast(S, V, texts): each text keeps textContrastMin against the topmost art fill of its node under its centre, in every state */
+  function contrast(S, V, texts) {
+    if (!texts.length) return true;
+    var min = S.token('textContrastMin'); if (min === FAIL) return FAIL; var byKey = new Map(V.nodes.map(function (n) { return [n.key, n]; }));
+    for (var i = 0; i < texts.length; i++) { var t = texts[i], n = byKey.get(t.node); if (!n || !n.art) continue;
+      var ink = S.token(t.ink); if (ink === FAIL) return FAIL; var px = t.x + t.width / HALF, py = (t.top + t.bottom) / HALF;
+      for (var j = n.art.length - 1; j >= 0; j--) { var s = n.art[j], states = Object.keys(s.drawn), under = false;
+        for (var k = 0; k < states.length; k++) { var d = s.drawn[states[k]];
+          for (var m = d.length - 1; m >= 0; m--) { var it = d[m]; if (it[0] !== 'rect' && it[0] !== 'rrect' && it[0] !== 'path') continue;
+            var e = extent([it]); if (px < e[0] || px > e[2] || py < e[1] || py > e[3]) continue;
+            var fill = s.fills[states[k]][m], r = ratio(ink, fill); under = true;
+            if (r < min) return F.with('CONTRAST_LOW', { app: S.app, screen: S.screen, slot: s.slot, state: states[k], id: n.id,
+              offered: Math.round(r * 100) / 100, needed: min, detail: JSON.stringify(t.text) + ' in ' + t.ink + ' over ' + fill });
+            break; } }
+        if (under) break; } }
+    return true; }
+
+  root.Exp7Art = Object.freeze({ load: load, assign: assign, override: override, clear: clear, art: art, fitArt: fitArt, draw: draw, hover: hover,
+    contrast: contrast, check: checkPiece, place: place, extent: extent, ratio: ratio,
+    pack: function (app) { var a = apps.get(app); return a ? a.pack : null; }, apps: function () { return Array.from(apps.keys()); } });
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script type="text/plain" id="art-budget-journal" data-exp7-shared="art-budget-journal">{"format":"exp7-art-pack/1","pack":"budget-journal","version":1,"sources":"adb0f1c410eb7934eefd1316c7481b5f9d84a08343335e9cf32589bef440cfcb","pieces":[{"component":"Page","slot":"page.background","pack":"budget-journal","version":1,"viewBox":[0,0,390,940],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"plain":{"idle":[["rect",0,0,390,940,{"token":"page"}]]}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"Page/page.background.svg"},{"component":"Page","slot":"page.edge","pack":"budget-journal","version":1,"viewBox":[0,0,390,940],"fit":"nine","insets":[4,4,4,4],"supports":{"w":[8,65536],"h":[8,65536]},"variants":{"plain":{"idle":[["border",0,0,390,940,4,1,{"token":"pageEdge"}]]}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"Page/page.edge.svg"},{"component":"LinkRow","slot":"link.background","pack":"budget-journal","version":1,"viewBox":[0,0,390,44],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"plain":{"idle":[["rect",0,0,390,44,{"token":"page"}]],"hover":[["rect",0,0,390,44,{"token":"wash"}]],"pressed":"=hover","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"LinkRow/link.background.svg"},{"component":"LinkRow","slot":"link.chevron","pack":"budget-journal","version":1,"viewBox":[-6,-6,12,12],"fit":"fit","supports":{"w":[1,12],"h":[1,12]},"variants":{"right":{"idle":[["stroke",[["M",-2,-5],["L",2,0],["L",-2,5]],{"token":"captionInk"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}]],"hover":"=idle","pressed":"=idle","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"LinkRow/link.chevron.svg"},{"component":"DateHeading","slot":"heading.background","pack":"budget-journal","version":1,"viewBox":[0,0,390,44],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"plain":{"idle":[["rect",0,0,390,44,{"token":"page"}]],"hover":[["rect",0,0,390,44,{"token":"wash"}]],"pressed":"=hover","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"DateHeading/heading.background.svg"},{"component":"DateHeading","slot":"heading.chevron","pack":"budget-journal","version":1,"viewBox":[-6,-6,12,12],"fit":"fit","supports":{"w":[1,12],"h":[1,12]},"variants":{"down":{"idle":[["stroke",[["M",-5,-2],["L",0,2],["L",5,-2]],{"token":"captionInk"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}]],"hover":"=idle","pressed":"=idle","focus":"=idle"},"up":{"idle":[["stroke",[["M",-5,2],["L",0,-2],["L",5,2]],{"token":"captionInk"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}]],"hover":"=idle","pressed":"=idle","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"DateHeading/heading.chevron.svg"},{"component":"DateHeading","slot":"heading.rule","pack":"budget-journal","version":1,"viewBox":[0,0,350,1],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"line":{"idle":[["rect",0,0,350,1,{"token":"line"}]],"hover":"=idle","pressed":"=idle","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"DateHeading/heading.rule.svg"},{"component":"MiniMonth","slot":"day.background","pack":"budget-journal","version":1,"viewBox":[0,0,56,48],"fit":"nine","insets":[2,2,2,2],"supports":{"w":[4,65536],"h":[4,65536]},"variants":{"plain":{"idle":[["rect",0,0,56,48,{"token":"page"}],["border",0,0,56,48,0,1,{"token":"lineSoft"}]],"hover":[["rect",0,0,56,48,{"token":"wash"}],["border",0,0,56,48,0,1,{"token":"lineSoft"}]],"pressed":"=hover","selected":"=idle","disabled":"=idle"},"L":{"idle":[["rect",0,0,56,48,{"token":"calLow"}],["border",0,0,56,48,0,1,{"token":"lineSoft"}]],"hover":[["rect",0,0,56,48,{"token":"wash"}],["border",0,0,56,48,0,1,{"token":"lineSoft"}]],"pressed":"=hover","selected":"=idle","disabled":"=idle"},"M":{"idle":[["rect",0,0,56,48,{"token":"calModerate"}],["border",0,0,56,48,0,1,{"token":"lineSoft"}]],"hover":[["rect",0,0,56,48,{"token":"wash"}],["border",0,0,56,48,0,1,{"token":"lineSoft"}]],"pressed":"=hover","selected":"=idle","disabled":"=idle"},"C":{"idle":[["rect",0,0,56,48,{"token":"calCritical"}],["border",0,0,56,48,0,1,{"token":"lineSoft"}]],"hover":[["rect",0,0,56,48,{"token":"wash"}],["border",0,0,56,48,0,1,{"token":"lineSoft"}]],"pressed":"=hover","selected":"=idle","disabled":"=idle"},"outside":{"idle":[["rect",0,0,56,48,{"token":"page"}],["border",0,0,56,48,0,1,{"token":"lineSoft"}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"MiniMonth/day.background.svg"},{"component":"MiniMonth","slot":"day.selected","pack":"budget-journal","version":1,"viewBox":[0,0,56,48],"fit":"nine","insets":[2,2,2,2],"supports":{"w":[4,65536],"h":[4,65536]},"variants":{"on":{"idle":[["border",1,1,54,46,0,1.5,{"token":"accent"}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"MiniMonth/day.selected.svg"},{"component":"MiniMonth","slot":"day.today","pack":"budget-journal","version":1,"viewBox":[0,0,56,48],"fit":"nine","insets":[2,2,2,2],"supports":{"w":[4,65536],"h":[4,65536]},"variants":{"on":{"idle":[["border",1,1,54,46,0,1.5,{"token":"accent"}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"MiniMonth/day.today.svg"},{"component":"MiniMonth","slot":"day.mark","pack":"budget-journal","version":1,"viewBox":[-6,-6,12,12],"fit":"fit","supports":{"w":[1,12],"h":[1,12]},"variants":{"L":{"idle":[["border",-3.2,-3.2,6.4,6.4,3.2,1.1,{"token":"mintInk"}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle"},"M":{"idle":[["stroke",[["M",-4,0],["L",4,0]],{"token":"muted"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle"},"C":{"idle":[["stroke",[["M",-4,-1.6],["L",4,-1.6]],{"token":"muted"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}],["stroke",[["M",-4,1.6],["L",4,1.6]],{"token":"muted"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"MiniMonth/day.mark.svg"},{"component":"Legend","slot":"legend.swatch","pack":"budget-journal","version":1,"viewBox":[0,0,18,18],"fit":"nine","insets":[2,2,2,2],"supports":{"w":[4,65536],"h":[4,65536]},"variants":{"L":{"idle":[["rect",0,0,18,18,{"token":"calLow"}],["border",0,0,18,18,0,1,{"token":"lineSoft"}]]},"M":{"idle":[["rect",0,0,18,18,{"token":"calModerate"}],["border",0,0,18,18,0,1,{"token":"lineSoft"}]]},"C":{"idle":[["rect",0,0,18,18,{"token":"calCritical"}],["border",0,0,18,18,0,1,{"token":"lineSoft"}]]}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"Legend/legend.swatch.svg"},{"component":"Legend","slot":"legend.mark","pack":"budget-journal","version":1,"viewBox":[-6,-6,12,12],"fit":"fit","supports":{"w":[1,12],"h":[1,12]},"variants":{"L":{"idle":[["border",-3.2,-3.2,6.4,6.4,3.2,1.1,{"token":"mintInk"}]]},"M":{"idle":[["stroke",[["M",-4,0],["L",4,0]],{"token":"muted"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}]]},"C":{"idle":[["stroke",[["M",-4,-1.6],["L",4,-1.6]],{"token":"muted"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}],["stroke",[["M",-4,1.6],["L",4,1.6]],{"token":"muted"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}]]}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"Legend/legend.mark.svg"},{"component":"Row","slot":"row.rule","pack":"budget-journal","version":1,"viewBox":[0,0,350,1],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"lineSoft":{"idle":[["rect",0,0,350,1,{"token":"lineSoft"}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle","focus":"=idle"},"line":{"idle":[["rect",0,0,350,1,{"token":"line"}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"Row/row.rule.svg"},{"component":"Row","slot":"row.chevron","pack":"budget-journal","version":1,"viewBox":[-6,-6,12,12],"fit":"fit","supports":{"w":[1,12],"h":[1,12]},"variants":{"down":{"idle":[["stroke",[["M",-5,-2],["L",0,2],["L",5,-2]],{"token":"captionInk"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"Row/row.chevron.svg"},{"component":"DatePicker","slot":"nav.background","pack":"budget-journal","version":1,"viewBox":[0,0,44,44],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"plain":{"idle":[["rect",0,0,44,44,{"token":"page"}]],"hover":[["rect",0,0,44,44,{"token":"wash"}]],"pressed":"=hover"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"DatePicker/nav.background.svg"},{"component":"DatePicker","slot":"nav.prev","pack":"budget-journal","version":1,"viewBox":[-6,-6,12,12],"fit":"fit","supports":{"w":[1,12],"h":[1,12]},"variants":{"left":{"idle":[["stroke",[["M",2,-5],["L",-2,0],["L",2,5]],{"token":"ink"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}]],"hover":"=idle","pressed":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"DatePicker/nav.prev.svg"},{"component":"DatePicker","slot":"nav.next","pack":"budget-journal","version":1,"viewBox":[-6,-6,12,12],"fit":"fit","supports":{"w":[1,12],"h":[1,12]},"variants":{"right":{"idle":[["stroke",[["M",-2,-5],["L",2,0],["L",-2,5]],{"token":"ink"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}]],"hover":"=idle","pressed":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"DatePicker/nav.next.svg"},{"component":"DatePicker","slot":"pick.rule","pack":"budget-journal","version":1,"viewBox":[0,0,350,1],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"line":{"idle":[["rect",0,0,350,1,{"token":"line"}]],"hover":"=idle","pressed":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"DatePicker/pick.rule.svg"},{"component":"BackBar","slot":"bar.back","pack":"budget-journal","version":1,"viewBox":[0,0,200,44],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"plain":{"idle":[["rect",0,0,200,44,{"token":"page"}]],"hover":[["rect",0,0,200,44,{"token":"wash"}]],"pressed":"=hover","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"BackBar/bar.back.svg"},{"component":"BackBar","slot":"bar.chevron","pack":"budget-journal","version":1,"viewBox":[-6,-6,12,12],"fit":"fit","supports":{"w":[1,12],"h":[1,12]},"variants":{"left":{"idle":[["stroke",[["M",2,-5],["L",-2,0],["L",2,5]],{"token":"ink"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}]],"hover":"=idle","pressed":"=idle","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"BackBar/bar.chevron.svg"},{"component":"BackBar","slot":"bar.action","pack":"budget-journal","version":1,"viewBox":[0,0,120,44],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"plain":{"idle":[["rect",0,0,120,44,{"token":"page"}]],"hover":[["rect",0,0,120,44,{"token":"wash"}]],"pressed":"=hover","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"BackBar/bar.action.svg"},{"component":"Divider","slot":"divider.rule","pack":"budget-journal","version":1,"viewBox":[0,0,350,1],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"divider":{"idle":[["rect",0,0,350,1,{"token":"divider"}]]},"line":{"idle":[["rect",0,0,350,1,{"token":"line"}]]}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"Divider/divider.rule.svg"},{"component":"Field","slot":"field.box","pack":"budget-journal","version":1,"viewBox":[0,0,350,44],"fit":"nine","insets":[4,4,4,4],"supports":{"w":[8,65536],"h":[8,65536]},"variants":{"plain":{"idle":[["rect",0,0,350,44,{"token":"page"}],["border",0,0,350,44,4,1,{"token":"line"}]],"hover":[["rect",0,0,350,44,{"token":"wash"}],["border",0,0,350,44,4,1,{"token":"line"}]],"pressed":"=hover","focus":"=idle","disabled":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"Field/field.box.svg"},{"component":"Field","slot":"field.rule","pack":"budget-journal","version":1,"viewBox":[0,0,350,1],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"line":{"idle":[["rect",0,0,350,1,{"token":"line"}]],"hover":"=idle","pressed":"=idle","focus":"=idle","disabled":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"Field/field.rule.svg"},{"component":"Choice","slot":"choice.background","pack":"budget-journal","version":1,"viewBox":[0,0,390,56],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"plain":{"idle":[["rect",0,0,390,56,{"token":"page"}]],"hover":[["rect",0,0,390,56,{"token":"wash"}]],"pressed":"=hover","selected":"=idle","disabled":"=idle","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"Choice/choice.background.svg"},{"component":"Choice","slot":"choice.mark","pack":"budget-journal","version":1,"viewBox":[-12,-12,24,24],"fit":"fit","supports":{"w":[1,24],"h":[1,24]},"variants":{"radio-on":{"idle":[["rrect",-8,-8,16,16,8,{"token":"accent"}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle","focus":"=idle"},"radio-off":{"idle":[["border",-8,-8,16,16,8,1.25,{"token":"captionInk"}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle","focus":"=idle"},"check-on":{"idle":[["rrect",-8,-8,16,16,2,{"token":"mint"}],["stroke",[["M",-4,0.5],["L",-1,4],["L",5,-3.5]],{"token":"page"},{"width":1.6,"join":"miter","cap":"butt","miterLimit":10}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle","focus":"=idle"},"check-off":{"idle":[["border",-8,-8,16,16,2,1.25,{"token":"captionInk"}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle","focus":"=idle"},"star-on":{"idle":[["path",[["M",4.5924254968e-16,-7.5],["L",1.67518796903,-2.30569843397],["L",7.13292387221,-2.31762745781],["L",2.71051107144,0.880698433969],["L",4.40838939219,6.06762745781],["L",1.74512168878e-16,2.85],["L",-4.40838939219,6.06762745781],["L",-2.71051107144,0.880698433969],["L",-7.13292387221,-2.31762745781],["L",-1.67518796903,-2.30569843397],["Z"]],{"token":"accent"}],["stroke",[["M",4.5924254968e-16,-7.5],["L",1.67518796903,-2.30569843397],["L",7.13292387221,-2.31762745781],["L",2.71051107144,0.880698433969],["L",4.40838939219,6.06762745781],["L",1.74512168878e-16,2.85],["L",-4.40838939219,6.06762745781],["L",-2.71051107144,0.880698433969],["L",-7.13292387221,-2.31762745781],["L",-1.67518796903,-2.30569843397],["Z"]],{"token":"accent"},{"width":1.25,"join":"miter","cap":"butt","miterLimit":10}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle","focus":"=idle"},"star-off":{"idle":[["stroke",[["M",4.5924254968e-16,-7.5],["L",1.67518796903,-2.30569843397],["L",7.13292387221,-2.31762745781],["L",2.71051107144,0.880698433969],["L",4.40838939219,6.06762745781],["L",1.74512168878e-16,2.85],["L",-4.40838939219,6.06762745781],["L",-2.71051107144,0.880698433969],["L",-7.13292387221,-2.31762745781],["L",-1.67518796903,-2.30569843397],["Z"]],{"token":"accent"},{"width":1.25,"join":"miter","cap":"butt","miterLimit":10}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"Choice/choice.mark.svg"},{"component":"Choice","slot":"choice.chevron","pack":"budget-journal","version":1,"viewBox":[-6,-6,12,12],"fit":"fit","supports":{"w":[1,12],"h":[1,12]},"variants":{"right":{"idle":[["stroke",[["M",-2,-5],["L",2,0],["L",-2,5]],{"token":"captionInk"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"Choice/choice.chevron.svg"},{"component":"Choice","slot":"choice.rule","pack":"budget-journal","version":1,"viewBox":[0,0,350,1],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"lineSoft":{"idle":[["rect",0,0,350,1,{"token":"lineSoft"}]],"hover":"=idle","pressed":"=idle","selected":"=idle","disabled":"=idle","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"Choice/choice.rule.svg"},{"component":"Every","slot":"every.box","pack":"budget-journal","version":1,"viewBox":[0,0,48,44],"fit":"nine","insets":[4,4,4,4],"supports":{"w":[8,65536],"h":[8,65536]},"variants":{"plain":{"idle":[["rect",0,0,48,44,{"token":"page"}],["border",0,0,48,44,4,1,{"token":"line"}]],"hover":[["rect",0,0,48,44,{"token":"wash"}],["border",0,0,48,44,4,1,{"token":"line"}]],"pressed":"=hover","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"Every/every.box.svg"},{"component":"Toggle","slot":"toggle.segment","pack":"budget-journal","version":1,"viewBox":[0,0,58,28],"fit":"nine","insets":[4,4,4,4],"supports":{"w":[8,65536],"h":[8,65536]},"variants":{"on":{"idle":[["rect",0,0,58,28,{"token":"wash"}],["border",0,0,58,28,4,1,{"token":"line"}]],"pressed":"=idle","selected":"=idle"},"off":{"idle":[["rect",0,0,58,28,{"token":"page"}],["border",0,0,58,28,4,1,{"token":"line"}]],"pressed":"=idle","selected":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"Toggle/toggle.segment.svg"},{"component":"PrimaryBand","slot":"primary.background","pack":"budget-journal","version":1,"viewBox":[0,0,350,44],"fit":"nine","insets":[4,4,4,4],"supports":{"w":[8,65536],"h":[8,65536]},"variants":{"enabled":{"idle":[["rect",0,0,350,44,{"token":"mint"}]],"hover":"=idle","pressed":"=idle","disabled":"=idle","focus":"=idle"},"disabled":{"idle":[["rect",0,0,350,44,{"token":"wash"}],["border",0,0,350,44,4,1,{"token":"line"}]],"hover":"=idle","pressed":"=idle","disabled":"=idle","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"PrimaryBand/primary.background.svg"},{"component":"TimePicker","slot":"time.cell","pack":"budget-journal","version":1,"viewBox":[0,0,58,44],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"on":{"idle":[["rect",0,0,58,44,{"token":"wash"}]],"hover":[["rect",0,0,58,44,{"token":"wash"}]],"pressed":"=hover","selected":"=idle"},"off":{"idle":[["rect",0,0,58,44,{"token":"page"}]],"hover":[["rect",0,0,58,44,{"token":"wash"}]],"pressed":"=hover","selected":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"TimePicker/time.cell.svg"},{"component":"FieldDatePicker","slot":"nav.background","pack":"budget-journal","version":1,"viewBox":[0,0,72,44],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"plain":{"idle":[["rect",0,0,72,44,{"token":"page"}]],"hover":[["rect",0,0,72,44,{"token":"wash"}]],"pressed":"=hover"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"FieldDatePicker/nav.background.svg"},{"component":"FieldDatePicker","slot":"nav.prev","pack":"budget-journal","version":1,"viewBox":[-6,-6,12,12],"fit":"fit","supports":{"w":[1,12],"h":[1,12]},"variants":{"left":{"idle":[["stroke",[["M",2,-5],["L",-2,0],["L",2,5]],{"token":"ink"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}]],"hover":"=idle","pressed":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"FieldDatePicker/nav.prev.svg"},{"component":"FieldDatePicker","slot":"nav.next","pack":"budget-journal","version":1,"viewBox":[-6,-6,12,12],"fit":"fit","supports":{"w":[1,12],"h":[1,12]},"variants":{"right":{"idle":[["stroke",[["M",-2,-5],["L",2,0],["L",-2,5]],{"token":"ink"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}]],"hover":"=idle","pressed":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"FieldDatePicker/nav.next.svg"},{"component":"HourRow","slot":"row.background","pack":"budget-journal","version":1,"viewBox":[0,0,390,56],"fit":"nine","insets":[8,2,8,2],"supports":{"w":[4,65536],"h":[16,65536]},"variants":{"on":{"idle":[["rect",0,0,390,56,{"token":"wash"}],["rect",0,8,2,40,{"token":"accent"}]],"hover":"=idle","pressed":"=idle","selected":"=idle"},"off":{"idle":[["rect",0,0,390,56,{"token":"page"}]],"hover":[["rect",0,0,390,56,{"token":"wash"}]],"pressed":"=hover","selected":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"HourRow/row.background.svg"},{"component":"HourRow","slot":"row.rule","pack":"budget-journal","version":1,"viewBox":[0,0,350,1],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"lineSoft":{"idle":[["rect",0,0,350,1,{"token":"lineSoft"}]],"hover":"=idle","pressed":"=idle","selected":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"HourRow/row.rule.svg"},{"component":"AmountRow","slot":"row.background","pack":"budget-journal","version":1,"viewBox":[0,0,390,48],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"plain":{"idle":[["rect",0,0,390,48,{"token":"page"}]],"hover":[["rect",0,0,390,48,{"token":"wash"}]],"pressed":"=hover"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"AmountRow/row.background.svg"},{"component":"AmountRow","slot":"row.rule","pack":"budget-journal","version":1,"viewBox":[0,0,350,1],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"lineSoft":{"idle":[["rect",0,0,350,1,{"token":"lineSoft"}]],"hover":"=idle","pressed":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"AmountRow/row.rule.svg"},{"component":"MonthHeading","slot":"heading.background","pack":"budget-journal","version":1,"viewBox":[0,0,390,44],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"plain":{"idle":[["rect",0,0,390,44,{"token":"page"}]],"hover":[["rect",0,0,390,44,{"token":"wash"}]],"pressed":"=hover","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"MonthHeading/heading.background.svg"},{"component":"MonthHeading","slot":"heading.chevron","pack":"budget-journal","version":1,"viewBox":[-6,-6,12,12],"fit":"fit","supports":{"w":[1,12],"h":[1,12]},"variants":{"down":{"idle":[["stroke",[["M",-5,-2],["L",0,2],["L",5,-2]],{"token":"captionInk"},{"width":1.4,"join":"miter","cap":"butt","miterLimit":10}]],"hover":"=idle","pressed":"=idle","focus":"=idle"}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"MonthHeading/heading.chevron.svg"},{"component":"BeforeAfter","slot":"step.changed","pack":"budget-journal","version":1,"viewBox":[0,0,390,60],"fit":"stretch","supports":{"w":[1,65536],"h":[1,65536]},"variants":{"wash":{"idle":[["rect",0,0,390,60,{"token":"wash"}]]},"mint":{"idle":[["rect",0,0,390,60,{"token":"mint"}]]}},"motion":{"loop":null,"transitions":"state-table"},"references":["exp7-budget-studies SPEC.md: the journal look (white page, thin rules, chevrons, tints, the mint band)","Budget 1.8.79 as drawn in code before phase 3"],"source":"BeforeAfter/step.changed.svg"}]}</script>
 <script data-exp7-shared="design-components">
 /* Exp7 design system: components (docs/design-system.md section 6). Components are the only way a screen is built.
  * Each one is registered with its bounds, slots, states and test fixtures; registration fails if any is missing.
@@ -14548,11 +14784,14 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
  * that shows. Every size and colour comes from the app's tokens, read by name. No throw, no try/catch, no defaults.
  * Phase 1 holds the set Budget Home needs: Page, Heading, DateHeading, DatePicker, MiniMonth, Legend, Note, Row, LinkRow.
  * Phase 2 adds the rest of Budget's screens: BackBar, Title, Section, Divider, Field, Choice, Every, Toggle, Pair, PrimaryBand,
- * TimePicker, FieldDatePicker, HourRow, AmountRow, MonthHeading, BeforeAfter. */
+ * TimePicker, FieldDatePicker, HourRow, AmountRow, MonthHeading, BeforeAfter.
+ * Phase 3: every visual that isn't live text is art (design-art). A component declares its slots and the variants it draws
+ * in each ({ slot: [variant] }); it places each slot's art at a rect it computes from tokens, and the art for the slot comes
+ * from the app's pack or an override. Hover comes from the art's hover drawing, not from a recolour in code. */
 (function (root) {
   'use strict';
   var F = root.Exp7Fail, B = root.Exp7Bounds, FAIL = F.FAIL, q = B.q;
-  var WEEK = 7, HALF = 2, NO_ROOM = 0, DAY_HOURS = 24, STAR_POINTS = 5;
+  var A = root.Exp7Art, WEEK = 7, HALF = 2, NO_ROOM = 0, DAY_HOURS = 24, LEVELS = { L: 1, M: 1, C: 1 };
   var registry = new Map();
 
   /* tokens(S, names): every named token, or FAIL */
@@ -14561,40 +14800,28 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   /* field(props, key): a value the component needs from its model, or DATA_MISSING */
   function field(props, key, where) { return props != null && props[key] != null ? props[key] : F.with('DATA_MISSING', Object.assign({ detail: key }, where == null ? {} : where)); }
 
-  /* Glyphs: two-line chevrons (never Unicode arrows) and the calendar's colour-blind marks. Phase 3 moves them to art slots. */
-  function glyphs(S) { var t = tokens(S, ['chevronW', 'chevronH', 'chevronStroke', 'markR', 'markStroke', 'markBarW', 'markBarGap']); if (t === FAIL) return FAIL;
-    var c = colours(S, ['mintInk', 'muted']); if (c === FAIL) return FAIL;
-    var w = t.chevronW, h = t.chevronH, st = { width: t.chevronStroke, join: 'miter', cap: 'butt' };
-    function bar(n, cx, cy) { n.items.push(['stroke', [['M', cx - t.markBarW / HALF, cy], ['L', cx + t.markBarW / HALF, cy]], c.muted, { width: t.chevronStroke, cap: 'butt' }]); }
-    return {
-      right: function (n, x, y, ink) { n.items.push(['stroke', [['M', x, y - h / HALF], ['L', x + w, y], ['L', x, y + h / HALF]], ink, st]); },
-      left: function (n, x, y, ink) { n.items.push(['stroke', [['M', x + w, y - h / HALF], ['L', x, y], ['L', x + w, y + h / HALF]], ink, st]); },
-      down: function (n, x, y, ink) { n.items.push(['stroke', [['M', x, y], ['L', x + h / HALF, y + w], ['L', x + h, y]], ink, st]); },
-      up: function (n, x, y, ink) { n.items.push(['stroke', [['M', x, y + w], ['L', x + h / HALF, y], ['L', x + h, y + w]], ink, st]); },
-      mark: function (n, level, cx, cy) {
-        if (level === 'L') n.items.push(['border', cx - t.markR, cy - t.markR, t.markR * HALF, t.markR * HALF, t.markR, t.markStroke, c.mintInk]);
-        if (level === 'M') bar(n, cx, cy);
-        if (level === 'C') { bar(n, cx, cy - t.markBarGap); bar(n, cx, cy + t.markBarGap); }
-      },
-      chevronH: h };
-  }
-  /* rule(): a hairline in its own node */
-  function rule(S, V, k, x, y, w, colour) { var t = tokens(S, ['rule']); if (t === FAIL) return FAIL; var c = S.color(colour); if (c === FAIL) return FAIL;
-    var n = V.node(k); n.items.push(['rect', x, y, w, t.rule, c]); return n; }
+  /* art(): a slot's art in node n at rect, at the end of its items (or at index at) */
+  function art(S, n, component, slot, variant, rect, at) { return A.draw(S, n, component, slot, variant, rect, at); }
+  /* glyph(): a fit piece about its anchor (cx, cy), in a square box of the size token */
+  function glyph(S, n, component, slot, variant, cx, cy, box) { var b = S.token(box); if (b === FAIL) return FAIL; return A.draw(S, n, component, slot, variant, [cx - b / HALF, cy - b / HALF, b, b, cx, cy]); }
+  /* chevron(): a two-line chevron (never a Unicode arrow) whose box starts at x; y is its middle (right, left) or its top (down, up) */
+  function chevron(S, n, component, slot, dir, x, y) { var t = tokens(S, ['chevronW', 'chevronH']); if (t === FAIL) return FAIL;
+    var side = dir === 'left' || dir === 'right'; return glyph(S, n, component, slot, dir, x + (side ? t.chevronW : t.chevronH) / HALF, side ? y : y + t.chevronW / HALF, 'glyphBox'); }
+  /* rule(): a hairline in its own node, drawn by the component's rule slot in the colour's variant */
+  function rule(S, V, k, component, slot, colour, x, y, w) { var t = tokens(S, ['rule']); if (t === FAIL) return FAIL;
+    var n = V.node(k); if (art(S, n, component, slot, colour, [x, y, w, t.rule]) === FAIL) return FAIL; return n; }
   /* hit(): the node's hit is its rect, at least target on both axes */
   function hit(S, V, n, rect, act, label, where) { var t = S.token('target'); if (t === FAIL) return FAIL;
     if (rect[2] < t || rect[3] < t) return F.with('TARGET_TOO_SMALL', Object.assign({ id: n.id, offered: { w: rect[2], h: rect[3] }, needed: { w: t, h: t } }, where == null ? {} : where));
     V.hit(n, rect, act, label); S.table.put(n.id, rect, null, [], V.key); return n; }
-  /* control(): a tappable band with a label centred on its metrics and an optional chevron (LinkRow and its kin) */
+  /* control(): a tappable band (p.bg, its background slot) with a label centred on its metrics and an optional chevron (p.chevronSlot) */
   function control(S, V, p, x, y, w, h) {
     var t = tokens(S, ['inset', 'controlInset', 'chevronRoom', 'chevronMargin']); if (t === FAIL) return FAIL;
-    var c = colours(S, ['page', 'wash', 'ink', 'captionInk']); if (c === FAIL) return FAIL;
-    var G = glyphs(S); if (G === FAIL) return FAIL;
-    var n = V.node(p.key); n.items.push(['rect', x, y, w, h, c.page]); n.base = c.page; n.hov = c.wash;
+    var n = V.node(p.key); if (art(S, n, p.component, p.bg, 'plain', [x, y, w, h]) === FAIL) return FAIL;
     if (hit(S, V, n, [x, y, w, h], p.act, p.label === '' ? p.act : p.label, { component: p.component }) === FAIL) return FAIL;
     var tx = x + (w >= V.W - 1 ? t.inset : t.controlInset), room = w - (p.chevron ? t.chevronRoom : t.controlInset * HALF) - (tx - x);
     if (p.label !== '' && S.centred(V, n, { text: p.label, role: p.role, bold: !!p.bold, ink: 'ink' }, [x, y, w, h], tx, room, { component: p.component, id: n.id }) === FAIL) return FAIL;
-    if (p.chevron) G.right(n, x + w - t.chevronMargin, y + h / HALF, c.captionInk);
+    if (p.chevron && chevron(S, n, p.component, p.chevronSlot, 'right', x + w - t.chevronMargin, y + h / HALF) === FAIL) return FAIL;
     return n;
   }
 
@@ -14603,20 +14830,25 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     return F.context('design.register:' + (def && def.name), function () {
       var need = ['name', 'bounds', 'slots', 'states', 'fixtures', 'draw'];
       for (var i = 0; i < need.length; i++) if (def[need[i]] == null) return F.with('COMPONENT_INVALID', { component: def.name == null ? null : def.name, detail: 'missing ' + need[i] });
-      if (!def.slots.length && def.slots !== NONE) return F.with('COMPONENT_INVALID', { component: def.name, detail: 'no slots' });
+      var slots = Object.keys(def.slots);
+      if (!slots.length && def.slots !== NONE) return F.with('COMPONENT_INVALID', { component: def.name, detail: 'no slots' });
+      for (var j = 0; j < slots.length; j++) { var vs = def.slots[slots[j]]; if (!Array.isArray(vs) || !vs.length) return F.with('COMPONENT_INVALID', { component: def.name, slot: slots[j], detail: 'a slot lists the variants the component draws' }); }
       if (!def.states.length || !def.fixtures.length) return F.with('COMPONENT_INVALID', { component: def.name, detail: 'no states or fixtures' });
       registry.set(def.name, Object.freeze(def)); return true;
     }, function (failure) { F.record(failure); });
   }
-  var NONE = Object.freeze([]);
+  var NONE = Object.freeze({});
   /* place(): check the width against the component's bounds, draw, check the height, record the rect */
   function place(name, S, V, props, x, y, w) {
     var def = registry.get(name); if (!def) return F.with('COMPONENT_INVALID', { component: name, detail: 'not registered' });
     var b = def.bounds(S, props); if (b === FAIL) return FAIL;
     var where = { component: name, screen: S.screen, app: S.app };
     if (B.axis(b.w, w, w, w, where) === FAIL) return FAIL;
-    var before = V.nodes.length, h = def.draw(S, V, props, x, y, w); if (h === FAIL) return FAIL;
+    var before = V.nodes.length, texts = V.texts.length, h = def.draw(S, V, props, x, y, w); if (h === FAIL) return FAIL;
     if (h < b.h.min - 1e-6 || h > b.h.max + 1e-6) return F.with('BOUNDS_UNSAT', Object.assign({ offered: { h: h }, needed: { min: b.h.min, max: b.h.max } }, where));
+    /* text over art keeps its contrast; a node whose art draws differently on hover keeps its hover items */
+    if (A.contrast(S, V, V.texts.slice(texts)) === FAIL) return FAIL;
+    V.nodes.slice(before).forEach(function (n) { var hv = A.hover(n); if (hv) n.hovItems = hv; else delete n.hovItems; });
     var kids = V.nodes.slice(before).map(function (n) { return n.id; }), id = B.fnv(V.key + ':' + name + ':' + (props.key == null ? name : props.key) + ':' + x + ',' + y);
     S.table.put(id, [x, y, w, h], b, kids, V.key);
     return h;
@@ -14629,14 +14861,13 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   function bounds(w, h) { return w === FAIL || h === FAIL ? FAIL : { w: w, h: h }; }
 
   /* ---------- Page: the paper, its edge ---------- */
-  register({ name: 'Page', slots: ['page.background', 'page.edge'], states: ['idle'],
+  register({ name: 'Page', slots: { 'page.background': ['plain'], 'page.edge': ['plain'] }, states: ['idle'],
     fixtures: [{ key: 'paper', height: 940 }],
     bounds: function (S) { return bounds(fill(S, 'target', 1), hug(S, null, Infinity)); },
-    draw: function (S, V, p, x, y, w) { var t = tokens(S, ['pageRadius', 'viewMin']); if (t === FAIL) return FAIL;
-      var c = colours(S, ['page', 'pageEdge']); if (c === FAIL) return FAIL;
+    draw: function (S, V, p, x, y, w) { var t = tokens(S, ['viewMin']); if (t === FAIL) return FAIL;
       var H = field(p, 'height', { component: 'Page' }); if (H === FAIL) return FAIL;
-      var n = V.node(p.key); n.items.push(['rect', x, y, w, H, c.page]);
-      if (H > t.viewMin) n.items.push(['border', x, y, w, H, t.pageRadius, 1, c.pageEdge]);
+      var n = V.node(p.key); if (art(S, n, 'Page', 'page.background', 'plain', [x, y, w, H]) === FAIL) return FAIL;
+      if (H > t.viewMin && art(S, n, 'Page', 'page.edge', 'plain', [x, y, w, H]) === FAIL) return FAIL;
       return H; } });
 
   /* ---------- Heading: a block's title on its baseline ---------- */
@@ -14661,79 +14892,75 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       return t[p.drop] + f.n * f.lh; } });
 
   /* ---------- LinkRow: a destination band with an optional chevron ---------- */
-  register({ name: 'LinkRow', slots: ['link.background', 'link.chevron'], states: ['idle', 'hover', 'pressed', 'focus'],
+  register({ name: 'LinkRow', slots: { 'link.background': ['plain'], 'link.chevron': ['right'] }, states: ['idle', 'hover', 'pressed', 'focus'],
     fixtures: [{ key: 'link0', label: 'Monthly expenses', act: 'nav:ledger', chevron: true, height: 'link', role: 'body' }, { key: 'add-day', label: 'Add to today', act: 'add:item', chevron: true, height: 'row', role: 'body' }],
     bounds: function (S) { return bounds(fill(S, 'target', 1), hug(S, 'link', Infinity)); },
     /* p: { key, label, act, chevron, height (a size token), role (a type size token), bold } */
     draw: function (S, V, p, x, y, w) { var h = S.token(p.height); if (h === FAIL) return FAIL;
-      var n = control(S, V, { key: p.key, label: p.label, act: p.act, chevron: p.chevron, role: p.role, bold: p.bold, component: 'LinkRow' }, x, y, w, h); if (n === FAIL) return FAIL;
+      var n = control(S, V, { key: p.key, label: p.label, act: p.act, chevron: p.chevron, role: p.role, bold: p.bold, component: 'LinkRow', bg: 'link.background', chevronSlot: 'link.chevron' }, x, y, w, h); if (n === FAIL) return FAIL;
       if (p.hoverDate) n.vm.hoverDate = true;
       return h; } });
 
   /* ---------- DateHeading: the day, bold, with the chevron that opens the shared picker, and the rule under it ---------- */
-  register({ name: 'DateHeading', slots: ['heading.chevron', 'heading.background'], states: ['idle', 'hover', 'pressed', 'focus'],
+  register({ name: 'DateHeading', slots: { 'heading.background': ['plain'], 'heading.chevron': ['down', 'up'], 'heading.rule': ['line'] }, states: ['idle', 'hover', 'pressed', 'focus'],
     fixtures: [{ key: 'date-heading', title: 'Saturday, November 14, 2026', open: false }, { key: 'date-heading', title: 'Wednesday, September 30, 2026', open: true }],
     bounds: function (S) { var t = S.token('target'); if (t === FAIL) return FAIL; return bounds(fill(S, 'target', 1), { mode: 'fixed', min: t, max: t }); },
     draw: function (S, V, p, x, y, w) { var t = tokens(S, ['target', 'inset', 'dateChevronGap', 'dateChevronMargin', 'dateChevronDrop', 'controlInset']); if (t === FAIL) return FAIL;
-      var c = colours(S, ['captionInk']); if (c === FAIL) return FAIL; var G = glyphs(S); if (G === FAIL) return FAIL;
       var title = field(p, 'title', { component: 'DateHeading' }); if (title === FAIL) return FAIL;
-      var n = control(S, V, { key: p.key, label: title, act: 'journal:date', chevron: false, role: 'body', bold: true, component: 'DateHeading' }, x, y, w, t.target); if (n === FAIL) return FAIL;
+      var n = control(S, V, { key: p.key, label: title, act: 'journal:date', chevron: false, role: 'body', bold: true, component: 'DateHeading', bg: 'heading.background' }, x, y, w, t.target); if (n === FAIL) return FAIL;
       n.vm.hoverDate = true;
       var drawn = V.texts[V.texts.length - 1], cx = Math.min(x + w - t.dateChevronMargin, x + t.inset + drawn.width + t.dateChevronGap);
-      if (p.open) G.up(n, cx, y + t.dateChevronDrop, c.captionInk); else G.down(n, cx, y + t.dateChevronDrop, c.captionInk);
-      if (rule(S, V, 'page-rule', x + t.inset, y + t.target, w - t.inset * HALF, 'line') === FAIL) return FAIL;
+      if (chevron(S, n, 'DateHeading', 'heading.chevron', p.open ? 'up' : 'down', cx, y + t.dateChevronDrop) === FAIL) return FAIL;
+      if (rule(S, V, 'page-rule', 'DateHeading', 'heading.rule', 'line', x + t.inset, y + t.target, w - t.inset * HALF) === FAIL) return FAIL;
       return t.target; } });
 
   /* ---------- MiniMonth: the 7-column grid with tints, colour-blind marks and the selected day ---------- */
-  register({ name: 'MiniMonth', slots: ['day.background', 'day.mark', 'day.today', 'day.selected'], states: ['idle', 'hover', 'pressed', 'selected', 'disabled'],
+  register({ name: 'MiniMonth', slots: { 'day.background': ['plain', 'L', 'M', 'C', 'outside'], 'day.selected': ['on'], 'day.today': ['on'], 'day.mark': ['L', 'M', 'C'] }, states: ['idle', 'hover', 'pressed', 'selected', 'disabled'],
     fixtures: [{ key: 'm', month: '2026-08', sel: '2026-08-01', today: '2026-08-14', days: ['2026-08-01', '2026-08-02', '2026-08-03', '2026-08-04', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09', '2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14', '2026-08-15', '2026-08-16', '2026-08-17', '2026-08-18', '2026-08-19', '2026-08-20', '2026-08-21', '2026-08-22', '2026-08-23', '2026-08-24', '2026-08-25', '2026-08-26', '2026-08-27', '2026-08-28', '2026-08-29', '2026-08-30', '2026-08-31'], risk: { '2026-08-03': { c: 'L' }, '2026-08-04': { c: 'M' }, '2026-08-05': { c: 'C' } }, prefix: '', act: 'budget:pickday:', strokeToday: false, gridTop: 'gridTop' }],
     bounds: function (S) { return bounds(fill(S, 'target', WEEK), hug(S, 'cell', Infinity)); },
     /* p: { month, sel, today, days (ISO dates), risk ({ date: { c: 'L'|'M'|'C' } }), prefix, act, strokeToday, gridTop (the token for
      * the grid's top below y; the weekday row sits above the grid, inside this rect) } */
     draw: function (S, V, p, x, y0, w) {
       var gt = S.token(p.gridTop); if (gt === FAIL) return FAIL; var y = y0 + gt;
-      var t = tokens(S, ['cell', 'dowRise', 'dayNumberDrop', 'trailNumberDrop', 'markRise', 'selectedStroke', 'selectedInset']); if (t === FAIL) return FAIL;
-      var c = colours(S, ['page', 'wash', 'lineSoft', 'accent', 'calLow', 'calModerate', 'calCritical']); if (c === FAIL) return FAIL;
-      var G = glyphs(S); if (G === FAIL) return FAIL;
+      var t = tokens(S, ['cell', 'dowRise', 'dayNumberDrop', 'trailNumberDrop', 'markRise']); if (t === FAIL) return FAIL;
       var month = field(p, 'month', { component: 'MiniMonth' }); if (month === FAIL) return FAIL;
       var days = field(p, 'days', { component: 'MiniMonth' }); if (days === FAIL) return FAIL;
-      var cw = w / WEEK, ch = t.cell, start = new Date(month + '-01T12:00:00').getDay(), names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], tint = { C: c.calCritical, M: c.calModerate, L: c.calLow };
+      var cw = w / WEEK, ch = t.cell, start = new Date(month + '-01T12:00:00').getDay(), names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       for (var i = 0; i < WEEK; i++) if (S.line(V, V.node(p.prefix + 'dow' + i), { text: names[i], role: 'secondary', ink: 'captionInk' }, x + i * cw + cw / HALF, y - t.dowRise, cw, 'center', { component: 'MiniMonth' }) === FAIL) return FAIL;
       for (var di = 0; di < days.length; di++) {
         var d = days[di], ix = start + di, cx0 = x + (ix % WEEK) * cw, cy0 = y + Math.floor(ix / WEEK) * ch, n = V.node(p.prefix + 'day:' + d);
-        var level = p.risk[d] && p.risk[d].c ? p.risk[d].c : '', bg = tint[level] != null ? tint[level] : c.page, isSel = d === p.sel, isToday = d === p.today;
-        n.items.push(['rect', cx0, cy0, cw, ch, bg]); n.base = bg; n.hov = c.wash; n.items.push(['border', cx0, cy0, cw, ch, 0, 1, c.lineSoft]);
+        var level = p.risk[d] && p.risk[d].c ? p.risk[d].c : '', marked = LEVELS[level] === 1, isSel = d === p.sel, isToday = d === p.today;
+        if (art(S, n, 'MiniMonth', 'day.background', marked ? level : 'plain', [cx0, cy0, cw, ch]) === FAIL) return FAIL;
         if (S.line(V, n, { text: String(+d.slice(8)), role: 'body', bold: isSel || isToday, ink: 'ink' }, cx0 + cw / HALF, cy0 + t.dayNumberDrop, cw, 'center', { component: 'MiniMonth', state: isSel ? 'selected' : 'idle' }) === FAIL) return FAIL;
-        if (isSel) n.items.push(['border', cx0 + t.selectedInset, cy0 + t.selectedInset, cw - t.selectedInset * HALF, ch - t.selectedInset * HALF, 0, t.selectedStroke, c.accent]);
-        else if (isToday && p.strokeToday) n.items.push(['border', cx0 + t.selectedInset, cy0 + t.selectedInset, cw - t.selectedInset * HALF, ch - t.selectedInset * HALF, 0, t.selectedStroke, c.accent]);
-        G.mark(n, level, cx0 + cw / HALF, cy0 + ch - t.markRise);
+        if (isSel ? art(S, n, 'MiniMonth', 'day.selected', 'on', [cx0, cy0, cw, ch]) === FAIL : isToday && p.strokeToday && art(S, n, 'MiniMonth', 'day.today', 'on', [cx0, cy0, cw, ch]) === FAIL) return FAIL;
+        if (marked && glyph(S, n, 'MiniMonth', 'day.mark', level, cx0 + cw / HALF, cy0 + ch - t.markRise, 'glyphBox') === FAIL) return FAIL;
         if (hit(S, V, n, [cx0, cy0, cw, ch], p.act + d, d, { component: 'MiniMonth' }) === FAIL) return FAIL;
       }
       var filled = start + days.length, trail = (WEEK - filled % WEEK) % WEEK;
       for (var ti = 0; ti < trail; ti++) { var jx = filled + ti, tx0 = x + (jx % WEEK) * cw, ty0 = y + Math.floor(jx / WEEK) * ch, m = V.node(p.prefix + 'trail' + ti);
-        m.items.push(['rect', tx0, ty0, cw, ch, c.page]); m.items.push(['border', tx0, ty0, cw, ch, 0, 1, c.lineSoft]);
+        if (art(S, m, 'MiniMonth', 'day.background', 'outside', [tx0, ty0, cw, ch]) === FAIL) return FAIL;
         if (S.line(V, m, { text: String(ti + 1), role: 'secondary', ink: 'captionInk' }, tx0 + cw / HALF, ty0 + t.trailNumberDrop, cw, 'center', { component: 'MiniMonth' }) === FAIL) return FAIL; }
       return gt + Math.ceil((filled + trail) / WEEK) * ch; } });
 
   /* ---------- Legend: swatch, mark and plain words, wrapped ---------- */
-  register({ name: 'Legend', slots: ['legend.swatch'], states: ['idle'],
-    fixtures: [{ key: 'mini-legend', items: [['calLow', 'L', 'Green: a surprise cost or late pay is absorbed.'], ['calModerate', 'M', 'Yellow: one would bite; there is room to recover.'], ['calCritical', 'C', 'Red: one would bite with no room to recover.']] }],
+  register({ name: 'Legend', slots: { 'legend.swatch': ['L', 'M', 'C'], 'legend.mark': ['L', 'M', 'C'] }, states: ['idle'],
+    fixtures: [{ key: 'mini-legend', items: [['L', 'Green: a surprise cost or late pay is absorbed.'], ['M', 'Yellow: one would bite; there is room to recover.'], ['C', 'Red: one would bite with no room to recover.']] }],
     bounds: function (S) { return bounds(fill(S, 'target', 1), hug(S, null, Infinity)); },
     draw: function (S, V, p, x, y, w) {
       var t = tokens(S, ['inset', 'swatch', 'legendTop', 'legendTextGap', 'legendDrop', 'legendStepMin', 'legendStepPad', 'legendEnd']); if (t === FAIL) return FAIL;
-      var c = colours(S, ['lineSoft']); if (c === FAIL) return FAIL; var G = glyphs(S); if (G === FAIL) return FAIL;
       var items = field(p, 'items', { component: 'Legend' }); if (items === FAIL) return FAIL;
       var ly = y + t.legendTop, tx = x + t.inset + t.swatch + t.legendTextGap, room = w - t.inset * HALF - t.swatch - t.legendTextGap;
-      for (var i = 0; i < items.length; i++) { var L = items[i], n = V.node(p.key + i), sw = S.color(L[0]); if (sw === FAIL) return FAIL;
-        n.items.push(['rect', x + t.inset, ly, t.swatch, t.swatch, sw]); n.items.push(['border', x + t.inset, ly, t.swatch, t.swatch, 0, 1, c.lineSoft]);
-        G.mark(n, L[1], x + t.inset + t.swatch / HALF, ly + t.swatch / HALF);
-        var f = S.para(V, n, { text: L[2], role: 'secondary', ink: 'captionInk' }, tx, ly + t.legendDrop, room, Infinity, { component: 'Legend' }); if (f === FAIL) return FAIL;
+    /* p: { key, items: [[level ('L' | 'M' | 'C'), text]] } */
+      for (var i = 0; i < items.length; i++) { var L = items[i], n = V.node(p.key + i);
+        if (art(S, n, 'Legend', 'legend.swatch', L[0], [x + t.inset, ly, t.swatch, t.swatch]) === FAIL) return FAIL;
+        if (glyph(S, n, 'Legend', 'legend.mark', L[0], x + t.inset + t.swatch / HALF, ly + t.swatch / HALF, 'glyphBox') === FAIL) return FAIL;
+        var f = S.para(V, n, { text: L[1], role: 'secondary', ink: 'captionInk' }, tx, ly + t.legendDrop, room, Infinity, { component: 'Legend' }); if (f === FAIL) return FAIL;
         ly += Math.max(t.legendStepMin, f.n * f.lh + t.legendStepPad); }
       return ly + t.legendEnd - y; } });
 
   /* ---------- Row: one item of a list. layout 'entry' (a day's item: time, name, cadence, amount) or 'choice'
    * (a plan step: name and the item in use, with the chevron that opens its alternatives; stacked when it doesn't fit) ---------- */
-  register({ name: 'Row', slots: ['row.background', 'row.rule', 'row.leading', 'row.chevron'], states: ['idle', 'hover', 'pressed', 'selected', 'disabled', 'focus'],
+  register({ name: 'Row', slots: { 'row.rule': ['lineSoft', 'line'], 'row.chevron': ['down'] }, states: ['idle', 'hover', 'pressed', 'selected', 'disabled', 'focus'],
     fixtures: [{ key: 'entry:a', layout: 'entry', id: 'a', name: 'Lunch out with a very long name that has to wrap or shrink', time: '13:30', amount: '1,234,567.00', cadence: 'Every 14 days' },
       { key: 'step:s', layout: 'choice', id: 's', name: 'Commute', selected: 'Bus pass', choices: 2 },
       { key: 'step:t', layout: 'choice', id: 't', name: 'A plan step with a name long enough to stack', selected: 'An alternative with a long name too', choices: 0 }],
@@ -14752,13 +14979,12 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     var fn = S.para(V, n, { text: name, role: 'body', ink: 'ink' }, labelX, base, Math.max(t.labelMin, x + w - labelX - aw - (p.cadence ? t.cadenceRoom : t.controlInset * HALF) - t.inset), Infinity, where); if (fn === FAIL) return FAIL;
     var rh = t.row + (fn.n - 1) * fn.lh;
     if (hit(S, V, n, [x, y, w, rh], 'entry:' + p.id, name, where) === FAIL) return FAIL;
-    if (rule(S, V, 'erule:' + p.id, x + t.inset, y + rh - 1, w - t.inset * HALF, 'lineSoft') === FAIL) return FAIL;
+    if (rule(S, V, 'erule:' + p.id, 'Row', 'row.rule', 'lineSoft', x + t.inset, y + rh - 1, w - t.inset * HALF) === FAIL) return FAIL;
     return rh;
   }
   function choiceRow(S, V, p, x, y, w) {
     var t = tokens(S, ['inset', 'row', 'rowDrop', 'body', 'secondary', 'lineHeight', 'planNameShare', 'planNameRoom', 'planChevron', 'planGap', 'planEnd', 'planChevronRoom',
       'planWrapRoom', 'planWrapTop', 'planWrapGap', 'planWrapEnd', 'planWrapNameDrop', 'planSelectedRise', 'labelMin', 'chevronH']); if (t === FAIL) return FAIL;
-    var c = colours(S, ['captionInk']); if (c === FAIL) return FAIL; var G = glyphs(S); if (G === FAIL) return FAIL;
     var name = field(p, 'name', { component: 'Row' }); if (name === FAIL) return FAIL;
     var selected = field(p, 'selected', { component: 'Row' }); if (selected === FAIL) return FAIL;
     var regular = S.font(false); if (regular === FAIL) return FAIL;
@@ -14778,24 +15004,23 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       var fs = S.para(V, target, { text: selected, role: 'secondary', ink: p.choices ? 'ink' : 'muted' }, x + t.inset, sy, room, Infinity, where); if (fs === FAIL) return FAIL;
       rh = Math.max(t.row, t.planWrapTop + nameH + t.planWrapGap + fs.n * fs.lh + t.planWrapEnd);
     }
-    if (p.choices) { G.down(a, right - t.chevronH, y + rh / HALF, c.captionInk);
+    if (p.choices) { if (chevron(S, a, 'Row', 'row.chevron', 'down', right - t.chevronH, y + rh / HALF) === FAIL) return FAIL;
       if (hit(S, V, a, [x, y, w, rh], 'picker:' + p.id, name + ' | ' + selected, where) === FAIL) return FAIL; a.vm.step = p.id; }
-    if (rule(S, V, 'step-rule:' + p.id, x + t.inset, y + rh - 1, w - t.inset * HALF, 'line') === FAIL) return FAIL;
+    if (rule(S, V, 'step-rule:' + p.id, 'Row', 'row.rule', 'line', x + t.inset, y + rh - 1, w - t.inset * HALF) === FAIL) return FAIL;
     return rh;
   }
 
   /* ---------- DatePicker: the inline picker under the DateHeading: month browse, Today, the month, Dismiss, notes ---------- */
-  register({ name: 'DatePicker', slots: ['nav.prev', 'nav.next', 'day.background', 'day.mark', 'day.today', 'day.selected'], states: ['idle', 'hover', 'pressed'],
+  register({ name: 'DatePicker', slots: { 'nav.background': ['plain'], 'nav.prev': ['left'], 'nav.next': ['right'], 'pick.rule': ['line'] }, states: ['idle', 'hover', 'pressed'],
     fixtures: [{ key: 'picker', month: '2026-02', monthTitle: 'February 2026', sel: '2026-02-04', today: '2026-02-14', days: ['2026-02-01', '2026-02-02', '2026-02-03', '2026-02-04', '2026-02-05', '2026-02-06', '2026-02-07', '2026-02-08', '2026-02-09', '2026-02-10', '2026-02-11', '2026-02-12', '2026-02-13', '2026-02-14', '2026-02-15', '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20', '2026-02-21', '2026-02-22', '2026-02-23', '2026-02-24', '2026-02-25', '2026-02-26', '2026-02-27', '2026-02-28'], risk: {}, todayNote: 'Today is Saturday, February 14.', selNote: 'The selected day is Wednesday, February 4.' }],
     bounds: function (S) { return bounds(fill(S, 'target', WEEK), hug(S, 'target', Infinity)); },
     draw: function (S, V, p, x, y, w) {
       var t = tokens(S, ['target', 'inset', 'pickTitleDrop', 'pickGridGap', 'pickGridEnd', 'pickNotesEnd', 'noteDrop', 'noteStep', 'ruleGap']); if (t === FAIL) return FAIL;
-      var c = colours(S, ['ink']); if (c === FAIL) return FAIL; var G = glyphs(S); if (G === FAIL) return FAIL;
-      var prev = control(S, V, { key: 'pick-prev', label: '', act: 'budget:pick:-1', role: 'title', component: 'DatePicker' }, x, y, t.target, t.target); if (prev === FAIL) return FAIL;
-      prev.vm.label = 'Previous month'; G.left(prev, x + t.inset, y + t.target / HALF, c.ink);
-      var nx = x + w - t.target * (HALF + 1), next = control(S, V, { key: 'pick-next', label: '', act: 'budget:pick:1', role: 'title', component: 'DatePicker' }, nx, y, t.target, t.target); if (next === FAIL) return FAIL;
-      next.vm.label = 'Next month'; G.right(next, nx + t.inset, y + t.target / HALF, c.ink);
-      if (control(S, V, { key: 'pick-today', label: 'Today', act: 'budget:pick:today', role: 'secondary', component: 'DatePicker' }, x + w - t.target * HALF, y, t.target * HALF, t.target) === FAIL) return FAIL;
+      var prev = control(S, V, { key: 'pick-prev', label: '', act: 'budget:pick:-1', role: 'title', component: 'DatePicker', bg: 'nav.background' }, x, y, t.target, t.target); if (prev === FAIL) return FAIL;
+      prev.vm.label = 'Previous month'; if (chevron(S, prev, 'DatePicker', 'nav.prev', 'left', x + t.inset, y + t.target / HALF) === FAIL) return FAIL;
+      var nx = x + w - t.target * (HALF + 1), next = control(S, V, { key: 'pick-next', label: '', act: 'budget:pick:1', role: 'title', component: 'DatePicker', bg: 'nav.background' }, nx, y, t.target, t.target); if (next === FAIL) return FAIL;
+      next.vm.label = 'Next month'; if (chevron(S, next, 'DatePicker', 'nav.next', 'right', nx + t.inset, y + t.target / HALF) === FAIL) return FAIL;
+      if (control(S, V, { key: 'pick-today', label: 'Today', act: 'budget:pick:today', role: 'secondary', component: 'DatePicker', bg: 'nav.background' }, x + w - t.target * HALF, y, t.target * HALF, t.target) === FAIL) return FAIL;
       if (S.line(V, V.node('pick-m'), { text: p.monthTitle, role: 'body', bold: true, ink: 'ink' }, x + w / HALF - t.inset, y + t.pickTitleDrop, w - t.target * HALF * (HALF + 1) + t.inset * HALF, 'center', { component: 'DatePicker' }) === FAIL) return FAIL;
       var gh = place('MiniMonth', S, V, { key: 'pmonth', month: p.month, sel: p.sel, today: p.today, days: p.days, risk: p.risk, prefix: 'p', act: 'budget:pickday:', strokeToday: false, gridTop: 'pickGridGap' }, x, y + t.target, w); if (gh === FAIL) return FAIL;
       var cur = y + t.target + gh + t.pickGridEnd;
@@ -14804,44 +15029,27 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       if (place('Note', S, V, { key: 'pick-n0', text: p.todayNote, role: 'secondary', ink: 'captionInk', drop: 'noteDrop', step: 'noteDrop' }, x, cur, w) === FAIL) return FAIL;
       if (p.selNote && place('Note', S, V, { key: 'pick-n1', text: p.selNote, role: 'secondary', ink: 'captionInk', drop: 'noteDrop', step: 'noteDrop' }, x, cur + t.noteStep, w) === FAIL) return FAIL;
       cur += t.pickNotesEnd + (p.selNote ? t.noteStep : 0);
-      if (rule(S, V, 'pick-end', x + t.inset, cur, w - t.inset * HALF, 'line') === FAIL) return FAIL;
+      if (rule(S, V, 'pick-end', 'DatePicker', 'pick.rule', 'line', x + t.inset, cur, w - t.inset * HALF) === FAIL) return FAIL;
       return cur + t.ruleGap - y; } });
 
 
   /* ---------- Phase 2: the screens' components (docs/design-system.md 6.1). Budget's day schedule, item page, forms, plan
    * alternatives, requirements, switch review, monthly expenses and cash are built only from these and the ones above. ---------- */
-  /* marks for choices: radio, check box and the preferred star */
-  function marks(S) { var t = tokens(S, ['markSize', 'markLine', 'checkRadius', 'checkStroke', 'checkX1', 'checkY1', 'checkX2', 'checkY2', 'checkX3', 'checkY3', 'starR', 'starInner']); if (t === FAIL) return FAIL;
-    var c = colours(S, ['accent', 'captionInk', 'mint', 'page']); if (c === FAIL) return FAIL;
-    var r = t.markSize / HALF;
-    return {
-      radio: function (n, cx, cy, on) { if (on) n.items.push(['rrect', cx - r, cy - r, t.markSize, t.markSize, r, c.accent]); else n.items.push(['border', cx - r, cy - r, t.markSize, t.markSize, r, t.markLine, c.captionInk]); },
-      check: function (n, cx, cy, on) { var x = cx - r, y = cy - r;
-        if (!on) { n.items.push(['border', x, y, t.markSize, t.markSize, t.checkRadius, t.markLine, c.captionInk]); return; }
-        n.items.push(['rrect', x, y, t.markSize, t.markSize, t.checkRadius, c.mint]);
-        n.items.push(['stroke', [['M', x + t.checkX1, y + t.checkY1], ['L', x + t.checkX2, y + t.checkY2], ['L', x + t.checkX3, y + t.checkY3]], c.page, { width: t.checkStroke, join: 'miter', cap: 'butt' }]); },
-      star: function (n, cx, cy, on) { var cmds = [], rot = -Math.PI / HALF;
-        for (var i = 0; i < STAR_POINTS; i++) { var a = rot + i * HALF * Math.PI / STAR_POINTS, b = rot + (i + 1 / HALF) * HALF * Math.PI / STAR_POINTS;
-          cmds.push([i ? 'L' : 'M', cx + Math.cos(a) * t.starR, cy + Math.sin(a) * t.starR]); cmds.push(['L', cx + Math.cos(b) * t.starR * t.starInner, cy + Math.sin(b) * t.starR * t.starInner]); }
-        cmds.push(['Z']); if (on) n.items.push(['path', cmds, c.accent]); n.items.push(['stroke', cmds, c.accent, { width: t.markLine, join: 'miter' }]); } };
-  }
-
   /* ---------- BackBar: the back control (chevron and where it goes) and an optional action on the right ---------- */
-  register({ name: 'BackBar', slots: ['bar.back', 'bar.action'], states: ['idle', 'hover', 'pressed', 'focus'],
+  register({ name: 'BackBar', slots: { 'bar.back': ['plain'], 'bar.chevron': ['left'], 'bar.action': ['plain'] }, states: ['idle', 'hover', 'pressed', 'focus'],
     fixtures: [{ key: 'bar', back: 'Home', backAct: 'nav:home' }, { key: 'bar', back: 'Add an item', backAct: 'add:choose', right: 'Continue to requirements', rightAct: 'save', rightBold: true }],
     bounds: function (S) { var t = tokens(S, ['pageTop', 'target']); if (t === FAIL) return FAIL; return bounds(fill(S, 'target', HALF + HALF), { mode: 'fixed', min: t.pageTop + t.target, max: t.pageTop + t.target }); },
     /* p: { key, back, backAct, right, rightAct, rightBold } */
     draw: function (S, V, p, x, y, w) { var t = tokens(S, ['pageTop', 'target', 'inset', 'barLabelGap', 'barRightMin', 'barRightPad', 'barGap', 'barBackMin', 'controlInset']); if (t === FAIL) return FAIL;
-      var c = colours(S, ['page', 'wash', 'ink']); if (c === FAIL) return FAIL; var G = glyphs(S); if (G === FAIL) return FAIL;
       var back = field(p, 'back', { component: 'BackBar' }); if (back === FAIL) return FAIL;
       var top = y + t.pageTop, rw = 0;
       if (p.right) { var bf = S.font(!!p.rightBold); if (bf === FAIL) return FAIL; var body = S.token('body'); if (body === FAIL) return FAIL;
         rw = Math.min(w - t.barBackMin, Math.max(t.barRightMin, S.measureText(bf, body, p.right) + t.barRightPad)); }
-      var bw = p.right ? w - rw - t.barGap : w, n = V.node(p.key + ':back'); n.items.push(['rect', x, top, bw, t.target, c.page]); n.base = c.page; n.hov = c.wash;
+      var bw = p.right ? w - rw - t.barGap : w, n = V.node(p.key + ':back'); if (art(S, n, 'BackBar', 'bar.back', 'plain', [x, top, bw, t.target]) === FAIL) return FAIL;
       if (hit(S, V, n, [x, top, bw, t.target], p.backAct, back, { component: 'BackBar' }) === FAIL) return FAIL;
-      G.left(n, x + t.inset, top + t.target / HALF, c.ink);
+      if (chevron(S, n, 'BackBar', 'bar.chevron', 'left', x + t.inset, top + t.target / HALF) === FAIL) return FAIL;
       if (S.centred(V, n, { text: back, role: 'body', ink: 'ink' }, [x, top, bw, t.target], x + t.inset + t.barLabelGap, bw - t.inset - t.barLabelGap - t.controlInset, { component: 'BackBar', id: n.id }) === FAIL) return FAIL;
-      if (p.right) { var r = V.node(p.key + ':right'), rx = x + w - rw; r.items.push(['rect', rx, top, rw, t.target, c.page]); r.base = c.page; r.hov = c.wash;
+      if (p.right) { var r = V.node(p.key + ':right'), rx = x + w - rw; if (art(S, r, 'BackBar', 'bar.action', 'plain', [rx, top, rw, t.target]) === FAIL) return FAIL;
         if (hit(S, V, r, [rx, top, rw, t.target], p.rightAct, p.right, { component: 'BackBar' }) === FAIL) return FAIL;
         var f = S.fit({ text: p.right, role: 'body', bold: !!p.rightBold, ink: 'ink', lines: { min: 1, max: 1 } }, { w: rw - t.controlInset, h: t.target }, { component: 'BackBar', id: r.id }); if (f === FAIL) return FAIL;
         S.paint(V, r, f, x + w - t.inset, S.centre(f, top, t.target), 'end', [rx, top, rw, t.target]); }
@@ -14873,17 +15081,17 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       return t.sectionDrop + (f.n - 1) * f.lh + t.sectionEnd; } });
 
   /* ---------- Divider: a full-width rule between a list and its total ---------- */
-  register({ name: 'Divider', slots: ['divider.rule'], states: ['idle'],
-    fixtures: [{ key: 'summary-rule', ink: 'divider' }],
-    bounds: function (S) { var t = S.token('dividerH'); if (t === FAIL) return FAIL; return bounds(fill(S, 'target', 1), { mode: 'fixed', min: t, max: t }); },
-    /* p: { key, ink (a colour token) } */
-    draw: function (S, V, p, x, y, w) { var t = tokens(S, ['inset', 'dividerTop', 'dividerH']); if (t === FAIL) return FAIL;
-      if (rule(S, V, p.key, x + t.inset, y + t.dividerTop, w - t.inset * HALF, p.ink) === FAIL) return FAIL;
-      return t.dividerH; } });
+  register({ name: 'Divider', slots: { 'divider.rule': ['divider', 'line'] }, states: ['idle'],
+    fixtures: [{ key: 'summary-rule', ink: 'divider', top: 'dividerTop', step: 'dividerH' }, { key: 'allday-end', ink: 'line', top: 'groupRuleGap', step: 'groupRuleStep' }],
+    bounds: function (S, p) { var t = S.token(p.step); if (t === FAIL) return FAIL; return bounds(fill(S, 'target', 1), { mode: 'fixed', min: t, max: t }); },
+    /* p: { key, ink (a colour token: the rule's variant), top (the token for the rule below y), step (the token for the height it takes) } */
+    draw: function (S, V, p, x, y, w) { var t = tokens(S, ['inset', p.top, p.step]); if (t === FAIL) return FAIL;
+      if (rule(S, V, p.key, 'Divider', 'divider.rule', p.ink, x + t.inset, y + t[p.top], w - t.inset * HALF) === FAIL) return FAIL;
+      return t[p.step]; } });
 
   /* ---------- Field: a form value that opens its editor. style 'line' (label left, value right, rule under),
    * 'box' (label above a full-width box) or 'amount' (label above a short box, the value at its end) ---------- */
-  register({ name: 'Field', slots: ['field.box', 'field.rule'], states: ['idle', 'hover', 'pressed', 'focus', 'disabled'],
+  register({ name: 'Field', slots: { 'field.box': ['plain'], 'field.rule': ['line'] }, states: ['idle', 'hover', 'pressed', 'focus', 'disabled'],
     fixtures: [{ key: 'f', style: 'line', label: 'Payee', value: '', placeholder: 'Add a payee', act: 'field:payee', bold: true },
       { key: 'g', style: 'box', label: 'Name', value: 'A name long enough that it has to shrink inside the box', placeholder: 'Add a name', act: 'field:name' },
       { key: 'h', style: 'amount', label: 'Amount (USD)', value: '1,234,567.00', placeholder: '0.00', act: 'field:amount', bold: true },
@@ -14891,8 +15099,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     bounds: function (S) { return bounds(fill(S, 'target', HALF), hug(S, 'fieldLineH', Infinity)); },
     /* p: { key, style, label, value, placeholder (shown when the value is empty), act (none: drawn, never tapped), bold } */
     draw: function (S, V, p, x, y, w) {
-      var t = tokens(S, ['inset', 'target', 'fieldLineH', 'fieldLineDrop', 'fieldLineHit', 'fieldRuleDrop', 'fieldValueGap', 'labelMin', 'fieldLabelDrop', 'fieldBoxTop', 'fieldBoxEnd', 'fieldPad', 'fieldRadius', 'amountW']); if (t === FAIL) return FAIL;
-      var c = colours(S, ['line', 'page', 'wash']); if (c === FAIL) return FAIL;
+      var t = tokens(S, ['inset', 'target', 'fieldLineH', 'fieldLineDrop', 'fieldLineHit', 'fieldRuleDrop', 'fieldValueGap', 'labelMin', 'fieldLabelDrop', 'fieldBoxTop', 'fieldBoxEnd', 'fieldPad', 'amountW']); if (t === FAIL) return FAIL;
       var label = field(p, 'label', { component: 'Field' }); if (label === FAIL) return FAIL;
       var value = field(p, 'value', { component: 'Field' }); if (value === FAIL) return FAIL;
       var shown = value === '' ? p.placeholder : value, n = V.node(p.key), where = { component: 'Field', id: n.id };
@@ -14901,12 +15108,12 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         var base = y + t.fieldLineDrop, lab = S.line(V, V.node(p.key + ':label'), { text: label, role: 'secondary', ink: 'captionInk' }, x + t.inset, base, w / HALF - t.inset, 'start', where); if (lab === FAIL) return FAIL;
         var lw = V.texts[V.texts.length - 1].width;
         if (shown !== '' && S.line(V, n, { text: shown, role: 'body', bold: !!p.bold, ink: 'ink' }, x + w - t.inset, base, Math.max(t.labelMin, w - t.inset * HALF - lw - t.fieldValueGap), 'end', where) === FAIL) return FAIL;
-        if (rule(S, V, p.key + ':rule', x + t.inset, base + t.fieldRuleDrop, w - t.inset * HALF, 'line') === FAIL) return FAIL;
+        if (rule(S, V, p.key + ':rule', 'Field', 'field.rule', 'line', x + t.inset, base + t.fieldRuleDrop, w - t.inset * HALF) === FAIL) return FAIL;
         if (p.act && hit(S, V, n, [x, base - t.fieldLineHit, w, t.target], p.act, label, where) === FAIL) return FAIL;
         return t.fieldLineH; }
       var amount = p.style === 'amount', bx = x + t.inset, by = y + t.fieldBoxTop, bw = amount ? t.amountW : w - t.inset * HALF;
       if (S.line(V, V.node(p.key + ':label'), { text: label, role: 'secondary', ink: 'captionInk' }, x + t.inset, y + t.fieldLabelDrop, w - t.inset * HALF, 'start', where) === FAIL) return FAIL;
-      n.items.push(['rect', bx, by, bw, t.target, c.page]); n.items.push(['border', bx, by, bw, t.target, t.fieldRadius, 1, c.line]); n.base = c.page; n.hov = c.wash;
+      if (art(S, n, 'Field', 'field.box', 'plain', [bx, by, bw, t.target]) === FAIL) return FAIL;
       if (shown !== '') { var f = S.fit({ text: shown, role: 'body', bold: !!p.bold, ink: 'ink', lines: { min: 1, max: 1 } }, { w: bw - t.fieldPad * HALF, h: t.target }, where); if (f === FAIL) return FAIL;
         S.paint(V, n, f, amount ? bx + bw - t.fieldPad : bx + t.fieldPad, S.centre(f, by, t.target), amount ? 'end' : 'start', [bx, by, bw, t.target]); }
       if (p.act && hit(S, V, n, [bx, by, bw, t.target], p.act, label, where) === FAIL) return FAIL;
@@ -14914,7 +15121,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
 
   /* ---------- Choice: one option of a list. mark 'radio' | 'check' | 'star' | 'none', a tag on the right, an optional
    * chevron; the text wraps and makes the row taller. quiet: drawn in caption ink and not tappable ---------- */
-  register({ name: 'Choice', slots: ['choice.mark', 'choice.background', 'choice.rule', 'choice.chevron'], states: ['idle', 'hover', 'pressed', 'selected', 'disabled', 'focus'],
+  register({ name: 'Choice', slots: { 'choice.background': ['plain'], 'choice.mark': ['radio-on', 'radio-off', 'check-on', 'check-off', 'star-on', 'star-off'], 'choice.chevron': ['right'], 'choice.rule': ['lineSoft'] }, states: ['idle', 'hover', 'pressed', 'selected', 'disabled', 'focus'],
     fixtures: [{ key: 'c1', text: 'Does not repeat', mark: 'radio', on: true, act: 'repeat:none', height: 'target' },
       { key: 'c2', text: 'An alternative with a very long name that wraps onto a second line', mark: 'check', on: true, tag: 'in use', act: 'choose:x', height: 'row' },
       { key: 'c3', text: 'Tesla', mark: 'star', on: true, tag: 'Preferred', tagInk: 'mintInk', act: 'choose:t', height: 'row' },
@@ -14925,56 +15132,50 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     draw: function (S, V, p, x, y, w) {
       var t = tokens(S, ['inset', 'markIndent', 'markSize', 'tagRoom', 'chevronRoom', 'chevronMargin', 'controlInset']); if (t === FAIL) return FAIL;
       var h0 = S.token(p.height); if (h0 === FAIL) return FAIL;
-      var c = colours(S, ['page', 'wash', 'captionInk']); if (c === FAIL) return FAIL;
-      var G = glyphs(S); if (G === FAIL) return FAIL; var M = marks(S); if (M === FAIL) return FAIL;
       var text = field(p, 'text', { component: 'Choice' }); if (text === FAIL) return FAIL;
       var n = V.node(p.key), where = { component: 'Choice', id: n.id }, marked = p.mark !== 'none', tx = x + t.inset + (marked ? t.markIndent : NO_ROOM);
       var right = p.tag ? t.tagRoom : p.chevron ? t.chevronRoom : t.inset, ink = p.quiet ? 'captionInk' : 'ink', lh0 = S.fit({ text: text, role: 'body', bold: !!p.bold, ink: ink, lines: { min: 1, max: 1 } }, { w: Infinity, h: h0 }, where); if (lh0 === FAIL) return FAIL;
       var base = S.centre(lh0, y, h0), f = S.para(V, n, { text: text, role: 'body', bold: !!p.bold, ink: ink }, tx, base, x + w - right - tx, Infinity, where); if (f === FAIL) return FAIL;
       var rh = h0 + (f.n - 1) * f.lh, cy = y + h0 / HALF;
-      n.items.unshift(['rect', x, y, w, rh, c.page]); n.base = c.page; n.hov = c.wash;
-      if (p.mark === 'radio') M.radio(n, x + t.inset + t.markSize / HALF, cy, !!p.on);
-      if (p.mark === 'check') M.check(n, x + t.inset + t.markSize / HALF, cy, !!p.on);
-      if (p.mark === 'star') M.star(n, x + t.inset + t.markSize / HALF, cy, !!p.on);
+      if (art(S, n, 'Choice', 'choice.background', 'plain', [x, y, w, rh], 0) === FAIL) return FAIL;
+      if (marked && glyph(S, n, 'Choice', 'choice.mark', p.mark + (p.on ? '-on' : '-off'), x + t.inset + t.markSize / HALF, cy, 'markBox') === FAIL) return FAIL;
       if (p.tag && S.line(V, V.node(p.key + ':tag'), { text: p.tag, role: 'secondary', ink: p.tagInk ? p.tagInk : 'captionInk' }, x + w - t.inset, base, t.tagRoom - t.controlInset, 'end', where) === FAIL) return FAIL;
-      if (p.chevron) G.right(n, x + w - t.chevronMargin, y + rh / HALF, c.captionInk);
+      if (p.chevron && chevron(S, n, 'Choice', 'choice.chevron', 'right', x + w - t.chevronMargin, y + rh / HALF) === FAIL) return FAIL;
       if (!p.quiet && hit(S, V, n, [x, y, w, rh], p.act, text, where) === FAIL) return FAIL;
-      if (rule(S, V, p.key + ':rule', x + t.inset, y + rh - 1, w - t.inset * HALF, 'lineSoft') === FAIL) return FAIL;
+      if (rule(S, V, p.key + ':rule', 'Choice', 'choice.rule', 'lineSoft', x + t.inset, y + rh - 1, w - t.inset * HALF) === FAIL) return FAIL;
       return rh; } });
 
   /* ---------- Every: "Every [n] days", the box opens the number ---------- */
-  register({ name: 'Every', slots: ['field.box'], states: ['idle', 'hover', 'pressed', 'focus'],
+  register({ name: 'Every', slots: { 'every.box': ['plain'] }, states: ['idle', 'hover', 'pressed', 'focus'],
     fixtures: [{ key: 'every', value: '14', act: 'field:every' }, { key: 'every', value: '365', act: 'field:every' }],
     bounds: function (S) { return bounds(fill(S, 'target', HALF + HALF), hug(S, 'everyH', Infinity)); },
-    draw: function (S, V, p, x, y, w) { var t = tokens(S, ['inset', 'target', 'everyH', 'everyBoxX', 'everyBoxW', 'everyAfter', 'fieldRadius', 'fieldPad']); if (t === FAIL) return FAIL;
-      var c = colours(S, ['line', 'page', 'wash']); if (c === FAIL) return FAIL;
+    draw: function (S, V, p, x, y, w) { var t = tokens(S, ['inset', 'target', 'everyH', 'everyBoxX', 'everyBoxW', 'everyAfter', 'fieldPad']); if (t === FAIL) return FAIL;
       var value = field(p, 'value', { component: 'Every' }); if (value === FAIL) return FAIL;
       var n = V.node(p.key), bx = x + t.everyBoxX, where = { component: 'Every', id: n.id };
       var f = S.fit({ text: 'Every', role: 'body', ink: 'ink', lines: { min: 1, max: 1 } }, { w: t.everyBoxX - t.inset, h: t.target }, where); if (f === FAIL) return FAIL;
       var base = S.centre(f, y, t.target); S.paint(V, V.node(p.key + ':a'), f, x + t.inset, base, 'start', [x + t.inset, y, t.everyBoxX - t.inset, t.target]);
-      n.items.push(['rect', bx, y, t.everyBoxW, t.target, c.page]); n.items.push(['border', bx, y, t.everyBoxW, t.target, t.fieldRadius, 1, c.line]); n.base = c.page; n.hov = c.wash;
+      if (art(S, n, 'Every', 'every.box', 'plain', [bx, y, t.everyBoxW, t.target]) === FAIL) return FAIL;
       if (S.line(V, n, { text: value, role: 'body', bold: true, ink: 'ink' }, bx + t.everyBoxW / HALF, base, t.everyBoxW - t.fieldPad, 'center', where) === FAIL) return FAIL;
       if (S.line(V, V.node(p.key + ':b'), { text: 'days', role: 'body', ink: 'ink' }, bx + t.everyBoxW + t.everyAfter, base, w - t.everyBoxX - t.everyBoxW - t.everyAfter - t.inset, 'start', where) === FAIL) return FAIL;
       if (hit(S, V, n, [bx, y, t.everyBoxW, t.target], p.act, 'Every n days', where) === FAIL) return FAIL;
       return t.everyH; } });
 
   /* ---------- Toggle: two segments, the one in effect washed ---------- */
-  register({ name: 'Toggle', slots: ['toggle.segment'], states: ['idle', 'pressed', 'selected'],
+  register({ name: 'Toggle', slots: { 'toggle.segment': ['on', 'off'] }, states: ['idle', 'pressed', 'selected'],
     fixtures: [{ key: 'tg', left: 'Percent', right: 'Fixed', on: 'left', leftAct: 'ded:kind:0:percent', rightAct: 'ded:kind:0:fixed' }],
     bounds: function (S) { var t = tokens(S, ['toggleW', 'target']); if (t === FAIL) return FAIL; return bounds({ mode: 'fixed', min: t.toggleW * HALF, max: t.toggleW * HALF }, { mode: 'fixed', min: t.target, max: t.target }); },
     /* p: { key, left, right, on ('left' | 'right'), leftAct, rightAct } */
-    draw: function (S, V, p, x, y, w) { var t = tokens(S, ['toggleW', 'toggleH', 'target', 'fieldRadius', 'controlInset']); if (t === FAIL) return FAIL;
-      var c = colours(S, ['line', 'wash', 'page']); if (c === FAIL) return FAIL;
+    draw: function (S, V, p, x, y, w) { var t = tokens(S, ['toggleW', 'toggleH', 'target', 'controlInset']); if (t === FAIL) return FAIL;
       var top = y + (t.target - t.toggleH) / HALF, sides = [['left', p.left, p.leftAct], ['right', p.right, p.rightAct]];
       for (var i = 0; i < sides.length; i++) { var sx = x + i * t.toggleW, on = p.on === sides[i][0], n = V.node(p.key + ':' + sides[i][0]);
-        n.items.push(['rect', sx, top, t.toggleW, t.toggleH, on ? c.wash : c.page]); n.items.push(['border', sx, top, t.toggleW, t.toggleH, t.fieldRadius, 1, c.line]);
+        if (art(S, n, 'Toggle', 'toggle.segment', on ? 'on' : 'off', [sx, top, t.toggleW, t.toggleH]) === FAIL) return FAIL;
         if (S.centred(V, n, { text: sides[i][1], role: 'secondary', bold: on, ink: 'ink' }, [sx, top, t.toggleW, t.toggleH], sx + t.controlInset, t.toggleW - t.controlInset * HALF, { component: 'Toggle', id: n.id }) === FAIL) return FAIL;
         var drawn = V.texts[V.texts.length - 1], dx = (t.toggleW - drawn.width) / HALF - t.controlInset; n.items[n.items.length - 1][1] += dx; drawn.x += dx;
         if (hit(S, V, n, [sx, y, t.toggleW, t.target], sides[i][2], sides[i][1], { component: 'Toggle' }) === FAIL) return FAIL; }
       return t.target; } });
 
   /* ---------- Pair: a name and a value on one line; a deduction row adds its Percent | Fixed toggle and taps on both sides ---------- */
-  register({ name: 'Pair', slots: ['pair.rule'], states: ['idle', 'hover', 'pressed'],
+  register({ name: 'Pair', slots: NONE, states: ['idle', 'hover', 'pressed'],
     fixtures: [{ key: 'p', left: 'Take-home pay', right: '2,239.00', role: 'body', bold: true, rightBold: true, height: 'pairH' },
       { key: 'q', left: 'Federal tax withholding with a long name', right: '12%', role: 'body', bold: true, rightBold: true, height: 'deductionH', toggle: 'percent', idx: 0, valueAct: 'ded:value:0', nameAct: 'ded:name:0' },
       { key: 'r', left: 'Subtotal', right: '1,234,567.00', role: 'secondary', rightRole: 'body', leftInk: 'muted', height: 'pairH' }],
@@ -14994,32 +15195,30 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       return rh; } });
 
   /* ---------- PrimaryBand: the one primary action, a full-width mint band; washed and not tappable while it can't be done ---------- */
-  register({ name: 'PrimaryBand', slots: ['primary.background'], states: ['idle', 'hover', 'pressed', 'disabled', 'focus'],
+  register({ name: 'PrimaryBand', slots: { 'primary.background': ['enabled', 'disabled'] }, states: ['idle', 'hover', 'pressed', 'disabled', 'focus'],
     fixtures: [{ key: 'accept', label: 'Accept', act: 'accept', enabled: true }, { key: 'accept', label: 'Accept', act: 'accept', enabled: false }],
     bounds: function (S) { var t = S.token('target'); if (t === FAIL) return FAIL; return bounds(fill(S, 'target', HALF), { mode: 'fixed', min: t, max: t }); },
-    draw: function (S, V, p, x, y, w) { var t = tokens(S, ['inset', 'target', 'fieldRadius', 'controlInset']); if (t === FAIL) return FAIL;
-      var c = colours(S, ['mint', 'wash', 'line']); if (c === FAIL) return FAIL;
+    draw: function (S, V, p, x, y, w) { var t = tokens(S, ['inset', 'target', 'controlInset']); if (t === FAIL) return FAIL;
       var label = field(p, 'label', { component: 'PrimaryBand' }); if (label === FAIL) return FAIL;
       var n = V.node(p.key), bx = x + t.inset, bw = w - t.inset * HALF, where = { component: 'PrimaryBand', id: n.id };
-      n.items.push(['rect', bx, y, bw, t.target, p.enabled ? c.mint : c.wash]); if (!p.enabled) n.items.push(['border', bx, y, bw, t.target, t.fieldRadius, 1, c.line]);
+      if (art(S, n, 'PrimaryBand', 'primary.background', p.enabled ? 'enabled' : 'disabled', [bx, y, bw, t.target]) === FAIL) return FAIL;
       var f = S.fit({ text: label, role: 'body', bold: true, ink: p.enabled ? 'ink' : 'captionInk', lines: { min: 1, max: 1 } }, { w: bw - t.controlInset * HALF, h: t.target }, where); if (f === FAIL) return FAIL;
       S.paint(V, n, f, bx + bw / HALF, S.centre(f, y, t.target), 'center', [bx, y, bw, t.target]);
       if (p.enabled && hit(S, V, n, [bx, y, bw, t.target], p.act, label, where) === FAIL) return FAIL;
       return t.target; } });
 
   /* ---------- TimePicker: the hour grid and the quarter-hour row ---------- */
-  register({ name: 'TimePicker', slots: ['time.cell', 'time.selected'], states: ['idle', 'hover', 'pressed', 'selected'],
+  register({ name: 'TimePicker', slots: { 'time.cell': ['on', 'off'] }, states: ['idle', 'hover', 'pressed', 'selected'],
     fixtures: [{ key: 'tp', value: '07:00' }, { key: 'tp', value: '23:45' }, { key: 'tp', value: '' }],
     bounds: function (S) { return bounds(fill(S, 'target', HALF + HALF), hug(S, 'target', Infinity)); },
     /* p: { key, value ('HH:MM', or '' while no time is set: nothing is selected) } */
     draw: function (S, V, p, x, y, w) { var t = tokens(S, ['inset', 'target', 'timeCols', 'timeLabelDrop', 'timeLabelH', 'timeGap']); if (t === FAIL) return FAIL;
-      var c = colours(S, ['wash', 'page']); if (c === FAIL) return FAIL;
       var value = field(p, 'value', { component: 'TimePicker' }); if (value === FAIL) return FAIL;
       var none = value === '', hh = none ? -1 : +value.slice(0, HALF), mm = none ? '' : value.slice(HALF + 1), gw = w - t.inset * HALF, cw = gw / t.timeCols, where = { component: 'TimePicker' };
       if (S.line(V, V.node(p.key + ':hl'), { text: 'Hour', role: 'secondary', ink: 'captionInk' }, x + t.inset, y + t.timeLabelDrop, gw, 'start', where) === FAIL) return FAIL;
       var top = y + t.timeLabelH;
       for (var h = 0; h < DAY_HOURS; h++) { var cx = x + t.inset + (h % t.timeCols) * cw, cy = top + Math.floor(h / t.timeCols) * t.target, lab = String(h).padStart(HALF, '0'), on = h === hh, n = V.node(p.key + ':h' + lab);
-        n.items.push(['rect', cx, cy, cw, t.target, on ? c.wash : c.page]); n.base = on ? c.wash : c.page; n.hov = c.wash;
+        if (art(S, n, 'TimePicker', 'time.cell', on ? 'on' : 'off', [cx, cy, cw, t.target]) === FAIL) return FAIL;
         if (S.centred(V, n, { text: lab, role: 'secondary', bold: on, ink: 'ink' }, [cx, cy, cw, t.target], cx, cw, where) === FAIL) return FAIL;
         var d = V.texts[V.texts.length - 1], dx = (cw - d.width) / HALF; n.items[n.items.length - 1][1] += dx; d.x += dx;
         if (hit(S, V, n, [cx, cy, cw, t.target], 'time:hour:' + lab, lab, where) === FAIL) return FAIL; }
@@ -15027,66 +15226,62 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       if (S.line(V, V.node(p.key + ':ml'), { text: 'Minute', role: 'secondary', ink: 'captionInk' }, x + t.inset, my + t.timeLabelDrop, gw, 'start', where) === FAIL) return FAIL;
       my += t.timeLabelH;
       for (var i = 0; i < quarters.length; i++) { var qx = x + t.inset + i * qw, qon = quarters[i] === mm, m = V.node(p.key + ':m' + quarters[i]);
-        m.items.push(['rect', qx, my, qw, t.target, qon ? c.wash : c.page]); m.base = qon ? c.wash : c.page; m.hov = c.wash;
+        if (art(S, m, 'TimePicker', 'time.cell', qon ? 'on' : 'off', [qx, my, qw, t.target]) === FAIL) return FAIL;
         if (S.centred(V, m, { text: quarters[i], role: 'body', bold: qon, ink: 'ink' }, [qx, my, qw, t.target], qx, qw, where) === FAIL) return FAIL;
         var e = V.texts[V.texts.length - 1], ex = (qw - e.width) / HALF; m.items[m.items.length - 1][1] += ex; e.x += ex;
         if (hit(S, V, m, [qx, my, qw, t.target], 'time:min:' + quarters[i], quarters[i], where) === FAIL) return FAIL; }
       return my + t.target - y; } });
 
   /* ---------- FieldDatePicker: a form's date field opened: month browse, the month, Today and Dismiss ---------- */
-  register({ name: 'FieldDatePicker', slots: ['nav.prev', 'nav.next', 'day.background', 'day.mark', 'day.today', 'day.selected'], states: ['idle', 'hover', 'pressed'],
+  register({ name: 'FieldDatePicker', slots: { 'nav.background': ['plain'], 'nav.prev': ['left'], 'nav.next': ['right'] }, states: ['idle', 'hover', 'pressed'],
     fixtures: [{ key: 'fp', month: '2026-08', monthTitle: 'August 2026', sel: '2026-08-14', today: '2026-11-14', days: ['2026-08-01', '2026-08-02', '2026-08-03', '2026-08-04', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09', '2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14', '2026-08-15', '2026-08-16', '2026-08-17', '2026-08-18', '2026-08-19', '2026-08-20', '2026-08-21', '2026-08-22', '2026-08-23', '2026-08-24', '2026-08-25', '2026-08-26', '2026-08-27', '2026-08-28', '2026-08-29', '2026-08-30', '2026-08-31'], risk: {}, prefix: 'fpdate' }],
     bounds: function (S) { return bounds(fill(S, 'target', WEEK), hug(S, 'target', Infinity)); },
     draw: function (S, V, p, x, y, w) { var t = tokens(S, ['target', 'inset', 'pickNavW', 'pickTitleDrop', 'pickGridEnd', 'barGap']); if (t === FAIL) return FAIL;
-      var c = colours(S, ['ink']); if (c === FAIL) return FAIL; var G = glyphs(S); if (G === FAIL) return FAIL;
       var month = field(p, 'month', { component: 'FieldDatePicker' }); if (month === FAIL) return FAIL;
-      var prev = control(S, V, { key: p.prefix + ':prev', label: '', act: 'month:-1', role: 'body', component: 'FieldDatePicker' }, x, y, t.pickNavW, t.target); if (prev === FAIL) return FAIL;
-      prev.vm.label = 'Previous month'; G.left(prev, x + t.inset, y + t.target / HALF, c.ink);
-      var next = control(S, V, { key: p.prefix + ':next', label: '', act: 'month:1', role: 'body', component: 'FieldDatePicker' }, x + w - t.pickNavW, y, t.pickNavW, t.target); if (next === FAIL) return FAIL;
-      next.vm.label = 'Next month'; G.right(next, x + w - t.inset, y + t.target / HALF, c.ink);
+      var prev = control(S, V, { key: p.prefix + ':prev', label: '', act: 'month:-1', role: 'body', component: 'FieldDatePicker', bg: 'nav.background' }, x, y, t.pickNavW, t.target); if (prev === FAIL) return FAIL;
+      prev.vm.label = 'Previous month'; if (chevron(S, prev, 'FieldDatePicker', 'nav.prev', 'left', x + t.inset, y + t.target / HALF) === FAIL) return FAIL;
+      var next = control(S, V, { key: p.prefix + ':next', label: '', act: 'month:1', role: 'body', component: 'FieldDatePicker', bg: 'nav.background' }, x + w - t.pickNavW, y, t.pickNavW, t.target); if (next === FAIL) return FAIL;
+      next.vm.label = 'Next month'; if (chevron(S, next, 'FieldDatePicker', 'nav.next', 'right', x + w - t.inset, y + t.target / HALF) === FAIL) return FAIL;
       if (S.line(V, V.node(p.prefix + ':m'), { text: p.monthTitle, role: 'body', bold: true, ink: 'ink' }, x + w / HALF, y + t.pickTitleDrop, w - t.pickNavW * HALF, 'center', { component: 'FieldDatePicker' }) === FAIL) return FAIL;
       var gh = place('MiniMonth', S, V, { key: p.prefix + ':month', month: month, sel: p.sel, today: p.today, days: p.days, risk: p.risk, prefix: p.prefix, act: 'budget:pickday:', strokeToday: false, gridTop: 'pickGridGap' }, x, y + t.target, w); if (gh === FAIL) return FAIL;
       var by = y + t.target + gh + t.pickGridEnd, half = (w - t.barGap) / HALF;
-      if (control(S, V, { key: p.prefix + ':today', label: 'Today', act: 'budget:pick:today', role: 'body', component: 'FieldDatePicker' }, x, by, half, t.target) === FAIL) return FAIL;
-      if (control(S, V, { key: p.prefix + ':dismiss', label: 'Dismiss', act: 'date-field:dismiss', role: 'body', component: 'FieldDatePicker' }, x + w - half, by, half, t.target) === FAIL) return FAIL;
+      if (control(S, V, { key: p.prefix + ':today', label: 'Today', act: 'budget:pick:today', role: 'body', component: 'FieldDatePicker', bg: 'nav.background' }, x, by, half, t.target) === FAIL) return FAIL;
+      if (control(S, V, { key: p.prefix + ':dismiss', label: 'Dismiss', act: 'date-field:dismiss', role: 'body', component: 'FieldDatePicker', bg: 'nav.background' }, x + w - half, by, half, t.target) === FAIL) return FAIL;
       return by + t.target - y; } });
 
   /* ---------- HourRow: one hour of the day schedule, or the All day group: each item a row with time, name, cadence and
    * amount; the selected item washed with the accent bar; an empty hour shows its label only ---------- */
-  register({ name: 'HourRow', slots: ['row.background', 'row.selected', 'row.rule'], states: ['idle', 'hover', 'pressed', 'selected'],
+  register({ name: 'HourRow', slots: { 'row.background': ['on', 'off'], 'row.rule': ['lineSoft'] }, states: ['idle', 'hover', 'pressed', 'selected'],
     fixtures: [{ key: 'h8', hour: '08:00', events: [{ id: 'a', name: 'Take the bus to the office on the long way round', time: '08:15', amount: '1,234.00', cadence: 'Every 14 days', on: true }, { id: 'b', name: 'Coffee', time: '08:45', amount: '4.50', cadence: '', on: false }] },
       { key: 'h9', hour: '09:00', events: [] }],
     bounds: function (S) { return bounds(fill(S, 'target', HALF + HALF), hug(S, 'row', Infinity)); },
     /* p: { key, hour (its label, or '' for the All day group), events: [{ id, name, time, amount, cadence, on }] } */
     draw: function (S, V, p, x, y, w) {
-      var t = tokens(S, ['inset', 'row', 'rowDrop', 'hourTimeX', 'hourNameX', 'cadenceGap', 'labelMin', 'selectBar', 'selectInset', 'controlInset']); if (t === FAIL) return FAIL;
-      var c = colours(S, ['wash', 'accent', 'page']); if (c === FAIL) return FAIL;
+      var t = tokens(S, ['inset', 'row', 'rowDrop', 'hourTimeX', 'hourNameX', 'cadenceGap', 'labelMin', 'controlInset']); if (t === FAIL) return FAIL;
       var events = field(p, 'events', { component: 'HourRow' }); if (events === FAIL) return FAIL;
       var cur = y, right = x + w - t.inset;
       if (!events.length) { if (S.line(V, V.node(p.key), { text: p.hour, role: 'secondary', ink: 'muted' }, x + t.hourTimeX, y + t.rowDrop, t.hourTimeX - t.inset, 'end', { component: 'HourRow' }) === FAIL) return FAIL; cur += t.row; }
       for (var i = 0; i < events.length; i++) { var e = events[i], n = V.node('event:' + e.id), where = { component: 'HourRow', id: n.id }, base = cur + t.rowDrop, on = !!e.on;
-        n.items.push(['rect', x, cur, w, t.row, on ? c.wash : c.page]); n.base = on ? c.wash : c.page; n.hov = c.wash;
-        if (on) n.items.push(['rect', x, cur + t.selectInset, t.selectBar, t.row - t.selectInset * HALF, c.accent]);
         var label = e.time !== '' ? e.time : p.hour;
         if (label !== '' && S.line(V, n, { text: label, role: 'secondary', bold: on, ink: on ? 'ink' : 'muted' }, x + t.hourTimeX, base, t.hourTimeX - t.inset, 'end', where) === FAIL) return FAIL;
         var aw = 0; if (e.amount !== '') { if (S.line(V, n, { text: e.amount, role: 'body', bold: on, ink: 'ink' }, right, base, w / HALF - t.inset, 'end', where) === FAIL) return FAIL; aw = V.texts[V.texts.length - 1].width + t.cadenceGap; }
         var cw = 0; if (e.cadence !== '') { if (S.line(V, n, { text: e.cadence, role: 'secondary', ink: 'captionInk' }, right - aw, base, Math.max(t.labelMin, w - t.hourNameX - aw - t.inset - t.labelMin), 'end', where) === FAIL) return FAIL; cw = V.texts[V.texts.length - 1].width + t.cadenceGap; }
         var f = S.para(V, n, { text: e.name, role: 'body', bold: on, ink: 'ink' }, x + t.hourNameX, base, Math.max(t.labelMin, right - aw - cw - x - t.hourNameX), Infinity, where); if (f === FAIL) return FAIL;
-        var rh = t.row + (f.n - 1) * f.lh; n.items[0][4] = rh; if (on) n.items[1][4] = rh - t.selectInset * HALF;
+        var rh = t.row + (f.n - 1) * f.lh; if (art(S, n, 'HourRow', 'row.background', on ? 'on' : 'off', [x, cur, w, rh], 0) === FAIL) return FAIL;
         if (hit(S, V, n, [x, cur, w, rh], 'entry:' + e.id, e.name, where) === FAIL) return FAIL;
         cur += rh; }
-      if (rule(S, V, p.key + ':rule', x + t.inset, cur - 1, w - t.inset * HALF, 'lineSoft') === FAIL) return FAIL;
+      if (rule(S, V, p.key + ':rule', 'HourRow', 'row.rule', 'lineSoft', x + t.inset, cur - 1, w - t.inset * HALF) === FAIL) return FAIL;
       return cur - y; } });
 
   /* ---------- AmountRow: a ledger or cash row: an optional lead (the date), the name with an optional line under it, the
    * amount at the end; it opens its day ---------- */
-  register({ name: 'AmountRow', slots: ['row.background', 'row.rule'], states: ['idle', 'hover', 'pressed'],
+  register({ name: 'AmountRow', slots: { 'row.background': ['plain'], 'row.rule': ['lineSoft'] }, states: ['idle', 'hover', 'pressed'],
     fixtures: [{ key: 'r0', lead: 'Nov 1', name: 'Rent to a landlord with a long name that wraps', amount: '1,200.00', act: 'date:2026-11-01', height: 'ledgerRow' },
       { key: 'r1', name: 'Checking account', sub: 'as of Aug 1', amount: '1,234,567.00', act: 'date:2026-08-01', height: 'cashRow' }],
     bounds: function (S) { return bounds(fill(S, 'target', HALF + HALF), hug(S, 'target', Infinity)); },
     /* p: { key, lead, name, sub, amount, act, height (a size token) } */
     draw: function (S, V, p, x, y, w) { var t = tokens(S, ['inset', 'target', 'leadW', 'cadenceGap', 'labelMin', 'subRise', 'rowDrop']); if (t === FAIL) return FAIL;
-      var h0 = S.token(p.height); if (h0 === FAIL) return FAIL; var c = colours(S, ['page', 'wash']); if (c === FAIL) return FAIL;
+      var h0 = S.token(p.height); if (h0 === FAIL) return FAIL;
       var name = field(p, 'name', { component: 'AmountRow' }); if (name === FAIL) return FAIL;
       var amount = field(p, 'amount', { component: 'AmountRow' }); if (amount === FAIL) return FAIL;
       var n = V.node(p.key), where = { component: 'AmountRow', id: n.id }, right = x + w - t.inset, sub = p.sub != null && p.sub !== '', base = sub ? y + h0 / HALF - t.subRise / HALF : y + t.rowDrop;
@@ -15097,46 +15292,43 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
       var f = S.para(V, n, { text: name, role: 'body', ink: 'ink' }, nx, base, Math.max(t.labelMin, right - aw - nx), Infinity, where); if (f === FAIL) return FAIL;
       var rh = h0 + (f.n - 1) * f.lh;
       if (sub && S.line(V, n, { text: p.sub, role: 'secondary', ink: 'muted' }, nx, base + (f.n - 1) * f.lh + t.subRise, Math.max(t.labelMin, right - aw - nx), 'start', where) === FAIL) return FAIL;
-      n.items.unshift(['rect', x, y, w, rh, c.page]); n.base = c.page; n.hov = c.wash;
+      if (art(S, n, 'AmountRow', 'row.background', 'plain', [x, y, w, rh], 0) === FAIL) return FAIL;
       if (hit(S, V, n, [x, y, w, rh], p.act, name, where) === FAIL) return FAIL;
-      if (rule(S, V, p.key + ':rule', x + t.inset, y + rh - 1, w - t.inset * HALF, 'lineSoft') === FAIL) return FAIL;
+      if (rule(S, V, p.key + ':rule', 'AmountRow', 'row.rule', 'lineSoft', x + t.inset, y + rh - 1, w - t.inset * HALF) === FAIL) return FAIL;
       return rh; } });
 
   /* ---------- MonthHeading: the month, title size, with the chevron that opens the shared picker ---------- */
-  register({ name: 'MonthHeading', slots: ['heading.chevron', 'heading.background'], states: ['idle', 'hover', 'pressed', 'focus'],
+  register({ name: 'MonthHeading', slots: { 'heading.background': ['plain'], 'heading.chevron': ['down'] }, states: ['idle', 'hover', 'pressed', 'focus'],
     fixtures: [{ key: 'ledger-date', title: 'November 2026' }],
     bounds: function (S) { var t = S.token('target'); if (t === FAIL) return FAIL; return bounds(fill(S, 'target', HALF), { mode: 'fixed', min: t, max: t }); },
     draw: function (S, V, p, x, y, w) { var t = tokens(S, ['target', 'dateChevronGap', 'dateChevronMargin', 'inset', 'chevronW']); if (t === FAIL) return FAIL;
-      var c = colours(S, ['captionInk']); if (c === FAIL) return FAIL; var G = glyphs(S); if (G === FAIL) return FAIL;
       var title = field(p, 'title', { component: 'MonthHeading' }); if (title === FAIL) return FAIL;
-      var n = control(S, V, { key: p.key, label: title, act: 'journal:date', chevron: false, role: 'title', bold: true, component: 'MonthHeading' }, x, y, w, t.target); if (n === FAIL) return FAIL;
+      var n = control(S, V, { key: p.key, label: title, act: 'journal:date', chevron: false, role: 'title', bold: true, component: 'MonthHeading', bg: 'heading.background' }, x, y, w, t.target); if (n === FAIL) return FAIL;
       n.vm.hoverDate = true;
-      var drawn = V.texts[V.texts.length - 1]; G.down(n, Math.min(x + w - t.dateChevronMargin, drawn.x + drawn.width + t.dateChevronGap), y + t.target / HALF - t.chevronW / HALF, c.captionInk);
+      var drawn = V.texts[V.texts.length - 1]; if (chevron(S, n, 'MonthHeading', 'heading.chevron', 'down', Math.min(x + w - t.dateChevronMargin, drawn.x + drawn.width + t.dateChevronGap), y + t.target / HALF - t.chevronW / HALF) === FAIL) return FAIL;
       return t.target; } });
 
   /* ---------- BeforeAfter: a plan's steps before or after a switch; the step that changes is tinted (wash before,
    * mint after) and, after, lists its requirements' answers ---------- */
-  register({ name: 'BeforeAfter', slots: ['step.background', 'step.changed'], states: ['idle'],
+  register({ name: 'BeforeAfter', slots: { 'step.changed': ['wash', 'mint'] }, states: ['idle'],
     fixtures: [{ key: 'before', label: 'Before', tint: 'wash', after: false, steps: [{ id: 's1', name: 'Commute to the office', use: 'Drive to work', changed: true, reqs: [] }, { id: 's2', name: 'Groceries', use: 'Groceries', changed: false, reqs: [] }] },
       { key: 'after', label: 'After', tint: 'mint', after: true, steps: [{ id: 's1', name: 'Commute', use: 'Take the bus', changed: true, reqs: ['Monthly bus pass: Reuse a copy', 'A requirement with a long name: Not decided'] }] }],
     bounds: function (S) { return bounds(fill(S, 'target', HALF + HALF), hug(S, 'sectionDrop', Infinity)); },
-    /* p: { key, label, tint (a colour token), steps: [{ id, name, use, changed, reqs: [text] }] } */
+    /* p: { key, label, tint (the changed step's variant: wash or mint), steps: [{ id, name, use, changed, reqs: [text] }] } */
     draw: function (S, V, p, x, y, w) { var t = tokens(S, ['inset', 'sectionDrop', 'sectionEnd', 'stepTop', 'stepGap', 'stepEnd', 'noteStep']); if (t === FAIL) return FAIL;
-      var tint = S.color(p.tint); if (tint === FAIL) return FAIL;
       var steps = field(p, 'steps', { component: 'BeforeAfter' }); if (steps === FAIL) return FAIL;
       var label = field(p, 'label', { component: 'BeforeAfter' }); if (label === FAIL) return FAIL;
       var room = w - t.inset * HALF, where = { component: 'BeforeAfter' };
       var hf = S.para(V, V.node(p.key + ':h'), { text: label + '  -  ' + steps.length + (steps.length === 1 ? ' step' : ' steps'), role: 'body', bold: true, ink: 'ink' }, x + t.inset, y + t.sectionDrop, room, Infinity, where); if (hf === FAIL) return FAIL;
       var cur = y + t.sectionDrop + (hf.n - 1) * hf.lh + t.sectionEnd;
       for (var i = 0; i < steps.length; i++) { var s = steps[i], n = V.node(p.key + ':' + s.id), top = cur;
-        if (s.changed) n.items.push(['rect', x, top, w, 1, tint]);
         var nf = S.para(V, n, { text: s.name, role: 'body', bold: true, ink: 'ink' }, x + t.inset, cur + t.stepTop, room, Infinity, where); if (nf === FAIL) return FAIL;
         cur += t.stepTop + (nf.n - 1) * nf.lh + t.stepGap;
         var uf = S.para(V, n, { text: s.use, role: 'secondary', ink: 'captionInk' }, x + t.inset, cur, room, Infinity, where); if (uf === FAIL) return FAIL;
         cur += (uf.n - 1) * uf.lh;
         for (var j = 0; j < s.reqs.length; j++) { cur += t.noteStep; var rf = S.para(V, n, { text: s.reqs[j], role: 'secondary', ink: 'captionInk' }, x + t.inset, cur, room, Infinity, where); if (rf === FAIL) return FAIL; cur += (rf.n - 1) * rf.lh; }
         cur += t.stepEnd;
-        if (s.changed) n.items[0][4] = cur - top; }
+        if (s.changed && art(S, n, 'BeforeAfter', 'step.changed', p.tint, [x, top, w, cur - top], 0) === FAIL) return FAIL; }
       return cur - y; } });
 
   root.Exp7Components = Object.freeze({ register: register, place: place, measure: measure, get: function (name) { return registry.has(name) ? registry.get(name) : null; },
@@ -15759,13 +15951,23 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     if(r==='monthdays'){ var on=(Array.isArray(v.on)?v.on:[]).join(', '); return on?'Monthly on '+on:'Monthly'; }
     if(r==='monthly')return 'Monthly'; if(r==='daily')return 'Daily'; if(r==='weekly')return 'Weekly'; if(r==='dates')return 'Selected dates'; return r; }
   function entryAmount(e){ var a=e.values.amount; if(a==null||a==='')return ''; a=+a; if(a>0)return money(a,'+'); if(a<0)return money(a,'abs'); return money(a); }
-  var HOME_LEGEND=[['calLow','L','Green: a surprise cost or late pay is absorbed.'],['calModerate','M','Yellow: one would bite; there is room to recover.'],['calCritical','C','Red: one would bite with no room to recover.']];
+  var HOME_LEGEND=[['L','Green: a surprise cost or late pay is absorbed.'],['M','Yellow: one would bite; there is room to recover.'],['C','Red: one would bite with no room to recover.']];
+  /* Budget's art (design-art): its first pack, embedded as data, is assigned once when this script loads, in a context of its own,
+   * so the assignment is committed before any layout (a layout's context would hold it back until the layout ends). No pack, no Budget:
+   * every layout starts with budgetPack(), which fails with ART_MISSING when the load-time assignment failed. */
+  function budgetArt(){ var A=root.Exp7Art, F=root.Exp7Fail; if(A.pack('budget')) return true;
+    return F.context('art:budget',function(){ var el=root.document&&root.document.getElementById('art-budget-journal');
+      if(!el) return F.with('ART_MISSING',{app:'budget',detail:'the art-budget-journal block is missing'});
+      /* the block is the compiler's output, checked against its sources by the tests; load() then checks every piece */
+      return A.assign('budget',A.load(JSON.parse(el.textContent))); },function(failure){ F.record(failure); }); }
+  function budgetPack(){ return root.Exp7Art.pack('budget')?true:root.Exp7Fail.with('ART_MISSING',{app:'budget',detail:'Budget\'s art pack was not assigned when it loaded'}); }
+  budgetArt();
   var HOME_LINKS=[{label:'Monthly expenses',act:'nav:ledger'},{label:'Cash and owned items',act:'nav:cash'}];
   var HOME_NOTES=[["Opens this month's expenses.",'secondary'],['Opens cash and owned items.','secondary'],['Amounts in USD.','caption']];
   /* o: { hostW, core, fonts:[regular,bold], day, today, pick, risk, calendar (journal model), entries, plan (journal model), start, keys } */
   function homeLayout(o){
     var D=root.Exp7Components, BD=root.Exp7Bounds, TK=root.Exp7Tokens, FL=root.Exp7Fail, FAIL=FL.FAIL;
-    var tokens=TK.check('budget',TK.BUDGET_JOURNAL); if(tokens===FAIL) return FAIL;
+    var tokens=TK.check('budget',TK.BUDGET_JOURNAL); if(tokens===FAIL) return FAIL; if(budgetPack()===FAIL) return FAIL;
     var fonts={}; fonts[tokens.font]=o.fonts[0]; fonts[tokens.fontStrong]=o.fonts[1];
     var S=BD.session({core:o.core,tokens:tokens,fonts:fonts,app:'budget',screen:'home'});
     var t=D.tokens(S,['phoneMax','columnMin','columnMax','columnMargin','monthTop','dayTop','dayMin','blockGap','sectionGap','pageBottom','pageMin','pagePickMin','pageTop','pageHeadEnd','viewPad','viewMin','groupGap','captionDrop','notesGap','noteStep','ruleGap','gridTop']); if(t===FAIL) return FAIL;
@@ -15796,8 +15998,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     if(!list.length){ var eh=at(AV,'Note',{key:'empty',text:'Nothing is scheduled this day.',role:'body',ink:'muted',drop:'noteDrop',step:'emptyStep'},ac); if(eh===FAIL) return FAIL; ac+=eh; }
     if(untimed.length){ var ch=at(AV,'Note',{key:'allday-h',text:'All day',role:'caption',ink:'muted',drop:'captionDrop',step:'captionStep'},ac); if(ch===FAIL) return FAIL; ac+=ch; }
     for(var i=0;i<list.length;i++){ var e=list[i];
-      if(i===untimed.length&&untimed.length){ var gt=D.tokens(S,['groupRuleGap','groupRuleStep','inset','rule']); if(gt===FAIL) return FAIL; var lc=S.color('line'); if(lc===FAIL) return FAIL;
-        AV.node('allday-end').items.push(['rect',gt.inset,ac+gt.groupRuleGap,colW-gt.inset*2,gt.rule,lc]); ac+=gt.groupRuleStep; }
+      if(i===untimed.length&&untimed.length){ var gr=at(AV,'Divider',{key:'allday-end',ink:'line',top:'groupRuleGap',step:'groupRuleStep'},ac); if(gr===FAIL) return FAIL; ac+=gr; }
       var rh2=at(AV,'Row',{key:'entry:'+e.id,layout:'entry',id:e.id,name:plain(e.name),time:formatTime24(e.values.time),amount:entryAmount(e),cadence:entryCadence(e)},ac); if(rh2===FAIL) return FAIL; ac+=rh2; }
     var agenda=finish(AV,ac);
     /* the plan: heading and one Row per step */
@@ -15934,7 +16135,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
         parts.push(gap('controlGap')); });
       var dated=rows.filter(function(r){return !r.undated;});
       if(!dated.length) parts.push(note('empty','No monthly expenses yet.','body','muted'));
-      else { parts.push({c:'Divider',key:'summary-rule',ink:'divider'});
+      else { parts.push({c:'Divider',key:'summary-rule',ink:'divider',top:'dividerTop',step:'dividerH'});
         parts.push({c:'Pair',key:'month-total',left:BUDGET_MONTHS[+lm.month.slice(5,7)-1]+' total',right:tot(net(dated)),role:'body',height:'pairH'});
         parts.push(note('month-cap','Pay less costs for items this month.','secondary','captionInk')); }
       return {route:route,parts:parts};
@@ -16098,7 +16299,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
   /* screenLayout(o) -> { Ls:{screen}, positions, H, colW, padX, table }, or FAIL. o: { hostW, core, fonts, model } */
   function screenLayout(o){
     var D=root.Exp7Components, BD=root.Exp7Bounds, TK=root.Exp7Tokens, FL=root.Exp7Fail, FAIL=FL.FAIL;
-    var tokens=TK.check('budget',TK.BUDGET_JOURNAL); if(tokens===FAIL) return FAIL;
+    var tokens=TK.check('budget',TK.BUDGET_JOURNAL); if(tokens===FAIL) return FAIL; if(budgetPack()===FAIL) return FAIL;
     var fonts={}; fonts[tokens.font]=o.fonts[0]; fonts[tokens.fontStrong]=o.fonts[1];
     var S=BD.session({core:o.core,tokens:tokens,fonts:fonts,app:'budget',screen:o.model.route});
     var t=D.tokens(S,['phoneMax','columnMin','columnMax','columnMargin','pagePickMin','pageBottom','viewPad']); if(t===FAIL) return FAIL;
@@ -16237,7 +16438,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     this.store=new root.Exp7ViewStore.Store(cat,function(rec){return blobs[rec.dl.file];},J);this.store.bindResources(this.core,{regular:jf[0],bold:jf[1]});this.blobs=blobs;
     var list=[];order.forEach(function(k){var rec=self.store.record('exp7.journal.'+k),v=self.views[k];if(!v){v=self.store.create(rec.id,{renderer:self.r});self.views[k]=v;}else{v.record=rec;v.scene.load(self.store.dl(rec.id));}
       var p=positions[k]||[0,0,colW,H];v.scene.onevent=function(e){var nodes=k==='selector'?self.overlayNodes:Ls[k].nodes,n=nodes.find(function(q){return q.id===e.id;});if(!n)return;
-        if((e.kind===J.EV.ENTER||e.kind===J.EV.LEAVE)&&n.hov!=null){v.scene.patch(new J.Patch().colorItem(n.id,0,e.kind===J.EV.ENTER?n.hov:n.base));self.r.draw();}if(k==='selector'&&e.kind===J.EV.ENTER&&self.popup&&self.popup.kind!=='date'&&n.id>=1000){self.popup.active=n.id-1000;var hp=new J.Patch();self.popup.choices.forEach(function(a,i){hp.colorItem(1000+i,0,color(i===self.popup.active?C.expense:a.ref===self.popup.selected?C.soft:C.white));});v.scene.patch(hp);self.r.draw();}if(e.kind===J.EV.CLICK&&n.vm)Promise.resolve(self.act(n.vm.act,k,n)).catch(function(err){self.status.textContent='Selection failed: '+String(err.message||err);});
+        if((e.kind===J.EV.ENTER||e.kind===J.EV.LEAVE)&&n.hovItems){var on=e.kind===J.EV.ENTER;v.scene.patch(new J.Patch().replace(n.id,function(b){JV.items(b,{items:on?n.hovItems:n.items,hit:n.hit,flags:n.flags});}));self.r.draw();}else if((e.kind===J.EV.ENTER||e.kind===J.EV.LEAVE)&&n.hov!=null){v.scene.patch(new J.Patch().colorItem(n.id,0,e.kind===J.EV.ENTER?n.hov:n.base));self.r.draw();}if(k==='selector'&&e.kind===J.EV.ENTER&&self.popup&&self.popup.kind!=='date'&&n.id>=1000){self.popup.active=n.id-1000;var hp=new J.Patch();self.popup.choices.forEach(function(a,i){hp.colorItem(1000+i,0,color(i===self.popup.active?C.expense:a.ref===self.popup.selected?C.soft:C.white));});v.scene.patch(hp);self.r.draw();}if(e.kind===J.EV.CLICK&&n.vm)Promise.resolve(self.act(n.vm.act,k,n)).catch(function(err){self.status.textContent='Selection failed: '+String(err.message||err);});
       };list.push([v,p[0],p[1]-(self.scrollY||0),p[2],p[3]]);});
     this.drawOrder=order;this.entries=this.store.compose(this.r,list);this.r.draw();this.painted=true;this.error='';var err=this.host.querySelector('.jrerr');if(err)err.remove();
   };
@@ -16757,7 +16958,7 @@ window.discHTML = typeof discHTML==='function' ? discHTML : window.discHTML;
     };
   }
 
-  var api={journalRepeat:journalRepeat,journalRepeatDraft:journalRepeatDraft,journalApplyOps:journalApplyOps,bindFullDate:bindFullDate,screenModel:screenModel,screenLayout:screenLayout,screenDraft:screenDraft,navigate:navigate,session:session,tokens:journalTokens,type:TYPE,space:SPACE,fullModel:fullModel,datePicker:datePicker,calendarModel:calendarModel,planModel:planModel,ledgerModel:ledgerModel,cashModel:cashModel,selectionOps:selectionOps,layout:layout,homeLayout:homeLayout,overlay:overlay,model:model,viewMetrics:viewMetrics,maxTexPx:maxTexPx,Home:Home,colors:C,fonts:journalFonts,overlayRect:overlayRect,overlayCorrection:overlayCorrection,journalCalId:journalCalId,journalWhen:journalWhen,formatTime24:formatTime24,dateLabel:dateLabel,hourLabel24:hourLabel24,fieldKey:fieldKey,fieldKind:fieldKind,payDraft:payDraft,glyphs:{chevronRight:chevronRight,chevronDown:chevronDown,chevronUp:chevronUp,chevronLeft:chevronLeft,markCircle:markCircle,markBar:markBar,markTwoBars:markTwoBars,},hostCssSize:hostCssSize,mount:function(o){var h=new Home(o);h.ready=h.init();return h;}};
+  var api={journalRepeat:journalRepeat,journalRepeatDraft:journalRepeatDraft,journalApplyOps:journalApplyOps,bindFullDate:bindFullDate,screenModel:screenModel,screenLayout:screenLayout,budgetArt:budgetArt,screenDraft:screenDraft,navigate:navigate,session:session,tokens:journalTokens,type:TYPE,space:SPACE,fullModel:fullModel,datePicker:datePicker,calendarModel:calendarModel,planModel:planModel,ledgerModel:ledgerModel,cashModel:cashModel,selectionOps:selectionOps,layout:layout,homeLayout:homeLayout,overlay:overlay,model:model,viewMetrics:viewMetrics,maxTexPx:maxTexPx,Home:Home,colors:C,fonts:journalFonts,overlayRect:overlayRect,overlayCorrection:overlayCorrection,journalCalId:journalCalId,journalWhen:journalWhen,formatTime24:formatTime24,dateLabel:dateLabel,hourLabel24:hourLabel24,fieldKey:fieldKey,fieldKind:fieldKind,payDraft:payDraft,glyphs:{chevronRight:chevronRight,chevronDown:chevronDown,chevronUp:chevronUp,chevronLeft:chevronLeft,markCircle:markCircle,markBar:markBar,markTwoBars:markTwoBars,},hostCssSize:hostCssSize,mount:function(o){var h=new Home(o);h.ready=h.init();return h;}};
   root.Exp7Journal=api;root.Exp7Views.journal=api;
 })(typeof window!=='undefined'?window:globalThis);
 
@@ -17799,7 +18000,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.79",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.80",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
