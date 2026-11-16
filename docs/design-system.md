@@ -745,6 +745,8 @@ Checked in Chrome on Matthew's Mac (2026-11-15, the lean by its sha at f289965, 
 
 Nothing changes on screen. Left for the next releases: the 8 try sites in `journal-views` that read saved records (the journal's calendar, an entry on a day, a proposal's requirements and selection, the atlas kept for the page), and the literal defaults in `budget-rules`, `budget-flows`, `journal-views` and `views-host`'s Budget code. Each script gets Layer 1's no-default lint as it is cleared. Tests in exp7-jrender: Layer 1 checks `budget-flows` has no try, catch or throw, keeps the plan before a recording as a copy, that `model`, `maxTexPx` and `cssDpr` have no try or guessed limit, that preparing and saving a switch hide nothing and that `journal-views` has no more than the 8 try sites that read saved records.
 
+Checked in Chrome on Matthew's Mac (2026-11-16, the lean by its sha at 0ff02e4, a blank Budget at 390 wide, made-up data only): Budget's Home drew on the GPU at the device's own texture limit; Add to today showed the day as Monday, November 16; a made-up item was added and saved, and Today's schedule redrew with it; recording it as planned saved and redrew. No failure was recorded and no page error was thrown. Not reached in the browser: a plan switch and the before and after comparison (a blank Budget has neither; the tests cover them). The test's storage was cleared after.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
