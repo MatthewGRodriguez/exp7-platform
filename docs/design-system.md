@@ -782,7 +782,9 @@ Checked in Chrome on Matthew's Mac (2026-11-16, the lean by its sha at b45951c, 
 - **Art** (`design-art`): `load` checks each piece alone (`art.load:<pack>:<i>`), so a bad piece, or a second piece for a slot, is left out and the pack loads with the rest. `assign` checks each slot, variant and state alone (`art.assign:<app>:<component>/<slot>:<variant>:<state>`) and assigns the pack with what it has. `draw` is its own failure context (`art.draw:<app>:<component>/<slot>`): a slot whose art fails draws nothing, and its node and its screen carry on without it. That covers every draw: Home, the screens, the Calendar, Board and Plan views (whose shadow nodes are made only when their art is there) and the top bar and Apps picker, and a node resting in a state its component does not declare, or an avatar mode its art does not draw, is left undrawn the same way. With no pack at all, Budget opens and every slot fails alone. An override is one piece, so an override that fails its check still leaves the art that was there.
 - **The atlas** (Budget's `check`): each part is checked alone (`budget.atlas:<part>`: its mark, items, components, type boards, calendar, plan and each type board), recorded when it is missing, and Budget carries on with the rest.
 
-Not changed yet: loading a saved atlas still rebuilds missing type boards and the plan's membership, and moves an old selection model on. Whether those stay is Matthew's call, and the defaults in `budget-flows`, `journal-views` and `views-host`'s Budget code are the next releases. Nothing changes on screen while every part is there.
+- **Loading saved data** (Budget's `load`): Matthew answered "Yes, stop both" (2026-11-16). Load no longer rebuilds a missing type board, puts entries back on the plan, the calendar or their boards, marks the atlas as Budget's, or moves picks saved before 1.8.57 to the new selection model. A part that is missing stays missing and is left out, and an old pick (an item's preferred choice, `state.pick` or `simPick`) never selects itself in Budget. Load still drops a stale view theme, as Budget's look is its token sets. Atlases saved by 1.8.57 or later already carry their boards, membership and selection model, so nothing changes for them.
+
+The defaults in `budget-flows`, `journal-views` and `views-host`'s Budget code are the next releases. Nothing changes on screen while every part is there.
 
 Tests in exp7-jrender: Layer app checks each part fails alone with its own context and is left out, that only the definition's shape keeps an app closed, that a token set left out fails with `TOKEN_MISSING` when read, and that Budget opened without its screens set draws no Home or screen while its views set still reads; Layer art checks a pack missing a piece is assigned with each gap recorded, a pack with a bad piece loads with the rest, and Home with its chevron piece missing still lays out with only the chevrons left out; Layer views checks a view with no pack lays out with no art, each slot recorded; and the atlas check records each missing part alone.
 
@@ -826,6 +828,7 @@ Studies, as second priority: when a screen moves to components, its study (if an
 | The rule behind it | "if there is a fail point that fail point will fail, the rest will carry on as if that fail point never existed" | Rule 1, strict fail and carry on |
 | One bad part of an app when it opens | "Yes, fail alone" | 10, 1.8.94 |
 | Missing art or atlas | "Strict fail and carry on": it carries on with the rest of the art and atlas and still works | Rule 1, 10, 1.8.94 |
+| Loading saved data: rebuilding missing boards, moving pre-1.8.57 picks | "Yes, stop both": a missing board and old picks are left out | 10, 1.8.94 |
 
 ## 12. Needs Ash
 

@@ -13135,7 +13135,7 @@ function selectedRef(w,id){
   if(avail.length){
     ref=has(st.userPick);
     if(!ref){ try{ const B=bestRank(w,id); ref=has(B&&B.pick&&B.pick.pick); }catch(e){} }
-    if(!ref) ref=((w.meta&&w.meta.budget&&w.meta.selModel>=2)?null:has(A.pref))||has(st.pick)||has(st.simPick)||avail[0];
+    if(!ref) ref=((w.meta&&w.meta.budget)?null:has(A.pref)||has(st.pick)||has(st.simPick))||avail[0]; /* 1.8.94: in Budget neither a preferred item nor a pick saved before 1.8.57 (state.pick, simPick) selects itself */
   }
   CAT_SEL.set(it,{sig:sig,ref:ref}); return ref;
 }
@@ -17753,11 +17753,14 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
 
   /* ---------- Budget's atlas (the app's atlas part) ----------
    * make(): a blank Budget atlas: the platform's calendar template, the four type boards (expense, income, debt, asset) and the
-   * plan (comp:reqs), all empty. load(saved): a saved atlas brought up to date (the boards and the plan's membership healed, the
-   * old selection model moved on). check(atlas): every part Budget's screens read is there, or FAIL with APP_INVALID.
+   * plan (comp:reqs), all empty. load(saved): the saved atlas as it was saved, with no stale view theme. 1.8.94 (Matthew: "Yes,
+   * stop both"): load no longer rebuilds a missing board or the plan's and boards' membership, marks the atlas as Budget's or
+   * moves picks saved before 1.8.57 to the new selection model: a part that is missing stays missing and is left out, and an
+   * old pick is not taken as a choice. check(atlas): each part Budget's screens read, checked alone (strict fail and carry on).
    * Budget's look comes from its token sets, not from the atlas: a view's theme (the calendar template's, or the light one
    * Budget wrote into every view before 1.8.88) is dropped, as the views draw Budget in its views token set. */
-  function budgetNoTheme(w){ Object.keys(w.components).forEach(function(id){ var c=w.components[id]; if(c&&c.view) delete c.view.theme; }); }
+  function budgetNoTheme(w){ if(w===null||typeof w!=='object'||w.components===null||typeof w.components!=='object') return;
+    Object.keys(w.components).forEach(function(id){ var c=w.components[id]; if(c&&c.view) delete c.view.theme; }); }
   function budgetAtlasMake(){
     var EV=root.Exp7Views, w=EV.blankMoneyAtlas('Budget');
     EV.normalizeDemoViews(w); EV.ensureBudgetBoards(w);
@@ -17769,20 +17772,14 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     EV.typeBoardIds(w).forEach(function(bid){ if(w.components[bid]) w.components[bid].items=[]; });
     if(w.components.reqs) w.components.reqs.items=[];
     budgetNoTheme(w);
-    w.meta=Object.assign({},w.meta,{budget:1,label:'blank',calId:R.calId,planId:'reqs',viewsModule:EV.MODULE_ID,provenance:'Exp7Views journal Home → JRViews → JRender'});
-    budgetMigrateSelection(w);
+    w.meta=Object.assign({},w.meta,{budget:1,label:'blank',calId:R.calId,planId:'reqs',viewsModule:EV.MODULE_ID,provenance:'Exp7Views journal Home → JRViews → JRender',selModel:2});
     return w;
   }
   function budgetAtlasLoad(w){
     var EV=root.Exp7Views;
-    w.meta=w.meta||{};
-    delete w.meta.htmlViews;
-    budgetHeal(w);
     budgetNoTheme(w);
-    w.meta.viewsModule=EV.MODULE_ID;
-    w.meta.provenance='Exp7Views journal Home → JRViews → JRender';
-    w.meta.budget=1;
-    budgetMigrateSelection(w);
+    if(w!==null&&typeof w==='object'&&w.meta!==null&&typeof w.meta==='object'){ delete w.meta.htmlViews;
+      w.meta.viewsModule=EV.MODULE_ID; w.meta.provenance='Exp7Views journal Home → JRViews → JRender'; }
     return w;
   }
   /* 1.8.94, strict fail and carry on: each part of the atlas is checked alone (budget.atlas:part). A part that is missing is
@@ -17801,40 +17798,6 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     parts.forEach(function(p){ part(p[0],function(){ var c=typeof p[1]==='string'?w.components[p[1]]:null;
       return obj(c)&&Array.isArray(c.items)?true:no('has no '+p[0]+' with its items'); }); });
     return true;
-  }
-  /* 1.8.57: a preferred item no longer selects itself. An atlas saved before that keeps its plan: what was in use is recorded as the accepted choice. */
-  function budgetMigrateSelection(w){ if(!w||!w.meta||w.meta.selModel>=2) return;
-    Object.keys(w.items||{}).forEach(function(id){ var it=w.items[id], A=it&&it.alts; if(!A||!Array.isArray(A.members)||!A.members.length) return;
-      var st=(it.state&&typeof it.state==='object'&&!Array.isArray(it.state))?it.state:(it.state={}); if(st.userPick) return;
-      var un=[].concat(A.unavail||[]), av=A.members.filter(function(m){ return w.items[String(m).replace(/^item:/,'')]&&un.indexOf(m)<0; });
-      var cur=(A.pref&&av.indexOf(A.pref)>=0)?A.pref:((st.pick&&av.indexOf(st.pick)>=0)?st.pick:null); if(cur) st.userPick=cur; });
-    w.meta.selModel=2; }
-  function budgetHeal(w){
-    var EV=root.Exp7Views;
-    EV.normalizeDemoViews(w);
-    EV.ensureBudgetBoards(w);
-    var R=EV.rootsFor(w);
-    var ids=w.meta.boardIds||{};
-    /* meta.planOwn: the atlas keeps its own Plan (only the steps it lists); 1.8.51. */
-    var own=!!(w.meta&&w.meta.planOwn);
-    function ensure(compId,ref){ var c=w.components[compId]; if(!c) return; c.items=c.items||[]; if(c.items.indexOf(ref)<0) c.items.push(ref); }
-    ((w.components[R.calId]||{}).items||[]).forEach(function(ref){
-      var id=String(ref).replace(/^item:/,''), it=w.items[id], t=(it&&it.values&&it.values.type)||'expense';
-      if(t!=='routine'){ /* 1.8.54: routines are schedule-only and stay off the money boards */
-        if(BUDGET_BOARD_TYPES.indexOf(t)<0) t='expense';
-        ensure(ids[t]||ids.expense,ref); }
-      if(!own) ensure(R.planId,ref);
-    });
-    /* 1.8.55: the Plan lists scheduled entries; a bare asset or debt is not a step */
-    function notStep(ref){ var x=w.items[String(ref).replace(/^item:/,'')], t=x&&x.values&&x.values.type; return (t==='asset'||t==='debt')&&!(x.values&&x.values.date); }
-    if(!own&&w.components[R.planId]&&Array.isArray(w.components[R.planId].items)) w.components[R.planId].items=w.components[R.planId].items.filter(function(ref){ return !notStep(ref); });
-    EV.typeBoardIds(w).forEach(function(bid){
-      ((w.components[bid]||{}).items||[]).forEach(function(ref){
-        if(!own&&!notStep(ref)) ensure(R.planId,ref);
-        var it=w.items[String(ref).replace(/^item:/,'')];
-        if(it&&it.values&&it.values.date) ensure(R.calId,ref);
-      });
-    });
   }
   var api={journalRepeat:journalRepeat,journalRepeatDraft:journalRepeatDraft,journalApplyOps:journalApplyOps,bindFullDate:bindFullDate,screenModel:screenModel,screenLayout:screenLayout,budgetApp:budgetApp,screenDraft:screenDraft,navigate:navigate,session:session,fullModel:fullModel,datePicker:datePicker,calendarModel:calendarModel,planModel:planModel,ledgerModel:ledgerModel,cashModel:cashModel,selectionOps:selectionOps,viewLayout:viewLayout,homeLayout:homeLayout,overlay:overlay,model:model,viewMetrics:viewMetrics,maxTexPx:maxTexPx,Home:Home,fonts:journalFonts,journalCalId:journalCalId,journalWhen:journalWhen,formatTime24:formatTime24,dateLabel:dateLabel,hourLabel24:hourLabel24,fieldKey:fieldKey,fieldKind:fieldKind,payDraft:payDraft,hostCssSize:hostCssSize,mount:function(o){var h=new Home(o);h.ready=h.init();return h;}};
   root.Exp7Journal=api;root.Exp7Views.journal=api;
