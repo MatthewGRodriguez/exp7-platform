@@ -759,6 +759,8 @@ By the same rule, two things 1.8.92 did stopped more than the part that failed, 
 
 Tests in exp7-jrender: Layer 1 lints `budget-rules`, checks the rules leave out a deduction or label missing a field, still report a value that is wrong, and read a complete schedule as before, and checks each redraw after a save is its own fail point and that `model` leaves the view's options alone.
 
+Checked in Chrome on Matthew's Mac (2026-11-16, the lean by its sha at b45951c, a blank Budget at 390 wide, made-up data only): Home loaded; on Add pay a gross of 1,000 with a 10% deduction showed take-home 900.00, and in the page a deduction with no name left take-home at 1,000. No failure was recorded and no page error was thrown. The pay was not saved. The test's storage was cleared after.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
