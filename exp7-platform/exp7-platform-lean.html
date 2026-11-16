@@ -6005,10 +6005,13 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
  * to the cent on its own, half up. Percentages are always of gross pay, never of the amount left after other deductions. */
 (function (root) {
   'use strict';
-  function r2(n) { n = +n || 0; return (n < 0 ? -1 : 1) * Math.round(Math.abs(n) * 100 + 1e-7) / 100; }
+  /* 1.8.93 (Matthew, 2026-11-16): a field a record is missing stays missing. Nothing here fills one in; the part that needs
+     it is left out, with no error: a deduction with no name, kind or amount is not a line; a schedule with no date or no
+     repeat has no label (null), and its callers show none. A value that is there but wrong is still reported. */
+  function r2(n) { n = +n; return (n < 0 ? -1 : 1) * Math.round(Math.abs(n) * 100 + 1e-7) / 100; }
   function pad(n) { return (n < 10 ? '0' : '') + n; }
   function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
-  function pdate(s) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || '')); if (!m) return null; var d = new Date(+m[1], +m[2] - 1, +m[3]); return d.getMonth() === +m[2] - 1 && d.getDate() === +m[3] ? d : null; }
+  function pdate(s) { if (typeof s !== 'string') return null; var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s); if (!m) return null; var d = new Date(+m[1], +m[2] - 1, +m[3]); return d.getMonth() === +m[2] - 1 && d.getDate() === +m[3] ? d : null; }
   function addDays(s, n) { var d = pdate(s); if (!d) return null; return ymd(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)); }
   function dayDiff(a, b) { var x = pdate(a), y = pdate(b); if (!x || !y) return NaN; return Math.round((Date.UTC(y.getFullYear(), y.getMonth(), y.getDate()) - Date.UTC(x.getFullYear(), x.getMonth(), x.getDate())) / 86400000); }
   function num(x) { var s = String(x == null ? '' : x).replace(/[$,\s]/g, ''); if (s === '') return NaN; var n = Number(s); return isFinite(n) ? n : NaN; }
@@ -6035,7 +6038,7 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
     return { ok: true, errors: [], payment: P, last: rows[n - 1].payment, rate: r, rows: rows, first: rows[0].date, lastDate: rows[n - 1].date, interest: interest, total: total, terms: n, every: ev, rule: DEBT_RULE };
   }
   /** balance still owed on a day (after the payments dated on or before it); the entered balance before the first payment */
-  function debtBalanceOn(d, day) { var S = debtSchedule(d); if (!S.ok) return num(d && d.balance) || 0; var bal = r2(num(d.balance));
+  function debtBalanceOn(d, day) { var S = debtSchedule(d); if (!S.ok) return num(d && d.balance); var bal = r2(num(d.balance));
     for (var i = 0; i < S.rows.length; i++) { if (S.rows[i].date > day) break; bal = S.rows[i].balance; } return bal; }
 
   var INCOME_RULE = 'Take-home is gross pay less each deduction. A percentage is of gross pay and is rounded to the cent on its own.';
@@ -6043,34 +6046,36 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
   function takeHome(p) {
     var g = num(p && p.gross), E = [], lines = [], tot = 0;
     if (!(g > 0)) E.push('Gross pay must be more than 0.');
-    ((p && p.deductions) || []).forEach(function (d, i) { var v = num(d && d.value), kind = d && d.kind === 'percent' ? 'percent' : 'fixed', name = String((d && d.name) || '').trim() || ('Deduction ' + (i + 1));
+    if (p && Array.isArray(p.deductions)) p.deductions.forEach(function (d) {
+      if (!d || typeof d.name !== 'string' || !d.name.trim() || (d.kind !== 'percent' && d.kind !== 'fixed') || d.value == null || d.value === '') return; /* missing a field: left out */
+      var v = num(d.value), kind = d.kind, name = d.name.trim();
       if (!(v >= 0)) { E.push(name + ': enter an amount of 0 or more.'); return; }
       if (kind === 'percent' && v > 100) { E.push(name + ': a percentage cannot be more than 100.'); return; }
-      var a = kind === 'percent' ? r2((g > 0 ? g : 0) * v / 100) : r2(v); tot = r2(tot + a); lines.push({ name: name, kind: kind, value: v, amount: a }); });
+      var a = kind === 'percent' ? r2(g * v / 100) : r2(v); tot = r2(tot + a); lines.push({ name: name, kind: kind, value: v, amount: a }); });
     if (!E.length && tot > g) E.push('Deductions are more than gross pay.');
-    return { ok: !E.length, errors: E, gross: g > 0 ? r2(g) : 0, net: r2((g > 0 ? g : 0) - tot), lines: lines, total: tot, rule: INCOME_RULE };
+    return { ok: !E.length, errors: E, gross: r2(g), net: r2(g - tot), lines: lines, total: tot, rule: INCOME_RULE };
   }
 
   /** '1, 15' or [1,15] -> sorted unique days of month 1..31 */
-  function monthDayList(x) { var out = []; (Array.isArray(x) ? x : String(x == null ? '' : x).split(/[ ,;]+/)).forEach(function (t) { var n = Math.floor(Number(t)); if (n >= 1 && n <= 31 && out.indexOf(n) < 0) out.push(n); }); return out.sort(function (a, b) { return a - b; }); }
+  function monthDayList(x) { var out = []; if (x == null) return out; (Array.isArray(x) ? x : String(x).split(/[ ,;]+/)).forEach(function (t) { var n = Math.floor(Number(t)); if (n >= 1 && n <= 31 && out.indexOf(n) < 0) out.push(n); }); return out.sort(function (a, b) { return a - b; }); }
   function ord(n) { var s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
   /** how a schedule reads to a person */
-  function repeatLabel(v) { v = v || {}; var rep = v.repeat || 'once';
-    if (!v.date) return 'not scheduled';
-    if (rep === 'every') { var n = Math.max(1, Math.floor(+v.every || 1)); return (n === 1 ? 'every day' : 'every ' + n + ' days') + ' from ' + v.date + (v.until ? ' to ' + v.until : ''); }
-    if (rep === 'monthdays') { var L = monthDayList(v.on); return (L.length ? 'on the ' + L.map(ord).join(', ') + ' each month' : 'each month') + ' from ' + v.date + (v.until ? ' to ' + v.until : ''); }
-    if (rep === 'monthly') { var d = pdate(v.date); return 'on the ' + (d ? ord(d.getDate()) : '?') + ' each month from ' + v.date + (v.until ? ' to ' + v.until : ''); }
-    if (rep === 'dates') return (Array.isArray(v.on) ? v.on.length : 1) + ' set dates';
+  function repeatLabel(v) { if (!v || typeof v.date !== 'string' || !v.date || typeof v.repeat !== 'string') return null; var rep = v.repeat;
+    if (rep === 'every') { var n = Math.floor(+v.every); if (!(n >= 1)) return null; return (n === 1 ? 'every day' : 'every ' + n + ' days') + ' from ' + v.date + (v.until ? ' to ' + v.until : ''); }
+    if (rep === 'monthdays') { var L = monthDayList(v.on); if (!L.length) return null; return 'on the ' + L.map(ord).join(', ') + ' each month from ' + v.date + (v.until ? ' to ' + v.until : ''); }
+    if (rep === 'monthly') { var d = pdate(v.date); if (!d) return null; return 'on the ' + ord(d.getDate()) + ' each month from ' + v.date + (v.until ? ' to ' + v.until : ''); }
+    if (rep === 'dates') return Array.isArray(v.on) && v.on.length ? v.on.length + ' set dates' : null;
     if (rep === 'daily') return 'every day from ' + v.date + (v.until ? ' to ' + v.until : '');
     if (rep === 'weekdays') return 'weekdays from ' + v.date + (v.until ? ' to ' + v.until : '');
     if (rep === 'weekly') return 'weekly from ' + v.date + (v.until ? ' to ' + v.until : '');
-    return 'once on ' + v.date; }
+    if (rep === 'once') return 'once on ' + v.date;
+    return null; }
   function money(n) { if (n == null || !isFinite(+n)) return '—'; return (+n < 0 ? '-' : '') + '$' + Math.abs(+n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
   /** last valid YYYY-MM-DD of a YYYY-MM month; never month+'-31' on a short month */
-  function lastDay(month) { if (!/^\d{4}-\d{2}$/.test(String(month || ''))) return null; var mo=+month.slice(5, 7); if (mo < 1 || mo > 12) return null; return ymd(new Date(+month.slice(0, 4), mo, 0)); }
+  function lastDay(month) { if (typeof month !== 'string' || !/^\d{4}-\d{2}$/.test(month)) return null; var mo=+month.slice(5, 7); if (mo < 1 || mo > 12) return null; return ymd(new Date(+month.slice(0, 4), mo, 0)); }
   /** Cash only when values.assetKind is 'cash'. Do not infer spendability from the name, and do not treat unmarked items as cash. */
-  function isCashAsset(it) { return ((it && it.values) || {}).assetKind === 'cash'; }
-  function isOwnedAsset(it) { return ((it && it.values) || {}).assetKind === 'owned'; }
+  function isCashAsset(it) { return !!(it && it.values) && it.values.assetKind === 'cash'; }
+  function isOwnedAsset(it) { return !!(it && it.values) && it.values.assetKind === 'owned'; }
 
 
   var api = { r2: r2, ymd: ymd, pdate: pdate, addDays: addDays, dayDiff: dayDiff, num: num, debtSchedule: debtSchedule, debtBalanceOn: debtBalanceOn, takeHome: takeHome,
@@ -13591,7 +13596,7 @@ function sessAtlas(V,S){ return (S&&S.J&&S.J.atlas)||(S&&S.s)||activeAtlas(V); }
 function vmTokens(V,c){ const T=window.Exp7Tokens, F=window.Exp7Fail, th=((c&&c.view&&c.view.theme)||{}).tokens;
   if(!th) return T.views('exp7',{}); const o=T.theme('exp7',th); return o===F.FAIL?o:T.views('exp7',o); }
 function vmOpts(V){ if(!V.opts){ var AW=activeAtlas(V), over=null; if(AW&&AW.meta&&AW.meta.budget) over={budget:{facts:false,tabs:false},plan:{presentation:'compact',summary:false,columns:['step','selected']},board:{presentation:'ledger'},calendar:{}}; V.opts=VMx().options(over);} return V.opts; }
-function buildModel(V,S){ const X=VMx(), A=sessAtlas(V,S), AW=activeAtlas(V)||A, O=vmOpts(V), kids=[];
+function buildModel(V,S,opts){ const X=VMx(), A=sessAtlas(V,S), AW=activeAtlas(V)||A, O=opts!==undefined?opts:vmOpts(V), kids=[];
   V.vmInfo={rows:[],days:0,dayItems:{},chips:0,flags:[],month:null,deps:null,detail:false};
   if(AW&&AW.meta&&AW.meta.budget&&(O.budget.facts||O.budget.tabs)) kids.push(budgetChromeVM(V,AW,O));
   const roots=(V.root||[]).map(String);
@@ -13971,7 +13976,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       else out.push(X.text('fin2', 'No payment schedule yet. Edit to enter the days between payments.', 'muted')); }
     if (t === 'income') { var D = Array.isArray(v.deductions) ? v.deductions : [];
       out.push(X.row('fin', [X.text('s', v.gross != null ? 'Gross ' + BR.money(v.gross) + ' · ' + D.length + ' deduction' + (D.length === 1 ? '' : 's') + ' · take-home ' + BR.money(v.amount) + ' each payday' : 'Amount ' + BR.money(v.amount), 'body'), X.btn('edit', 'Edit', 'fin:edit:' + id)]));
-      out.push(X.text('fin2', BR.repeatLabel(v), 'small')); }
+      var rlab = BR.repeatLabel(v); if (rlab !== null) out.push(X.text('fin2', rlab, 'small')); } /* 1.8.93: no label when the schedule is missing a field */
     return out; }
 
   function finAct(V, a) { var F = V.form, m;
@@ -14122,7 +14127,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     rows.forEach(function (e) { var o = e.ex || {}, amt = e.routine ? '' : (e.charge == null ? (o.skip ? 'not charged' : '$0.00') : (e.income ? '+' : '') + BR.money(e.income ? e.charge : Math.abs(e.charge)));
       kids.push(X.row('e:' + e.id, [X.text('t', fmtTime(e.values, o), 'muted'), X.text('n', e.label || e.name, 'body', { bold: true }), amt && X.text('a', amt, 'body'), X.btn('open', 'Open', 'occ:actions:' + e.id)].filter(Boolean)));
       var notes = []; if (o.actual) notes.push('Recorded: ' + (OUTCOME[o.outcome] || o.outcome) + (o.note ? ' · ' + o.note : ''));
-      if (o.moved && e.exKey !== day) notes.push('Moved here from ' + e.exKey); if (e.repeating) notes.push(BR.repeatLabel(e.values));
+      if (o.moved && e.exKey !== day) notes.push('Moved here from ' + e.exKey); if (e.repeating) { var rl = BR.repeatLabel(e.values); if (rl !== null) notes.push(rl); }
       if (notes.length) kids.push(X.text('n:' + e.id, notes.join(' · '), 'small', { indent: 18 }));
       if (F && F.kind === 'occ' && F.item === e.id && F.day === day) kids.push(occFormVM(V, w, F));
       if (V.alt2 && V.alt2.item === e.id && typeof altPanelVM === 'function') kids.push(altPanelVM(V, w, e.id)); });
@@ -14239,13 +14244,14 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if (T && Object.keys(p.reviews || {}).length) ops.push({ path: 'items/' + bare(p.to) + '/values/reqReview', op: (T.values || {}).reqReview === undefined ? 'add' : 'set', value: clone(p.reviews) });
     return ops; }
   function afterAtlas(w, p) { return applyOpsTo(clone(w), acceptOps(w, p)); }
-  function refreshAll() { Object.keys(root.JVS || {}).forEach(function (k) { var v = root.JVS[k]; if (v && v.sess && v.queue) v.queue(v.sess, 'form'); }); /* 1.8.92: a failing redraw is not swallowed */
-    var h = root.budget && root.budget.home && root.budget.home(); if (h && h.update) h.update(root.budget.W()); }
+  /* 1.8.93: each redraw is its own fail point. One that fails fails alone (nothing hides it), and the other views and Home still redraw */
+  function refreshAll() { Object.keys(root.JVS || {}).forEach(function (k) { var v = root.JVS[k]; if (v && v.sess && v.queue) Promise.resolve().then(function () { v.queue(v.sess, 'form'); }); });
+    var h = root.budget && root.budget.home && root.budget.home(); if (h && h.update) Promise.resolve().then(function () { h.update(root.budget.W()); }); }
   var OPEN_PROP = null;
   function openProp(id) { OPEN_PROP = id; if (root.__budgetChromeAct) root.__budgetChromeAct('budget:tab:plan'); refreshAll(); }
 
   /* ---- forms ---- */
-  function schedLabel(v) { v = v || {}; var a = v.amount == null || v.amount === '' ? null : +v.amount; return (a ? BR.money(Math.abs(a)) + ' ' : '') + BR.repeatLabel(v); }
+  function schedLabel(v) { v = v || {}; var a = v.amount == null || v.amount === '' ? null : +v.amount; var lab = BR.repeatLabel(v); return (a ? BR.money(Math.abs(a)) : '') + (a && lab !== null ? ' ' : '') + (lab !== null ? lab : ''); } /* 1.8.93: a schedule missing a field has no label */
   function repRow(F, same) { var X = VM(), rp = F.rep || (same ? 'same' : 'once'), out = [], b = [X.text('l', 'Repeats:', 'body', { bold: true })];
     if (same) b.push(X.btn('r:same', 'Same schedule as ' + same, 'alt2:rep:same', { on: rp === 'same' }));
     b.push(X.btn('r:once', 'Once', 'alt2:rep:once', { on: rp === 'once' }), X.btn('r:md', 'Dates each month', 'alt2:rep:monthdays', { on: rp === 'monthdays' }), X.btn('r:ev', 'Every X days', 'alt2:rep:every', { on: rp === 'every' })); out.push(X.row('rep', b));
@@ -16418,8 +16424,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   }
   function model(V,S,kind) {
     var A=sessAtlas(V,S), O=X.options({budget:{facts:false,tabs:false},calendar:{presentation:kind==='agenda'?'agenda':'mini'},plan:{presentation:'compact'},board:{presentation:'ledger',ledgerSources:V.journalSources||[]}});
-    var old=V.opts; V.opts=O;
-    var built=buildModel(V,S); V.opts=old; return built;
+    return buildModel(V,S,O); /* 1.8.93: the journal's options go in as an argument, so a model that fails leaves the view's own options as they were */
   }
   /* 1.8.83 (design system phase 4, part 3): the journal's plan, ledger and cash views are built from design components
    * (Label, Note, Row, ViewHead, DateBand, MoneyRow, TotalRow) with Budget's tokens and art, in one failure context. A layout
@@ -18728,7 +18733,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.92",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.93",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
