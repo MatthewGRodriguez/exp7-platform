@@ -14105,7 +14105,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     var ops = occOps(w, e, c, scope, F.day); clearFormFields(V); V.form = null; V.formFocus = null;
     if (!ops.length) { V.note = 'nothing changed'; return redraw(V); }
     /* an actual update is applied at once; the comparison stays up until it is closed, and closing it changes nothing */
-    if (F.mode === 'actual') V.cmp = { before: JSON.stringify(w), title: 'Plan before and after recording ' + e.name + ' on ' + F.day, month: F.day.slice(0, 7) };
+    if (F.mode === 'actual') V.cmp = { before: clone(w), title: 'Plan before and after recording ' + e.name + ' on ' + F.day, month: F.day.slice(0, 7) };
     V.note = (F.mode === 'actual' ? 'recorded ' : 'changed ') + e.name + (scope === 'future' && e.repeating ? ' from ' + F.day + ' on' : ' on ' + F.day);
     return submitViews(ops, 'occ:' + F.mode + ':' + scope, V); }
 
@@ -14126,8 +14126,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       if (notes.length) kids.push(X.text('n:' + e.id, notes.join(' · '), 'small', { indent: 18 }));
       if (F && F.kind === 'occ' && F.item === e.id && F.day === day) kids.push(occFormVM(V, w, F));
       if (V.alt2 && V.alt2.item === e.id && typeof altPanelVM === 'function') kids.push(altPanelVM(V, w, e.id)); });
-    if (V.cmp && !(F && F.kind === 'occ' && F.mode === 'actual')) { var before = null; try { before = JSON.parse(V.cmp.before); } catch (err) {}
-      if (before) kids.push(compareVM(V, before, w, { title: V.cmp.title, closeAct: 'occ:cmp:close', closeLabel: 'Close comparison', month: V.cmp.month, note: 'The record is saved. Closing this comparison does not undo it.' })); }
+    if (V.cmp && !(F && F.kind === 'occ' && F.mode === 'actual')) { /* 1.8.92: the plan before is kept as a copy, not as text to parse back */
+      kids.push(compareVM(V, V.cmp.before, w, { title: V.cmp.title, closeAct: 'occ:cmp:close', closeLabel: 'Close comparison', month: V.cmp.month, note: 'The record is saved. Closing this comparison does not undo it.' })); }
     kids.push(X.row('add', [X.btn('add', 'Add to ' + day, 'add:open', { kind: 'ghost' })]));
     if (F && F.kind === 'actions') return actionsVM(V, w, F);
     if (F && F.kind === 'add') return addChooserVM(V, w, F);
@@ -14239,8 +14239,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if (T && Object.keys(p.reviews || {}).length) ops.push({ path: 'items/' + bare(p.to) + '/values/reqReview', op: (T.values || {}).reqReview === undefined ? 'add' : 'set', value: clone(p.reviews) });
     return ops; }
   function afterAtlas(w, p) { return applyOpsTo(clone(w), acceptOps(w, p)); }
-  function refreshAll() { Object.keys(root.JVS || {}).forEach(function (k) { var v = root.JVS[k]; if (v && v.sess && v.queue) { try { v.queue(v.sess, 'form'); } catch (e) {} } });
-    var h = root.budget && root.budget.home && root.budget.home(); if (h && h.update) { try { h.update(root.budget.W()); } catch (e) {} } }
+  function refreshAll() { Object.keys(root.JVS || {}).forEach(function (k) { var v = root.JVS[k]; if (v && v.sess && v.queue) v.queue(v.sess, 'form'); }); /* 1.8.92: a failing redraw is not swallowed */
+    var h = root.budget && root.budget.home && root.budget.home(); if (h && h.update) h.update(root.budget.W()); }
   var OPEN_PROP = null;
   function openProp(id) { OPEN_PROP = id; if (root.__budgetChromeAct) root.__budgetChromeAct('budget:tab:plan'); refreshAll(); }
 
@@ -14509,7 +14509,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     return out;
   }
 
-  function dayLabel(d) { try { return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }); } catch (e) { return d; } }
+  function dayLabel(d) { return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }); }
 
   function actionsVM(V, w, F) {
     var X = VM(), e = entryOn(w, F.item, F.day) || { id: F.item, name: (w.items[F.item] || {}).name || F.item, values: {}, ex: {} }, o = e.ex || {};
@@ -16419,7 +16419,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   function model(V,S,kind) {
     var A=sessAtlas(V,S), O=X.options({budget:{facts:false,tabs:false},calendar:{presentation:kind==='agenda'?'agenda':'mini'},plan:{presentation:'compact'},board:{presentation:'ledger',ledgerSources:V.journalSources||[]}});
     var old=V.opts; V.opts=O;
-    try { return buildModel(V,S); } finally { V.opts=old; }
+    var built=buildModel(V,S); V.opts=old; return built;
   }
   /* 1.8.83 (design system phase 4, part 3): the journal's plan, ledger and cash views are built from design components
    * (Label, Note, Row, ViewHead, DateBand, MoneyRow, TotalRow) with Budget's tokens and art, in one failure context. A layout
@@ -16556,19 +16556,15 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   JV.View.prototype.show=async function(cv,m,w,opt){var r=await fullShow.call(this,cv,m,w,opt);if(m&&m.journalFull&&this.s&&!(opt&&opt.displayListOnly))bindFullDate(this,m);return r;};
   JV.View.prototype.wire=function(){fullWire.call(this);var self=this,prev=this.s&&this.s.onevent;if(!this.s)return;this.s.onevent=function(e){var n=self.byId&&self.byId.get(e.id);if(e.kind===J.EV.CLICK&&n&&n.vm&&n.vm.hoverDate&&self.journalSuppressClick){self.journalSuppressClick=false;return;}if(prev)prev(e);};};
   function journalOf(m){ if(!m)return m; if(m.t==='journal'||m.kind)return m; if(m.__vm||m.kids)return (m.kids||[]).find(function(n){return n&&n.t==='journal';})||m; return m; }
-  function maxTexPx(gc){
-    try{ var d=gc&&gc.dev, n=d&&d.limits&&d.limits.maxTextureDimension2D; if(n>0) return n|0; }catch(e){}
-    return 8192;
-  }
+  /* 1.8.92: the device's own limit; Budget mounts only with the shared GPUContext, so there is no guessed limit */
+  function maxTexPx(gc){ return gc.dev.limits.maxTextureDimension2D|0; }
   /* Viewport canvas metrics: device-pixel height stays at or under the WebGPU maxTextureDimension2D (8192 on Safari). */
   function cssDpr(){
     var dpr=(typeof devicePixelRatio==='number'&&devicePixelRatio>0)?devicePixelRatio:1;
-    try{
-      if(dpr<1.5&&typeof matchMedia==='function'&&matchMedia('(min-resolution: 1.5dppx)').matches){
-        var sw=(window.screen&&screen.width)||0, iw=window.innerWidth||0;
-        dpr=(iw&&sw&&iw>sw*1.2)?Math.max(2,Math.round(iw/Math.max(1,sw))):2;
-      }
-    }catch(e){}
+    if(dpr<1.5&&typeof matchMedia==='function'&&matchMedia('(min-resolution: 1.5dppx)').matches){ /* 1.8.92: no try around it */
+      var sw=(window.screen&&screen.width)||0, iw=window.innerWidth||0;
+      dpr=(iw&&sw&&iw>sw*1.2)?Math.max(2,Math.round(iw/Math.max(1,sw))):2;
+    }
     return Math.min(Math.max(dpr,0.5),3);
   }
   function hostCssSize(host){
@@ -17585,12 +17581,12 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       var answers=RL.filter(function(q){ return q.id; }).map(function(q){ return {id:q.id,d:ans[q.key]}; });
       var extra=RL.filter(function(q){ return q.added&&ans[q.key]!=='none'; }).map(function(q){ var r=q.added, d0=r.date||budgetDateKey();
         return {name:r.name, values:journalRepeat({repeat:r.repeat,every:r.every,mdays:r.mdays,time:r.time},{type:'expense',flow:'out',consume:true,charge:'per',amount:-Math.abs(+r.amount||0),date:d0},d0)}; });
-      var res=null; try{ res=BF.acceptChoice(this.atlas,this.context,step,ref,answers,extra); }catch(e){ res={ok:false,note:'The switch could not be prepared: '+((e&&e.message)||e)}; }
+      var res=BF.acceptChoice(this.atlas,this.context,step,ref,answers,extra); /* 1.8.92: a fault preparing the switch is not turned into a note */
       if(!res||!res.ok){ say((res&&res.note)||'The switch was not saved. The current plan is unchanged.'); return; }
       if(res.ops&&res.ops.length){
         if(typeof submitViews!=='function'||!this.context){ say('The switch was not saved. The current plan is unchanged.'); return; }
-        var ent=null; this._accepting=true;
-        try{ ent=await submitViews(res.ops,'prop:accept',this.context); }catch(e){ ent=null; } finally{ this._accepting=false; }
+        this._accepting=true; var self=this; /* 1.8.92: a save that throws is not swallowed: the person is told it was not saved, and the fault still fails */
+        var ent=await Promise.resolve().then(function(){ return submitViews(res.ops,'prop:accept',self.context); }).then(null,function(err){ self._accepting=false; say('The switch was not saved. The current plan is unchanged.'); throw err; }); this._accepting=false;
         if(!ent||ent.ok===false||(ent.r&&ent.r.ok===false)){ say('The switch was not saved. The current plan is unchanged.'); return; }
       }
       if(res.done) res.done();
@@ -17617,7 +17613,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     var max=Math.max(0,(this.host.scrollHeight||0)-(this.host.clientHeight||0));
     var target=max>0?Math.min(y,max):y;
     this.host.scrollTop=target;
-    try{ if(this.host.scrollTo) this.host.scrollTo(0,target); }catch(e){}
+    this.host.scrollTo(0,target);
     this.scrollY=this.host.scrollTop||target;
     this._planScrollMeta={step:this._pendingPlanStep,y:y,target:target,scrollTop:this.host.scrollTop,scrollHeight:this.host.scrollHeight,clientHeight:this.host.clientHeight,wrapH:this.wrap&&this.wrap.offsetHeight,H:this.H,max:max};
     return this.host.scrollTop||0;
@@ -18732,7 +18728,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.91",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.92",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
