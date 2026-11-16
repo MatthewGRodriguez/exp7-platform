@@ -11757,10 +11757,12 @@ window.x7 = window.x7 || function (t) {
       return F.with('FONT_MISSING', { app: model.app, screen: 'views', detail: 'the view tokens name fonts that are not embedded: ' + model.tokens.font + ', ' + model.tokens.fontStrong });
     FONT = FI[model.tokens.font]; FONTB = FI[model.tokens.fontStrong];
     var T = resolve(model.tokens), D = T.density, FS = T.text, S = session(model), bad = false;
-    /* art(n, component, slot, variant, rect, at): the slot's art in node n (at index at, or at the end); a failure ends the layout */
+    /* art(n, component, slot, variant, rect, at): the slot's art in node n (at index at, or at the end); a slot whose art fails
+       draws nothing and the layout carries on (Exp7Art.draw, 1.8.94) */
     function art(n, component, slot, variant, rect, at) { if (bad) return; if (A.draw(S, n, component, slot, variant, rect, at) === FAIL) bad = true; }
     /* drawn(component, slot, variant, key): whether the slot's art draws anything (a shadow node is made only when it does) */
-    function drawn(component, slot, variant, key) { var p = A.art(S, component, slot, key); if (p === FAIL) { bad = true; return false; }
+    function drawn(component, slot, variant, key) { /* 1.8.94: no art for the slot fails alone, and no shadow node is made */
+      var p = F.context('art.draw:' + S.app + ':' + component + '/' + slot, function () { return A.art(S, component, slot, key); }, function (failure) { F.record(failure); }); if (p === FAIL) return false;
       var v = p.variants[variant], d = v ? v.idle : null; if (typeof d === 'string') d = v[d.slice(1)]; return Array.isArray(d) && d.length > 0; }
     /* ink(name): a colour the model names, by token; an unknown name ends the layout */
     function ink(name) { var c = typeof name === 'string' && Object.prototype.hasOwnProperty.call(T, name) ? T[name] : null;
@@ -15110,9 +15112,13 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
  * of every component, in every variant the component draws and every state it declares. Packs are authored as SVG with the
  * studies, compiled by exp7-jrender tools/art (exp7-art-pack/1) and embedded here as data. A piece's items are the JRViews
  * item contract (rect, rrect, border, path, stroke) in the piece's own coordinates; colours are a colour token or #rrggbb.
- * load(pack) checks every piece (ART_INVALID, ART_OUTSIDE). assign(app, pack) checks the pack is complete for every
- * registered component (ART_MISSING). Art swaps at three levels, each a failure context that leaves the art that was there
- * when it fails: the app's pack, a screen's override, one component instance's override. fitArt(piece, rect) places a piece
+ * Strict fail and carry on (1.8.94, Matthew): each piece of art is its own fail point. load(pack) checks every piece alone
+ * (ART_INVALID, ART_OUTSIDE): a piece that fails is recorded and left out, and the pack loads with the rest. assign(app, pack)
+ * checks the pack against every component the app draws, each slot, variant and state alone (ART_MISSING): a gap is recorded
+ * and the pack is assigned with what it has. draw() is its own failure context: a slot whose art fails (no pack, no piece, a
+ * missing state, no room) is recorded and draws nothing, and the node and the screen carry on without it. Art swaps at three
+ * levels: the app's pack, a screen's override, one component instance's override; an override is one piece, so a piece that
+ * fails its check leaves the art that was there. fitArt(piece, rect) places a piece
  * in a slot rect: stretch scales each axis, nine keeps the insets and stretches the middle, fit draws at its drawn size about
  * its anchor (the rect's centre); art shrinks evenly to fit and never spills out of its slot (BOX_EMPTY only with no room).
  * No throw, no try/catch, no defaults. */
@@ -15240,8 +15246,11 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   function load(json) {
     if (!json || json.format !== 'exp7-art-pack/1' || typeof json.pack !== 'string' || !Array.isArray(json.pieces)) return invalid(null, 'not an exp7-art-pack/1 pack');
     var pieces = new Map();
-    for (var i = 0; i < json.pieces.length; i++) { var p = json.pieces[i]; if (checkPiece(p) === FAIL) return FAIL;
-      if (pieces.has(pid(p.component, p.slot))) return invalid(p, 'two pieces for one slot'); pieces.set(pid(p.component, p.slot), Object.freeze(p)); }
+    /* each piece alone: one that fails its check, or a second piece for a slot, is recorded and left out */
+    json.pieces.forEach(function (p, i) {
+      if (F.context('art.load:' + json.pack + ':' + i, function () { if (checkPiece(p) === FAIL) return FAIL;
+          return pieces.has(pid(p.component, p.slot)) ? invalid(p, 'two pieces for one slot') : true; }, function (failure) { F.record(failure); }) !== FAIL)
+        pieces.set(pid(p.component, p.slot), Object.freeze(p)); });
     return Object.freeze({ name: json.pack, version: json.version, pieces: pieces });
   }
   /* complete(pack, components): every slot of every component, in every variant it draws and every state it declares (ART_MISSING) */
@@ -15250,19 +15259,24 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     var v = piece && piece.variants[variant];
     if (!v || drawing(v, state) === null) return F.with('ART_MISSING', { component: def.name, slot: slot, state: state, detail: piece ? 'variant ' + variant : 'no piece' });
     return true; }
-  function complete(pieces, names) { var C = root.Exp7Components;
-    for (var i = 0; i < names.length; i++) { var def = C.get(names[i]), list = needs(def);
-      for (var j = 0; j < list.length; j++) if (covers(pieces.get(pid(def.name, list[j][0])), def, list[j][0], list[j][1], list[j][2]) === FAIL) return FAIL; }
-    return true; }
-  /* assign(app, pack, components): the app's pack, complete for every component the app draws (phase 4: each app names its
-   * components, since the views and Budget's screens draw different sets); a failed swap keeps the pack it had */
+  /* complete(app, pieces, names): each slot, variant and state of each component checked alone; a gap is recorded (ART_MISSING)
+   * and only what draws it fails when it is drawn. The components that are registered, the rest recorded (COMPONENT_INVALID). */
+  function complete(app, pieces, names) { var C = root.Exp7Components, out = [];
+    names.forEach(function (name) { var def = C.get(name);
+      if (!def) { F.context('art.assign:' + app + ':' + name, function () { return F.with('COMPONENT_INVALID', { app: app, component: name, detail: 'not registered' }); }, function (failure) { F.record(failure); }); return; }
+      out.push(name);
+      needs(def).forEach(function (k) { F.context('art.assign:' + app + ':' + name + '/' + k[0] + ':' + k[1] + ':' + k[2], function () {
+        return covers(pieces.get(pid(def.name, k[0])), def, k[0], k[1], k[2]); }, function (failure) { F.record(failure); }); }); });
+    return out; }
+  /* assign(app, pack, components): the app's pack for every component the app draws (phase 4: each app names its components,
+   * since the views and Budget's screens draw different sets). Each gap fails alone and the pack is assigned with what it
+   * has (1.8.94). A pack that did not load is no pack, and keeps the pack the app had. */
   function assign(app, pack, components) {
     return F.context('art.assign:' + app, function (tx) {
       if (pack === FAIL || !pack || !pack.pieces) return invalid(null, 'no pack to assign to ' + app);
       if (!Array.isArray(components) || !components.length) return invalid(null, app + ' names no components to draw');
-      for (var i = 0; i < components.length; i++) if (!root.Exp7Components.get(components[i])) return F.with('COMPONENT_INVALID', { app: app, component: components[i], detail: 'not registered' });
-      if (complete(pack.pieces, components) === FAIL) return FAIL;
-      tx.stage(function () { var cur = apps.get(app); apps.set(app, { pack: pack, components: components.slice(), screens: cur ? cur.screens : new Map(), instances: cur ? cur.instances : new Map() }); });
+      var drawn = complete(app, pack.pieces, components);
+      tx.stage(function () { var cur = apps.get(app); apps.set(app, { pack: pack, components: drawn, screens: cur ? cur.screens : new Map(), instances: cur ? cur.instances : new Map() }); });
       return true;
     }, function (failure) { F.record(failure); });
   }
@@ -15300,12 +15314,17 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       var col = typeof c === 'string' ? root.JRender.hex(c) : S.color(c.token); if (col === FAIL) return FAIL; it[ci] = col; }
     return items; }
 
-  /* draw(S, n, component, slot, variant, rect, at): the slot's art in node n, in every state the component declares. The node
+  /* draw(S, n, component, slot, variant, rect, at): the slot's art in node n, in every state the component declares, or no items
+   * when it fails (recorded in its own context: art.draw:app:component/slot). The node
    * rests in n.rest: idle, or a state its component put it in from data before drawing it (selected, disabled), which the
    * component must declare (COMPONENT_INVALID). The rest state's drawing goes in n.items (at the end, or at index at). The node
    * keeps every state's drawing per slot and which drawing each state uses (shows), for its looks (look, looks) and the
    * contrast check. 1.8.90: every state is drawn live: the rest from data, hover, pressed and focus from input (Home). */
   function draw(S, n, component, slot, variant, rect, at) {
+    /* 1.8.94: one slot's art is its own fail point: it is recorded and draws nothing, and the node carries on without it */
+    var none = [], rest = F.context('art.draw:' + S.app + ':' + component + '/' + slot, function () { return drawSlot(S, n, component, slot, variant, rect, at); }, function (failure) { F.record(failure); });
+    return rest === FAIL ? none : rest; }
+  function drawSlot(S, n, component, slot, variant, rect, at) {
     var def = root.Exp7Components.get(component); if (!def) return F.with('COMPONENT_INVALID', { component: component, detail: 'not registered' });
     if (!has(def.slots, slot) || def.slots[slot].indexOf(variant) < 0) return F.with('COMPONENT_INVALID', { component: component, slot: slot, detail: 'variant ' + variant + ' is not declared for the slot' });
     /* a node no component has put in another state rests in idle */
@@ -16229,11 +16248,20 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
  *   the platform's view tokens) or chrome (Exp7Tokens.chrome);
  * - pack: its art pack, the embedded block it is in and every component it must cover (Exp7Art.assign checks it is complete);
  * - screens: its routes, the route aliases, the components its screens draw from the catalog, and its layout functions.
- * define(id, def) records a definition. open(id) checks every part together in one failure context: a part missing or
- * unknown, a token set that fails its check, a pack that does not load or does not cover the components, a screen component
- * that is not registered or not in the pack, a route named twice, a blank atlas that fails the app's own check. Only when all
- * of it passes are the checked tokens, the assigned pack and the routes staged as the opened app; a failed open leaves what was
- * open before. get(id) gives the opened app, or FAIL with APP_INVALID. Nothing is defaulted. No throw, no try/catch. */
+ * define(id, def) records a definition. open(id) checks it in one failure context, by strict fail and carry on (1.8.94,
+ * Matthew: like Verse, a fail point fails on its own and the rest carries on as if it never existed):
+ * - only a definition that is not there or not in the shape of its four parts (and the atlas's three functions) keeps the app
+ *   closed: there is nothing to open;
+ * - every other part is checked in its own failure context inside the open. One that fails is recorded and left out, and the
+ *   app opens without it: a token set that fails its check or is of no known kind, the pack (its block missing, or not a pack:
+ *   the app opens with no pack; a piece or a gap in it fails alone in Exp7Art), the blank atlas failing the app's own check
+ *   (each of its parts alone), a route that is not a name or is named twice, an alias that is also a route or leads to no
+ *   route, a screen component that is not registered or not in the pack, a layout that is not a function. What reads a part
+ *   that was left out fails then, by itself: tokens(app, group) with TOKEN_MISSING, route(app, name) with APP_INVALID, a draw
+ *   with ART_MISSING.
+ * Only when the open succeeds are the checked tokens, the assigned pack and the routes staged as the opened app; a failed open
+ * leaves what was open before. get(id) gives the opened app, or FAIL with APP_INVALID. Nothing is defaulted. No throw, no
+ * try/catch. */
 (function (root) {
   'use strict';
   var F = root.Exp7Fail, FAIL = F.FAIL;
@@ -16248,8 +16276,9 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     for (var i = 0; i < keys.length; i++) if (!Object.prototype.hasOwnProperty.call(o, keys[i])) return 'missing ' + keys[i];
     var own = Object.keys(o); for (var j = 0; j < own.length; j++) if (keys.indexOf(own[j]) < 0) return 'unknown ' + own[j];
     return ''; }
-  function names(list) { return Array.isArray(list) && list.length > 0 && list.every(function (n) { return typeof n === 'string' && n.length > 0; }); }
-  function twice(list) { for (var i = 0; i < list.length; i++) if (list.indexOf(list[i]) !== i) return list[i]; return ''; }
+  function names(list) { return Array.isArray(list) && list.every(function (n) { return typeof n === 'string' && n.length > 0; }); }
+  /* alone(id, part, check): one part's check in its own failure context; its failure is recorded and goes no further */
+  function alone(id, part, check) { return F.context('app.open:' + id + ':' + part, check, function (failure) { F.record(failure); }); }
 
   /* one token set, checked by its kind's checker */
   function tokenSet(id, group, t) {
@@ -16266,47 +16295,62 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   function open(id) {
     return F.context('app.open:' + id, function (tx) {
       var A = root.Exp7Art, C = root.Exp7Components, def = defs.get(id);
+      /* what the app is drawn from: any of it failing keeps the app closed */
       if (!def) return bad(id, 'no app is defined as ' + id);
       var miss = exactly(def, PARTS); if (miss) return bad(id, miss);
       miss = exactly(def.atlas, ATLAS); if (miss) return bad(id, 'atlas: ' + miss);
       for (var a = 0; a < ATLAS.length; a++) if (typeof def.atlas[ATLAS[a]] !== 'function') return bad(id, 'atlas.' + ATLAS[a] + ' is not a function');
       if (!isObj(def.tokens) || !Object.keys(def.tokens).length) return bad(id, 'tokens: no token sets');
-      var tokens = {}, groups = Object.keys(def.tokens);
-      for (var g = 0; g < groups.length; g++) { var set = tokenSet(id, groups[g], def.tokens[groups[g]]); if (set === FAIL) return FAIL; tokens[groups[g]] = set; }
       miss = exactly(def.pack, PACK); if (miss) return bad(id, 'pack: ' + miss);
-      if (!names(def.pack.components)) return bad(id, 'pack: components must be a list of component names');
+      if (!names(def.pack.components) || !def.pack.components.length) return bad(id, 'pack: components must be a list of component names');
       miss = exactly(def.screens, SCREENS); if (miss) return bad(id, 'screens: ' + miss);
       var S = def.screens;
-      if (!names(S.routes)) return bad(id, 'screens: routes must be a list of route names');
-      var dup = twice(S.routes); if (dup) return bad(id, 'screens: route ' + dup + ' is named twice');
+      if (!Array.isArray(S.routes)) return bad(id, 'screens: routes must be a list');
       if (!isObj(S.aliases)) return bad(id, 'screens: aliases must be an object');
-      var al = Object.keys(S.aliases);
-      for (var r = 0; r < al.length; r++) { if (S.routes.indexOf(al[r]) >= 0) return bad(id, 'screens: alias ' + al[r] + ' is also a route');
-        if (S.routes.indexOf(S.aliases[al[r]]) < 0) return bad(id, 'screens: alias ' + al[r] + ' leads to ' + S.aliases[al[r]] + ', which is not a route'); }
-      if (!names(S.components)) return bad(id, 'screens: components must be a list of component names');
-      for (var c = 0; c < S.components.length; c++) { var n = S.components[c];
-        if (!C.get(n)) return F.with('COMPONENT_INVALID', { app: id, component: n, detail: 'a screen component that is not registered' });
-        if (def.pack.components.indexOf(n) < 0) return bad(id, 'screens draw ' + n + ', which the pack is not checked to cover'); }
-      if (!isObj(S.layout) || !Object.keys(S.layout).length) return bad(id, 'screens: no layout functions');
-      var lk = Object.keys(S.layout); for (var l = 0; l < lk.length; l++) if (typeof S.layout[lk[l]] !== 'function') return bad(id, 'screens: layout ' + lk[l] + ' is not a function');
-      var el = root.document.getElementById(def.pack.block); if (!el) return F.with('ART_MISSING', { app: id, detail: 'the ' + def.pack.block + ' block is missing' });
-      /* the block is the art compiler's output, checked against its sources by the tests; load() then checks every piece */
-      var pack = A.load(JSON.parse(el.textContent)); if (pack === FAIL) return FAIL;
-      if (A.assign(id, pack, def.pack.components) === FAIL) return FAIL;
-      if (def.atlas.check(def.atlas.make()) === FAIL) return FAIL;
-      var app = Object.freeze({ id: id, atlas: def.atlas, tokens: Object.freeze(tokens), pack: pack,
-        screens: Object.freeze({ routes: Object.freeze(S.routes.slice()), aliases: Object.freeze(Object.assign({}, S.aliases)), components: Object.freeze(S.components.slice()), layout: S.layout }) });
+      if (!Array.isArray(S.components)) return bad(id, 'screens: components must be a list');
+      if (!isObj(S.layout)) return bad(id, 'screens: layout must be an object');
+      /* each part alone: one that fails is recorded and left out */
+      /* the pack: the block is the art compiler's output, checked against its sources by the tests; load() checks each piece
+         alone and assign() each component's slots alone. With no pack the app opens with none, and each draw fails alone */
+      var pack = alone(id, 'pack', function () { var el = root.document.getElementById(def.pack.block);
+        if (!el) return F.with('ART_MISSING', { app: id, detail: 'the ' + def.pack.block + ' block is missing' });
+        var p = A.load(JSON.parse(el.textContent)); if (p === FAIL) return FAIL;
+        return A.assign(id, p, def.pack.components) === FAIL ? FAIL : p; });
+      /* a blank atlas, checked by the app's own check, whose parts fail alone */
+      alone(id, 'atlas', function () { return def.atlas.check(def.atlas.make()); });
+      var tokens = {}, routes = [], aliases = {}, components = [], layout = {};
+      Object.keys(def.tokens).forEach(function (g) { var set = alone(id, 'tokens.' + g, function () { return tokenSet(id, g, def.tokens[g]); });
+        if (set !== FAIL) tokens[g] = set; });
+      S.routes.forEach(function (r, i) { if (alone(id, 'route.' + i, function () {
+          if (typeof r !== 'string' || !r) return bad(id, 'screens: route ' + i + ' is not a route name');
+          return routes.indexOf(r) >= 0 ? bad(id, 'screens: route ' + r + ' is named twice') : true; }) !== FAIL) routes.push(r); });
+      Object.keys(S.aliases).forEach(function (k) { if (alone(id, 'alias.' + k, function () {
+          if (routes.indexOf(k) >= 0) return bad(id, 'screens: alias ' + k + ' is also a route');
+          return routes.indexOf(S.aliases[k]) < 0 ? bad(id, 'screens: alias ' + k + ' leads to ' + S.aliases[k] + ', which is not a route') : true; }) !== FAIL) aliases[k] = S.aliases[k]; });
+      S.components.forEach(function (n, i) { if (alone(id, 'component.' + i, function () {
+          if (typeof n !== 'string' || !n) return bad(id, 'screens: component ' + i + ' is not a component name');
+          if (!C.get(n)) return F.with('COMPONENT_INVALID', { app: id, component: n, detail: 'a screen component that is not registered' });
+          if (components.indexOf(n) >= 0) return bad(id, 'screens: component ' + n + ' is named twice');
+          return def.pack.components.indexOf(n) < 0 ? bad(id, 'screens draw ' + n + ', which the pack is not checked to cover') : true; }) !== FAIL) components.push(n); });
+      Object.keys(S.layout).forEach(function (k) { if (alone(id, 'layout.' + k, function () {
+          return typeof S.layout[k] === 'function' ? true : bad(id, 'screens: layout ' + k + ' is not a function'); }) !== FAIL) layout[k] = S.layout[k]; });
+      var app = Object.freeze({ id: id, atlas: def.atlas, tokens: Object.freeze(tokens), pack: pack === FAIL ? null : pack,
+        screens: Object.freeze({ routes: Object.freeze(routes), aliases: Object.freeze(aliases), components: Object.freeze(components), layout: Object.freeze(layout) }) });
       tx.stage(function () { opened.set(id, app); });
       return app;
     }, function (failure) { F.record(failure); });
   }
   /* get(id) -> the opened app, or FAIL (APP_INVALID) when it has not opened */
   function get(id) { return opened.has(id) ? opened.get(id) : bad(id, 'the app has not opened: its definition failed its check, or was never opened'); }
+  /* tokens(app, group) -> the app's token set of that group, or FAIL (TOKEN_MISSING) when the set failed its check as the app
+   * opened and was left out, or was never defined */
+  function tokens(app, group) { return Object.prototype.hasOwnProperty.call(app.tokens, group) ? app.tokens[group]
+    : F.with('TOKEN_MISSING', { app: app.id, detail: 'the ' + group + ' token set is not part of the opened app: it failed its check when the app opened, or was never defined' }); }
   /* route(app, name) -> the route a name leads to (itself, or the route its alias leads to), or FAIL (APP_INVALID) */
   function route(app, name) { var r = Object.prototype.hasOwnProperty.call(app.screens.aliases, name) ? app.screens.aliases[name] : name;
     return app.screens.routes.indexOf(r) >= 0 ? r : bad(app.id, 'no screen route ' + name); }
 
-  root.Exp7Apps = Object.freeze({ define: define, open: open, get: get, route: route,
+  root.Exp7Apps = Object.freeze({ define: define, open: open, get: get, tokens: tokens, route: route,
     defined: function () { return Array.from(defs.keys()); }, opened: function () { return Array.from(opened.keys()); } });
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
@@ -16320,13 +16364,13 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   /* Budget's look in the views (Calendar, Board, Plan): the opened app's views token set (design-tokens VIEW_JOURNAL over the
    * platform's) and the budget-journal pack's view art (gen-views.mjs). All model actions, fields, risk labels and selection/drag
    * semantics stay native Exp7. Budget not open: FAIL with APP_INVALID. */
-  function viewTokens(){ var app=root.Exp7Apps.get('budget'); return app===root.Exp7Fail.FAIL?app:app.tokens.views; }
+  function viewTokens(){ var app=root.Exp7Apps.get('budget'); return app===root.Exp7Fail.FAIL?app:root.Exp7Apps.tokens(app,'views'); }
   /* The journal's two fonts, its tokens' font and fontStrong (Source Sans 3 Regular and Semibold), as the JRender core loaded
    * them. There is no substitute font: asked for before the core has booted, it records FONT_MISSING and returns Exp7Fail.FAIL. */
   function journalFonts(){
     if(journalFonts.ids) return journalFonts.ids;
     var app=root.Exp7Apps.get('budget'); if(app===root.Exp7Fail.FAIL) return app;
-    var TK=app.tokens.screens, FI=JV.fontIds();
+    var TK=root.Exp7Apps.tokens(app,'screens'); if(TK===root.Exp7Fail.FAIL) return TK; var FI=JV.fontIds();
     if(!Object.prototype.hasOwnProperty.call(FI,TK.font)||!Object.prototype.hasOwnProperty.call(FI,TK.fontStrong)){ root.Exp7Fail.record({code:'FONT_MISSING',context:null,app:'budget',screen:null,component:null,slot:null,state:null,id:null,offered:null,needed:null,detail:'the journal fonts ('+TK.font+', '+TK.fontStrong+') are not loaded: the JRender core has not booted'}); return root.Exp7Fail.FAIL; }
     journalFonts.ids=[FI[TK.font],FI[TK.fontStrong]];
     return journalFonts.ids;
@@ -16431,7 +16475,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
    * returns the view, or Exp7Fail.FAIL with the failure recorded: the host keeps the frame it shows. A journal model of any
    * other kind fails: the calendar and agenda journal kinds are not reached from the app (Home draws its own month and day). */
   function budgetSession(screen){ var FL=root.Exp7Fail, FAIL=FL.FAIL;
-    var app=budgetApp(); if(app===FAIL) return FAIL; var tokens=app.tokens.screens;
+    var app=budgetApp(); if(app===FAIL) return FAIL; var tokens=root.Exp7Apps.tokens(app,'screens'); if(tokens===FAIL) return FAIL;
     var jf=journalFonts(); if(jf===FAIL) return FL.with('FONT_MISSING',{app:'budget',screen:screen,detail:'the journal fonts are not loaded'});
     var fonts={}; fonts[tokens.font]=jf[0]; fonts[tokens.fontStrong]=jf[1];
     return root.Exp7Bounds.session({core:JV.__core(),tokens:tokens,fonts:fonts,app:'budget',screen:screen}); }
@@ -16710,7 +16754,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   /* o: { hostW, core, fonts:[regular,bold], day, today, pick, risk, calendar (journal model), entries, plan (journal model), start, keys } */
   function homeLayout(o){
     var D=root.Exp7Components, BD=root.Exp7Bounds, FL=root.Exp7Fail, FAIL=FL.FAIL;
-    var app=budgetApp(); if(app===FAIL) return FAIL; var tokens=app.tokens.screens;
+    var app=budgetApp(); if(app===FAIL) return FAIL; var tokens=root.Exp7Apps.tokens(app,'screens'); if(tokens===FAIL) return FAIL;
     var fonts={}; fonts[tokens.font]=o.fonts[0]; fonts[tokens.fontStrong]=o.fonts[1];
     var S=BD.session({core:o.core,tokens:tokens,fonts:fonts,app:'budget',screen:'home'});
     var t=D.tokens(S,['phoneMax','columnMin','columnMax','columnMargin','monthTop','dayTop','dayMin','blockGap','sectionGap','pageBottom','pageMin','pagePickMin','pageTop','pageHeadEnd','viewPad','viewMin','groupGap','captionDrop','notesGap','noteStep','ruleGap','gridTop']); if(t===FAIL) return FAIL;
@@ -17059,7 +17103,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
    * whose target the screen does not have fails (DATA_MISSING). */
   function screenLayout(o){
     var D=root.Exp7Components, BD=root.Exp7Bounds, FL=root.Exp7Fail, FAIL=FL.FAIL;
-    var app=budgetApp(); if(app===FAIL) return FAIL; var tokens=app.tokens.screens;
+    var app=budgetApp(); if(app===FAIL) return FAIL; var tokens=root.Exp7Apps.tokens(app,'screens'); if(tokens===FAIL) return FAIL;
     var fonts={}; fonts[tokens.font]=o.fonts[0]; fonts[tokens.fontStrong]=o.fonts[1];
     var S=BD.session({core:o.core,tokens:tokens,fonts:fonts,app:'budget',screen:o.model.route});
     var t=D.tokens(S,['phoneMax','columnMin','columnMax','columnMargin','pagePickMin','pageBottom','viewPad']); if(t===FAIL) return FAIL;
@@ -17741,16 +17785,21 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     budgetMigrateSelection(w);
     return w;
   }
+  /* 1.8.94, strict fail and carry on: each part of the atlas is checked alone (budget.atlas:part). A part that is missing is
+   * recorded (APP_INVALID) and Budget carries on with the rest; what reads that part fails then, by itself. */
   function budgetAtlasCheck(w){
     var F=root.Exp7Fail, EV=root.Exp7Views;
     function no(detail){ return F.with('APP_INVALID',{app:'budget',detail:'the atlas '+detail}); }
-    if(!w||typeof w!=='object'||!w.meta||w.meta.budget!==1) return no('is not marked as a Budget atlas');
-    if(!w.items||typeof w.items!=='object'||!w.components||typeof w.components!=='object') return no('has no items or components');
-    var R=EV.rootsFor(w), ids=w.meta.boardIds, parts=[['calendar',R.calId],['plan',R.planId]];
-    if(!ids||typeof ids!=='object') return no('names no type boards');
-    BUDGET_BOARD_TYPES.forEach(function(t){ parts.push([t+' board',ids[t]]); });
-    for(var i=0;i<parts.length;i++){ var c=w.components[parts[i][1]];
-      if(typeof parts[i][1]!=='string'||!c||!Array.isArray(c.items)) return no('has no '+parts[i][0]+' with its items'); }
+    function obj(o){ return o!==null&&typeof o==='object'&&!Array.isArray(o); }
+    function part(name,check){ F.context('budget.atlas:'+name,check,function(failure){ F.record(failure); }); }
+    part('mark',function(){ return obj(w)&&obj(w.meta)&&w.meta.budget===1?true:no('is not marked as a Budget atlas'); });
+    part('items',function(){ return obj(w)&&obj(w.items)?true:no('has no items'); });
+    if(!obj(w)||!obj(w.components)){ part('components',function(){ return no('has no components'); }); return true; }
+    var R=EV.rootsFor(w), ids=obj(w.meta)?w.meta.boardIds:null, parts=[['calendar',R.calId],['plan',R.planId]];
+    if(!obj(ids)) part('boards',function(){ return no('names no type boards'); });
+    else BUDGET_BOARD_TYPES.forEach(function(t){ parts.push([t+' board',ids[t]]); });
+    parts.forEach(function(p){ part(p[0],function(){ var c=typeof p[1]==='string'?w.components[p[1]]:null;
+      return obj(c)&&Array.isArray(c.items)?true:no('has no '+p[0]+' with its items'); }); });
     return true;
   }
   /* 1.8.57: a preferred item no longer selects itself. An atlas saved before that keeps its plan: what was in use is recorded as the accepted choice. */
@@ -18733,7 +18782,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.93",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.94",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
