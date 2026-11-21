@@ -12682,8 +12682,10 @@ function proposeOps(V, ops, proc, src){
 function startRuntime(w,root,carry,onHtml,pins){ const s=JSON.parse(JSON.stringify(w)); s.root=root; if(s.clock) s.clock.on=false;
   if(pins) Object.keys(pins).forEach(k=>{ const it=s.items[k]; if(it&&it.alts&&pins[k]){ if(!it.state) it.state={}; if(!it.state.userPick) it.state.userPick=pins[k]; } });
   projectCategories(s,w);
+  /* 1.8.105: the saved state each component had when this session started, so the next session can tell what the saved atlas changed since */
+  const base=Object.fromEntries(Object.keys(hostRd(s.components)).filter(c=>s.components[c].state!==undefined).map(c=>[c,JSON.parse(JSON.stringify(s.components[c].state))]));
   if(carry) Object.keys(carry).forEach(c=>{ if(s.components&&s.components[c]) s.components[c].state=JSON.parse(JSON.stringify(carry[c])); });
-  const S={s,html:'',renders:0,errs:[],L:{},dead:false,settled:false,clicks:0}; let quiet=null, first; const timers=[]; S.ready=new Promise(r=>first=r);
+  const S={s,base,html:'',renders:0,errs:[],L:{},dead:false,settled:false,clicks:0}; let quiet=null, first; const timers=[]; S.ready=new Promise(r=>first=r);
   const fire=()=>{ if(S.dead) return; if(!S.settled){ S.settled=true; first(S); } else onHtml(S); };
   const bump=()=>{ clearTimeout(quiet); quiet=setTimeout(fire,40); };
   const app={ set innerHTML(v){ S.html=String(v); S.renders++; bump(); }, get innerHTML(){ return S.html; }, querySelector(){ return null; }, querySelectorAll(){ return []; } };
@@ -12703,6 +12705,16 @@ function startRuntime(w,root,carry,onHtml,pins){ const s=JSON.parse(JSON.stringi
   setTimeout(()=>{ if(!S.settled&&!S.dead){ S.errs.push('runtime passes did not settle within 4 s (rendered what it had)'); fire(); } },4000); bump(); return S; }
 /* atlas paths a view action changed in its session snapshot -> proposal ops (view-local components/<id>/state excluded) */
 var VROOTS=['items','components','joys'];
+/* 1.8.105: what a component's state is in the next session of a view. The session's own state (view-local) is kept, except
+ * each key the saved atlas changed since the session started: the saved value (or its absence) wins there. So a Board's
+ * sort and show, saved through a proposal, are what the next session draws. cs: the session's state; bs: the saved state
+ * the session started from; ls: the saved state now. Nothing to carry gives undefined (the saved state stands). */
+function carryState(cs,bs,ls){ const same=(x,y)=>JSON.stringify(x)===JSON.stringify(y);
+  if(cs===null||typeof cs!=='object'||Array.isArray(cs)) return same(ls,bs)?cs:undefined;
+  if(Array.isArray(ls)) return same(ls,bs)?cs:undefined;
+  const o=JSON.parse(JSON.stringify(cs)), b=hostRd(bs), l=hostRd(ls);
+  new Set(Object.keys(b).concat(Object.keys(l))).forEach(k=>{ if(same(l[k],b[k])) return; if(k in l) o[k]=JSON.parse(JSON.stringify(l[k])); else delete o[k]; });
+  return o; }
 function pick(s){ const o={}; VROOTS.forEach(k=>o[k]=JSON.parse(JSON.stringify(hostRd(s[k])))); return o; }
 function viewOps(a,b){ const ops=[]; const isObj=v=>v&&typeof v==='object'&&!Array.isArray(v);
   const walk=(x,y,p)=>{ if(JSON.stringify(x)===JSON.stringify(y)) return; if(/^components\/[^/]+\/state$/.test(p)||/^items\/[^/]+\/state\/(pick|pickWhy)$/.test(p)) return; /* view-local state; eval.js-derived pick */
@@ -12721,7 +12733,9 @@ function setView(id,w,root,cb,ro,mopt){ const box=$(id); if(!box) return;
    * ResizeObserver redraws it at its own width once it has one */
   const bw=Math.round(box.clientWidth); V.w=Math.max(1,bw>0?bw:V.w>0?V.w:VIEW_START_W);
   let cv=V.cv||box.querySelector('canvas'); if(!cv) cv=document.createElement('canvas'); if(cv.parentNode!==box){ box.querySelectorAll('canvas').forEach(c=>c!==cv&&c.remove()); box.appendChild(cv); } V.cv=cv; /* the same canvas (and its scene) follows the view when the panel is re-rendered */
-  const rev=atlasRev(w), VA=V.sess&&(V.sess.J&&V.sess.J.atlas||V.sess.s), carry=VA?Object.fromEntries(Object.keys(hostRd(VA.components)).filter(c=>VA.components[c].state).map(c=>[c,VA.components[c].state])):null;
+  const rev=atlasRev(w), VA=V.sess&&(V.sess.J&&V.sess.J.atlas||V.sess.s), WC=hostRd(w.components), VB=V.sess?hostRd(V.sess.base):HOST_NONE;
+  /* 1.8.105: carried state gives way to what the saved atlas changed since the last session started (carryState) */
+  const carry=VA?Object.fromEntries(Object.keys(hostRd(VA.components)).filter(c=>VA.components[c].state).map(c=>[c,carryState(VA.components[c].state,VB[c],hostRd(WC[c]).state)]).filter(e=>e[1]!==undefined)):null;
   if(V.sess) V.sess.dispose();
   /* 1.8.81: a view that cannot be drawn shows no error page. The last frame stays, and the failure goes to Exp7Fail.records()
      (and the diagnostics) for the logs; nothing is drawn in its place. */
@@ -18927,7 +18941,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.104",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.105",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
