@@ -11684,6 +11684,12 @@ window.x7 = window.x7 || function (t) {
   var J = root.JRender, JV = root.JRViews;
   if (!J || !JV) return;
   var NF = J.NF;
+  /* 1.8.106: no || defaults. What may be missing is read through vmRd, vmLs and vmStr: a record or list that is not there
+   * reads as a frozen nothing, a text that is not there as ''. A size, minimum, indent or space that is not given is left out. */
+  var VM_NONE = Object.freeze({}), VM_NO_LIST = Object.freeze([]);
+  function vmRd(o) { return o !== null && typeof o === 'object' ? o : VM_NONE; }
+  function vmLs(a) { return Array.isArray(a) ? a : VM_NO_LIST; }
+  function vmStr(v) { return v == null || v === false ? '' : String(v); }
 
   /* ---------------- colour ---------------- */
   /* hex(s): '#rgb[a]' or '#rrggbb[aa]' as [r, g, b, a]; null when s is not a colour */
@@ -11696,7 +11702,7 @@ window.x7 = window.x7 || function (t) {
   function radial(x0, y0, r0, x1, y1, r1, stops, o) { return J.radial(x0, y0, r0, x1, y1, r1, gs(stops), o); }
   function conic(angle, cx, cy, stops, o) { return J.conic(angle, cx, cy, gs(stops), o); }
   /* a stroked path as an item: cmds as JRender path(), colour [r,g,b,a] or a gradient, o { width, join, cap, miterLimit, dash, dashOffset } */
-  function strokeItem(cmds, c, o) { return ['stroke', cmds, U(c), o || {}]; }
+  function strokeItem(cmds, c, o) { return ['stroke', cmds, U(c), o]; } /* the options its caller gives */
 
   /* ---------------- options ---------------- */
   var OPTIONS = {
@@ -11705,7 +11711,7 @@ window.x7 = window.x7 || function (t) {
     plan: { columns: ['risk', 'seq', 'step', 'when', 'requires', 'extra', 'selected', 'joy', 'neededBy', 'btn'], alternatives: true, summary: true },
     budget: { facts: true, tabs: true }
   };
-  function options(over) { var o = {}; Object.keys(OPTIONS).forEach(function (k) { o[k] = Object.assign({}, OPTIONS[k], (over && over[k]) || {}); }); return o; }
+  function options(over) { var o = {}; Object.keys(OPTIONS).forEach(function (k) { o[k] = Object.assign({}, OPTIONS[k], over && over[k]); }); return o; }
   function has(list, x) { return !list || list.indexOf(x) >= 0; }
 
   /* ---------------- tokens and art ---------------- */
@@ -11768,15 +11774,15 @@ window.x7 = window.x7 || function (t) {
     function ink(name) { var c = typeof name === 'string' && Object.prototype.hasOwnProperty.call(T, name) ? T[name] : null;
       if (!Array.isArray(c)) { if (!bad) { F.with('TOKEN_UNKNOWN', { app: model.app, screen: 'views', detail: 'ink ' + name }); bad = true; } return T.ink; } return c; }
     var nodes = [], NM = new Map(), used = new Set([0, GID]), POPS = [], TB = [], ENTER = [], counts = { items: 0, rows: 0, glyphs: 0 };
-    function nd(key, vm, slabOwner) { var n = NM.get(key); if (n) return n; var id = fnv(key) || 1;
+    function nd(key, vm, slabOwner) { var n = NM.get(key); if (n) return n; var id = fnv(key); /* 0 is in used, so the loop below moves an id of 0 on */
       var reserved = function (b) { return b === 0x1 || b === 0x2 || b === 0x4 || b === 0x5 || b === 0x6 || b === 0x7; }; /* TextField 0x5/0x1/0x7/0x4, slabs 0x6 */
-      while (used.has(id) || id === 0xffffffff || reserved(id >>> 28)) { if (id === 0xffffffff || reserved(id >>> 28)) id = ((id & 0xf0000000) + 0x10000000) >>> 0 || 1; else id = (id + 1) >>> 0 || 1; }
-      used.add(id); n = { key: key, id: id, flags: 0, items: [], hit: null, el: null, act: null, vm: vm || null, slabOwner: slabOwner || null }; NM.set(key, n); nodes.push(n); return n; }
+      while (used.has(id) || id === 0xffffffff || reserved(id >>> 28)) { if (id === 0xffffffff || reserved(id >>> 28)) id = ((id & 0xf0000000) + 0x10000000) >>> 0; else id = (id + 1) >>> 0; }
+      used.add(id); n = { key: key, id: id, flags: 0, items: [], hit: null, el: null, act: null, vm: vm, slabOwner: slabOwner }; /* every caller gives both */ NM.set(key, n); nodes.push(n); return n; }
     function textItem(n, x, base, sz, c, s, maxw, bold) { s = String(s == null ? '' : s).replace(/\s+$/, ''); if (!s) return; counts.glyphs += s.replace(/\s/g, '').length;
       if (bold) { /* shrink to fit: a bold label wider than its room gets smaller and stays on one line, never wraps out of its box */
         var bw = maxw ? tw(s, sz, true) : 0, bs = bw > maxw ? sz * maxw / bw : sz;
-        n.items.push(['rich', x, base - bs * 0.92, [{ text: s, size: bs, color: U(c), bold: true }], bs < sz ? 0 : maxw || 0, 1.25, FONT, FONTB]); }
-      else n.items.push(['text', x, base, sz, U(c), s, maxw || 0, FONT]); }
+        n.items.push(['rich', x, base - bs * 0.92, [{ text: s, size: bs, color: U(c), bold: true }], bs < sz ? 0 : maxw, 1.25, FONT, FONTB]); }
+      else n.items.push(['text', x, base, sz, U(c), s, maxw, FONT]); } /* every caller gives maxw (0: no limit) */
     function wrapH(s, sz, w, lh) { return CORE.wrap(FONT, sz, placed(s), Math.max(8, w), { lineHeight: lh }).height; }
     function size(s) { return s === 'title' ? FS + 3 : s === 'h' ? FS + 1 : s === 'small' || s === 'muted' ? FS - 2 : s === 'tiny' ? FS - 3 : s === 'code' ? FS - 1 : FS; }
     function inkOf(nm) { return nm.color ? ink(nm.color) : nm.s === 'title' ? T.accent : nm.s === 'muted' || nm.s === 'small' || nm.s === 'tiny' ? T.muted : nm.s === 'flag' ? T.danger : T.ink; }
@@ -11787,7 +11793,7 @@ window.x7 = window.x7 || function (t) {
       if (bold) { var lay = CORE.richLayout(placedRuns([{ text: s, size: sz, color: U(inkOf(nm)), bold: true }]), { maxw: w, lineHeight: 1.4, font: FONT, boldFont: FONTB }); n.items.push(['rich', x, y + 1, [{ text: s, size: sz, color: U(inkOf(nm)), bold: true }], w, 1.4, FONT, FONTB]); TB.push({ key: n.key, text: s, size: sz, maxw: w, lh: 1.4, count: lay.count, height: lay.height, kind: 'rich' }); return lay.height + 2; }
       var wr = CORE.wrap(FONT, sz, placed(s), w, { lineHeight: lh }); n.items.push(['tbox', x, y + lh * 0.72, sz, U(inkOf(nm)), s, w, lh, FONT]); TB.push({ key: n.key, text: s, size: sz, maxw: w, lh: lh, count: wr.count, height: wr.height, kind: 'tbox' }); return wr.height; }
     /* a paragraph of runs ({ text, bold, color }), wrapped as one block; a run's colour is a token name (the style's ink when none) */
-    function runsBlock(nm, key, x, y, w, owner) { var sz = size(nm.s || 'body'), all = !!nm.bold || nm.s === 'title' || nm.s === 'h';
+    function runsBlock(nm, key, x, y, w, owner) { var sz = size(nm.s), all = !!nm.bold || nm.s === 'title' || nm.s === 'h';
       var runs = nm.runs.map(function (r) { return { text: String(r.text).replace(/\s+/g, ' '), size: sz, color: U(r.color ? ink(r.color) : inkOf(nm)), bold: all || !!r.bold }; }).filter(function (r) { return r.text.length > 0; });
       if (!runs.length) return 0; var n = nd(key + ':tx', nm, owner), lay = CORE.richLayout(placedRuns(runs), { maxw: w, lineHeight: 1.4, font: FONT, boldFont: FONTB });
       runs.forEach(function (r) { counts.glyphs += r.text.replace(/\s/g, '').length; });
@@ -11796,11 +11802,11 @@ window.x7 = window.x7 || function (t) {
     function codeBlock(nm, key, x, y, w, owner) { var s = String(nm.text == null ? '' : nm.text).replace(/\s+$/, ''); if (!s) return 0; var sz = size('code'), lh = Math.round(sz * 1.4);
       var n = nd(key + ':tx', nm, owner), wr = CORE.wrap(FONT, sz, placed(s), w, { lineHeight: lh }); counts.glyphs += s.replace(/\s/g, '').length;
       n.items.push(['tbox', x, y + lh * 0.72, sz, U(inkOf(nm)), s, w, lh, FONT]); TB.push({ key: n.key, text: s, size: sz, maxw: w, lh: lh, count: wr.count, height: wr.height, kind: 'tbox' }); return wr.height; }
-    function setHit(n, x, y, w, h, flags, act) { n.flags = flags; n.hit = [x, y, w, h]; n.act = act || 'vm'; }
+    function setHit(n, x, y, w, h, flags) { n.flags = flags; n.hit = [x, y, w, h]; n.act = 'vm'; } /* a hit node's act is its view model's */
 
     /* intrinsic width of an inline atom */
-    function atomW(nm) { var sz = size(nm.s || 'body');
-      if (nm.t === 'btn') { var b = nm.kind === 'primary' || nm.on; return Math.max(nm.minW || 0, tw(nm.label, FS, b) + (nm.kind === 'icon' ? T.iconPad : T.btnPad) * D); }
+    function atomW(nm) { var sz = size(nm.s);
+      if (nm.t === 'btn') { var b = nm.kind === 'primary' || nm.on; var bw = tw(nm.label, FS, b) + (nm.kind === 'icon' ? T.iconPad : T.btnPad) * D; return nm.minW > bw ? nm.minW : bw; } /* a minimum not given is left out */
       if (nm.t === 'chip') return tw(nm.label, FS - 1, !!nm.on) + T.chipPad * D;
       if (nm.t === 'field') return nm.fill ? Infinity : nm.w || T.fieldW;
       if (nm.t === 'text') return tw(String(nm.text), sz, !!nm.bold || nm.s === 'h');
@@ -11814,7 +11820,7 @@ window.x7 = window.x7 || function (t) {
 
     /* draw an inline atom at x,y in a line of height lh */
     function atom(nm, key, x, y, w, lh, owner) { var h = atomH(nm, w), ay = y + (lh - h) / 2;
-      if (nm.t === 'btn') { var kind = nm.kind || 'default', round = kind === 'tab' || kind === 'pill', primary = kind === 'primary';
+      if (nm.t === 'btn') { var kind = nm.kind, round = kind === 'tab' || kind === 'pill', primary = kind === 'primary';
         var bv = (round ? 'round' : 'ctl') + (primary ? '-primary' : '-plain') + (nm.on ? '-on' : '') + (nm.invalid ? '-inv' : '') + (nm.disabled ? '-dis' : ''), sv = kind === 'ghost' ? 'none' : round ? 'round' : 'ctl';
         var sh = drawn('Button', 'button.shadow', sv, key + ':sh') ? nd(key + ':sh', nm, owner) : null, n = nd(key, nm, owner), bold = !!nm.on || primary;
         if (sh) art(sh, 'Button', 'button.shadow', sv, [x, ay + 1, w, h + 0.5]);
@@ -11831,11 +11837,11 @@ window.x7 = window.x7 || function (t) {
         var fs = T.fieldSize, fp = T.fieldPad, fv = nm.v == null ? '' : String(nm.v).split('\n')[0], fm = CORE.metrics(FONT), fa = fm.asc / fm.upm * fs;
         if (fv || fn.ph) { var flh = fs * 1.25, fc = Math.max(0, (h - fp * 2 - flh) / 2) + (fv ? (flh - fs) / 4 : 0); /* TextField: single line centred, value nudged by (lh-size)/4 */
           fn.items.push(['text', x + fp, ay + fp + fa + fc, fs, U(fv ? T.ink : T.muted), fv || fn.ph, Math.max(1, w - 2 * fp), FONT]); /* cut with an ellipsis, as the unfocused live field */ counts.glyphs += (fv || fn.ph).replace(/\s/g, '').length; } return; }
-      if (nm.t === 'text') { var sz = size(nm.s || 'body'), tn = nd(key + ':tx', nm, owner); textItem(tn, x, y + lh / 2 + sz * 0.36, sz, inkOf(nm), nm.text, 0, !!nm.bold || nm.s === 'h'); } }
+      if (nm.t === 'text') { var sz = size(nm.s), tn = nd(key + ':tx', nm, owner); textItem(tn, x, y + lh / 2 + sz * 0.36, sz, inkOf(nm), nm.text, 0, !!nm.bold || nm.s === 'h'); } }
 
     /* horizontal flow with wrapping; returns height */
     function row(nm, key, x, y, w, owner) { var gap = (nm.gap == null ? 6 : nm.gap) * D, lines = [], cur = [], cx = 0;
-      (nm.kids || []).forEach(function (c) { if (!c) return; var aw = Math.min(atomW(c), w), wide = c.t === 'text' && atomW(c) > w;
+      vmLs(nm.kids).forEach(function (c) { if (!c) return; var aw = Math.min(atomW(c), w), wide = c.t === 'text' && atomW(c) > w;
         if (wide) { if (cur.length) lines.push(cur); lines.push([{ c: c, w: w, block: true }]); cur = []; cx = 0; return; }
         if (cur.length && cx + aw > w) { lines.push(cur); cur = []; cx = 0; } cur.push({ c: c, w: aw }); cx += aw + gap; });
       if (cur.length) lines.push(cur);
@@ -11852,10 +11858,10 @@ window.x7 = window.x7 || function (t) {
       if (nm.t === 'grid') return grid(nm, key, x, y, w, owner);
       if (nm.t === 'table') return table(nm, key, x, y, w, owner);
       if (nm.t === 'pop') { POPS.push({ nm: nm, key: key, owner: owner }); return -1; }
-      if (nm.t === 'split') { var sk = (nm.kids || []).filter(Boolean), sg = (nm.gap == null ? 16 : nm.gap) * D, sn = Math.max(1, sk.length), sw = Math.floor((w - sg * (sn - 1)) / sn), smax = 0;
+      if (nm.t === 'split') { var sk = vmLs(nm.kids).filter(Boolean), sg = (nm.gap == null ? 16 : nm.gap) * D, sn = Math.max(1, sk.length), sw = Math.floor((w - sg * (sn - 1)) / sn), smax = 0;
         if (sw < 300 * D) { var sy = y; sk.forEach(function (c) { var h = block(c, key + '/' + c.k, x, sy, w, owner); if (h > 0) sy += h + sg; }); return Math.max(0, sy - y - sg); }
         sk.forEach(function (c, i) { var h = block(c, key + '/' + c.k, x + i * (sw + sg), y, sw, owner); if (h > smax) smax = h; }); return smax; }
-      if (nm.t === 'space') return (nm.h || 6) * D;
+      if (nm.t === 'space') return typeof nm.h === 'number' ? nm.h * D : 0; /* a space with no height takes no room */
       if (nm.t === 'btn' || nm.t === 'chip' || nm.t === 'field') return row({ kids: [nm] }, key + ':r', x, y, w, owner);
       /* col: optional container role */
       var role = nm.role, pad = role ? (nm.pad != null ? nm.pad : role === 'view' ? T.viewPad : T.pad) * D : 0, inset = role === 'row' || role === 'section' || role === 'detail' ? (nm.bar ? 6 : 0) : 0;
@@ -11863,16 +11869,17 @@ window.x7 = window.x7 || function (t) {
       var sh = role ? nd(key + ':sh', nm, own) : null, fn = role ? nd(key, nm, own) : null;
       if (fn && nm.slab) { fn.slabKind = nm.slab; fn.slabKey = key; } if (nm.enter) ENTER.push(key); if (role === 'row' || role === 'section') counts.rows++;
       var gap = (nm.gap == null ? (role === 'view' ? T.viewGap : T.gap) : nm.gap) * D, cy = y + pad, iw = w - 2 * pad - inset, ix = x + pad + inset, any = false;
-      (nm.kids || []).forEach(function (c) { if (!c) return; var h = block(c, key + '/' + c.k, ix + (c.indent || 0) * D, cy, iw - (c.indent || 0) * D, own); if (h < 0) return; cy += h + gap; any = true; });
-      var h = Math.max(nm.minH || 0, (any ? cy - gap : cy) - y + pad);
+      vmLs(nm.kids).forEach(function (c) { if (!c) return; var ci = typeof c.indent === 'number' ? c.indent * D : 0, h = block(c, key + '/' + c.k, ix + ci, cy, iw - ci, own); /* an indent not given is none */ if (h < 0) return; cy += h + gap; any = true; });
+      var h = (any ? cy - gap : cy) - y + pad; if (nm.minH > h) h = nm.minH; /* a minimum not given is left out */
       if (fn) { var pv = nm.bar ? role + '-' + nm.bar : role; /* bar: a risk level C, M or L, or paying (a row only) */
         art(sh, 'Panel', 'panel.shadow', pv, role === 'pop' ? [x - 1, y + 3, w + 2, h + 5] : [x - 1, y + 1, w + 2, h + 3]); art(fn, 'Panel', 'panel.face', pv, [x, y, w, h], 0);
-        if (role === 'pop') { setHit(fn, x, y, w, h, NF.HIT, null); fn.act = null; }
+        if (role === 'pop') { setHit(fn, x, y, w, h, NF.HIT); fn.act = null; }
         else if (nm.act) { setHit(fn, x, y, w, h, NF.HIT); fn.mo = 'row'; } /* a panel you can tap as a whole (the controls in it are drawn over it) */ }
       return h; }
 
     /* calendar grid: n columns; cells: {t:'dow'|'pad'|'day'} */
-    function grid(nm, key, x, y, w, owner) { var n = nm.cols || 7, gap = (nm.gap == null ? 5 : nm.gap) * D, cw = (w - gap * (n - 1)) / n, DH = (nm.cellH || 80) * D, cy = y, i = 0, rh = 0, cells = nm.kids || [];
+    function grid(nm, key, x, y, w, owner) { if (!(nm.cols > 0) || !(nm.cellH > 0)) return 0; /* a grid with no columns or cell height is left out */
+      var n = nm.cols, gap = (nm.gap == null ? 5 : nm.gap) * D, cw = (w - gap * (n - 1)) / n, DH = nm.cellH * D, cy = y, i = 0, rh = 0, cells = vmLs(nm.kids);
       cells.forEach(function (c, k) { var cx = x + (i % n) * (cw + gap), h = 0, ck = key + '/' + c.k;
         if (c.t === 'dow') { var sz = FS - 2, tn = nd(ck + ':tx', c, owner); textItem(tn, cx + (cw - tw(c.text, sz)) / 2, cy + 13, sz, T.muted, c.text, 0); h = 20; }
         else if (c.t === 'pad') h = DH;
@@ -11880,8 +11887,8 @@ window.x7 = window.x7 || function (t) {
         else h = block(c, ck, cx, cy, cw, owner);
         rh = Math.max(rh, h); i++; if (i % n === 0 || k === cells.length - 1) { cy += rh + gap; rh = 0; } });
       return Math.max(0, cy - y - gap); }
-    function day(c, key, x, y, w, H, owner) { var dv = (c.risk || 'none') + (c.sel || c.drag ? '-sel' : '') + (c.span ? '-span' : '') + (c.today ? '-today' : '') + (c.anchor ? '-anchor' : '');
-      var sh = nd(key + ':sh', c, owner), n = nd(key, c, owner); art(sh, 'DayCell', 'day.shadow', 'plain', [x, y + 1, w, H + 0.5]); art(n, 'DayCell', 'day.face', dv, [x, y, w, H], 0); setHit(n, x, y, w, H, NF.HIT | NF.DRAG); n.mo = 'cell'; n.anim = c.anim || null; n.stateName = c.state || null;
+    function day(c, key, x, y, w, H, owner) { var dv = c.risk + (c.sel || c.drag ? '-sel' : '') + (c.span ? '-span' : '') + (c.today ? '-today' : '') + (c.anchor ? '-anchor' : '');
+      var sh = nd(key + ':sh', c, owner), n = nd(key, c, owner); art(sh, 'DayCell', 'day.shadow', 'plain', [x, y + 1, w, H + 0.5]); art(n, 'DayCell', 'day.face', dv, [x, y, w, H], 0); setHit(n, x, y, w, H, NF.HIT | NF.DRAG); n.mo = 'cell'; if (c.anim) n.anim = c.anim; if (c.state) n.stateName = c.state;
       var pad = T.dayPad * D, ix = x + pad + 4, iw = Math.max(8, w - 2 * pad - 4), num = String(c.num);
       textItem(n, ix, y + pad + 11, FS - 1, c.today ? T.accent : T.ink, num, 0, true);
       if (c.badge) { var bs = FS - 3, bw2 = tw(c.badge, bs, true); textItem(n, x + w - pad - bw2 - 2, y + pad + 10, bs, c.badgeInk ? ink(c.badgeInk) : T.muted, c.badge, 0, true); }
@@ -11889,7 +11896,7 @@ window.x7 = window.x7 || function (t) {
       if (c.count) textItem(n, ix, y + pad + 19, Math.max(6, FS - 5), T.muted, c.count + (c.count === 1 ? ' item' : ' items'), 0);
       /* 1.8.52: plain lines stack; steps are boxes tinted by kind that flow side by side with a small gap and move to the next
          row only at the cell edge. Text shrinks (to 3px) until all of it fits the fixed cell; nothing is dropped or cut. */
-      var lines = c.lines || [], top = y + pad + (c.count ? 23 : 17), ih = Math.max(8, H - (top - y) - pad);
+      var lines = vmLs(c.lines), top = y + pad + (c.count ? 23 : 17), ih = Math.max(8, H - (top - y) - pad);
       /* a step's box is the DayStep art of its kind (out, in, debt, routine); its text is in the kind's ink */
       var TONE_INK = { out: 'toneOutInk', 'in': 'toneInInk', debt: 'toneDebtInk', routine: 'toneRoutineInk' };
       function lay(s, emit) { var lh = Math.max(3.5, s * 1.25), px = Math.max(1, s * 0.3), py = Math.max(0.5, s * 0.12), g = Math.max(1.5, s * 0.3), cy = top, cx = ix, rowH = 0, ok = true;
@@ -11910,12 +11917,12 @@ window.x7 = window.x7 || function (t) {
       return H; }
 
     /* table: columns sized from content; rows may carry a full-width sub block (alternatives) */
-    function table(nm, key, x, y, w, owner) { var cols = nm.cols || [], nc = cols.length, P = T.tablePad * D, sz = FS, hs = FS - 2; if (!nc) return 0;
+    function table(nm, key, x, y, w, owner) { var cols = vmLs(nm.cols), nc = cols.length, P = T.tablePad * D, sz = FS, hs = FS - 2; if (!nc) return 0;
       var mn = cols.map(function (c) { return tw(c.label, hs) + P; }), pf = mn.slice(), fx = cols.map(function () { return false; });
       /* a cell { btn, act } is a button in the cell, as wide as its label */
       var btnOf = function (c, k) { return { t: 'btn', k: k, label: String(c.btn), act: c.act, kind: 'ghost' }; };
-      (nm.rows || []).forEach(function (r) { (r.cells || []).forEach(function (cell, i) { if (i >= nc) return; if (cell && cell.btn != null) { var bw0 = atomW(btnOf(cell)) + P; mn[i] = Math.max(mn[i], bw0); pf[i] = Math.max(pf[i], bw0); fx[i] = true; return; }
-        var t = String(cell && cell.text != null ? cell.text : cell || '');
+      vmLs(nm.rows).forEach(function (r) { vmLs(r.cells).forEach(function (cell, i) { if (i >= nc) return; if (cell && cell.btn != null) { var bw0 = atomW(btnOf(cell)) + P; mn[i] = Math.max(mn[i], bw0); pf[i] = Math.max(pf[i], bw0); fx[i] = true; return; }
+        var t = cell && cell.text != null ? String(cell.text) : vmStr(cell); /* measured as cellsRow draws it */
         mn[i] = Math.max(mn[i], Math.min(T.columnCap, Math.max.apply(null, t.split(' ').map(function (q) { return tw(q, sz); }).concat([0]))) + P); pf[i] = Math.max(pf[i], tw(t, sz) + P); }); });
       var smn = mn.reduce(function (a, b) { return a + b; }, 0), spf = pf.reduce(function (a, b) { return a + b; }, 0), cw;
       if (spf <= w) cw = pf.map(function (v) { return v + (w - spf) * v / spf; });
@@ -11935,12 +11942,12 @@ window.x7 = window.x7 || function (t) {
           else tn.items.push(['tbox', q.x + P / 2, cy + 5 * D + lh * 0.72, q.s, U(ink2), q.t, q.w - P, lh, FONT]); counts.glyphs += q.t.replace(/\s/g, '').length; });
         counts.rows++; cy += rh; }
       cellsRow(key + '/h', cols.map(function (c) { return { text: c.label }; }), true, {}, null);
-      (nm.rows || []).forEach(function (r) { cellsRow(key + '/' + r.k, r.cells || [], false, { risk: r.risk, sel: r.sel, tone: r.tone }, r);
+      vmLs(nm.rows).forEach(function (r) { cellsRow(key + '/' + r.k, vmLs(r.cells), false, { risk: r.risk, sel: r.sel, tone: r.tone }, r);
         if (r.sub) { var sk = key + '/' + r.k + '/sub', sub = r.sub, h = block(sub, sk, x + 10 * D, cy + 4 * D, w - 20 * D, owner); if (h > 0) cy += h + 8 * D; } });
       return cy - y; }
 
     var inset = (model.inset == null ? T.inset : +model.inset) * D, H = 0, cy = inset;
-    (model.kids || []).forEach(function (c) { var h = block(c, c.k, inset, cy, width - 2 * inset, null); if (h >= 0) cy += h + T.viewGap * D; });
+    vmLs(model.kids).forEach(function (c) { var h = block(c, c.k, inset, cy, width - 2 * inset, null); if (h >= 0) cy += h + T.viewGap * D; });
     H = Math.ceil(cy - T.viewGap * D + inset);
     /* popovers last: under their anchor, inside the page; the page grows if one runs past the end */
     POPS.forEach(function (P) { var from = nodes.length, an = P.nm.anchor && NM.get(P.nm.anchor), ah = an && an.hit ? an.hit : [inset, inset, 0, 0], pw = Math.min(width - 2 * inset, (P.nm.w || T.popW) * D);
@@ -11969,7 +11976,7 @@ window.x7 = window.x7 || function (t) {
     for (var mi = 0; mi < nodes.length; mi++) { var mn = nodes[mi], ms = [];
       for (var mj = 0; mj < mn.items.length; mj++) ms = ms.concat(marksOf(mn.items[mj]));
       for (var mq = 0; mq < ms.length; mq++) { var q = ms[mq], tone = TONEC[q.c];
-        if (!tone) return F.with('TOKEN_UNKNOWN', { app: model.app, screen: 'views', detail: 'the mark ' + q.ch + ' in ' + JSON.stringify(String(q.text).slice(0, 60)) + ' is in the colour of ' + (Object.keys(T).filter(function (t) { return Array.isArray(T[t]) && U(T[t]) === q.c; }).join(', ') || 'no token') + ', and no mark tone (' + root.Exp7ViewComponents.markTones.join(', ') + ') has that colour' });
+        if (!tone) return F.with('TOKEN_UNKNOWN', { app: model.app, screen: 'views', detail: 'the mark ' + q.ch + ' in ' + JSON.stringify(String(q.text).slice(0, 60)) + ' is in a colour ' + (function (nmd) { return nmd ? 'the tokens ' + nmd + ' have' : 'no token has'; })(Object.keys(T).filter(function (t) { return Array.isArray(T[t]) && U(T[t]) === q.c; }).join(', ')) + ', and no mark tone (' + root.Exp7ViewComponents.markTones.join(', ') + ') has that colour' });
         if (A.draw(S, mn, 'Mark', 'mark.glyph', MK[q.ch] + '-' + tone, [q.x, q.base - q.sz * 0.32 - q.w / 2, q.w, q.w]) === FAIL) return FAIL; } }
     /* every character an item draws is in the font it draws it in: a missing one fails the layout (no notdef box) */
     for (var gi = 0; gi < nodes.length; gi++) for (var gj = 0; gj < nodes[gi].items.length; gj++) { var gt = nodes[gi].items[gj], miss = null;
@@ -11979,13 +11986,14 @@ window.x7 = window.x7 || function (t) {
     return hovers({ nodes: nodes, H: Math.max(T.minH, H), items: counts.items, rows: counts.rows, glyphs: counts.glyphs, hits: nodes.filter(function (n) { return n.flags & NF.HIT; }).length, tboxes: TB, notdef: [], vm: true, tokens: T, fonts: { regular: FONT, bold: FONTB }, enter: ENTER }); }
 
   /* ---------------- motion ---------------- */
-  var MCFG = root.EXP7_MOTION_CONFIG || {};
-  function trMs(from, to, d) { var L = (MCFG.transitions || []).find(function (x) { return x.from === from && x.to === to; }); return L && L.ms != null ? +L.ms : d; }
+  /* 1.8.106: the motion is read from EXP7_MOTION_CONFIG as it is; a motion it does not give (a hover lift, a press scale) is left out */
+  var MCFG = vmRd(root.EXP7_MOTION_CONFIG), REST = [0, 0, 1], ORIGIN = [0, 0]; /* REST: a node at rest (no move, scale 1) */
+  function trMs(from, to, d) { var L = vmLs(MCFG.transitions).find(function (x) { return x.from === from && x.to === to; }); return L && L.ms != null ? +L.ms : d; }
   var EASE = { out: function (t) { return 1 - Math.pow(1 - t, 3); }, soft: function (t) { return t * t * (3 - 2 * t); }, lin: function (t) { return t; } };
   function reduced() { try { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; } }
   function Motion(view) { this.view = view; this.cur = new Map(); this.tw = new Map(); this.raf = 0; this.pressed = null; }
-  Motion.prototype.to = function (ids, target, ms, ease, center) { if (reduced()) ms = 0; var now = performance.now(), self = this;
-    ids.forEach(function (id) { var from = self.cur.get(id) || [0, 0, 1]; self.tw.set(id, { a: from, b: target, t0: now, ms: Math.max(0, ms), e: EASE[ease] || EASE.out, c: center || [0, 0] }); });
+  Motion.prototype.to = function (ids, target, ms, ease, center) { if (!EASE[ease]) return; /* an ease the motion does not have: the tween is left out */ if (reduced()) ms = 0; var now = performance.now(), self = this;
+    ids.forEach(function (id) { var from = self.cur.has(id) ? self.cur.get(id) : REST; self.tw.set(id, { a: from, b: target, t0: now, ms: Math.max(0, ms), e: EASE[ease], c: center }); });
     this.kick(); };
   Motion.prototype.kick = function () { var self = this; if (this.raf) return; this.raf = requestAnimationFrame(function step(t) { self.raf = 0; if (!self.view.s) { self.tw.clear(); return; }
       var p = new J.Patch(), n = 0, now = performance.now();
@@ -11995,11 +12003,12 @@ window.x7 = window.x7 || function (t) {
         if (k >= 1) { self.tw.delete(id); if (v[0] === 0 && v[1] === 0 && v[2] === 1) self.cur.delete(id); } });
       if (n) { try { self.view.s.patch(p); self.view.r && self.view.r.draw(); } catch (e) { self.tw.clear(); } }
       if (self.tw.size) self.kick(); }); };
-  function ctr(n) { var h = n.hit || [0, 0, 0, 0]; return [h[0] + h[2] / 2, h[1] + h[3] / 2]; }
+  function ctr(n) { var h = n.hit; return [h[0] + h[2] / 2, h[1] + h[3] / 2]; }
   function pair(view, n) { var ids = [n.id], sh = view.byId && view.L && view.L.nodes.find(function (q) { return q.key === n.key + ':sh'; }); if (sh) ids.push(sh.id); return ids; }
-  Motion.prototype.event = function (e, n) { var EV = J.EV, E = (MCFG.element || {});
-    if (!n || !n.vm || n.mo !== 'free') return;
-    var lift = -Math.min(2, ((E.hover || {}).lift || 2) * 0.75), ps = (E.pressed || {}).scale || 0.97;
+  Motion.prototype.event = function (e, n) { var EV = J.EV, E = vmRd(MCFG.element), hl = vmRd(E.hover).lift, ps = vmRd(E.pressed).scale;
+    if (!n || !n.vm || n.mo !== 'free' || !n.hit) return;
+    if (typeof hl !== 'number' || typeof ps !== 'number') return; /* no hover lift or press scale in the motion config: no hover or press motion */
+    var lift = -Math.min(2, hl * 0.75);
     if (e.kind === EV.ENTER) { var self = this, down = []; this.cur.forEach(function (v, id) { if (id !== n.id && v[1] < 0 && !(self.pressed && self.pressed.id === id)) down.push(id); });
       if (down.length) this.to(down, [0, 0, 1], trMs('hover', 'idle', 180), 'soft'); this.to([n.id], [0, lift, 1], trMs('idle', 'hover', 120), 'out', ctr(n)); }
     else if (e.kind === EV.LEAVE) this.to(pair(this.view, n), [0, 0, 1], trMs('hover', 'idle', 180), 'soft', ctr(n));
@@ -12011,9 +12020,9 @@ window.x7 = window.x7 || function (t) {
     var gone = []; this.cur.forEach(function (v, id) { if (!keep.has(id) && !self.tw.has(id)) gone.push(id); }); if (gone.length) this.reset(gone); };
   /* nodes that appeared in a patch: containers marked enter slide in with their contents */
   Motion.prototype.enter = function (prev, L) { if (!prev || reduced() || !L.enter || !L.enter.length) return; var self = this, under = function (k, key) { return k === key || k.indexOf(key + '/') === 0 || k.indexOf(key + ':') === 0; };
-    var was = new Set(prev.enter || []); L.enter.forEach(function (key) { if (was.has(key) || prev.nodes.some(function (n) { return under(n.key, key); })) return;
+    var was = new Set(vmLs(prev.enter)); L.enter.forEach(function (key) { if (was.has(key) || prev.nodes.some(function (n) { return under(n.key, key); })) return;
       var ids = L.nodes.filter(function (n) { return under(n.key, key); }).map(function (n) { return n.id; }); if (!ids.length) return;
-      ids.forEach(function (id) { self.cur.set(id, [0, 8, 1]); }); self.to(ids, [0, 0, 1], trMs('idle', 'settling', 170), 'out'); }); };
+      ids.forEach(function (id) { self.cur.set(id, [0, 8, 1]); }); self.to(ids, [0, 0, 1], trMs('idle', 'settling', 170), 'out', ORIGIN); }); }; /* a slide has scale 1, so its centre is any point */
   /* a day that enters an atlas state with anim "shake" shakes once */
   Motion.prototype.states = function (prev, L) { if (!prev || reduced()) return; var was = new Map(prev.nodes.map(function (n) { return [n.id, n.stateName]; })), self = this;
     L.nodes.forEach(function (n) { if (n.anim !== 'shake' || !was.has(n.id) || was.get(n.id) === n.stateName) return; var ids = pair(self.view, n); ids.forEach(function (id) { self.tw.set(id, { a: [0, 0, 1], b: [0, 0, 1], t0: performance.now(), ms: 260, e: EASE.lin, c: [0, 0], shake: 2.5 }); }); self.kick(); }); };
@@ -12031,12 +12040,12 @@ window.x7 = window.x7 || function (t) {
     s.onevent = function (e) { self._inEvent = true; try { if (ev) ev(e); } finally { self._inEvent = false; } var n = e.id != null && self.byId && self.byId.get(e.id); if (self._vmMotion && n) self._vmMotion.event(e, n); }; };
 
   /* ---------------- helpers for builders ---------------- */
-  function col(k, kids, o) { return Object.assign({ t: 'col', k: k, kids: kids.filter(Boolean) }, o || {}); }
-  function rowN(k, kids, o) { return Object.assign({ t: 'row', k: k, kids: kids.filter(Boolean) }, o || {}); }
-  function text(k, s, style, o) { return Object.assign({ t: 'text', k: k, text: s, s: style || 'body' }, o || {}); }
-  function btn(k, label, act, o) { return Object.assign({ t: 'btn', k: k, label: label, act: act }, o || {}); }
-  function chip(k, label, o) { return Object.assign({ t: 'chip', k: k, label: label }, o || {}); }
-  function field(k, tf, ph, o) { return Object.assign({ t: 'field', k: k, tf: tf, ph: ph }, o || {}); }
+  function col(k, kids, o) { return Object.assign({ t: 'col', k: k, kids: kids.filter(Boolean) }, o); }
+  function rowN(k, kids, o) { return Object.assign({ t: 'row', k: k, kids: kids.filter(Boolean) }, o); }
+  function text(k, s, style, o) { return Object.assign({ t: 'text', k: k, text: s, s: style }, o); } /* no style: body text */
+  function btn(k, label, act, o) { return Object.assign({ t: 'btn', k: k, label: label, act: act }, o); }
+  function chip(k, label, o) { return Object.assign({ t: 'chip', k: k, label: label }, o); }
+  function field(k, tf, ph, o) { return Object.assign({ t: 'field', k: k, tf: tf, ph: ph }, o); }
 
   root.Exp7VM = { version: '1.8.81', linear: linear, radial: radial, conic: conic, strokeItem: strokeItem, layout: layout, session: session, hovers: hovers, OPTIONS: OPTIONS, options: options, has: has,
     col: col, row: rowN, text: text, btn: btn, chip: chip, field: field, fieldStyle: fieldStyle, Motion: Motion };
@@ -13687,7 +13696,7 @@ function calVM(V,A,c,O){ const X=VMx(), M=window.JAtlasModel, E=window.JAtlasEva
       return {at:tm, text:(tm?tm.replace(/^0(\d)/,'$1')+' ':'')+it.name, chip:true, tone:v.type==='routine'?'routine':(v.flow==='in'||v.type==='income')?'in':(v.payTo||v.type==='debt')?'debt':'out'}; })
       .filter(Boolean).sort((p,q)=>p.at<q.at?-1:p.at>q.at?1:0).forEach(L=>lines.push(L));
     V.vmInfo.days++; if(by[d]&&by[d].length) V.vmInfo.dayItems[d]=by[d].map(r=>M.get(A,r).name);
-    cells.push({t:'day',k:d,day:d,num:+d.slice(8),lines,count:hostLs(by[d]).length,risk:rk?rk.c:null,badge:rk?((A.meta&&A.meta.budget&&window.BudgetFlows&&window.BudgetFlows.resLetter)?window.BudgetFlows.resLetter(rk.c):rk.c):null,badgeInk:rk?'riskText'+rk.c:null,sel,drag,anchor:CS.anchor===d,span:!!spanCover[d],today:d===today,
+    cells.push({t:'day',k:d,day:d,num:+d.slice(8),lines,count:hostLs(by[d]).length,risk:rk?rk.c:'none',badge:rk?((A.meta&&A.meta.budget&&window.BudgetFlows&&window.BudgetFlows.resLetter)?window.BudgetFlows.resLetter(rk.c):rk.c):null,badgeInk:rk?'riskText'+rk.c:null,sel,drag,anchor:CS.anchor===d,span:!!spanCover[d],today:d===today,
       state:name,anim:st&&st.anim?st.anim:null,title:rk?d+' · '+((A.meta&&A.meta.budget&&window.BudgetFlows&&window.BudgetFlows.resLabel)?window.BudgetFlows.resLabel(rk.c):RISK_COL[rk.c][1])+' · '+rk.why:d,styleName:ds[d]?ds[d]:null}); });
   kids.push({t:'grid',k:'grid',cols:7,gap:5,cellH:80,kids:cells});
   if(o.legend&&A.meta&&A.meta.budget&&window.BudgetFlows&&window.BudgetFlows.resLabel){ kids.push(X.row('legend',['L','M','C'].map(k=>X.text(k,window.BudgetFlows.resLetter(k)+'  '+window.BudgetFlows.resLabel(k),'small',{color:'riskText'+k,bold:true})),{gap:14})); kids.push(X.text('legendnote',window.BudgetFlows.RES_NOTE,'muted')); }
@@ -18941,7 +18950,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.105",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.106",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
