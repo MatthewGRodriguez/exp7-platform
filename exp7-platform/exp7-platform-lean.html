@@ -13841,7 +13841,7 @@ function budgetChromeVM(V,AW,O){ const X=VMx(), o=O.budget, ui=window.__budgetUi
   if(o.facts){ const ddi=f.ddi==null?'—':(f.ddi*100).toFixed(1)+'%', fact=(k,v)=>X.text('f:'+k,k+'  '+v,'body');
     const facts=X.row('facts',[X.btn('date',budgetDateLabel(date)+' ▾','budget:date',{on:!!pick}),fact('surplus',budgetMoney(f.surplus)),fact('ddi',ddi),fact('net income',budgetMoney(f.netIncome)),fact('living cost',budgetMoney(f.living)),fact('net worth',budgetMoney(f.netWorth))],{gap:12});
     kids.push(X.col('figs',[facts],{role:'section',slab:'inner'}));
-    if(pick) kids.push(window.Exp7Journal.datePicker(pick,date)); }
+    if(pick) kids.push(window.Exp7Journal.datePicker(pick,date,'budget/figs/facts/date')); }
   if(o.tabs){ kids.push(X.row('tabs',[['home','Home'],['cal','Calendar'],['brd','Board'],['plan','Plan']].map(([id,lab])=>X.btn(id,lab,'budget:tab:'+id,{kind:'tab',on:ui.tab===id,minW:96}))));
     if(ui.tab==='brd') kids.push(X.row('types',['expense','income','debt','asset'].map(t=>X.btn(t,t,'budget:board:'+t,{kind:'tab',on:ui.boardTab===t,minW:80})))); }
   return X.col('budget',kids,{gap:8}); }
@@ -16508,6 +16508,13 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
 (function (root) {
   'use strict';
   var J = root.JRender, JV = root.JRViews, X = root.Exp7VM;
+  /* 1.8.101: journal-views has no || defaults. What may be missing is read through rd, ls and str, as in budget-flows: a
+   * record or list that is not there reads as a frozen nothing (a write into it fails first), a text that is not there as ''.
+   * The screen state (window.__budgetUi) is started by the Budget app before Home opens, and Home opens on its home route. */
+  var NONE=Object.freeze({}), NO_LIST=Object.freeze([]);
+  function rd(o){ return o!==null&&typeof o==='object'?o:NONE; }
+  function ls(a){ return Array.isArray(a)?a:NO_LIST; }
+  function str(v){ return v==null||v===false?'':String(v); }
   /* Budget's look in the views (Calendar, Board, Plan): the opened app's views token set (design-tokens VIEW_JOURNAL over the
    * platform's) and the budget-journal pack's view art (gen-views.mjs). All model actions, fields, risk labels and selection/drag
    * semantics stay native Exp7. Budget not open: FAIL with APP_INVALID. */
@@ -16529,24 +16536,24 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function(t,i){cells.push({t:'dow',k:'w'+i,text:t});});
     for(var i=0;i<first;i++)cells.push({t:'pad',k:'p'+i});
     days.forEach(function(d){cells.push(X.btn('d'+d,String(+d.slice(8)),'budget:pickday:'+d,{on:d===date,minW:44}));});
-    return {t:'pop',k:'datepick',anchor:anchor||'budget/figs/facts/date',w:358,kids:[
+    return {t:'pop',k:'datepick',anchor:anchor,w:358,kids:[
       X.row('head',[X.btn('prev','<','budget:pick:-1',{kind:'icon'}),X.text('m',monthTitle(month),'h'),X.btn('next','>','budget:pick:1',{kind:'icon'}),X.btn('today','Today','budget:pick:today')],{gap:5}),
       {t:'grid',k:'days',cols:7,gap:4,cellH:44,kids:cells},
       X.row('dismiss',[X.btn('dismiss','Dismiss','budget:date')])]};
   }
   function fullModel(m,V){
-    if((m.kids||[]).some(function(n){return n&&n.t==='journal';}))return m;
+    if(ls(m.kids).some(function(n){return n&&n.t==='journal';}))return m;
     m.app='budget';m.tokens=viewTokens();m.journalFull=true;m.journalContext=V;
     /* Keep the real Board editor, but give every visible item its actual
      * monthly/undated amount in one aligned ledger column. Never manufacture
      * a payment status or use the full amount for every repeated charge. */
     var A=activeAtlas(V)||V.atlasW;
-    (m.kids||[]).forEach(function(view){if(!view||!/^brd:/.test(view.k))return;
+    ls(m.kids).forEach(function(view){if(!view||!/^brd:/.test(view.k))return;
       var c=A.components[view.k.slice(4)];if(!c)return;
-      var lm=ledgerModel(V,A,c,{board:{ledgerSources:[]}}),by={};lm.rows.forEach(function(r){(by[r.id]=by[r.id]||[]).push(r);});
+      var lm=ledgerModel(V,A,c,{board:{ledgerSources:[]}}),by={};lm.rows.forEach(function(r){(by[r.id]?by[r.id]:(by[r.id]=[])).push(r);});
       var ix=view.kids.findIndex(function(n){return /^c:/.test(n.k);});
       if(ix>=0)view.kids.splice(ix,0,X.row('journal-columns',[X.text('item',monthTitle(lm.month)+' - items','small'),X.text('amount','Amount','small',{bold:true})],{alignLast:'end'}));
-      view.kids.forEach(function(n){if(!/^c:/.test(n.k))return;var rs=by[n.k.slice(2)]||[],head=n.kids&&n.kids.find(function(q){return q.k==='head';});if(!head)return;
+      view.kids.forEach(function(n){if(!/^c:/.test(n.k))return;var rs=ls(by[n.k.slice(2)]),head=n.kids&&n.kids.find(function(q){return q.k==='head';});if(!head)return;
         var sum=rs.reduce(function(t,r){return t+r.amount;},0),dates=rs.filter(function(r){return r.date;}).map(function(r){return r.date;});
         var label=!rs.length?'No charges this month':!dates.length?'Needs a date':dates.length===1?BUDGET_MONTHS[+dates[0].slice(5,7)-1].slice(0,3)+' '+(+dates[0].slice(8)):dates.length+' dates this month';
         head.alignLast='end';head.kids.push(X.text('journal-dates',label,'muted'),X.text('journal-amount',money(sum),'body',{bold:true}));
@@ -16561,29 +16568,29 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       if(n.t==='btn'&&n.act==='budget:date'){n.hoverDate=true;n.label=String(n.label).replace(/\s*[\u25be\u25bc]$/,'')+'  ';}
       if(n.t==='pop'&&n.k==='datepick'&&V.journalPickAnchor)n.anchor=V.journalPickAnchor;
       if(n.t==='day')n.anim=null;
-      (n.kids||[]).forEach(function(q){walk(q,key+'/'+q.k);});
-      (n.rows||[]).forEach(function(r){if(r.sub)walk(r.sub,key+'/sub');});
+      ls(n.kids).forEach(function(q){walk(q,key+'/'+q.k);});
+      ls(n.rows).forEach(function(r){if(r.sub)walk(r.sub,key+'/sub');});
     }
-    (m.kids||[]).forEach(function(n){walk(n,n.k);});return m;
+    ls(m.kids).forEach(function(n){walk(n,n.k);});return m;
   }
   function copy(x) { return JSON.parse(JSON.stringify(x)); }
   function plain(x) { return String(x == null ? '' : x).replace(/[\u2012-\u2015\u2212]/g,'-').replace(/\u2192/g,' / ').replace(/\u2014/g,'-'); }
   function monthTitle(m) { return BUDGET_MONTHS[+m.slice(5,7)-1]+' '+m.slice(0,4); }
   function dayTitle(d) { var x = new Date(d+'T12:00:00'); return x.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
-  function dateLabel(d){ var s=String(d||'').trim(); if(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s)) s=dayTitle(s); return s.replace(/,\s*\d{4}$/,''); }
+  function dateLabel(d){ var s=str(d).trim(); if(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s)) s=dayTitle(s); return s.replace(/,\s*\d{4}$/,''); }
   function money(n,sign) { var v=Number(n), s=Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); if(sign==='+'&&v>0)return '+'+s; if(sign==='abs')return Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); return s; }
-  function avail(A,id) { var it=A.items[id], un=((it&&it.alts&&it.alts.unavail)||[]).map(memberRef); return catMembers(it).filter(function(r){return A.items[r.slice(5)]&&un.indexOf(r)<0;}); }
+  function avail(A,id) { var it=A.items[id], un=ls(it&&it.alts&&it.alts.unavail).map(memberRef); return catMembers(it).filter(function(r){return A.items[r.slice(5)]&&un.indexOf(r)<0;}); }
   function base(V,A,c,kind) { return {t:'journal',k:'journal:'+kind+':'+c.id,kind:kind,component:c.id,day:V.journalDay||budgetDateKey(),month:V.journalMonth||window.JAtlasEval.monthOf(c),title:c.name||c.id}; }
   function calendarModel(V,A,c,O) {
     var m=base(V,A,c,O.calendar.presentation==='agenda'?'agenda':'calendar'), E=root.JAtlasEval, AW=activeAtlas(V)||A;
-    m.month=V.journalMonth||E.monthOf(c); m.days=E.monthDays(m.month); m.by={}; m.risk=((typeof riskOf==='function'?riskOf(AW):{days:{}}).days)||{};
-    (c.items||[]).forEach(function(r){var id=r.replace(/^item:/,''), it=effItem(A,id); if(!it)return;
-      E.occurrences(it,m.month).forEach(function(d){(m.by[d]=m.by[d]||[]).push({id:id,name:it.name,values:copy(it.values||{}),selected:selectedRef(AW,id)});}); });
-    m.entries=(m.by[m.day]||[]).slice(); return m;
+    m.month=V.journalMonth||E.monthOf(c); m.days=E.monthDays(m.month); m.by={}; m.risk=riskOf(AW).days;
+    ls(c.items).forEach(function(r){var id=r.replace(/^item:/,''), it=effItem(A,id); if(!it)return;
+      E.occurrences(it,m.month).forEach(function(d){(m.by[d]?m.by[d]:(m.by[d]=[])).push({id:id,name:it.name,values:copy(rd(it.values)),selected:selectedRef(AW,id)});}); });
+    m.entries=ls(m.by[m.day]).slice(); return m;
   }
   function planModel(V,A,c) {
     var m=base(V,A,c,'plan'), AW=activeAtlas(V)||A, D=depsRows(A,c);
-    m.current=(c.state&&c.state.currentStep)||null; m.rows=D.rows.map(function(r){
+    m.current=rd(c.state).currentStep; m.rows=D.rows.map(function(r){
       var it=AW.items[r.id], ref=it&&selectedRef(AW,r.id), item=ref&&AW.items[ref.slice(5)];
       return Object.assign({},r,{name:r.step||(it&&it.name)||r.id,selected:ref,selectedName:item?item.name:(it&&it.alts?'No available item':'No alternative'),choices:it?avail(AW,r.id).map(function(q){return {ref:q,name:AW.items[q.slice(5)].name};}):[],current:m.current===r.id||m.current==='item:'+r.id}); });
     return m;
@@ -16591,17 +16598,19 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   function ledgerModel(V,A,c,O) {
     var m=base(V,A,c,'ledger'), month=V.journalMonth||budgetMonthKey(), E=root.JAtlasEval;
     var owners=catOwners(A), seen={};m.month=month;m.rows=[];
-    var sources=[{component:c,role:'expense'}].concat(((O.board||{}).ledgerSources||[]).map(function(q){return {component:A.components[String(q.root).replace(/^comp:/,'')],role:q.role};}));
-    sources.forEach(function(src){if(!src.component)return;boardRows(A,src.component).L.forEach(function(r){var id=r.replace(/^item:/,''),it=effItem(A,id);if(!it||(owners[r]&&owners[r]!==id)||seen[id]||(it.values||{}).kind==='resource'||(it.values||{}).type==='asset'||(it.values||{}).assetKind)return;seen[id]=1;
-      var v=it.values||{}; if(!v.date){ /* not a calendar charge: show only so the user can give it a date. 1.8.100: one with no amount is left out */ var ua=budgetAmount(it); if(!isFinite(ua))return; m.rows.push({id:id,date:'',name:it.name,category:v.category||'',type:src.role,amount:Math.abs(ua),scheduled:false,undated:true,paid:false}); return; }
+    var sources=[{component:c,role:'expense'}].concat(ls(rd(O.board).ledgerSources).map(function(q){return {component:A.components[String(q.root).replace(/^comp:/,'')],role:q.role};}));
+    sources.forEach(function(src){if(!src.component)return;boardRows(A,src.component).L.forEach(function(r){var id=r.replace(/^item:/,''),it=effItem(A,id);if(!it||(owners[r]&&owners[r]!==id)||seen[id]||rd(it.values).kind==='resource'||rd(it.values).type==='asset'||rd(it.values).assetKind)return;seen[id]=1;
+      var v=rd(it.values); if(!v.date){ /* not a calendar charge: show only so the user can give it a date. 1.8.100: one with no amount is left out */ var ua=budgetAmount(it); if(!isFinite(ua))return; m.rows.push({id:id,date:'',name:it.name,category:str(v.category),type:src.role,amount:Math.abs(ua),scheduled:false,undated:true,paid:false}); return; }
       var charges=E.charges(it,month);
-      Object.keys(charges).forEach(function(d){if(!isFinite(charges[d]))return;m.rows.push({id:id,date:d,name:it.name,category:v.category||'',type:src.role,amount:src.role==='income'?charges[d]:Math.abs(charges[d]),scheduled:!!d&&d>m.day,undated:!d,paid:v.paid===true||v.status==='paid'});});
+      Object.keys(charges).forEach(function(d){if(!isFinite(charges[d]))return;m.rows.push({id:id,date:d,name:it.name,category:str(v.category),type:src.role,amount:src.role==='income'?charges[d]:Math.abs(charges[d]),scheduled:!!d&&d>m.day,undated:!d,paid:v.paid===true||v.status==='paid'});});
     });});
-    m.rows.sort(function(a,b){return (a.date||'9999').localeCompare(b.date||'9999')||a.name.localeCompare(b.name);});return m;
+    m.rows.sort(byDate);return m;
+    /* the month's rows by date, undated last, then by name */
+    function byDate(a,b){ if(a.date!==b.date){ if(!a.date) return 1; if(!b.date) return -1; return a.date.localeCompare(b.date); } return a.name.localeCompare(b.name); }
   }
   function cashModel(V,A,c){
     var m=base(V,A,c,'cash'); m.rows={cash:[],owned:[],unmarked:[]};
-    (c.items||[]).forEach(function(r){var id=String(r).replace(/^item:/,''),it=A.items[id]; if(!it)return; var v=it.values||{}, amt=budgetAmount(it); if(!isFinite(amt))return; /* 1.8.100: a balance with no amount is left out */ var row={id:id,name:it.name,amount:amt,asOf:v.asOf||''};
+    ls(c.items).forEach(function(r){var id=String(r).replace(/^item:/,''),it=A.items[id]; if(!it)return; var v=rd(it.values), amt=budgetAmount(it); if(!isFinite(amt))return; /* 1.8.100: a balance with no amount is left out */ var row={id:id,name:it.name,amount:amt,asOf:str(v.asOf)};
       if(v.assetKind==='cash')m.rows.cash.push(row); else if(v.assetKind==='owned')m.rows.owned.push(row); else m.rows.unmarked.push(row); });
     return m;
   }
@@ -16614,7 +16623,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     return !st||typeof st!=='object'?[{path:'items/'+id+'/state',op:'add',value:{userPick:ref}}]:[{path:'items/'+id+'/state/userPick',op:Object.prototype.hasOwnProperty.call(st,'userPick')?'ref':'add',value:ref}];
   }
   function model(V,S,kind) {
-    var A=sessAtlas(V,S), O=X.options({budget:{facts:false,tabs:false},calendar:{presentation:kind==='agenda'?'agenda':'mini'},plan:{presentation:'compact'},board:{presentation:'ledger',ledgerSources:V.journalSources||[]}});
+    var A=sessAtlas(V,S), O=X.options({budget:{facts:false,tabs:false},calendar:{presentation:kind==='agenda'?'agenda':'mini'},plan:{presentation:'compact'},board:{presentation:'ledger',ledgerSources:ls(V.journalSources)}});
     return buildModel(V,S,O); /* 1.8.93: the journal's options go in as an argument, so a model that fails leaves the view's own options as they were */
   }
   /* 1.8.83 (design system phase 4, part 3): the journal's plan, ledger and cash views are built from design components
@@ -16708,7 +16717,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     v.journalDocument=m;if(v.journalBoundCanvas===v.c)return;v.journalBoundCanvas=v.c;
     if(v.journalAbort)v.journalAbort.abort();var ac=v.journalAbort=new AbortController(),cv=v.c,V=m.journalContext,openTimer=null,openKey=null,closeTimer=null,hover=false;
     function cancel(){if(openTimer)clearTimeout(openTimer);if(closeTimer)clearTimeout(closeTimer);openTimer=closeTimer=null;}
-    function ui(){return root.__budgetUi||{};}
+    function ui(){return root.__budgetUi;}
     function act(a){if(root.__budgetChromeAct)root.__budgetChromeAct(a);}
     function redraw(){var q=v.journalDocument.journalContext;if(q.queue&&q.sess)q.queue(q.sess,'journal-date-key');else if(v.journalRedraw)v.journalRedraw();}
     function close(){cancel();hover=false;if(fullOwner===v)fullOwner=null;if(ui().pick)act('budget:date');}
@@ -16751,24 +16760,23 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   var fullShow=JV.View.prototype.show,fullWire=JV.View.prototype.wire;
   JV.View.prototype.show=async function(cv,m,w,opt){var r=await fullShow.call(this,cv,m,w,opt);if(m&&m.journalFull&&this.s&&!(opt&&opt.displayListOnly))bindFullDate(this,m);return r;};
   JV.View.prototype.wire=function(){fullWire.call(this);var self=this,prev=this.s&&this.s.onevent;if(!this.s)return;this.s.onevent=function(e){var n=self.byId&&self.byId.get(e.id);if(e.kind===J.EV.CLICK&&n&&n.vm&&n.vm.hoverDate&&self.journalSuppressClick){self.journalSuppressClick=false;return;}if(prev)prev(e);};};
-  function journalOf(m){ if(!m)return m; if(m.t==='journal'||m.kind)return m; if(m.__vm||m.kids)return (m.kids||[]).find(function(n){return n&&n.t==='journal';})||m; return m; }
+  function journalOf(m){ if(!m)return m; if(m.t==='journal'||m.kind)return m; if(m.__vm||m.kids){ var jn=ls(m.kids).find(function(n){return n&&n.t==='journal';}); return jn?jn:m; } return m; }
   /* 1.8.92: the device's own limit; Budget mounts only with the shared GPUContext, so there is no guessed limit */
   function maxTexPx(gc){ return gc.dev.limits.maxTextureDimension2D|0; }
   /* Viewport canvas metrics: device-pixel height stays at or under the WebGPU maxTextureDimension2D (8192 on Safari). */
   function cssDpr(){
     var dpr=(typeof devicePixelRatio==='number'&&devicePixelRatio>0)?devicePixelRatio:1;
     if(dpr<1.5&&typeof matchMedia==='function'&&matchMedia('(min-resolution: 1.5dppx)').matches){ /* 1.8.92: no try around it */
-      var sw=(window.screen&&screen.width)||0, iw=window.innerWidth||0;
+      var sw=window.screen.width, iw=window.innerWidth;
       dpr=(iw&&sw&&iw>sw*1.2)?Math.max(2,Math.round(iw/Math.max(1,sw))):2;
     }
     return Math.min(Math.max(dpr,0.5),3);
   }
   function hostCssSize(host){
     var dpr=cssDpr();
-    var r=host&&host.getBoundingClientRect?host.getBoundingClientRect():null;
-    var w=(host&&host.clientWidth)||(r&&r.width)||390, h=(r&&r.height)||(host&&host.clientHeight)||1; /* clientWidth: a visible scrollbar never covers the journal's right column */
-    var vw=(typeof visualViewport!=='undefined'&&visualViewport&&visualViewport.width)||0;
-    var sw=(window.screen&&screen.width)||0;
+    var w=host.clientWidth, h=host.getBoundingClientRect().height; /* clientWidth: a visible scrollbar never covers the journal's right column. 1.8.101: no made-up width; the bounds below hold */
+    var vw=typeof visualViewport!=='undefined'&&visualViewport?visualViewport.width:0;
+    var sw=window.screen.width;
     if(dpr>1.2){
       if(vw>0&&w>vw*1.4&&Math.abs(w/dpr-vw)<Math.abs(w-vw)){ w=w/dpr; h=h/dpr; }
       else if(sw>0&&w>sw*1.05){ w=w/dpr; h=h/dpr; }
@@ -16783,23 +16791,23 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   function entriesForDay(atlas, day, existing){
     var out=[], seen={}, list=existing?existing.slice():[];
     list.forEach(function(e){ if(e&&e.id){ seen[e.id]=true; out.push(e); } });
-    var items=(atlas&&atlas.items)||{};
+    var items=rd(atlas&&atlas.items);
     Object.keys(items).forEach(function(id){
       if(seen[id]) return;
-      var it=items[id]||{}, v=it.values||{}, when=v.date||v.asOf||'';
+      var it=items[id]; if(!it) return; var v=rd(it.values), when=v.date?v.date:str(v.asOf);
       if(when===day) out.push({id:id, name:it.name, values:v});
     });
     /* A day row shows that day's occurrence: a recorded or changed amount or time, not only the item's usual one. */
     var BF=root.BudgetFlows;
     if(BF&&BF.entryOn) out=out.map(function(e){ var en=atlas&&atlas.items&&atlas.items[e.id]?BF.entryOn(atlas,e.id,day):null;
-      if(!en) return e; var nv=Object.assign({},e.values||{}); if(en.charge!=null) nv.amount=en.charge; if(en.ex&&en.ex.time!=null){ nv.time=en.ex.time; if(en.ex.time) nv.allDay=false; }
+      if(!en) return e; var nv=Object.assign({},rd(e.values)); if(en.charge!=null) nv.amount=en.charge; if(en.ex&&en.ex.time!=null){ nv.time=en.ex.time; if(en.ex.time) nv.allDay=false; }
       return Object.assign({},e,{values:nv}); });
     return out;
   }
   function timedHours(entries){
     var hs=[];
-    (entries||[]).forEach(function(e){
-      var t=String((e&&e.values||{}).time||''), m=/^(\d{1,2}):(\d{2})$/.exec(t);
+    ls(entries).forEach(function(e){
+      var t=str(rd(e&&e.values).time), m=/^(\d{1,2}):(\d{2})$/.exec(t);
       if(m) hs.push(+m[1]);
     });
     hs.sort(function(a,b){return a-b;});
@@ -16809,20 +16817,20 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
      'every' -> every N days. Any other repeat already on an item (monthly, weekly...) is left as it is. */
   /* 1.8.99: a repeat is what the form picked. Every N days needs N (1 or more), else the repeat is left out; no repeat picked
      leaves the repeat out, and 'none' is once. The save asks for N before it gets here. */
-  function journalRepeat(draft, v, when){ var d=draft||{}, r=d.repeat;
+  function journalRepeat(draft, v, when){ var d=rd(draft), r=d.repeat;
     if(r==='every'){ var n=Math.floor(+d.every); if(n>=1){ v.repeat='every'; v.every=n; } }
-    else if(r==='mdays'){ var BR=root.BudgetRules, L=BR&&BR.monthDayList?BR.monthDayList(d.mdays):[]; if(!L.length&&/^\d{4}-\d{2}-\d{2}$/.test(when||'')) L=[+String(when).slice(8)]; v.repeat='monthdays'; v.on=L; }
+    else if(r==='mdays'){ var BR=root.BudgetRules, L=BR&&BR.monthDayList?BR.monthDayList(d.mdays):[]; if(!L.length&&/^\d{4}-\d{2}-\d{2}$/.test(str(when))) L=[+String(when).slice(8)]; v.repeat='monthdays'; v.on=L; }
     else if(r==='none') v.repeat='once';
     var tm=formatTime24(d.time); if(tm){ v.time=tm; v.allDay=false; } else v.allDay=true; return v; }
   /* an item's repeat as the journal form shows it */
-  function journalRepeatDraft(v){ v=v||{}; var r=v.repeat; if(typeof r!=='string'||!r) return ''; /* 1.8.99: a saved item with no repeat shows none picked */ return r==='monthdays'?'mdays':(r==='once'||r==='none'||r==='dates')?'none':r; }
+  function journalRepeatDraft(v){ var r=rd(v).repeat; if(typeof r!=='string'||!r) return ''; /* 1.8.99: a saved item with no repeat shows none picked */ return r==='monthdays'?'mdays':(r==='once'||r==='none'||r==='dates')?'none':r; }
   /* Apply view ops to a local atlas copy at any depth. add on a list appends once; add/set/ref on a key sets it; drop deletes it;
      remove takes a value out of a list. Applying the same ops twice gives the same atlas. */
   function journalApplyOps(list, A){
     if(!A) return A;
-    (list||[]).forEach(function(op){
-      var path=String(op.path||'').split('/').filter(function(p){return p!=='';}); if(!path.length) return;
-      if(path[0]==='components'&&path.length===2&&op.op==='add'){ A.components=A.components||{}; if(!A.components[path[1]]) A.components[path[1]]=op.value||{id:path[1],items:[]}; return; }
+    ls(list).forEach(function(op){
+      var path=str(op.path).split('/').filter(function(p){return p!=='';}); if(!path.length) return;
+      if(path[0]==='components'&&path.length===2&&op.op==='add'){ if(!A.components||op.value===null||typeof op.value!=='object') return; /* 1.8.101: a board added with no value, or to an atlas with no components, is left out */ if(!A.components[path[1]]) A.components[path[1]]=op.value; return; }
       var cur=A; for(var i=0;i<path.length-1;i++){ var k=path[i]; if(cur[k]==null||typeof cur[k]!=='object'){ if(op.op==='drop'||op.op==='remove') return; cur[k]=(path[0]==='components'&&i===1)?{id:k,items:[]}:{}; } cur=cur[k]; }
       var last=path[path.length-1];
       if(op.op==='drop'){ if(Array.isArray(cur)){ var di=+last; if(di>=0) cur.splice(di,1); } else delete cur[last]; return; }
@@ -16835,9 +16843,9 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     return A;
   }
   function journalWhen(draft, day, route){
-    var d=draft||{}, asOf=(d.asOf&&/^\d{4}-\d{2}-\d{2}$/.test(d.asOf))?d.asOf:'', date=(d.date&&/^\d{4}-\d{2}-\d{2}$/.test(d.date))?d.date:'';
-    if(route==='debt-entry') return asOf||date||day||'';
-    return date||asOf||day||'';
+    var d=rd(draft), asOf=(d.asOf&&/^\d{4}-\d{2}-\d{2}$/.test(d.asOf))?d.asOf:'', date=(d.date&&/^\d{4}-\d{2}-\d{2}$/.test(d.date))?d.date:'';
+    if(route==='debt-entry') return asOf?asOf:date?date:str(day);
+    return date?date:asOf?asOf:str(day);
   }
   function formatTime24(raw){
     var s=String(raw==null?'':raw).trim();
@@ -16854,16 +16862,16 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   function hourLabel24(h){ h=((+h)+24)%24; return (h<10?'0':'')+h+':00'; }
 
   function fieldKey(raw){
-    var k=String(raw||'').trim();
+    var k=str(raw).trim();
     var map={'Payee':'payee','Pay date':'date','Gross pay':'gross','Amount (USD)':'amount','Amount':'amount','Name':'name','Time':'time','Date':'date','As-of date':'asOf','APR (%)':'apr','APR':'apr','Balance owed':'balance','Balance':'balance','Creditor':'creditor','Purpose':'purpose','Payments remaining':'terms','Days between payments':'every','First payment date':'first','Payment amount':'payment','Actual amount (USD)':'actual','What do these choices have in common?':'category','Category':'category','cname':'cname','aname':'aname','rname':'rname'};
     if(map[k]) return map[k];
     k=k.replace(/\s+/g,'').replace(/\(.*\)/,'').toLowerCase();
     if(k==='paydate') return 'date';
     if(k==='asof'||k==='as-of'||k==='as-ofdate'||k==='asofdate') return 'asOf';
-    return k||'name';
+    return k;
   }
   function fieldKind(key){
-    var k=String(key||'').toLowerCase();
+    var k=str(key).toLowerCase();
     if(/^(date|asof|as-of|paydate|first)$/.test(k)||/date$/.test(k)) return 'date';
     if(k==='time') return 'time';
     if(/^(amount|gross|balance|apr|payment|every|terms|actual)$/.test(k)||/amount/.test(k)) return 'number';
@@ -16872,12 +16880,11 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   /* 1.8.99: what is not a number reads as NaN, never 0: the save that needs it asks for it */
   function parseMoney(v){ var n=parseFloat(String(v==null?'':v).replace(/[^0-9.-]/g,'')); return isFinite(n)?n:NaN; }
   function viewMetrics(hostW, hostH, contentH, dpr, maxPx){
-    dpr=Math.min(Math.max(+dpr||1,0.5),3);
-    maxPx=maxPx>0?maxPx:8192;
-    var viewW=Math.max(1,Math.round(hostW||1)), viewH=Math.max(1,Math.round(hostH||1));
+    dpr=Math.min(Math.max(+dpr,0.5),3);
+    var viewW=Math.max(1,Math.round(hostW)), viewH=Math.max(1,Math.round(hostH));
     if(viewW*dpr>maxPx) viewW=Math.max(1,Math.floor(maxPx/dpr));
     if(viewH*dpr>maxPx) viewH=Math.max(1,Math.floor(maxPx/dpr));
-    return {viewW:viewW,viewH:viewH,dpr:dpr,maxPx:maxPx,canvasPxW:Math.max(1,Math.round(viewW*dpr)),canvasPxH:Math.max(1,Math.round(viewH*dpr)),contentH:Math.max(viewH,Math.round(contentH||viewH))};
+    return {viewW:viewW,viewH:viewH,dpr:dpr,maxPx:maxPx,canvasPxW:Math.max(1,Math.round(viewW*dpr)),canvasPxH:Math.max(1,Math.round(viewH*dpr)),contentH:Math.max(viewH,Math.round(contentH))};
   }
   /* ---------- Budget Home on design components (docs/design-system.md, phase 1) ----------
    * homeLayout(o) is a failable step: it lays out Home's five views (page, calendar, agenda, plan, links) from the app's
@@ -17281,7 +17288,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   }
   /* every tap target of a laid-out Home, in page coordinates, in draw order (the keyboard's Tab order) */
   function targetsOf(Ls,positions){ var out=[]; Object.keys(Ls).forEach(function(k){ var p=positions[k]; Ls[k].nodes.forEach(function(n){ if(n.flags&J.NF.HIT) out.push({key:n.key,node:n,kind:k,rect:[p[0]+n.hit[0],p[1]+n.hit[1],n.hit[2],n.hit[3]]}); }); }); return out; }
-  function Home(opts) { this.o=opts;this.host=opts.host;this.atlas=opts.atlas;this.id=this.host.id;this.views={};this.focusKey=null;this.chain=Promise.resolve();this.dead=false;this.serial=0;this.abort=new AbortController();this._planArmed=true;this._planArmAt=0; }
+  function Home(opts) { this.o=opts;this.host=opts.host;this.atlas=opts.atlas;this.id=this.host.id;this.views={};this.focusKey=null;this.chain=Promise.resolve();this.dead=false;this.serial=0;this.abort=new AbortController();this._planArmed=true;this._planArmAt=0;this.route='home';this.routeExtra=null; }
   Home.prototype.init=async function(){var self=this;await JV.boot();if(this.dead)return;
     this.core=await JV.core();
     var gc=JV.gc();
@@ -17295,8 +17302,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     this.r=await J.Renderer.init({canvas:cv,core:this.core,context:gc,clear:[1,1,1,1],readback:true});
     if(this.r.core!==this.core||this.r.gc!==gc||this.r.ownGc) throw Error('Budget renderer must use the shared Core and GPUContext');
     if(this.dead){this.r.destroy();return;}
-    this.r.ondevicelost=function(e){self.error=String(e.message||e);if(self.o.onError)self.o.onError(e);};this.r.attach();this.status=document.createElement('div');this.status.setAttribute('role','status');this.status.setAttribute('aria-live','polite');this.status.style.cssText='position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)';this.host.appendChild(this.status);
-    window.__exp7ViewsPropose=window.__exp7ViewsPropose||{};this.proposalHook=this.o.onPropose;window.__exp7ViewsPropose[this.id]=this.proposalHook;
+    this.r.ondevicelost=function(e){self.error=String(e.message?e.message:e);if(self.o.onError)self.o.onError(e);};this.r.attach();this.status=document.createElement('div');this.status.setAttribute('role','status');this.status.setAttribute('aria-live','polite');this.status.style.cssText='position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)';this.host.appendChild(this.status);
+    if(!window.__exp7ViewsPropose) window.__exp7ViewsPropose={};this.proposalHook=this.o.onPropose;window.__exp7ViewsPropose[this.id]=this.proposalHook;
     cv.addEventListener('keydown',function(e){self.key(e);},{signal:this.abort.signal});
     /* A press on the page while a field is open: the field keeps its value and the redraw waits for the release, so the tap (Save, a row) still lands. */
     cv.addEventListener('pointerdown',function(){self.cvDown=true;},{capture:true,signal:this.abort.signal});
@@ -17313,23 +17320,23 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     return this.update(); };
   Home.prototype.update=function(A){if(A)this.atlas=A;var self=this,serial=++this.serial;
     this.chain=this.chain.catch(function(){}).then(async function(){if(self.dead||!self.r||serial!==self.serial)return;
-      var A=self.atlas,R=root.Exp7Views.rootsFor(A),ids=((A.meta||{}).boardIds)||{}, roots={calendar:R.calendar,agenda:R.calendar,plan:R.plan,ledger:ids.expense?['comp:'+ids.expense]:[],cash:ids.asset?['comp:'+ids.asset]:[]},old=self.session;
+      var A=self.atlas,R=root.Exp7Views.rootsFor(A),ids=rd(rd(A.meta).boardIds), roots={calendar:R.calendar,agenda:R.calendar,plan:R.plan,ledger:ids.expense?['comp:'+ids.expense]:[],cash:ids.asset?['comp:'+ids.asset]:[]},old=self.session;
       if(old)old.dispose();var V=self.context={id:self.id,atlasW:A,root:R.plan,plan:true,open:{},vmInfo:{},journalDay:budgetDateKey(),journalMonth:budgetMonthKey()};
       var S=self.session=startRuntime(A,[].concat(R.calendar,R.plan,roots.ledger),null,function(){},livePins(A));await S.ready;
       if(self.dead||serial!==self.serial){S.dispose();return;}if(S.errs.length)throw Error('Atlas evaluation: '+S.errs.join('; '));var models={};Object.keys(roots).forEach(function(k){var v=Object.assign({},V,{root:roots[k],plan:k==='plan',vmInfo:{},journalSources:k==='ledger'&&A.meta.boardIds&&A.meta.boardIds.income?[{root:'comp:'+A.meta.boardIds.income,role:'income'}]:[]});models[k]=model(v,S,k);});
       self.models=models;self.render();if(self.o.onUpdate)self.o.onUpdate(self);return self;
-    }).catch(function(e){if(self.dead)return;self.error=String(e&&e.message||e);
+    }).catch(function(e){if(self.dead)return;self.error=String(e&&e.message?e.message:e);
       /* the update failed: the last frame stays, the failure is recorded, and the app is told (boot fails on a first draw that never came) */
-      root.Exp7Fail.record({code:'CONTEXT_FAILED',context:'budget.update',app:'budget',screen:self.route||'home',component:null,slot:null,state:null,id:null,offered:null,needed:null,detail:self.error});
+      root.Exp7Fail.record({code:'CONTEXT_FAILED',context:'budget.update',app:'budget',screen:self.route,component:null,slot:null,state:null,id:null,offered:null,needed:null,detail:self.error});
       if(self.o.onError)self.o.onError(e);});return this.chain;};
   /* Fill the item page's draft from the tapped entry: its name, the tapped day, that day's time and charge, and its repeat. */
-  Home.prototype.draftEntry=function(eid){ var it=this.atlas&&this.atlas.items&&this.atlas.items[eid]; if(it){ root.__budgetUi=Object.assign({},root.__budgetUi||{},{entry:eid}); var v=it.values||{}, d=this.uiDraft(), oday=root.__budgetUi.day||v.date||budgetDateKey(), BF=root.BudgetFlows, en=BF&&BF.entryOn&&this.atlas?BF.entryOn(this.atlas,eid,oday):null; d.name=it.name; d.date=v.date&&(!en||!en.repeating)?v.date:oday; d.time=(en&&en.ex&&en.ex.time!=null)?en.ex.time:(v.time||''); d.amount=en&&en.charge!=null?String(Math.abs(+en.charge)):(v.amount!=null?String(Math.abs(+v.amount)):''); d.repeat=journalRepeatDraft(v); d.every=v.every!=null?String(v.every):''; d.mdays=Array.isArray(v.on)?v.on.join(', '):(v.mdays||''); d.scope=d.scope||'future'; d.recScope='one'; d.rec='planned'; d.actual=''; root.__budgetUi.draft=d; } };
+  Home.prototype.draftEntry=function(eid){ var it=this.atlas&&this.atlas.items&&this.atlas.items[eid]; if(it){ root.__budgetUi=Object.assign({},root.__budgetUi,{entry:eid}); var v=rd(it.values), d=this.uiDraft(), oday=root.__budgetUi.day?root.__budgetUi.day:v.date?v.date:budgetDateKey(), BF=root.BudgetFlows, en=BF&&BF.entryOn&&this.atlas?BF.entryOn(this.atlas,eid,oday):null; d.name=it.name; d.date=v.date&&(!en||!en.repeating)?v.date:oday; d.time=(en&&en.ex&&en.ex.time!=null)?en.ex.time:str(v.time); d.amount=en&&en.charge!=null?String(Math.abs(+en.charge)):(v.amount!=null?String(Math.abs(+v.amount)):''); d.repeat=journalRepeatDraft(v); d.every=v.every!=null?String(v.every):''; d.mdays=Array.isArray(v.on)?v.on.join(', '):str(v.mdays); if(!d.scope) d.scope='future'; d.recScope='one'; d.rec='planned'; d.actual=''; root.__budgetUi.draft=d; } };
   Home.prototype.show=function(route,day,extra){ var self=this; if(this.live) this.closeField(true);
-    if(!this.models){ this.route=route||'home'; this.routeExtra=extra||null; return this.update(); }
-    this.transact('budget.show:'+(route||'home'),function(){
-      if(day) root.__budgetUi=Object.assign({},root.__budgetUi||{},{day:day,month:String(day).slice(0,7)});
+    if(!this.models){ this.route=route; this.routeExtra=extra?extra:null; return this.update(); }
+    this.transact('budget.show:'+route,function(){
+      if(day) root.__budgetUi=Object.assign({},root.__budgetUi,{day:day,month:String(day).slice(0,7)});
       if(extra&&extra.entry) self.draftEntry(extra.entry);
-      self.route=route||'home'; self.routeExtra=extra||null;
+      self.route=route; self.routeExtra=extra?extra:null;
       return self.render(); });
     return this.chain;
   };
@@ -17340,18 +17347,18 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
      * open has no layout to keep, so its fail logic tells the shell (the Apps picker is phase 4). */
     var home=this, FL=root.Exp7Fail, css=hostCssSize(this.host), hostW=css.w;
     var pick=typeof budgetPickMonth==='function'?budgetPickMonth():'';
-    var risk=((this.models.calendar&&this.models.calendar.kids&&this.models.calendar.kids[0]&&this.models.calendar.kids[0].risk)||(this.models.calendar&&this.models.calendar.risk)||{});
+    var calM=journalOf(this.models.calendar), risk=rd(calM&&calM.risk);
     var startLinks=root.BudgetFlows?root.BudgetFlows.startLinks(this.atlas):[];
-    var route=this.route||'home';
+    var route=this.route;
     if(ROUTE_ALIAS[route]) route=this.route=ROUTE_ALIAS[route]; /* no full-page month view: the mini month on Home is the only month calendar */
-    root.__budgetUi=restorePlan(root.__budgetUi||{});
-    if(route==='date-picker-open') pick=pick||budgetMonthKey();
+    root.__budgetUi=restorePlan(root.__budgetUi);
+    if(route==='date-picker-open'&&!pick) pick=budgetMonthKey();
     if(route==='date-picker-closed') pick='';
     var selDay=budgetDateKey(), built;
     function failed(what){ return function(failure){ home.lastFailure=failure; home.renderFailed=failure; if(!home.painted&&home.o.onError) home.o.onError(Error('Budget '+what+' could not be laid out: '+failure.code+(failure.detail?' ('+failure.detail+')':''))); }; }
     if(HOME_ROUTES.indexOf(route)>=0){
       var calJ=journalOf(this.models.calendar), agJ=journalOf(this.models.agenda), plJ=journalOf(this.models.plan);
-      var homeIn={hostW:hostW,core:this.core,fonts:journalFonts(),day:selDay,today:budgetTodayKey(),pick:pick||'',risk:risk,calendar:calJ,
+      var homeIn={hostW:hostW,core:this.core,fonts:journalFonts(),day:selDay,today:budgetTodayKey(),pick:pick,risk:risk,calendar:calJ,
         entries:entriesForDay(this.atlas,selDay,agJ.entries),plan:plJ,start:startLinks,keys:{calendar:calJ.k,agenda:agJ.k,plan:plJ.k}};
       built=FL.context('budget.home.layout',function(){ return homeLayout(homeIn); },failed('Home'));
     } else {
@@ -17375,11 +17382,10 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if(this._lastRoute!==route){ this._lastRoute=route; if(this.host && route!=='home' && route!=='add-item-home'){ this.host.scrollTop=0; this._pendingPlanStep=''; this._pendingPlanY=null; } }
     var TT=root.Exp7Apps.get('budget').tokens.screens; /* open: the layout that is being painted read it */
     if(this.host) this.host.style.background=TT.desk;
-    var hostH=css.h||Math.max(1,Math.round(this.host.clientHeight)||H);
-    var dpr=css.dpr||Math.min(root.devicePixelRatio||1,3);
+    var hostH=css.h, dpr=css.dpr; /* hostCssSize gives both, at least 1 */
     var metrics=viewMetrics(hostW,hostH,H,dpr,maxTexPx(this.r&&this.r.gc));
-    this.viewH=metrics.viewH; this.dpr=metrics.dpr; this.scrollY=this.host.scrollTop||0;
-    if(this.atlas){ root.__budgetUi=Object.assign({},root.__budgetUi||{},{atlas:this.atlas,day:selDay}); }
+    this.viewH=metrics.viewH; this.dpr=metrics.dpr; this.scrollY=this.host.scrollTop;
+    if(this.atlas){ root.__budgetUi=Object.assign({},root.__budgetUi,{atlas:this.atlas,day:selDay}); }
     root.__budgetType={hostW:hostW,colW:colW,padX:padX,dpr:metrics.dpr,viewW:metrics.viewW,viewH:metrics.viewH,canvasCssW:metrics.viewW,canvasPxW:metrics.canvasPxW,bodyPt:TT.body,captionPt:TT.caption,titlePt:TT.title,cssPtEqualsDesignPt:Math.abs((metrics.viewW*metrics.dpr)-metrics.canvasPxW)<1};
     if(this.wrap){ this.wrap.style.minHeight=H+'px'; this.wrap.style.height=H+'px'; }
     if(this.host) void this.host.offsetHeight;
@@ -17389,24 +17395,24 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     var jf=journalFonts();
     var order=['page','calendar','plan','agenda','ledger','links','cash','screen','selector'],blobs={},cat={format:'exp7-view-store/1',resources:{fonts:[{rid:'regular',slot:jf[0]},{rid:'bold',slot:jf[1]}]},views:[]};
     order=order.filter(function(k){return k==='selector'||Ls[k];});
-    order.forEach(function(k){var p=positions[k]||[0,0,colW,H],record={format:'exp7-view-record/1',id:'exp7.journal.'+k,version:1,role:k==='selector'?'overlay':'slot',hit:k==='selector'?'fallthrough':'capture',canvas:{w:p[2],h:p[3]},states:{idle:{},open:{},selected:{}},edgeMs:0,resources:{fonts:['regular','bold']},dl:{file:k},paint:{ops:['rect','text','stroke','border'],gaps:[]}};
+    order.forEach(function(k){var p=k==='selector'?[0,0,colW,H]:positions[k],record={format:'exp7-view-record/1',id:'exp7.journal.'+k,version:1,role:k==='selector'?'overlay':'slot',hit:k==='selector'?'fallthrough':'capture',canvas:{w:p[2],h:p[3]},states:{idle:{},open:{},selected:{}},edgeMs:0,resources:{fonts:['regular','bold']},dl:{file:k},paint:{ops:['rect','text','stroke','border'],gaps:[]}};
       cat.views.push({id:record.id,role:record.role,record:record});if(k!=='selector')blobs[k]=JV.fullDL(Ls[k],p[2],p[3]).bytes();});
     this.positions=positions;this.layouts=Ls;this.planDraw=Ls.plan;this.targets=targets;
-    var uiNow=root.__budgetUi||{};
+    var uiNow=root.__budgetUi;
     if(route==='home') this.scrollHomeToPlanStep();
     var scrollEntry=uiNow.scrollEntry;
     if((route==='schedule'||route==='agenda') && scrollEntry && this.host){
-      var eHit=this.targets.find(function(q){ var lab=(q.node&&q.node.vm&&q.node.vm.label)||'', act=(q.node&&q.node.vm&&q.node.vm.act)||''; return lab===scrollEntry || (act&&act.indexOf('entry:')===0&&lab===scrollEntry); });
+      var eHit=this.targets.find(function(q){ var vm=rd(q.node&&q.node.vm), lab=str(vm.label), act=str(vm.act); return lab===scrollEntry || (act&&act.indexOf('entry:')===0&&lab===scrollEntry); });
       /* Only scroll when the saved item would be off screen, so the back row stays in view otherwise. */
-      if(eHit&&eHit.rect && eHit.rect[1]+eHit.rect[3] > (this.host.scrollTop||0)+(this.host.clientHeight||hostH)) this.host.scrollTop=Math.max(0, eHit.rect[1]-24);
+      if(eHit&&eHit.rect && eHit.rect[1]+eHit.rect[3] > this.host.scrollTop+this.host.clientHeight) this.host.scrollTop=Math.max(0, eHit.rect[1]-24);
       root.__budgetUi.scrollEntry='';
     }
     blobs.selector=ov.dl.bytes();this.overlayNodes=ov.nodes;
     this.store=new root.Exp7ViewStore.Store(cat,function(rec){return blobs[rec.dl.file];},J);this.store.bindResources(this.core,{regular:jf[0],bold:jf[1]});this.blobs=blobs;
     var list=[];order.forEach(function(k){var rec=self.store.record('exp7.journal.'+k),v=self.views[k];if(!v){v=self.store.create(rec.id,{renderer:self.r});self.views[k]=v;}else{v.record=rec;v.scene.load(self.store.dl(rec.id));}
-      var p=positions[k]||[0,0,colW,H];v.scene.onevent=function(e){var nodes=k==='selector'?self.overlayNodes:Ls[k].nodes,n=nodes.find(function(q){return q.id===e.id;});if(!n)return;
-        if(n.looks){self.pointer(k,n,e.kind);}else if((e.kind===J.EV.ENTER||e.kind===J.EV.LEAVE)&&n.hov!=null){v.scene.patch(new J.Patch().colorItem(n.id,0,e.kind===J.EV.ENTER?n.hov:n.base));self.r.draw();}if(e.kind===J.EV.CLICK&&n.vm)Promise.resolve(self.act(n.vm.act,k,n)).catch(function(err){self.status.textContent='Selection failed: '+String(err.message||err);});
-      };list.push([v,p[0],p[1]-(self.scrollY||0),p[2],p[3]]);});
+      var p=k==='selector'?[0,0,colW,H]:positions[k];v.scene.onevent=function(e){var nodes=k==='selector'?self.overlayNodes:Ls[k].nodes,n=nodes.find(function(q){return q.id===e.id;});if(!n)return;
+        if(n.looks){self.pointer(k,n,e.kind);}else if((e.kind===J.EV.ENTER||e.kind===J.EV.LEAVE)&&n.hov!=null){v.scene.patch(new J.Patch().colorItem(n.id,0,e.kind===J.EV.ENTER?n.hov:n.base));self.r.draw();}if(e.kind===J.EV.CLICK&&n.vm)Promise.resolve(self.act(n.vm.act,k,n)).catch(function(err){self.status.textContent='Selection failed: '+String(err.message?err.message:err);});
+      };list.push([v,p[0],p[1]-self.scrollY,p[2],p[3]]);});
     this.drawOrder=order;this.entries=this.store.compose(this.r,list);
     /* every scene was loaded at rest: the pointer is over and down on nothing new, and the focused target draws its focus look */
     this.over=null;this.down=null;var ft=this.focused();if(ft&&ft.node.looks)this.drawState(ft.kind,ft.node);
@@ -17414,15 +17420,15 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     this.r.draw();this.painted=true;this.error='';
   };
   Home.prototype.placeScenes=function(){if(this.dead||!this.r||!this.store||!this.drawOrder)return;
-    var css=hostCssSize(this.host), scrollY=this.host.scrollTop||0, viewH=this.viewH||css.h, hostW=this.W||css.w, H=this.H, colW=this.colW, self=this, dpr=this.dpr||css.dpr;
-    if(this._pendingPlanY!=null&&this.route==='home'&&this._planRestoreLive()&&Math.abs(scrollY-this._pendingPlanY)>8){ if(this.wrap&&this.H){ this.wrap.style.minHeight=this.H+'px'; this.wrap.style.height=this.H+'px'; } void this.host.offsetHeight; this.host.scrollTop=this._pendingPlanY; scrollY=this.host.scrollTop||this._pendingPlanY; }
+    var css=hostCssSize(this.host), scrollY=this.host.scrollTop, viewH=this.viewH, hostW=this.W, H=this.H, colW=this.colW, self=this, dpr=this.dpr; /* paint set all of these before drawOrder */
+    if(this._pendingPlanY!=null&&this.route==='home'&&this._planRestoreLive()&&Math.abs(scrollY-this._pendingPlanY)>8){ if(this.wrap&&this.H){ this.wrap.style.minHeight=this.H+'px'; this.wrap.style.height=this.H+'px'; } void this.host.offsetHeight; this.host.scrollTop=this._pendingPlanY; scrollY=this.host.scrollTop; }
     if(viewH!==(this.cv&&this.cv.clientHeight)){
-      var metrics=viewMetrics(hostW,css.h||viewH,H,dpr,maxTexPx(this.r&&this.r.gc));
+      var metrics=viewMetrics(hostW,css.h,H,dpr,maxTexPx(this.r&&this.r.gc));
       this.viewH=viewH=metrics.viewH; this.cv.style.height=viewH+'px'; this.r.resize(metrics.viewW,viewH,metrics.dpr);
     }
     this.scrollY=scrollY;
     var list=[], order=this.drawOrder, positions=this.positions;
-    order.forEach(function(k){var v=self.views[k],p=positions[k]||[0,0,colW,H];if(!v)return;list.push([v,p[0],p[1]-scrollY,p[2],p[3]]);});
+    order.forEach(function(k){var v=self.views[k],p=k==='selector'?[0,0,colW,H]:positions[k];if(!v)return;list.push([v,p[0],p[1]-scrollY,p[2],p[3]]);});
     if(list.length){this.entries=this.store.compose(this.r,list);this.r.draw();}
   };
   /* focus(key): move the keyboard focus ring to the target named key (none: no ring). The ring is drawn first; if it can't be,
@@ -17453,16 +17459,16 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   Home.prototype.itemsOf=function(n){ var st=this.artState(n); return n.looks[st]?n.looks[st]:n.items; };
   Home.prototype.drawState=function(k,n){ var items=this.itemsOf(n);
     this.views[k].scene.patch(new J.Patch().replace(n.id,function(b){JV.items(b,{items:items,hit:n.hit,flags:n.flags});})); this.r.draw(); return true; };
-  Home.prototype.point=function(e){var r=this.cv.getBoundingClientRect(),vh=this.viewH||r.height||this.H;return [(e.clientX-r.left)*this.W/r.width,(e.clientY-r.top)*vh/r.height+(this.scrollY||0)];};
+  Home.prototype.point=function(e){var r=this.cv.getBoundingClientRect(),vh=this.viewH;return [(e.clientX-r.left)*this.W/r.width,(e.clientY-r.top)*vh/r.height+this.scrollY];};
   Home.prototype.openDate=function(n,hover){if(hover)return; /* phone-first: the picker is an inline expansion, not a hover popup */
     var t=this.targets.find(function(t){return t.node===n;});if(t)this.focusKey=t.key;
     if(fullOwner&&fullOwner.journalRelease)fullOwner.journalRelease();
     if(root.__budgetChromeAct)root.__budgetChromeAct('budget:date');
-    else {var cur=root.__budgetUi||{}, month=budgetMonthKey();root.__budgetUi=Object.assign({},cur,{pick:cur.pick? '':month});this.render();}
+    else {var cur=root.__budgetUi, month=budgetMonthKey();root.__budgetUi=Object.assign({},cur,{pick:cur.pick? '':month});this.render();}
     this.status.textContent='Choose a date.';};
   Home.prototype.dateAct=function(a){
     /* Inline picker (phone-first, no popup): previous / next browse the month shown in the expansion. */
-    if(/^budget:pick:-?1$/.test(a)){var ui0=root.__budgetUi||{},cur=ui0.pick||String(ui0.day||budgetDateKey()).slice(0,7),nm=budgetShiftMonth(cur,+a.split(':').pop());root.__budgetUi=Object.assign({},ui0,{pick:nm});if(this.status)this.status.textContent=monthTitle(nm);return this.models?this.render():this.update();}
+    if(/^budget:pick:-?1$/.test(a)){var ui0=root.__budgetUi,cur=ui0.pick?ui0.pick:String(ui0.day?ui0.day:budgetDateKey()).slice(0,7),nm=budgetShiftMonth(cur,+a.split(':').pop());root.__budgetUi=Object.assign({},ui0,{pick:nm});if(this.status)this.status.textContent=monthTitle(nm);return this.models?this.render():this.update();}
   };
   /* 1.8.79 (design system phase 2): every action is a failure context. act0 changes the route and the screen state and
    * redraws; if the redraw fails (render returns FAIL), the context fails and its fail logic puts back the route, the
@@ -17486,35 +17492,35 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     /* a tap elsewhere keeps what was typed in the open field (a tap on the canvas has already done this, as the field lost focus) */
     if(this.live) this.closeField(true);
     if(a==='journal:date'){ if(this.dateTarget||(root.__budgetUi&&root.__budgetUi.picking)) return this.openDateField(this.dateTarget||root.__budgetUi.picking,n); this.openDate(n,false);return; }
-    if(a==='date-field:dismiss'){ this.dateTarget=null; root.__budgetUi=Object.assign({},root.__budgetUi||{},{picking:'',formPick:'',dateField:''}); return this.models?this.render():this.update(); }
+    if(a==='date-field:dismiss'){ this.dateTarget=null; root.__budgetUi=Object.assign({},root.__budgetUi,{picking:'',formPick:'',dateField:''}); return this.models?this.render():this.update(); }
     if(a==='budget:pick:today'||a.indexOf('budget:pickday:')===0){
       var d=a==='budget:pick:today'?budgetTodayKey():a.slice('budget:pickday:'.length);
       if(!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
-      var picking=this.dateTarget||((root.__budgetUi||{}).picking);
-      if(picking){ var draft=this.uiDraft(); draft[picking]=d; root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:draft,picking:'',formPick:'',dateField:''}); this.dateTarget=null; if(this.status) this.status.textContent='Date set to '+dayTitle(d); return this.models?this.render():this.update(); }
-      var cur=(root.__budgetUi&&root.__budgetUi.day)||budgetDateKey();
+      var picking=this.dateTarget?this.dateTarget:root.__budgetUi.picking;
+      if(picking){ var draft=this.uiDraft(); draft[picking]=d; root.__budgetUi=Object.assign({},root.__budgetUi,{draft:draft,picking:'',formPick:'',dateField:''}); this.dateTarget=null; if(this.status) this.status.textContent='Date set to '+dayTitle(d); return this.models?this.render():this.update(); }
+      var cur=root.__budgetUi.day?root.__budgetUi.day:budgetDateKey();
       var onHome=(!this.route||this.route==='home'||this.route==='add-item-home'||this.route==='date-picker-open'||this.route==='date-picker-closed');
-      if(onHome&&d===cur){ this.route='schedule'; root.__budgetUi=Object.assign({},root.__budgetUi||{},{day:d,month:d.slice(0,7),pick:''}); if(this.o.onNavigate)this.o.onNavigate(this.route,d); if(this.status) this.status.textContent=dayTitle(d)+' schedule'; return this.models?this.render():this.update(); }
-      root.__budgetUi=Object.assign({},root.__budgetUi||{},{day:d,month:d.slice(0,7),pick:''});
+      if(onHome&&d===cur){ this.route='schedule'; root.__budgetUi=Object.assign({},root.__budgetUi,{day:d,month:d.slice(0,7),pick:''}); if(this.o.onNavigate)this.o.onNavigate(this.route,d); if(this.status) this.status.textContent=dayTitle(d)+' schedule'; return this.models?this.render():this.update(); }
+      root.__budgetUi=Object.assign({},root.__budgetUi,{day:d,month:d.slice(0,7),pick:''});
       this.route=d===(typeof budgetTodayKey==='function'?budgetTodayKey():d)?'home':'add-item-home';
       if(this.o.onNavigate)this.o.onNavigate(this.route,d);
       return this.models?this.render():this.update();
     }
     if(a.indexOf('budget:pick')===0)return this.dateAct(a);
-    if(a==='view:day'){ var day=(root.__budgetUi&&root.__budgetUi.day)||budgetDateKey(); this.route='schedule'; if(this.o.onNavigate)this.o.onNavigate(this.route,day); return this.models?this.render():this.update(); }
-    if(a.indexOf('picker:')===0){var id=a.slice(7),pm=journalOf(this.models.plan),r=(pm.rows||[]).find(function(q){return q.id===id;});root.__budgetUi=Object.assign({},root.__budgetUi||{},{step:id,stepName:r&&r.name,selected:r&&r.selected,choices:r&&r.choices,scrollPlanStep:id});rememberPlan(root.__budgetUi);this.route=navigate(this.route||'home',a);if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey(),{step:id});this.status.textContent=r?('Alternatives for '+r.name):'Alternatives';return this.models?this.render():this.update();}
-    if(a.indexOf('choose:')===0){var ref=a.slice(7), ui=root.__budgetUi||{};
-      root.__budgetUi=Object.assign({},ui,{choice:ref,choiceName:(ui.choices||[]).map(function(c){return c.ref===ref||c.id===ref?c.name:'';}).filter(Boolean)[0]||ref});
+    if(a==='view:day'){ var day=root.__budgetUi.day?root.__budgetUi.day:budgetDateKey(); this.route='schedule'; if(this.o.onNavigate)this.o.onNavigate(this.route,day); return this.models?this.render():this.update(); }
+    if(a.indexOf('picker:')===0){var id=a.slice(7),pm=journalOf(this.models.plan),r=ls(pm.rows).find(function(q){return q.id===id;});root.__budgetUi=Object.assign({},root.__budgetUi,{step:id,stepName:r&&r.name,selected:r&&r.selected,choices:r&&r.choices,scrollPlanStep:id});rememberPlan(root.__budgetUi);this.route=navigate(this.route,a);if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey(),{step:id});this.status.textContent=r?('Alternatives for '+r.name):'Alternatives';return this.models?this.render():this.update();}
+    if(a.indexOf('choose:')===0){var ref=a.slice(7), ui=root.__budgetUi;
+      root.__budgetUi=Object.assign({},ui,{choice:ref,choiceName:ls(ui.choices).map(function(c){return c.ref===ref||c.id===ref?c.name:'';}).filter(Boolean).concat([ref])[0]});
       this.route='plan-c'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey(),{step:ui.step,choice:ref}); return this.models?this.render():this.update();}
-    if(a==='entry:alts'&&(root.__budgetUi||{}).entry){
+    if(a==='entry:alts'&&root.__budgetUi.entry){
       /* Alternatives opened from a day item belong to that item, not to the first plan row. */
-      var sid=root.__budgetUi.entry, spm=journalOf(this.models&&this.models.plan||{}), sr=(spm.rows||[]).find(function(q){return q.id===sid;});
-      root.__budgetUi=Object.assign({},root.__budgetUi,{step:sid,stepName:(sr&&sr.name)||((this.atlas&&this.atlas.items&&this.atlas.items[sid]||{}).name),selected:sr&&sr.selected,choices:sr&&sr.choices});
+      var sid=root.__budgetUi.entry, spm=journalOf(rd(this.models&&this.models.plan)), sr=ls(spm.rows).find(function(q){return q.id===sid;});
+      root.__budgetUi=Object.assign({},root.__budgetUi,{step:sid,stepName:sr&&sr.name?sr.name:rd(this.atlas&&this.atlas.items&&this.atlas.items[sid]).name,selected:sr&&sr.selected,choices:sr&&sr.choices});
       rememberPlan(root.__budgetUi);
     }
-    if(a.indexOf('entry:')===0){ var eid=a.slice(6); if(eid&&eid!=='actions'&&eid!=='change'&&eid!=='alts'&&eid!=='record'&&eid!=='comparison'&&eid!=='pref'&&eid!=='unavail'){ this.draftEntry(eid); } this.route=navigate(this.route||'home',a); if(this.o.onNavigate) this.o.onNavigate(this.route,budgetDateKey(),{entry:eid}); return this.models?this.render():this.update();}
+    if(a.indexOf('entry:')===0){ var eid=a.slice(6); if(eid&&eid!=='actions'&&eid!=='change'&&eid!=='alts'&&eid!=='record'&&eid!=='comparison'&&eid!=='pref'&&eid!=='unavail'){ this.draftEntry(eid); } this.route=navigate(this.route,a); if(this.o.onNavigate) this.o.onNavigate(this.route,budgetDateKey(),{entry:eid}); return this.models?this.render():this.update();}
     if(a.indexOf('nav:')===0){
-      var dest=navigate(this.route||'home',a);
+      var dest=navigate(this.route,a);
       if(dest==='home'||a==='nav:home'||a==='nav:back'||a==='nav:plan') return this.returnHomeToPlanStep();
       this.route=dest;
       if(this.o.onNavigate) this.o.onNavigate(this.route,budgetDateKey());
@@ -17522,11 +17528,11 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     }
     /* An item with no date is never listed in a month total. Tapping it opens its edit page with the date picker open, so it gets a date. */
     if(a.indexOf('date-needed:')===0){ var nid=a.slice(12), nit=this.atlas&&this.atlas.items&&this.atlas.items[nid]; if(!nit){ this.route='monthly'; return this.models?this.render():this.update(); }
-      var tday=budgetTodayKey(), nv=nit.values||{}; root.__budgetUi=Object.assign({},root.__budgetUi||{},{entry:nid,day:tday,month:tday.slice(0,7)});
-      var nd=this.uiDraft(); nd.name=nit.name; nd.date=tday; nd.time=nv.time||''; nd.amount=nv.amount!=null?String(Math.abs(+nv.amount)):''; nd.repeat=journalRepeatDraft(nv); nd.every=nv.every!=null?String(nv.every):''; nd.mdays=Array.isArray(nv.on)?nv.on.join(', '):''; nd.scope='future'; root.__budgetUi.draft=nd;
+      var tday=budgetTodayKey(), nv=rd(nit.values); root.__budgetUi=Object.assign({},root.__budgetUi,{entry:nid,day:tday,month:tday.slice(0,7)});
+      var nd=this.uiDraft(); nd.name=nit.name; nd.date=tday; nd.time=str(nv.time); nd.amount=nv.amount!=null?String(Math.abs(+nv.amount)):''; nd.repeat=journalRepeatDraft(nv); nd.every=nv.every!=null?String(nv.every):''; nd.mdays=Array.isArray(nv.on)?nv.on.join(', '):''; nd.scope='future'; root.__budgetUi.draft=nd;
       this.route='schedule-editor'; if(this.o.onNavigate) this.o.onNavigate(this.route,tday,{entry:nid});
       var opened=this.openDateField('date',null); if(this.status) this.status.textContent='Give '+nit.name+' a date, then save.'; return opened; }
-    if(a.indexOf('date:')===0){root.__budgetUi=Object.assign({},root.__budgetUi||{},{day:a.slice(5),month:a.slice(5,12)});this.route='schedule'; return this.models?this.render():this.update();}
+    if(a.indexOf('date:')===0){root.__budgetUi=Object.assign({},root.__budgetUi,{day:a.slice(5),month:a.slice(5,12)});this.route='schedule'; return this.models?this.render():this.update();}
 
     if(a==='keep'){ return this.returnHomeToPlanStep(); }
     if(a==='cash:view'){ if(this.status) this.status.textContent='Add or update this item from a calendar day (as-of date).'; return; }
@@ -17534,24 +17540,24 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if(a.indexOf('repeat:')===0){ var d=this.uiDraft(); d.repeat=a.slice(7); root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
     if(a.indexOf('rec:')===0){ var d=this.uiDraft(); d.rec=a.slice(4); root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
     if(a.indexOf('scope:')===0){ var d=this.uiDraft(); if(this.route==='day-record') d.recScope=a.slice(6); else d.scope=a.slice(6); root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
-    if(a==='ded:add'){ var d=this.uiDraft(); d.deductions=d.deductions||[]; d.deductions.push({name:'New deduction',kind:'percent',value:'0'}); root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
-    if(a.indexOf('ded:kind:')===0){ var parts=a.split(':'), i=+parts[2], kind=parts[3]||'percent', d=this.uiDraft(); d.deductions=d.deductions||[]; if(!d.deductions[i]) d.deductions[i]={name:'Deduction',kind:kind,value:'0'}; else d.deductions[i].kind=kind; root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
+    if(a==='ded:add'){ var d=this.uiDraft(); if(!d.deductions) d.deductions=[]; d.deductions.push({name:'New deduction',kind:'percent',value:'0'}); root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
+    if(a.indexOf('ded:kind:')===0){ var parts=a.split(':'), i=+parts[2], kind=parts[3], d=this.uiDraft(); if(!kind||!d.deductions||!d.deductions[i]) return; /* 1.8.101: a kind for a deduction that is not there changes nothing */ d.deductions[i].kind=kind; root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
     if(a.indexOf('ded:value:')===0){ return this.openField('deduct:'+a.split(':')[2],n); }
     if(a.indexOf('ded:name:')===0){ return this.openField('deduct-name:'+a.split(':')[2],n); }
     if(a.indexOf('field:')===0){ return this.openField(a.slice(6),n); }
     if(a.indexOf('add:')===0||a.indexOf('add-alt:')===0){
       if(a==='add:pay'||a==='add:debt'||a==='add:activity'||a==='add:cash'){
-        var keepDay=((root.__budgetUi&&root.__budgetUi.day)||this.uiDraft().date||budgetDateKey()); /* the selected day, not a leftover draft */
-        root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:{date:keepDay,asOf:keepDay,kind:'cash',repeat:a==='add:pay'?'every':'none',every:a==='add:debt'?'30':'14'}});
+        var keepDay=root.__budgetUi.day?root.__budgetUi.day:this.uiDraft().date?this.uiDraft().date:budgetDateKey(); /* the selected day, not a leftover draft */
+        root.__budgetUi=Object.assign({},root.__budgetUi,{draft:{date:keepDay,asOf:keepDay,kind:'cash',repeat:a==='add:pay'?'every':'none',every:a==='add:debt'?'30':'14'}});
       }
-      if(a==='add-alt:form'||a==='add-alt-form'){ if(this.closeField) this.closeField(true); var d=this.uiDraft(), cn=String(d.category||d.cname||d.name||'').trim(); if(cn) d.cname=cn; else delete d.cname; /* no category yet: the form's own start, not undefined */ root.__budgetUi.draft=d; }
-      if(a==='add:alt'){ var ad=this.uiDraft(); ad.aname=''; delete ad.preferred; var ui=root.__budgetUi||{}, it=this.atlas&&this.atlas.items&&this.atlas.items[ui.step]; this.route=(it&&it.alts&&(it.alts.name||(it.alts.members&&it.alts.members.length)))?'add-alt-form':'add-alt-category'; }
-      else this.route=navigate(this.route||'home',a);
+      if(a==='add-alt:form'||a==='add-alt-form'){ if(this.closeField) this.closeField(true); var d=this.uiDraft(), cn=str(d.category?d.category:d.cname?d.cname:d.name).trim(); if(cn) d.cname=cn; else delete d.cname; /* no category yet: the form's own start, not undefined */ root.__budgetUi.draft=d; }
+      if(a==='add:alt'){ var ad=this.uiDraft(); ad.aname=''; delete ad.preferred; var ui=root.__budgetUi, it=this.atlas&&this.atlas.items&&this.atlas.items[ui.step]; this.route=(it&&it.alts&&(it.alts.name||(it.alts.members&&it.alts.members.length)))?'add-alt-form':'add-alt-category'; }
+      else this.route=navigate(this.route,a);
       if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey());
       return this.models?this.render():this.update();
     }
     if(a==='pref:star'||a==='field:preferred'){ if(this.closeField) this.closeField(false); var d=this.uiDraft(); d.preferred=!(d.preferred!==false); root.__budgetUi.draft=d; return this.models?this.render():this.update(); }
-    if(a.indexOf('kind:')===0){ root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:Object.assign({},(root.__budgetUi||{}).draft||{},{kind:a.slice(5)})}); return this.models?this.render():this.update(); }
+    if(a.indexOf('kind:')===0){ root.__budgetUi=Object.assign({},root.__budgetUi,{draft:Object.assign({},rd(root.__budgetUi.draft),{kind:a.slice(5)})}); return this.models?this.render():this.update(); }
     if(a.indexOf('time:hour:')===0||a.indexOf('time:min:')===0){
       if(this.closeField) this.closeField(false);
       var d=this.uiDraft(), cur=formatTime24(d.time), hh=cur.slice(0,2), mm=cur===''?'00':cur.slice(3,5);
@@ -17559,14 +17565,14 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       else if(cur==='') return; /* no hour yet: a minute alone sets no time */
       else mm=a.slice(9);
       d.time=formatTime24(hh+':'+mm);
-      root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:d, picking:'time'});
+      root.__budgetUi=Object.assign({},root.__budgetUi,{draft:d, picking:'time'});
       return this.models?this.render():this.update();
     }
-    if(a==='req:add'){ if(this.closeField) this.closeField(false); var d=this.uiDraft(); d.rname=''; d.time=''; d.amount=''; d.repeat='none'; /* a new requirement starts empty, on the same date */ root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:d, picking:''}); this.route='add-req-form'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey()); return this.models?this.render():this.update(); }
-    if(a.indexOf('req:')===0){ var rq=a.slice(4), rcut=rq.lastIndexOf(':'), rk=rcut>0?rq.slice(0,rcut):rq, rv=rcut>0?rq.slice(rcut+1):'own', u0=restorePlan(root.__budgetUi||{}), reqs=Object.assign({},reqAnswers(u0)); if(rk){ reqs[rk]=(rv==='own'||rv==='reuse'||rv==='none')?rv:'own'; } root.__budgetUi=Object.assign({},u0,{reqs:reqs,reqsFor:reqCtx(u0)}); rememberPlan(root.__budgetUi); this.route='plan-c'; return this.models?this.render():this.update(); }
+    if(a==='req:add'){ if(this.closeField) this.closeField(false); var d=this.uiDraft(); d.rname=''; d.time=''; d.amount=''; d.repeat='none'; /* a new requirement starts empty, on the same date */ root.__budgetUi=Object.assign({},root.__budgetUi,{draft:d, picking:''}); this.route='add-req-form'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey()); return this.models?this.render():this.update(); }
+    if(a.indexOf('req:')===0){ var rq=a.slice(4), rcut=rq.lastIndexOf(':'), rk=rcut>0?rq.slice(0,rcut):rq, rv=rcut>0?rq.slice(rcut+1):'own', u0=restorePlan(root.__budgetUi), reqs=Object.assign({},reqAnswers(u0)); if(rk){ reqs[rk]=(rv==='own'||rv==='reuse'||rv==='none')?rv:'own'; } root.__budgetUi=Object.assign({},u0,{reqs:reqs,reqsFor:reqCtx(u0)}); rememberPlan(root.__budgetUi); this.route='plan-c'; return this.models?this.render():this.update(); }
     if(a==='save'||a==='rightAct'){ return this.saveJournal(); }
     if(a==='accept'||a==='proposal:accept'||a==='proposal:after'){
-      var rt=this.route||'home';
+      var rt=this.route;
       if(rt==='plan-c'){ this.route=(this.models&&this.models.plan)?'plan-switch-after':'plan-switch-before'; /* live: one stacked Before and After page */ }
       else if(rt==='plan-switch-before'){ this.route='plan-switch-after'; }
       else if(rt==='plan-switch-after'){ return this.acceptPlanSwitch(); }
@@ -17574,22 +17580,22 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey());
       return this.models?this.render():this.update();
     }
-    if(a.indexOf('month:')===0){var src=(this.dateTarget||(root.__budgetUi&&root.__budgetUi.picking))?((root.__budgetUi||{}).formPick||(root.__budgetUi||{}).pick):((root.__budgetUi||{}).pick||(root.__budgetUi||{}).month), old=src||budgetMonthKey(),next=budgetShiftMonth(old,+a.slice(6));
-      if(this.dateTarget||(root.__budgetUi&&root.__budgetUi.picking)){ root.__budgetUi=Object.assign({},root.__budgetUi||{},{formPick:next}); return this.models?this.render():this.update(); }
-      root.__budgetUi=Object.assign({},root.__budgetUi||{},{month:next,day:next+'-01',pick:next});var cid=this.atlas.meta.calId,ops=[{path:'components/'+cid+'/view/month',op:'set',value:next}];await submitViews(ops,'calendar:month',this.context);return this.update();}
+    if(a.indexOf('month:')===0){var U=root.__budgetUi, src=(this.dateTarget||U.picking)?(U.formPick?U.formPick:U.pick):(U.pick?U.pick:U.month), old=src?src:budgetMonthKey(),next=budgetShiftMonth(old,+a.slice(6));
+      if(this.dateTarget||U.picking){ root.__budgetUi=Object.assign({},U,{formPick:next}); return this.models?this.render():this.update(); }
+      root.__budgetUi=Object.assign({},U,{month:next,day:next+'-01',pick:next});var cid=this.atlas.meta.calId,ops=[{path:'components/'+cid+'/view/month',op:'set',value:next}];await submitViews(ops,'calendar:month',this.context);return this.update();}
   };
-  function planSession(){ root.__budgetPlanSession=root.__budgetPlanSession||{}; return root.__budgetPlanSession; }
+  function planSession(){ if(!root.__budgetPlanSession) root.__budgetPlanSession={}; /* started the first time a plan step is opened */ return root.__budgetPlanSession; }
   function rememberPlan(ui){ var s=planSession(); if(!ui) return s; ['step','stepName','choice','choiceName','preferred','reqs','reqsFor','reqItems','reqItemsFor','draft','scrollPlanStep'].forEach(function(k){ if(ui[k]!=null) s[k]=ui[k]; }); return s; }
-  function restorePlan(ui){ var s=planSession(); ui=ui||{}; ['step','stepName','choice','choiceName','preferred','reqs','reqsFor','reqItems','reqItemsFor','scrollPlanStep'].forEach(function(k){ if(ui[k]==null&&s[k]!=null) ui[k]=s[k]; }); if(!ui.draft&&s.draft) ui.draft=s.draft; return ui; }
+  function restorePlan(ui){ var s=planSession(); ['step','stepName','choice','choiceName','preferred','reqs','reqsFor','reqItems','reqItemsFor','scrollPlanStep'].forEach(function(k){ if(ui[k]==null&&s[k]!=null) ui[k]=s[k]; }); if(!ui.draft&&s.draft) ui.draft=s.draft; return ui; }
   /* 1.8.75: requirement answers and added requirements belong to one step and one choice, so the next alternative never opens already answered. */
-  function reqCtx(ui){ ui=ui||{}; return String(ui.step||'')+'>'+String(ui.choice||''); }
-  function reqAnswers(ui){ ui=ui||{}; return (ui.reqsFor&&ui.reqsFor===reqCtx(ui)&&ui.reqs)||{}; }
-  function reqAdded(ui){ ui=ui||{}; return (ui.reqItemsFor&&ui.reqItemsFor===reqCtx(ui)&&Array.isArray(ui.reqItems)&&ui.reqItems)||[]; }
+  function reqCtx(ui){ return str(ui.step)+'>'+str(ui.choice); }
+  function reqAnswers(ui){ return rd(ui.reqsFor&&ui.reqsFor===reqCtx(ui)&&ui.reqs); }
+  function reqAdded(ui){ return ls(ui.reqItemsFor&&ui.reqItemsFor===reqCtx(ui)&&ui.reqItems); }
   /* The review's requirements are those of the choice in use: the step's JReqs (a ref, a list, {jgroup:[...]} or a record, as in 1.8.72) while the step's own
      item is in use; after a switch, what that switch kept (a Reuse copy in place of the original, "Needs its own" as the original, "Not needed" dropped) and the
      requirements made for that choice. Then those added here for this choice. Each has a stable key; an atlas item keeps its id so its answer can be saved. */
-  function forAltOf(AT, ref){ var BF=root.BudgetFlows, out=[]; if(!ref) return out; if(BF&&typeof BF.reqsOf==='function') return BF.reqsOf(AT, ref)||[];
-    Object.keys(AT.items||{}).forEach(function(id){ var v=(AT.items[id]||{}).values; if(v&&v.forAlt===ref) out.push(id); }); return out; }
+  function forAltOf(AT, ref){ var BF=root.BudgetFlows, out=[]; if(!ref) return out; if(BF&&typeof BF.reqsOf==='function') return ls(BF.reqsOf(AT, ref));
+    Object.keys(rd(AT.items)).forEach(function(id){ var v=rd(AT.items[id]).values; if(v&&v.forAlt===ref) out.push(id); }); return out; }
   function inUseReqs(AT, step, seeded){ var cur=(typeof root.selectedRef==='function')?root.selectedRef(AT, step):null;
     if(!cur||cur==='item:'+step) return seeded;
     var C=AT.items[String(cur).replace(/^item:/,'')]; if(!C) return seeded;
@@ -17602,17 +17608,17 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       out.push(q); });
     made.forEach(function(id){ if(out.indexOf('item:'+id)<0) out.push('item:'+id); });
     return out; }
-  function reviewReqs(AT, ui){ AT=AT||{}; ui=ui||{}; var stepIt=(AT.items&&ui.step&&AT.items[ui.step])||null, raw=stepIt?stepIt.jreq:null, out=[], seen={};
+  function reviewReqs(AT, ui){ AT=rd(AT); var stepIt=AT.items&&ui.step&&AT.items[ui.step]?AT.items[ui.step]:null, raw=stepIt?stepIt.jreq:null, out=[], seen={};
     var seeded=Array.isArray(raw)?raw:(raw&&typeof raw==='object'&&Array.isArray(raw.jgroup)?raw.jgroup:(raw?[raw]:[]));
     if(stepIt) seeded=inUseReqs(AT, ui.step, seeded);
     seeded.forEach(function(q,i){ var id=null, nm=null;
-      if(typeof q==='string'){ var m=/^(item|bp|joy|comp):(.+)$/.exec(q), col=m?({item:'items',bp:'blueprints',joy:'joys',comp:'components'})[m[1]]:'items', key=m?m[2]:q, t=(AT[col]||{})[key]; nm=(t&&(t.name||t.title))||null; if(col==='items'&&t) id=key; }
-      else if(q&&typeof q==='object'){ nm=q.name||q.title||null; if(q.id&&AT.items&&AT.items[q.id]) id=q.id; }
-      var k=id?('i.'+id):('n'+i); if(seen[k]) return; seen[k]=1; out.push({key:k,name:nm||('Requirement '+(i+1)),id:id,added:null}); });
-    if(!out.length) out.push({key:'n0',name:'Needs from '+(ui.stepName||'this step'),id:null,added:null});
+      if(typeof q==='string'){ var m=/^(item|bp|joy|comp):(.+)$/.exec(q), col=m?({item:'items',bp:'blueprints',joy:'joys',comp:'components'})[m[1]]:'items', key=m?m[2]:q, t=rd(AT[col])[key]; nm=t?(t.name?t.name:t.title):null; if(col==='items'&&t) id=key; }
+      else if(q&&typeof q==='object'){ nm=q.name?q.name:q.title; if(q.id&&AT.items&&AT.items[q.id]) id=q.id; }
+      var k=id?('i.'+id):('n'+i); if(seen[k]) return; seen[k]=1; if(!nm) return; /* 1.8.101: a requirement with no name is left out */ out.push({key:k,name:nm,id:id,added:null}); });
+    if(!out.length&&ui.stepName) out.push({key:'n0',name:'Needs from '+ui.stepName,id:null,added:null});
     reqAdded(ui).forEach(function(r){ if(r&&r.name&&r.id&&!seen['a.'+r.id]){ seen['a.'+r.id]=1; out.push({key:'a.'+r.id,name:r.name,id:null,added:r}); } });
     return out; }
-  Home.prototype.uiDraft=function(){ root.__budgetUi=restorePlan(root.__budgetUi||{}); root.__budgetUi.draft=root.__budgetUi.draft||{}; return root.__budgetUi.draft; };
+  Home.prototype.uiDraft=function(){ root.__budgetUi=restorePlan(root.__budgetUi); if(!root.__budgetUi.draft) root.__budgetUi.draft={}; /* a page's draft starts empty */ return root.__budgetUi.draft; };
 
   /* 1.8.89 (design system phase 5): the field being typed in. openField keeps it as this.live { key, act, value } and redraws:
    * screenLayout lays a LiveField (Budget's art) over the tapped field's target, and paint puts a JRender TextField on it in
@@ -17626,17 +17632,15 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     var key=live.key, v=live.value;
     if(commit!==false){
       if(key.indexOf('deduct:')===0){
-        var i=+key.split(':')[1], list=draft.deductions||[];
+        var i=+key.split(':')[1], list=ls(draft.deductions);
         if(list[i]) list[i].value=v;
-        draft.deductions=list;
       } else if(key.indexOf('deduct-name:')===0){
-        var k=+key.split(':')[1], names=draft.deductions||[];
+        var k=+key.split(':')[1], names=ls(draft.deductions);
         if(names[k]) names[k].name=v;
-        draft.deductions=names;
-      } else if(key==='time'){ draft.time=formatTime24(v)||v; root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:draft, picking:''}); }
+      } else if(key==='time'){ var t24=formatTime24(v); draft.time=t24?t24:v; root.__budgetUi=Object.assign({},root.__budgetUi,{draft:draft, picking:''}); }
       else draft[key]=v;
     }
-    if(key==='time' && (root.__budgetUi||{}).picking==='time'){ root.__budgetUi=Object.assign({},root.__budgetUi||{},{picking:''}); }
+    if(key==='time' && root.__budgetUi.picking==='time'){ root.__budgetUi=Object.assign({},root.__budgetUi,{picking:''}); }
   };
   /* Enter: what was typed goes into the draft and the field closes */
   Home.prototype.commitField=function(){ var key=this.live.key; this.closeField(true); if(this.status) this.status.textContent=key+' set'; return this.models?this.render():this.update(); };
@@ -17670,7 +17674,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     /* Moving to another field keeps what was typed in the open one. */
     this.closeField(true);
     var draft=this.uiDraft();
-    root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:draft, picking:key, formPick:budgetMonthKey(), dateField:key});
+    root.__budgetUi=Object.assign({},root.__budgetUi,{draft:draft, picking:key, formPick:budgetMonthKey(), dateField:key});
     this.dateTarget=key;
     this.dateFieldNode=n;
     if(this.status) this.status.textContent='Choose a date.';
@@ -17683,14 +17687,14 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     this.closeField(true);
     var draft=this.uiDraft();
     if(key==='time'){
-      root.__budgetUi=Object.assign({},root.__budgetUi||{},{draft:draft, picking:'time'});
+      root.__budgetUi=Object.assign({},root.__budgetUi,{draft:draft, picking:'time'});
       this.dateTarget=null;
     }
     var initial=draft[key];
     if(key.indexOf('deduct:')===0){ var i=+key.split(':')[1]; initial=draft.deductions&&draft.deductions[i]&&draft.deductions[i].value; }
     if(key.indexOf('deduct-name:')===0){ var k=+key.split(':')[1]; initial=draft.deductions&&draft.deductions[k]&&draft.deductions[k].name; }
-    if(key==='time') initial=formatTime24(initial)||'';
-    if((initial==null||initial==='')&&key==='mdays'){ var dd=+String(draft.date||((root.__budgetUi||{}).day)||'').slice(8); if(dd) initial=String(dd); }
+    if(key==='time') initial=formatTime24(initial);
+    if((initial==null||initial==='')&&key==='mdays'){ var dd=+str(draft.date?draft.date:root.__budgetUi.day).slice(8); if(dd) initial=String(dd); }
     if(initial==null||initial==='') initial=(key==='time'?'':(fieldKind(key)==='number'?'0.00':''));
     this.live={key:key, act:n.vm.act, value:String(initial)};
     if(this.status) this.status.textContent=key+' — enter a value';
@@ -17699,7 +17703,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   Home.prototype.saveJournal=async function(){
     this.dateTarget=null;
     if(this.closeField) this.closeField(true);
-    var route=this.route||'', ui=root.__budgetUi||{}, draft=this.uiDraft(), day=ui.day||budgetDateKey(), name=String(draft.name||draft.aname||draft.cname||draft.rname||'').trim();
+    var route=this.route, ui=root.__budgetUi, draft=this.uiDraft(), day=ui.day?ui.day:budgetDateKey(), name=str([draft.name,draft.aname,draft.cname,draft.rname].filter(Boolean)[0]).trim();
     root.__budgetUi=Object.assign({},ui,{picking:'',formPick:'',dateField:''}); ui=root.__budgetUi;
     var amount=parseMoney(draft.amount!=null&&draft.amount!==''?draft.amount:(draft.gross!=null&&draft.gross!==''?draft.gross:draft.balance));
     var when=journalWhen(draft, day, route), self=this;
@@ -17709,28 +17713,28 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     var NEEDS_AMOUNT={'cash-entry':1,'add-item-form':1,'schedule-editor':1,'pay-entry':1,'debt-entry':1,'add-alt-form':1,'add-req-form':1};
     if(NEEDS_AMOUNT[route]&&!(amount>=0)) return ask('Enter an amount of 0 or more.');
     if(NEEDS_AMOUNT[route]&&draft.repeat==='every'&&!(Math.floor(+draft.every)>=1)) return ask('Enter how many days apart it repeats.');
-    var ops=[], atlas=this.atlas||{}, id='n'+Date.now().toString(36);
+    var ops=[], atlas=rd(this.atlas), id='n'+Date.now().toString(36);
     var calId=journalCalId(atlas);
     /* the board the atlas names for the kind (meta.boardIds); with none, the item is not put on a board */
     function boardId(kind){ var ids=atlas.meta&&atlas.meta.boardIds, id=ids?ids[kind]:null; return typeof id==='string'&&id?id:null; }
     function addItem(values, board){ ops.push({path:'items/'+id,op:'add',value:{id:id,name:name,values:values,state:{},alts:null,jreq:[],blueprint:null}}); if(board) ops.push({path:'components/'+board+'/items',op:'add',value:'item:'+id}); if(calId&&(values.date||values.asOf)) ops.push({path:'components/'+calId+'/items',op:'add',value:'item:'+id}); }
     function repeatValues(v){ return journalRepeat(draft, v, when); }
-    if(route==='cash-entry'){ var kind=(draft.kind==='owned')?'owned':'cash'; name=String(draft.name||'').trim(); if(!name) return ask('Enter a name.'); addItem({type:'asset',assetKind:kind,amount:amount,asOf:when,date:when}, boardId('asset')); }
-    else if(route==='add-item-form'){ name=String(draft.name||'').trim(); if(!name) return ask('Enter a name.'); addItem(repeatValues({type:'expense',flow:'out',consume:true,charge:'per',amount:-amount,date:when}), boardId('expense')); }
-    else if(route==='schedule-editor'){ var eid=(ui.entry||draft.entry||''); if(eid&&atlas.items&&atlas.items[eid]){ var it=atlas.items[eid], iv=it.values||{}, sgn=(iv.flow==='in'||iv.type==='income')?1:-1;
-      name=String(draft.name||'').trim(); if(name&&name!==it.name) ops.push({path:'items/'+eid+'/name',op:'set',value:name}); if(!name) name=it.name;
+    if(route==='cash-entry'){ var kind=(draft.kind==='owned')?'owned':'cash'; name=str(draft.name).trim(); if(!name) return ask('Enter a name.'); addItem({type:'asset',assetKind:kind,amount:amount,asOf:when,date:when}, boardId('asset')); }
+    else if(route==='add-item-form'){ name=str(draft.name).trim(); if(!name) return ask('Enter a name.'); addItem(repeatValues({type:'expense',flow:'out',consume:true,charge:'per',amount:-amount,date:when}), boardId('expense')); }
+    else if(route==='schedule-editor'){ var eid=ui.entry?ui.entry:str(draft.entry); if(eid&&atlas.items&&atlas.items[eid]){ var it=atlas.items[eid], iv=rd(it.values), sgn=(iv.flow==='in'||iv.type==='income')?1:-1;
+      name=str(draft.name).trim(); if(name&&name!==it.name) ops.push({path:'items/'+eid+'/name',op:'set',value:name}); if(!name) name=it.name;
       var BF=root.BudgetFlows, en=BF&&BF.entryOn?BF.entryOn(atlas,eid,day):null;
       var repNow=journalRepeatDraft(iv), repSame=!draft.repeat||draft.repeat===repNow;
       if(en&&en.repeating&&iv.date&&repSame&&BF.occOps){ var c={}, want=Math.round(sgn*amount*100)/100, had=en.charge==null?0:Math.round(en.charge*100)/100; if(want!==had) c.amount=want;
-        var tm=formatTime24(draft.time)||'', hadT=(en.ex&&en.ex.time!=null)?en.ex.time:(en.values.allDay?'':(en.values.time||'')); if(tm!==hadT) c.time=tm;
+        var tm=formatTime24(draft.time), hadT=(en.ex&&en.ex.time!=null)?en.ex.time:(en.values.allDay?'':str(en.values.time)); if(tm!==hadT) c.time=tm;
         if(when&&when!==day) c.moved=when;
         ops=ops.concat(BF.occOps(atlas,en,c,draft.scope==='one'?'once':'future',day)); }
       else { var vals=Object.assign({},iv,repeatValues({charge:'per',amount:sgn*amount,date:when})); ops.push({path:'items/'+eid+'/values',op:'set',value:vals});
         /* an item that just got its date joins the calendar, so it shows on that day */
-        if(calId){ var calItems=atlas.components[calId].items||[]; if(vals.date&&calItems.indexOf('item:'+eid)<0) ops.push({path:'components/'+calId+'/items',op:'add',value:'item:'+eid}); } } } else { name=String(draft.name||'').trim(); if(!name) return ask('Enter a name.'); addItem(repeatValues({type:'expense',flow:'out',consume:true,charge:'per',amount:-amount,date:when}), boardId('expense')); } }
-    else if(route==='pay-entry'){ name=String(draft.payee||draft.name||'').trim(); if(!name) return ask('Enter who pays.'); var dens=(draft.deductions||[]).map(function(d){return {name:d.name||'',kind:d.kind==='fixed'?'fixed':'percent',value:parseMoney(d.value)};}); var gross=amount, TH=root.BudgetRules.takeHome({gross:gross,deductions:dens}); if(!TH.ok) return ask(TH.errors.join(' ')); addItem(repeatValues({type:'income',flow:'in',amount:TH.net,date:when,gross:gross,deductions:dens,charge:'per',allDay:true}), boardId('income')); }
-    else if(route==='debt-entry'){ var cred=String(draft.creditor||'').trim(), purp=String(draft.purpose||draft.name||'').trim(); if(!cred) return ask('Enter who the debt is owed to.'); if(!purp) return ask('Enter what the debt is for.'); name=purp+' ('+cred+')'; var asOf=(draft.asOf&&/^\d{4}-\d{2}-\d{2}$/.test(draft.asOf))?draft.asOf:when; var apr=parseMoney(draft.apr), terms=parseMoney(draft.terms), ev=parseMoney(draft.every); if(!(terms>=1)) return ask('Enter how many payments are left.'); if(!(ev>=1)) return ask('Enter how many days apart the payments are.'); var sch=root.BudgetRules.debtSchedule({balance:amount,apr:apr,terms:terms,every:ev,asOf:asOf}); if(!sch.ok) return ask(sch.errors.join(' ')); addItem({type:'debt',creditor:cred,purpose:purp,amount:amount,asOf:asOf,apr:apr,terms:terms,every:ev,payment:sch.payment,date:asOf}, boardId('debt')); }
-    else if(route==='day-record'){ var eid=(ui.entry||draft.entry||''), BF=root.BudgetFlows, en=eid&&BF&&BF.entryOn&&atlas.items&&atlas.items[eid]?BF.entryOn(atlas,eid,day):null;
+        if(calId){ var calItems=ls(atlas.components[calId].items); if(vals.date&&calItems.indexOf('item:'+eid)<0) ops.push({path:'components/'+calId+'/items',op:'add',value:'item:'+eid}); } } } else { name=str(draft.name).trim(); if(!name) return ask('Enter a name.'); addItem(repeatValues({type:'expense',flow:'out',consume:true,charge:'per',amount:-amount,date:when}), boardId('expense')); } }
+    else if(route==='pay-entry'){ name=str(draft.payee?draft.payee:draft.name).trim(); if(!name) return ask('Enter who pays.'); var dens=ls(draft.deductions).map(function(d){return {name:str(d.name),kind:d.kind==='fixed'?'fixed':'percent',value:parseMoney(d.value)};}); var gross=amount, TH=root.BudgetRules.takeHome({gross:gross,deductions:dens}); if(!TH.ok) return ask(TH.errors.join(' ')); addItem(repeatValues({type:'income',flow:'in',amount:TH.net,date:when,gross:gross,deductions:dens,charge:'per',allDay:true}), boardId('income')); }
+    else if(route==='debt-entry'){ var cred=str(draft.creditor).trim(), purp=str(draft.purpose?draft.purpose:draft.name).trim(); if(!cred) return ask('Enter who the debt is owed to.'); if(!purp) return ask('Enter what the debt is for.'); name=purp+' ('+cred+')'; var asOf=(draft.asOf&&/^\d{4}-\d{2}-\d{2}$/.test(draft.asOf))?draft.asOf:when; var apr=parseMoney(draft.apr), terms=parseMoney(draft.terms), ev=parseMoney(draft.every); if(!(terms>=1)) return ask('Enter how many payments are left.'); if(!(ev>=1)) return ask('Enter how many days apart the payments are.'); var sch=root.BudgetRules.debtSchedule({balance:amount,apr:apr,terms:terms,every:ev,asOf:asOf}); if(!sch.ok) return ask(sch.errors.join(' ')); addItem({type:'debt',creditor:cred,purpose:purp,amount:amount,asOf:asOf,apr:apr,terms:terms,every:ev,payment:sch.payment,date:asOf}, boardId('debt')); }
+    else if(route==='day-record'){ var eid=ui.entry?ui.entry:str(draft.entry), BF=root.BudgetFlows, en=eid&&BF&&BF.entryOn&&atlas.items&&atlas.items[eid]?BF.entryOn(atlas,eid,day):null;
       if(!en||!BF.occOps){ if(this.status) this.status.textContent='Open the item from its day to record what happened.'; return; }
       var rk=draft.rec; if(rk!=='planned'&&rk!=='diff'&&rk!=='none') return ask('Pick what happened.'); var c={actual:true,outcome:rk==='diff'?'changed':rk==='none'?'skipped':'done'};
       if(c.outcome==='skipped') c.skip=true;
@@ -17738,24 +17742,24 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       ops=BF.occOps(atlas,en,c,draft.recScope==='future'?'future':'once',day); name=en.name; when=day; }
     else if(route==='add-alt-form'||route==='add-alt-category'){
       if(route==='add-alt-category'){ if(!name) return ask('Enter a name for the category.'); draft.cname=name; this.route='add-alt-form'; if(this.status) this.status.textContent='Category named. Now add the alternative.'; return this.models?this.render():this.update(); }
-      var step=ui.step, an=String(draft.aname||'').trim(), isPref=draft.preferred!==false; /* the star decides preferred */
+      var step=ui.step, an=str(draft.aname).trim(), isPref=draft.preferred!==false; /* the star decides preferred */
       if(!an) return ask('Enter a name for the alternative.'); name=an;
       /* An alternative is charged the same way as the item it replaces (per occurrence for an activity), so its amount reads as typed. */
-      var sv=(step&&atlas.items&&atlas.items[step]&&atlas.items[step].values)||{}, sIn=sv.flow==='in';
-      var base={type:sv.type||'expense',flow:sIn?'in':'out',amount:(sIn?1:-1)*amount,date:when}; if(sv.consume!=null) base.consume=sv.consume; if(sv.charge) base.charge=sv.charge;
+      var sv=rd(step&&atlas.items&&atlas.items[step]&&atlas.items[step].values), sIn=sv.flow==='in';
+      var base={flow:sIn?'in':'out',amount:(sIn?1:-1)*amount,date:when}; if(sv.type) base.type=sv.type; /* 1.8.101: the type of the item it replaces, when that has one */ if(sv.consume!=null) base.consume=sv.consume; if(sv.charge) base.charge=sv.charge;
       addItem(repeatValues(base), null);
       if(step&&atlas.items&&atlas.items[step]){
         var it=atlas.items[step];
-        if(!it.alts){ var av={name:draft.cname||it.name,members:['item:'+step,'item:'+id]}; if(isPref) av.pref='item:'+id; ops.push({path:'items/'+step+'/alts',op:'set',value:av}); }
-        else { var mem=(it.alts.members||[]).concat(['item:'+id]); ops.push({path:'items/'+step+'/alts/members',op:'set',value:mem}); if(isPref) ops.push({path:'items/'+step+'/alts/pref',op:'ref',value:'item:'+id}); }
+        if(!it.alts){ var av={name:draft.cname?draft.cname:it.name,members:['item:'+step,'item:'+id]}; if(isPref) av.pref='item:'+id; ops.push({path:'items/'+step+'/alts',op:'set',value:av}); }
+        else { var mem=ls(it.alts.members).concat(['item:'+id]); ops.push({path:'items/'+step+'/alts/members',op:'set',value:mem}); if(isPref) ops.push({path:'items/'+step+'/alts/pref',op:'ref',value:'item:'+id}); }
       }
       ui.choice='item:'+id; ui.choiceName=an; ui.preferred=isPref; rememberPlan(ui);
     }
     else if(route==='add-req-form'){
-      var rname=String(draft.rname||'').trim(); if(!rname) return ask('Enter a name for the requirement.');
+      var rname=str(draft.rname).trim(); if(!rname) return ask('Enter a name for the requirement.');
       var uiR=restorePlan(Object.assign({},ui)), items=reqAdded(uiR).slice();
-      items.push({id:'req'+Date.now().toString(36), name:rname, date:when, time:formatTime24(draft.time)||'', repeat:draft.repeat||'none', every:draft.every, mdays:draft.mdays, amount:amount});
-      root.__budgetUi=Object.assign({},ui,{reqItems:items, reqItemsFor:reqCtx(uiR), choiceName:ui.choiceName||planSession().choiceName, draft:Object.assign({},draft,{rname:''})});
+      var req={id:'req'+Date.now().toString(36), name:rname, date:when, time:formatTime24(draft.time), every:draft.every, mdays:draft.mdays, amount:amount}; if(draft.repeat) req.repeat=draft.repeat; /* 1.8.101: no repeat picked leaves it out */ items.push(req);
+      root.__budgetUi=Object.assign({},ui,{reqItems:items, reqItemsFor:reqCtx(uiR), choiceName:ui.choiceName?ui.choiceName:planSession().choiceName, draft:Object.assign({},draft,{rname:''})});
       rememberPlan(root.__budgetUi);
       this.route='plan-c';
       if(this.status) this.status.textContent='Requirement added.';
@@ -17774,15 +17778,15 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     } else if(ops.length&&atlas){
       applyLocal(ops, atlas);
     }
-    if(this.status) this.status.textContent=route==='day-record'?'Recorded for '+(name||'this item')+'.':'Saved.';
+    if(this.status) this.status.textContent=route==='day-record'?'Recorded for '+name+'.':'Saved.';
     if(route==='add-alt-form'){ this.route='plan-c'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey()); return this.update(); }
-    root.__budgetUi=Object.assign({},root.__budgetUi||{},{day:when,month:when.slice(0,7),scrollEntry:name||id});
+    root.__budgetUi=Object.assign({},root.__budgetUi,{day:when,month:when.slice(0,7),scrollEntry:name?name:id});
     this.route=(route==='cash-entry')?'cash-list':((route==='add-item-form'||route==='pay-entry'||route==='debt-entry'||route==='schedule-editor'||route==='day-record')?'schedule':'home');
     if(this.o.onNavigate)this.o.onNavigate(this.route,when);
     return this.update();
   };
   Home.prototype.acceptPlanSwitch=async function(){
-    var ui=restorePlan(root.__budgetUi||{}), step=ui.step, ref=ui.choice, self=this, BF=root.BudgetFlows;
+    var ui=restorePlan(root.__budgetUi), step=ui.step, ref=ui.choice, self=this, BF=root.BudgetFlows;
     function say(m){ if(self.status) self.status.textContent=m; }
     if(this._accepting) return;
     if(BF&&BF.acceptChoice&&this.atlas&&this.atlas.meta&&this.atlas.meta.budget&&step&&ref){
@@ -17793,7 +17797,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       var extra=RL.filter(function(q){ return q.added&&ans[q.key]!=='none'&&/^\d{4}-\d{2}-\d{2}$/.test(q.added.date)&&isFinite(+q.added.amount); }).map(function(q){ var r=q.added, d0=r.date; /* 1.8.99: an added requirement without its date or amount is left out */
         return {name:r.name, values:journalRepeat({repeat:r.repeat,every:r.every,mdays:r.mdays,time:r.time},{type:'expense',flow:'out',consume:true,charge:'per',amount:-Math.abs(+r.amount),date:d0},d0)}; });
       var res=BF.acceptChoice(this.atlas,this.context,step,ref,answers,extra); /* 1.8.92: a fault preparing the switch is not turned into a note */
-      if(!res||!res.ok){ say((res&&res.note)||'The switch was not saved. The current plan is unchanged.'); return; }
+      if(!res||!res.ok){ say(res&&res.note?res.note:'The switch was not saved. The current plan is unchanged.'); return; }
       if(res.ops&&res.ops.length){
         if(typeof submitViews!=='function'||!this.context){ say('The switch was not saved. The current plan is unchanged.'); return; }
         this._accepting=true; var self=this; /* 1.8.92: a save that throws is not swallowed: the person is told it was not saved, and the fault still fails */
@@ -17801,8 +17805,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
         if(!ent||ent.ok===false||(ent.r&&ent.r.ok===false)){ say('The switch was not saved. The current plan is unchanged.'); return; }
       }
       if(res.done) res.done();
-      root.__budgetUi=Object.assign({},root.__budgetUi||{},{reqs:{},reqsFor:'',reqItems:[],reqItemsFor:''}); rememberPlan(root.__budgetUi);
-      var back=this.returnHomeToPlanStep(); say(res.note||'Plan updated.'); return back;
+      root.__budgetUi=Object.assign({},root.__budgetUi,{reqs:{},reqsFor:'',reqItems:[],reqItemsFor:''}); rememberPlan(root.__budgetUi);
+      var back=this.returnHomeToPlanStep(); say(res.note?res.note:'Plan updated.'); return back;
     }
     if(step&&ref&&typeof selectionOps==='function'&&typeof submitViews==='function'&&this.context){
       var ops=selectionOps(this.atlas,step,ref);
@@ -17816,26 +17820,26 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if(this.wrap){
       if(this.H){ this.wrap.style.minHeight=this.H+'px'; this.wrap.style.height=this.H+'px'; }
       if(!this._scrollPad){ this._scrollPad=document.createElement('div'); this._scrollPad.setAttribute('aria-hidden','true'); this._scrollPad.style.cssText='width:1px;pointer-events:none;visibility:hidden;'; this.wrap.appendChild(this._scrollPad); }
-      var cvH=(this.cv&&(this.cv.offsetHeight||this.viewH))||0;
+      var cvH=this.cv.offsetHeight;
       if(this.H) this._scrollPad.style.height=Math.max(0, this.H-cvH)+'px';
     }
     void this.host.offsetHeight;
     if(this.wrap) void this.wrap.offsetHeight;
-    var max=Math.max(0,(this.host.scrollHeight||0)-(this.host.clientHeight||0));
+    var max=Math.max(0,this.host.scrollHeight-this.host.clientHeight);
     var target=max>0?Math.min(y,max):y;
     this.host.scrollTop=target;
     this.host.scrollTo(0,target);
-    this.scrollY=this.host.scrollTop||target;
+    this.scrollY=this.host.scrollTop;
     this._planScrollMeta={step:this._pendingPlanStep,y:y,target:target,scrollTop:this.host.scrollTop,scrollHeight:this.host.scrollHeight,clientHeight:this.host.clientHeight,wrapH:this.wrap&&this.wrap.offsetHeight,H:this.H,max:max};
-    return this.host.scrollTop||0;
+    return this.host.scrollTop;
   };
   Home.prototype._planRestoreLive=function(){ if(!this._planArmed) return false; if(this._planArmAt&&Date.now()-this._planArmAt>1200){ this._releasePlanScroll(); return false; } return true; };
-  Home.prototype._releasePlanScroll=function(){ this._planArmed=false; this._pendingPlanY=null; this._planScrollGen=(this._planScrollGen||0)+1; };
+  Home.prototype._releasePlanScroll=function(){ this._planArmed=false; this._pendingPlanY=null; this._planScrollGen=this._planScrollGen?this._planScrollGen+1:1; };
   Home.prototype.scrollHomeToPlanStep=function(){
     if(!this._planRestoreLive()) return false;
-    var ui=restorePlan(root.__budgetUi||{}), step=ui.scrollPlanStep||ui.step||this._pendingPlanStep||planSession().step;
+    var ui=restorePlan(root.__budgetUi), step=[ui.scrollPlanStep,ui.step,this._pendingPlanStep,planSession().step].filter(Boolean)[0];
     if(!step||!this.host||(this.route&&this.route!=='home')) return false;
-    var tHit=(this.targets||[]).find(function(q){ var act=(q.node&&q.node.vm&&q.node.vm.act)||(q.act)||''; return act==='picker:'+step || (q.node&&q.node.key&&String(q.node.key).indexOf('step:'+step)>=0); });
+    var tHit=ls(this.targets).find(function(q){ var vm=rd(q.node&&q.node.vm), act=vm.act?vm.act:str(q.act); return act==='picker:'+step || (q.node&&q.node.key&&String(q.node.key).indexOf('step:'+step)>=0); });
     if(!(tHit&&tHit.rect)) return false;
     var y=Math.max(0, tHit.rect[1]-24);
     this._pendingPlanStep=step;
@@ -17850,14 +17854,14 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     return true;
   };
   Home.prototype.returnHomeToPlanStep=function(){
-    var ui=restorePlan(root.__budgetUi||{});
-    var step=ui.step||planSession().step;
+    var ui=restorePlan(root.__budgetUi);
+    var step=ui.step?ui.step:planSession().step;
     if(step) ui.scrollPlanStep=step;
     rememberPlan(ui);
     root.__budgetUi=ui;
     this.route='home';
     this._planArmed=true; this._planArmAt=0;
-    this._pendingPlanStep=step||this._pendingPlanStep||'';
+    this._pendingPlanStep=str([step,this._pendingPlanStep].filter(Boolean)[0]);
     if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey());
     var out=this.models?this.render():this.update();
     this.scrollHomeToPlanStep();
@@ -17894,7 +17898,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if(act&&act.indexOf('choose:')===0) return 'plan-c';
     if(act&&act.indexOf('entry:')===0) return 'day-actions';
     if(act==='add:alt'){
-      var ui=(typeof root!=='undefined'&&root.__budgetUi)||{}, it=ctxItem(ui.step);
+      var ui=root.__budgetUi, it=ctxItem(ui.step);
       if(it&&it.alts&&(it.alts.name||(it.alts.members&&it.alts.members.length))) return 'add-alt-form';
       return 'add-alt-category';
     }
@@ -17902,10 +17906,10 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if(act==='accept'||act==='proposal:accept') return route==='plan-switch-before'?'plan-switch-after':(route==='plan-switch-after'?'home':'plan-switch-before');
     if(act==='cash:view') return route;
     return route;
-    function ctxItem(id){ var A=(typeof root!=='undefined'&&root.__budgetUi&&root.__budgetUi.atlas)||null; return (id&&A&&A.items&&A.items[id])||null; }
+    function ctxItem(id){ var A=root.__budgetUi.atlas; return id&&A&&A.items&&A.items[id]?A.items[id]:null; }
   }
   function session(start){
-    var route=start||'home';
+    var route=start;
     return {
       route:function(){return route;},
       act:function(a){ route=navigate(route,a); return route; },
@@ -17927,7 +17931,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     var EV=root.Exp7Views, w=EV.blankMoneyAtlas('Budget');
     EV.normalizeDemoViews(w); EV.ensureBudgetBoards(w);
     var R=EV.rootsFor(w), cal=w.components[R.calId];
-    w.joys=w.joys||{};
+    if(!w.joys) w.joys={}; /* the blank atlas's joys start here */
     w.joys.priority_pool={id:'priority_pool',name:'Priority pool',value:0,jtype:'ranking',rangeMin:0,rangeMax:100,inv:false};
     w.joys.attention_pool={id:'attention_pool',name:'Attention pool',value:0,jtype:'ranking',rangeMin:0,rangeMax:10,inv:false};
     if(cal) cal.items=[];
@@ -18907,7 +18911,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.100",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.101",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
