@@ -16914,7 +16914,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if(!o.pick){ var CV=view(o.keys.calendar), cm=o.calendar;
       var month=D.field(cm,'month',{screen:'home'}); if(month===FAIL) return FAIL;
       var gh=at(CV,'MiniMonth',{key:'month',month:month,sel:o.day,today:o.today,days:root.JAtlasEval.monthDays(month),risk:o.risk,prefix:'',act:'budget:pickday:',strokeToday:false,gridTop:'gridTop'},0); if(gh===FAIL) return FAIL;
-      var cur=gh, lh=at(CV,'Legend',{key:'mini-legend',items:HOME_LEGEND},cur); if(lh===FAIL) return FAIL; cur+=lh;
+      /* 1.8.100: with no day risk (a Budget without meta.riskHT) the legend has nothing to explain and is left out */
+      var cur=gh; if(Object.keys(o.risk).length){ var lh=at(CV,'Legend',{key:'mini-legend',items:HOME_LEGEND},cur); if(lh===FAIL) return FAIL; cur+=lh; }
       var why=o.risk[o.day]&&o.risk[o.day].reasons&&o.risk[o.day].reasons[0];
       if(why){ var rt=D.tokens(S,['reasonDrop','reasonEnd','lineHeight']); if(rt===FAIL) return FAIL;
         var rh=at(CV,'Note',{key:'reason',text:plain(why),role:'secondary',ink:'muted',drop:'reasonDrop'},cur); if(rh===FAIL) return FAIL;
