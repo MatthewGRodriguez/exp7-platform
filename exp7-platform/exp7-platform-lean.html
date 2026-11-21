@@ -12757,14 +12757,17 @@ function setView(id,w,root,cb,ro,mopt){ const box=$(id); if(!box) return;
     /* Host-drive Board sort/filter on *this* app's atlas (universal view behavior; data stays per-app). */
     if((a==='act:sort'||a==='act:filter')&&isBoardRoot(V)){
       const cid=vm.comp||boardCompId(V), AW=activeAtlas(V); if(!AW||!AW.components||!AW.components[cid]) return;
-      const c=AW.components[cid]; if(!c.state) c.state={}; const cv=hostRd(c.view);
-      const sortOf=()=>c.state.sort?c.state.sort:cv.sort?cv.sort:BOARD_START.sort, filOf=()=>c.state.filter?c.state.filter:cv.filter?cv.filter:BOARD_START.filter;
-      if(a==='act:sort'){ const cur=sortOf(); c.state.sort=cur==='name'?'date':cur==='date'?'category':'name'; V.note='sort: '+c.state.sort; }
-      else { const F=['all','unscheduled','scheduled']; const cur=filOf(); c.state.filter=F[(F.indexOf(cur)+1)%3]; V.note='show: '+c.state.filter; }
-      return submitViews([
-        {path:'components/'+cid+'/state/sort',op:'set',value:sortOf()},
-        {path:'components/'+cid+'/state/filter',op:'set',value:filOf()}
-      ],'board:'+a.slice(4),V); }
+      const c=AW.components[cid], st=c.state!==null&&typeof c.state==='object'?c.state:null, cs=hostRd(st), cv=hostRd(c.view);
+      let sort=cs.sort?cs.sort:cv.sort?cv.sort:BOARD_START.sort, filter=cs.filter?cs.filter:cv.filter?cv.filter:BOARD_START.filter;
+      if(a==='act:sort') sort=sort==='name'?'date':sort==='date'?'category':'name';
+      else { const F=['all','unscheduled','scheduled']; filter=F[(F.indexOf(filter)+1)%3]; }
+      /* 1.8.104: the board's state changes only through the proposal (no write into the atlas first) */
+      const p='components/'+cid+'/state';
+      const ops=st?[{path:p+'/sort',op:'sort' in st?'set':'add',value:sort},{path:p+'/filter',op:'filter' in st?'set':'add',value:filter}]
+                  :[{path:p,op:'add',value:{sort:sort,filter:filter}}];
+      const ent=submitViews(ops,'board:'+a.slice(4),V);
+      if(taken(ent)) V.note=a==='act:sort'?'sort: '+sort:'show: '+filter; else if(V.sess) V.queue(V.sess,'board');
+      return ent; }
     if(a.startsWith('cal:')||a.startsWith('form:')||a.startsWith('pick:')||a.startsWith('use:')||a.startsWith('res:')||a.startsWith('alt:')||a.startsWith('brd:')){
       if(a.startsWith('cal:')) hostCalAct(V,a); else if(a.startsWith('use:')||a.startsWith('res:')||a.startsWith('alt:')||a.startsWith('brd:')) hostBoardAct(V,a); else hostFormAct(V,a); return; }
     planAct(V,a); };
@@ -13046,6 +13049,9 @@ function syncCalPlanOps(ops,V){
     if(dated) ensureMemOp(ops,calP,'add',r); });
   return ops; }
 function submitViews(ops,src,V){ const synced=syncCalPlanOps(ops.map(o=>Object.assign({},o)),V); return proposeOps(V,synced,'ui:views',src); } /* every caller gives its view */
+/* 1.8.104: a view writes its atlas only through a proposal. When nothing takes the write (no proposer, or the proposal is
+ * refused) the write fails alone: the atlas stays as it was, the view draws it again, and the rest carries on. */
+function taken(ent){ return !!ent&&!(ent.r&&ent.r.ok===false); }
 function mkItemRecord(id,name,extra){ return {id,name,values:Object.assign({},hostRd(extra&&extra.values)),factors:{},state:{},alts:extra&&extra.alts?extra.alts:null,jreq:extra&&extra.jreq?extra.jreq:null,blueprint:null}; }
 function resourcesOf(w){ const raw=hostRd(hostRd(w.components).resources).items; const L=Array.isArray(raw)?raw:(typeof raw==='string'&&raw?[raw]:[]);
   return L.map(r=>w.items[String(r).replace(/^item:/,'')]).filter(Boolean); }
@@ -13202,20 +13208,10 @@ function commitRename(V,id){ const it=hostRd(hostRd(activeAtlas(V)).items)[id]; 
   const name=String(raw).replace(/\s+/g,' ').trim();
   /* An empty name is not a rename. The row goes back to the name it has. */
   if(!name||name===it.name){ if(V.sess&&String(raw)!==hostStr(it.name)) V.queue(V.sess,'rename'); return null; }
-  V.note='renamed '+id+' to '+name;
   const ent=submitViews([{path:'items/'+id+'/name',op:'set',value:name}],'board:rename',V);
-  if(!ent||(ent.r&&ent.r.ok===false)){ it.name=name; if(V.sess) V.queue(V.sess,'rename'); }
+  /* 1.8.104: a rename nothing takes is not written into the atlas; the row goes back to the name it has */
+  if(taken(ent)) V.note='renamed '+id+' to '+name; else if(V.sess) V.queue(V.sess,'rename');
   return ent; }
-function ensureAlts(it){
-  if(!it.alts||typeof it.alts!=='object'||Array.isArray(it.alts)) it.alts={members:[],pref:null,unavail:[],method:'best'};
-  if(!Array.isArray(it.alts.members)) it.alts.members=it.alts.members?[it.alts.members]:[];
-  if(!Array.isArray(it.alts.unavail)) it.alts.unavail=it.alts.unavail?[it.alts.unavail]:[];
-  it.state=it.state&&typeof it.state==='object'&&!Array.isArray(it.state)?it.state:{};
-  if(!Object.prototype.hasOwnProperty.call(it.state,'userPick')) it.state.userPick=null;
-  return it.alts;
-}
-/* Ops are built from the item as it is now. ref/add/remove are what the proposal checker accepts for these paths.
-   A set of null on a string pref is rejected, which is why the star used to do nothing. */
 function preferOps(id, it, mid){
   const A=it.alts, ref=memberRef(mid); if(!A||!ref) return null;
   const on=A.pref!=null&&memberRef(A.pref)===ref, next=on?null:ref;
@@ -13238,23 +13234,6 @@ function restrictOps(id, it, mid){
   if(!on&&it.state&&Object.prototype.hasOwnProperty.call(it.state,'userPick')&&it.state.userPick!=null&&memberRef(it.state.userPick)===ref)
     ops.push({path:'items/'+id+'/state/userPick',op:'ref',value:null});
   return {on:on, ref:ref, unavailable:!on, ops:ops};
-}
-function applyAltOps(it, kind, mid){
-  const A=ensureAlts(it), ref=memberRef(mid); if(!ref) return;
-  if(kind==='pref'){
-    const on=A.pref!=null&&memberRef(A.pref)===ref, next=on?null:ref;
-    A.pref=next;
-    if(next) A.unavail=A.unavail.filter(function(x){ return memberRef(x)!==ref; });
-    it.state.userPick=next;
-  } else {
-    const on=A.unavail.some(function(x){ return memberRef(x)===ref; });
-    if(on) A.unavail=A.unavail.filter(function(x){ return memberRef(x)!==ref; });
-    else {
-      A.unavail=A.unavail.concat([ref]);
-      if(A.pref!=null&&memberRef(A.pref)===ref) A.pref=null;
-      if(it.state.userPick!=null&&memberRef(it.state.userPick)===ref) it.state.userPick=null;
-    }
-  }
 }
 function negateAmount(raw){
   const s=String(raw==null?'':raw).trim(); if(!s) return '0';
@@ -13318,9 +13297,9 @@ function hostFormAct(V,a){ const W=hostRd(activeAtlas(V)); if(!W.items||!W.compo
     /* 1.8.103: an amount that is not a number is not saved (no made-up 0) */
     const n=hostNum(next); const has=it.values&&it.values.amount!=null;
     V.form.amount=next; if(n===null){ V.note='the amount is not a number'; return V.sess&&V.queue(V.sess,'form'); }
-    V.note=(n<0?'consuming ':'not consuming ')+id;
     const ent=submitViews([{path:'items/'+id+'/values/amount',op:has?'set':'add',value:n}],'board:sign',V);
-    if(!ent||(ent.r&&ent.r.ok===false)){ if(!it.values) it.values={}; it.values.amount=n; if(V.sess) V.queue(V.sess,'form'); }
+    /* 1.8.104: a sign nothing takes is not written into the atlas */
+    if(taken(ent)) V.note=(n<0?'consuming ':'not consuming ')+id; else if(V.sess) V.queue(V.sess,'form');
     return ent; }
   if(a.startsWith('pick:')){ const id=a.slice(5); if(!V.form) return; V.form.itemId=id; const it=W.items[id]; V.note='picked '+hostStr(it&&it.name)+' · requires '+((it&&it.jreq)?String(it.jreq).replace(/^item:/,''):'—'); return V.sess&&V.queue(V.sess,'form'); }
   if(a==='form:cancel'){ clearFormFields(V); V.form=null; V.formFocus=null; V.note='form cancelled'; return V.sess&&V.queue(V.sess,'form'); }
@@ -13503,29 +13482,26 @@ function hostBoardAct(V,a){
     const ref='item:'+id;
     const ops=[{path:'components/resources/items',op:'remove',value:ref}];
     Object.keys(W.items).forEach(function(oid){ if(oid===id) return; const uses=W.items[oid]&&W.items[oid].values&&W.items[oid].values.uses; if(Array.isArray(uses)&&uses.some(function(x){ return memberRef(x)===ref; })) ops.push({path:'items/'+oid+'/values/uses',op:'remove',value:ref}); });
-    const comp=W.components&&W.components.resources;
-    if(comp){ const raw=comp.items; const L=Array.isArray(raw)?raw:(raw?[raw]:[]); comp.items=L.filter(function(x){ return memberRef(x)!==ref; }); }
-    Object.keys(W.items).forEach(function(oid){ if(oid===id) return; const uses=W.items[oid]&&W.items[oid].values&&W.items[oid].values.uses; if(Array.isArray(uses)) W.items[oid].values.uses=uses.filter(function(x){ return memberRef(x)!==ref; }); });
-    const name=hostStr(W.items[id].name); delete W.items[id];
-    V.note='removed resource '+name;
-    return submitViews(ops,'board:res-remove',V); }
+    /* 1.8.104: the resource goes only through the proposal, which now drops its item too (nothing is changed in the atlas first) */
+    ops.push({path:'items/'+id,op:'drop'});
+    const name=hostStr(W.items[id].name);
+    const ent=submitViews(ops,'board:res-remove',V);
+    if(taken(ent)) V.note='removed resource '+name; else if(V.sess) V.queue(V.sess,'board');
+    return ent; }
   if(W.meta&&W.meta.budget&&window.BudgetFlows&&window.BudgetFlows.altPanelVM){
     if(a.startsWith('alt:pref:')) return window.BudgetFlows.act(V,'alt2:pref:'+a.slice(9));
     if(a.startsWith('alt:restrict:')) return window.BudgetFlows.act(V,'alt2:unavail:'+a.slice(13));
     if(a.startsWith('alt:add:')) return window.BudgetFlows.act(V,'alt2:addalt:'+a.slice(8)); }
   if(a.startsWith('alt:pref:')){ const pair=a.slice(9).split('/'); const id=pair[0], mid=pair[1]; const it=W.items[id]; if(!it||!mid) return;
-    if(!it.alts) ensureAlts(it);
+    /* 1.8.104: an item with no alternatives is not given any here; the preference goes only through the proposal */
     const r=preferOps(id, it, mid); if(!r) return; if(!V.open) V.open={}; V.open[id]=true;
-    V.note=r.next?('preferred '+mid):('cleared preference '+mid);
     const ent=submitViews(r.ops,'board:pref',V);
-    if(!ent||(ent.r&&ent.r.ok===false)){ applyAltOps(it, 'pref', mid); if(V.sess) V.queue(V.sess,'alt'); }
+    if(taken(ent)) V.note=r.next?('preferred '+mid):('cleared preference '+mid); else if(V.sess) V.queue(V.sess,'alt');
     return ent; }
   if(a.startsWith('alt:restrict:')){ const pair=a.slice(13).split('/'); const id=pair[0], mid=pair[1]; const it=W.items[id]; if(!it||!mid) return;
-    if(!it.alts) ensureAlts(it);
     const r=restrictOps(id, it, mid); if(!r) return; if(!V.open) V.open={}; V.open[id]=true;
-    V.note=r.unavailable?('unavailable '+mid):('available '+mid);
     const ent=submitViews(r.ops,'board:restrict',V);
-    if(!ent||(ent.r&&ent.r.ok===false)){ applyAltOps(it, 'restrict', mid); if(V.sess) V.queue(V.sess,'alt'); }
+    if(taken(ent)) V.note=r.unavailable?('unavailable '+mid):('available '+mid); else if(V.sess) V.queue(V.sess,'alt');
     return ent; }
   /* The list is open until its arrow hides it. */
   if(a.startsWith('alt:tog:')){ const id=a.slice(8); if(!V.open) V.open={}; V.open[id]=!V.open[id]; V.note=(V.open[id]?'opened':'hid')+' items of '+id; return V.sess&&V.queue(V.sess,'alt'); }
@@ -13538,15 +13514,11 @@ function hostBoardAct(V,a){
     if(it.state&&it.state.userPick!=null&&same(it.state.userPick)) ops.push({path:'items/'+id+'/state/userPick',op:'ref',value:null});
     if(W.meta&&W.meta.budget&&W.items[mid]&&!itemInUse(W,ref,id)) ops.push({path:'items/'+mid,op:'drop'});
     if(!ops.length) return;
-    if(!V.open) V.open={}; V.open[id]=true; V.note='removed item '+hostStr(hostRd(W.items[mid]).name);
+    if(!V.open) V.open={}; V.open[id]=true; const gone=hostStr(hostRd(W.items[mid]).name);
     if(V.form&&V.form.item===mid){ clearFormFields(V); V.form=null; V.formFocus=null; }
     const ent=submitViews(ops,'board:alt-remove',V);
-    if(!ent||(ent.r&&ent.r.ok===false)){
-      if(Array.isArray(A.members)) A.members=A.members.filter(function(x){ return !same(x); });
-      if(Array.isArray(A.unavail)) A.unavail=A.unavail.filter(function(x){ return !same(x); });
-      if(A.pref!=null&&same(A.pref)) A.pref=null;
-      if(it.state&&it.state.userPick!=null&&same(it.state.userPick)) it.state.userPick=null;
-      if(V.sess) V.queue(V.sess,'alt'); }
+    /* 1.8.104: a removal nothing takes is not written into the atlas */
+    if(taken(ent)) V.note='removed item '+gone; else if(V.sess) V.queue(V.sess,'alt');
     return ent; }
   if(a.startsWith('use:')){ const id=a.slice(4); if(!V.form) return; if(!V.form.usesIds) V.form.usesIds={}; /* a use chip is only in a form */ V.form.usesIds[id]=!V.form.usesIds[id]; return V.sess&&V.queue(V.sess,'form'); }
 }
@@ -18955,7 +18927,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.103",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.104",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
