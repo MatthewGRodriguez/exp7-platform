@@ -892,6 +892,8 @@ Checked in Chrome on Matthew's Mac (2026-11-21, made-up data only): the lean fet
 
 On screen, for every app: nothing changes. A new Budget atlas comes out exactly as in 1.8.107 (checked field by field, with the test fixtures' atlases), and the Exp7 demo's atlas gives every part these functions read. For saved data: an atlas Budget saved is read as before. The only difference would be in a hand-edited atlas, where a record that is not an object is now read as missing, and an alternative needing a key saved as a number is not met.
 
+Checked in Chrome on Matthew's Mac (2026-11-21, made-up data only): the lean fetched at this release's commit matched `release.json`. The Exp7 demo's Calendar, Board and Plan views drew at 390 wide with the same nodes (111, 173, 143), glyphs and heights as 1.8.107. A blank Budget opened at 390 wide on Home and its date picker opened and closed; Budget and the demo at 1024 wide opened with no failure records or page errors. Storage was cleared afterwards.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
