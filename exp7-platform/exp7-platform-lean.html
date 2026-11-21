@@ -13385,7 +13385,7 @@ function hostCalAct(V,a){ V._dragJust=false; V.drag=null; const W=activeAtlas(V)
   if(a==='cal:expand'){ CS.selected=expandYears(CS.selected); V.note='expanded selection across years ('+sortedDays(CS.selected).length+' days)'; return S&&V.queue(S,'sel'); }
   if(a==='cal:add'||a==='cal:span'){ const days=sortedDays(CS.selected);
     if(!days.length){ V.note='select days first (click / drag), then '+a.slice(4); return S&&V.queue(S,'sel'); }
-    V.form={kind:a==='cal:span'?'span':'caladd', itemId:null, src:null, open:null, allDay:true, newType:'expense'}; V.formFocus=null;
+    V.form={kind:a==='cal:span'?'span':'caladd', itemId:null, src:null, open:null, allDay:true, newType:'expense', rep:'days'}; /* 1.8.95: repeat starts at only the selected days */ V.formFocus=null;
     V.note='add item: choose a step, an item or a new item, then its time'; return S&&V.queue(S,'form'); }
   if(a==='cal:remove'){ const days=new Set(sortedDays(CS.selected)); if(!days.size){ V.note='select days first, then Remove'; return S&&V.queue(S,'sel'); }
     const ops=[]; const seen={}; const _cid=calCompId(V), _pid=planCompId(V); const cal=(W.components[_cid]||{}).items||[];
@@ -13868,7 +13868,11 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   function VM() { return root.Exp7VM; }
   function AW(V) { return activeAtlas(V) || { items: {}, components: {}, meta: {} }; }
   function isBudget(w) { return !!(w && w.meta && w.meta.budget); }
-  function redraw(V, why) { return V && V.sess && V.queue(V.sess, why || 'form'); }
+  function redraw(V) { return V && V.sess && V.queue(V.sess, 'form'); }
+  /* 1.8.95: the atlas's calendar and plan component ids. One that is missing stays missing: what would go there is left out. */
+  function calIdOf(w) { return w && w.meta && typeof w.meta.calId === 'string' && w.meta.calId ? w.meta.calId : null; }
+  function planIdOf(w) { return w && w.meta && typeof w.meta.planId === 'string' && w.meta.planId ? w.meta.planId : null; }
+  function calItems(w, cid) { var c = cid && w.components ? w.components[cid] : null; return c && Array.isArray(c.items) ? c.items : []; }
   function bare(ref) { return String(ref == null ? '' : ref).replace(/^item:/, ''); }
 
 /* ---- A. Starting finances: assets (cash or owned), debts with calculated payments, pay with deductions ---- */
@@ -13896,15 +13900,15 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       D.forEach(function (d, i) { F['ded' + i + 'name'] = d.name || ''; F['ded' + i + 'kind'] = d.kind === 'percent' ? 'percent' : 'fixed'; F['ded' + i + 'value'] = d.value == null ? '' : String(d.value); }); }
     V.form = F; V.formFocus = type === 'debt' ? 'creditor' : 'name'; V.note = (id ? 'edit ' : 'new ') + type; return redraw(V); }
 
-  function finFormVM(V, w, F) { var X = VM(), kids = [], f = function (key, lab, ph, wd) { return X.row('f:' + key, [X.text('l', lab + ':', 'body', { bold: true }), X.field('f', key, ph || lab, { w: wd || 240, v: F[key] != null ? F[key] : '' })]); };
+  function finFormVM(V, w, F) { var X = VM(), kids = [], f = function (key, lab, ph, wd) { return X.row('f:' + key, [X.text('l', lab + ':', 'body', { bold: true }), X.field('f', key, ph, { w: wd, v: F[key] != null ? F[key] : '' })]); };
     kids.push(X.text('title', (F.item ? 'Edit ' : 'New ') + (F.type === 'asset' ? 'asset' : F.type === 'debt' ? 'debt' : 'pay'), 'h'));
     if (F.type === 'asset') {
-      kids.push(f('name', 'Name', 'Checking account'));
+      kids.push(f('name', 'Name', 'Checking account', 240));
       kids.push(X.row('kind', [X.text('l', 'Kind:', 'body', { bold: true }), X.btn('cash', 'Cash balance', 'fin:kind:cash', { on: F.assetKind === 'cash' }), X.btn('owned', 'Owned item', 'fin:kind:owned', { on: F.assetKind === 'owned' })]));
       kids.push(X.text('kindhint', F.assetKind === 'cash' ? 'Money you can spend. It counts as cash available.' : 'Something you own, such as a car. Its value counts toward net worth, not toward cash available.', 'muted'));
       kids.push(f('amount', F.assetKind === 'cash' ? 'Balance' : 'Value', '0.00', 140)); if (F.asOfLocked) kids.push(X.row('f:asOf', [X.text('l', 'As of:', 'body', { bold: true }), X.text('v', F.asOf, 'body')])); else kids.push(f('asOf', 'As of', 'YYYY-MM-DD', 140)); }
     if (F.type === 'debt') {
-      kids.push(f('creditor', 'Creditor', 'Who is owed')); kids.push(f('purpose', 'Purpose', 'What it paid for'));
+      kids.push(f('creditor', 'Creditor', 'Who is owed', 240)); kids.push(f('purpose', 'Purpose', 'What it paid for', 240));
       kids.push(f('balance', 'Balance owed', '0.00', 140)); if (F.asOfLocked) kids.push(X.row('f:asOf', [X.text('l', 'As of:', 'body', { bold: true }), X.text('v', F.asOf, 'body')])); else kids.push(f('asOf', 'As of', 'YYYY-MM-DD', 140)); kids.push(f('apr', 'APR %', '0', 100));
       kids.push(f('terms', 'Payments remaining', 'count', 100)); kids.push(f('every', 'Days between payments', 'days', 100));
       kids.push(X.row('calc', [X.btn('calc', 'Calculate payment', 'fin:calc')]));
@@ -13916,7 +13920,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       kids.push(X.row('sched', [X.btn('sched', (F.schedule ? '✓ ' : '') + 'Put the calculated payments on the calendar', 'fin:schedule', { on: !!F.schedule })]));
       if (man.length) kids.push(X.text('man', 'Already paid by ' + man.map(function (m) { return m.name; }).join(', ') + '. That entry is kept as it is' + (F.schedule ? '; the calculated payments are added as well.' : '.'), 'muted')); }
     if (F.type === 'income') {
-      kids.push(f('name', 'Name', 'Paycheck')); kids.push(f('gross', 'Gross pay each payday', '0.00', 140));
+      kids.push(f('name', 'Name', 'Paycheck', 240)); kids.push(f('gross', 'Gross pay each payday', '0.00', 140));
       kids.push(X.text('dh', 'Deductions', 'body', { bold: true }));
       for (var i = 0; i < (F.dedN || 0); i++) { if (F['ded' + i + 'gone']) continue; var pc = F['ded' + i + 'kind'] === 'percent';
         kids.push(X.row('d' + i, [X.field('n', 'ded' + i + 'name', 'Deduction name', { w: 190, v: F['ded' + i + 'name'] || '' }), X.btn('fx', 'Fixed $', 'fin:dedkind:' + i + ':fixed', { on: !pc }), X.btn('pc', '% of gross', 'fin:dedkind:' + i + ':percent', { on: pc }),
@@ -13939,7 +13943,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       if (JSON.stringify(v[k]) !== JSON.stringify(val)) ops.push({ path: 'items/' + id + '/values/' + k, op: v[k] === undefined ? 'add' : 'set', value: val }); }); return ops; }
   function nameOp(id, it, name) { return it && it.name !== name ? [{ path: 'items/' + id + '/name', op: 'set', value: name }] : []; }
 
-  function finSave(V) { var F = V.form, w = AW(V); if (!F || F.kind !== 'fin') return; var E = [], ops = [], id = F.item, it = id ? w.items[id] : null, bid = finBoard(F.type), calId = (w.meta && w.meta.calId) || 'budget';
+  function finSave(V) { var F = V.form, w = AW(V); if (!F || F.kind !== 'fin') return; var E = [], ops = [], id = F.item, it = id ? w.items[id] : null, bid = finBoard(F.type), calId = calIdOf(w);
     function fresh(name, values) { id = uniqItemId(name, V); ops.push({ path: 'items/' + id, op: 'add', value: mkItemRecord(id, name, { values: values }) }, { path: 'components/' + bid + '/items', op: 'add', value: 'item:' + id }); }
     if (F.type === 'asset') { var name = String(F.name || '').trim(), amt = BR.num(F.amount);
       if (!name) E.push('Give the asset a name.'); if (!(amt >= 0)) E.push('Enter a balance or value of 0 or more.'); if (F.asOf && !BR.pdate(F.asOf)) E.push('As-of date must be a real date, YYYY-MM-DD.');
@@ -13953,17 +13957,17 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
         if (F.schedule) { var pname = purp + ' payment';
           if (auto) ops = ops.concat(nameOp(auto.id, auto, pname), setOps(auto.id, auto, pv));
           else { var pid = uniqItemId(pname, V); if (pid === id) pid = pid + '_pay';
-            ops.push({ path: 'items/' + pid, op: 'add', value: mkItemRecord(pid, pname, { values: pv }) }, { path: 'components/' + finBoard('expense') + '/items', op: 'add', value: 'item:' + pid }, { path: 'components/' + calId + '/items', op: 'add', value: 'item:' + pid }); } }
-        else if (auto) { ['expense'].forEach(function (t) { ops.push({ path: 'components/' + finBoard(t) + '/items', op: 'remove', value: 'item:' + auto.id }); }); ops.push({ path: 'components/' + calId + '/items', op: 'remove', value: 'item:' + auto.id }, { path: 'items/' + auto.id, op: 'drop' }); } } }
+            ops.push({ path: 'items/' + pid, op: 'add', value: mkItemRecord(pid, pname, { values: pv }) }, { path: 'components/' + finBoard('expense') + '/items', op: 'add', value: 'item:' + pid }); if (calId) ops.push({ path: 'components/' + calId + '/items', op: 'add', value: 'item:' + pid }); } }
+        else if (auto) { ['expense'].forEach(function (t) { ops.push({ path: 'components/' + finBoard(t) + '/items', op: 'remove', value: 'item:' + auto.id }); }); if (calId) ops.push({ path: 'components/' + calId + '/items', op: 'remove', value: 'item:' + auto.id }); ops.push({ path: 'items/' + auto.id, op: 'drop' }); } } }
     if (F.type === 'income') { var iname = String(F.name || '').trim(), T = BR.takeHome(incomeInput(F)), list = BR.monthDayList(F.days), ev = Math.floor(BR.num(F.every)), start = F.start, first = null;
       if (!iname) E.push('Give this pay a name.'); if (!T.ok) E = E.concat(T.errors);
       if (!BR.pdate(start)) E.push('Start date must be a real date, YYYY-MM-DD.');
       else if (F.sched === 'monthdays') { if (!list.length) E.push('Enter the days of the month you are paid, such as 1, 15.'); else first = firstMonthday(start, list); }
       else { if (!(ev >= 1)) E.push('Enter the number of days between paydays.'); else first = start; }
       if (!E.length) { var iv = { type: 'income', flow: 'in', gross: T.gross, deductions: T.lines.map(function (l) { return { name: l.name, kind: l.kind, value: l.value }; }), amount: T.net, charge: 'per', date: first, repeat: F.sched === 'monthdays' ? 'monthdays' : 'every',
-          on: F.sched === 'monthdays' ? list : undefined, every: F.sched === 'monthdays' ? undefined : ev, pay: undefined, category: ((it && it.values) || {}).category || 'Pay', allDay: true };
-        if (it) ops = nameOp(id, it, iname).concat(setOps(id, it, iv)); else { Object.keys(iv).forEach(function (k) { if (iv[k] === undefined) delete iv[k]; }); fresh(iname, iv); ops.push({ path: 'components/' + calId + '/items', op: 'add', value: 'item:' + id }); }
-        if (it && ((w.components[calId] || {}).items || []).indexOf('item:' + id) < 0) ops.push({ path: 'components/' + calId + '/items', op: 'add', value: 'item:' + id }); } }
+          on: F.sched === 'monthdays' ? list : undefined, every: F.sched === 'monthdays' ? undefined : ev, pay: undefined, category: it ? (it.values ? it.values.category : undefined) : 'Pay', allDay: true }; /* 1.8.95: a new pay starts in Pay; an edit keeps its own category, and a missing one stays missing */
+        if (it) ops = nameOp(id, it, iname).concat(setOps(id, it, iv)); else { Object.keys(iv).forEach(function (k) { if (iv[k] === undefined) delete iv[k]; }); fresh(iname, iv); if (calId) ops.push({ path: 'components/' + calId + '/items', op: 'add', value: 'item:' + id }); }
+        if (it && calId && calItems(w, calId).indexOf('item:' + id) < 0) ops.push({ path: 'components/' + calId + '/items', op: 'add', value: 'item:' + id }); } }
     if (E.length) { F.errors = E; F.calc = true; V.note = E[0]; return redraw(V); }
     clearFormFields(V); V.form = null; V.formFocus = null; V.note = 'saved ' + F.type;
     if (!ops.length) return redraw(V);
@@ -13995,7 +13999,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if (a === 'fin:ok') return finSave(V); }
 
   /* ---- Calendar Add item: how the entry repeats ---- */
-  function calRepeatVM(V, F) { var X = VM(), rp = F.rep || 'days', out = [];
+  function calRepeatVM(V, F) { var X = VM(), rp = F.rep, out = [];
     out.push(X.row('rep', [X.text('l', 'Repeats:', 'body', { bold: true }), X.btn('r:days', 'Only the selected days', 'form:calrep:days', { on: rp === 'days' }), X.btn('r:md', 'Dates each month', 'form:calrep:monthdays', { on: rp === 'monthdays' }), X.btn('r:ev', 'Every X days', 'form:calrep:every', { on: rp === 'every' })]));
     if (rp === 'monthdays') { out.push(X.row('f:rdays', [X.text('l', 'Days of the month:', 'body', { bold: true }), X.field('f', 'rdays', '1, 15', { w: 140, v: F.rdays != null ? F.rdays : '' })])); out.push(X.text('rdh', 'A month without that day uses its last day.', 'muted')); }
     if (rp === 'every') out.push(X.row('f:revery', [X.text('l', 'Days between:', 'body', { bold: true }), X.field('f', 'revery', '7', { w: 100, v: F.revery != null ? F.revery : '' })]));
@@ -14005,8 +14009,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if (kind === 'monthdays' && !String(F.rdays || '').trim()) { var L = []; (days || []).forEach(function (d) { var n = +String(d).slice(8); if (L.indexOf(n) < 0) L.push(n); }); F.rdays = L.sort(function (a, b) { return a - b; }).join(', '); }
     V.formFocus = kind === 'monthdays' ? 'rdays' : kind === 'every' ? 'revery' : V.formFocus; return redraw(V); }
   /* the schedule values a repeat choice sets, starting from the first selected day */
-  function repeatValues(F, start) { var rp = (F && F.rep) || 'days', out = { ok: true, patch: null };
-    if (rp === 'days') return out; var until = String(F.runtil || '').trim();
+  function repeatValues(F, start) { var rp = F ? F.rep : undefined, out = { ok: true, patch: null };
+    if (rp !== 'monthdays' && rp !== 'every') return out; /* 1.8.95: only the selected days, or no repeat picked: no repeat values */ var until = String(F.runtil || '').trim();
     if (until && !BR.pdate(until)) return { ok: false, error: 'Until must be a real date, YYYY-MM-DD.' };
     if (until && until < start) return { ok: false, error: 'Until is before the first day.' };
     if (rp === 'monthdays') { var L = BR.monthDayList(F.rdays); if (!L.length) return { ok: false, error: 'Enter the days of the month, such as 1, 15.' };
@@ -14024,8 +14028,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
 /* ---- B. The day schedule: change one occurrence or this and future ones, and record what happened ---- */
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   /* the same path writes Budget applies to its atlas, for a private copy (comparisons and proposals never touch the live atlas) */
-  function applyOpsTo(w, ops) { (ops || []).forEach(function (o) { var parts = String(o.path).split('/'), cur = w; for (var i = 0; i < parts.length - 1; i++) { if (cur[parts[i]] == null || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {}; cur = cur[parts[i]]; }
-      var leaf = parts[parts.length - 1], op = o.op || 'set';
+  function applyOpsTo(w, ops) { (ops || []).forEach(function (o) { if (typeof o.op !== 'string') return; /* 1.8.95: a write without its op fails alone */ var parts = String(o.path).split('/'), cur = w; for (var i = 0; i < parts.length - 1; i++) { if (cur[parts[i]] == null || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {}; cur = cur[parts[i]]; }
+      var leaf = parts[parts.length - 1], op = o.op;
       if (op === 'add' && Array.isArray(cur[leaf])) { if (cur[leaf].indexOf(o.value) < 0) cur[leaf].push(o.value); }
       else if (op === 'remove' && Array.isArray(cur[leaf])) cur[leaf] = cur[leaf].filter(function (x) { return x !== o.value; });
       else if (op === 'drop') delete cur[leaf]; else cur[leaf] = o.value; }); w.rev = (w.rev || 0) + 1; return w; }
@@ -14038,14 +14042,14 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     var tv = (w.items[tid] || {}).values || {}, R = E.valuesOn(tv, day), on = E.valuesOn(ev, day).values, X = R.values.ex || {}, key = day;
     Object.keys(X).forEach(function (k) { if (X[k] && X[k].moved === day) key = k; });
     var ch = E.charges(eff, String(day).slice(0, 7))[day];
-    return { id: id, tid: tid, name: (w.items[id] || {}).name || id, label: ((w.items[id] || {}).name || id) + ((w.items[id] || {}).alts && w.items[tid] && tid !== id ? ': ' + w.items[tid].name : ''), values: on, path: R.path, exKey: key, ex: X[key] || null, charge: ch == null ? null : ch, repeating: (on.repeat || 'once') !== 'once' && !((on.repeat === 'dates') && (!Array.isArray(on.on) || on.on.length < 2)),
+    return { id: id, tid: tid, name: (w.items[id] || {}).name || id, label: ((w.items[id] || {}).name || id) + ((w.items[id] || {}).alts && w.items[tid] && tid !== id ? ': ' + w.items[tid].name : ''), values: on, path: R.path, exKey: key, ex: X[key] || null, charge: ch == null ? null : ch, repeating: typeof on.repeat === 'string' && on.repeat !== 'once' && !((on.repeat === 'dates') && (!Array.isArray(on.on) || on.on.length < 2)),
       first: String(R.values.date || '') === String(key), income: on.flow === 'in' || on.type === 'income', routine: on.type === 'routine' }; }
   function occBase(tid, path) { return 'items/' + tid + '/values' + path.map(function (p) { return '/' + p; }).join(''); }
   function hm(t) { var q = /^\s*(\d{1,2})(?::(\d{2}))?\s*$/.exec(String(t == null ? '' : t)); if (!q) return ''; return pad2(Math.min(23, +q[1])) + ':' + pad2(Math.min(59, +(q[2] || 0))); }
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
   /* form -> the changes it asks for: {amount?, time?, endTime?, allDay?, moved?, skip?, outcome?, note?, actual?} or {error} */
   function occChanges(F, e) { var c = {}, sign = e.income ? 1 : -1;
-    if (F.mode === 'actual') { c.actual = true; c.outcome = F.outcome || 'done'; var note = String(F.onote || '').trim(); if (note) c.note = note;
+    if (F.mode === 'actual') { c.actual = true; if (F.outcome !== 'done' && F.outcome !== 'changed' && F.outcome !== 'skipped') return { error: 'Pick what happened.' }; c.outcome = F.outcome; var note = String(F.onote || '').trim(); if (note) c.note = note;
       if (c.outcome === 'skipped') { c.skip = true; return c; }
       if (c.outcome === 'changed') { var a = BR.num(F.oamount); if (!(a >= 0)) return { error: 'Enter what it actually cost.' }; c.amount = BR.r2(sign * a); }
       return c; }
@@ -14082,7 +14086,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
 
   function occOpen(V, id, mode) { var w = AW(V), day = calNavOf(V).day; if (!day || !w.items[id]) return; var e = entryOn(w, id, day), v = e.values, o = e.ex || {};
     V.form = { kind: 'occ', mode: mode, item: id, day: day, oamount: e.charge == null ? '' : String(Math.abs(BR.r2(e.charge))), odate: day, oallDay: o.time != null ? !o.time : (!!v.allDay || !v.time), otime: o.time != null ? o.time : (v.time || ''), oend: o.endTime != null ? o.endTime : (v.endTime || ''),
-      outcome: o.outcome || 'done', onote: o.note || '', cmp: mode === 'actual', error: '' };
+      outcome: o.actual ? o.outcome : 'done', /* 1.8.95: a new record starts at Happened as planned; a saved one keeps its own outcome */ onote: o.note || '', cmp: mode === 'actual', error: '' };
     V.formFocus = mode === 'actual' ? 'onote' : 'oamount'; V.note = (mode === 'actual' ? 'record ' : 'change ') + e.name + ' on ' + day; return redraw(V); }
   function occFormVM(V, w, F) { var X = VM(), e = entryOn(w, F.item, F.day), kids = [], lab = function (t) { return X.text('l', t, 'body', { bold: true }); };
     if (F.mode === 'actual') { kids.push(X.text('title', 'What happened: ' + e.name + ' on ' + F.day, 'h'));
@@ -14123,7 +14127,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if (typeof resilienceVM === 'function') resilienceVM(V, w, day).forEach(function (k) { kids.push(k); });
     var rows = its.map(function (it) { return entryOn(w, it.id, day); }).sort(function (a, b) { var x = fmtTime(a.values, a.ex), y = fmtTime(b.values, b.ex); x = x === 'All day' ? '' : x; y = y === 'All day' ? '' : y; return x < y ? -1 : x > y ? 1 : 0; });
     /* an occurrence recorded as not happening stays listed for the day it was planned on */
-    Object.keys(w.items || {}).forEach(function (id) { if (rows.some(function (r) { return r.id === id; })) return; var cal = ((w.components[(w.meta && w.meta.calId) || 'budget'] || {}).items) || []; if (cal.indexOf('item:' + id) < 0) return;
+    Object.keys(w.items || {}).forEach(function (id) { if (rows.some(function (r) { return r.id === id; })) return; var cal = calItems(w, calIdOf(w)); if (cal.indexOf('item:' + id) < 0) return;
       var e = entryOn(w, id, day); if (e.ex && e.ex.skip && e.ex.actual && e.exKey === day) rows.push(e); });
     if (!rows.length) kids.push(X.text('empty', 'Nothing scheduled on this day.', 'muted'));
     rows.forEach(function (e) { var o = e.ex || {}, amt = e.routine ? '' : (e.charge == null ? (o.skip ? 'not charged' : '$0.00') : (e.income ? '+' : '') + BR.money(e.income ? e.charge : Math.abs(e.charge)));
@@ -14143,8 +14147,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     return kids; }
 
   /* ---- before and after: the full dependencies and sequence of two atlases side by side, with the month's money ---- */
-  function planTable(key, A, month, other, moLabel) { var X = VM(), E = EVL(), w = effAtlas(A), pid = (w.meta && w.meta.planId) || 'reqs', c = (w.components || {})[pid] || { items: [] }, D = depsRows(w, c), o = other ? effAtlas(other) : null, oD = o ? depsRows(o, (o.components || {})[pid] || { items: [] }) : null, oBy = {}, changed = 0;
-    function cells(Aw, R) { var it = Aw.items[R.id], pc = planCells(Aw, R.id, null), ch = it ? E.charges(effItem(Aw, R.id) || it, month) : {}, m = 0; Object.keys(ch).forEach(function (d) { m += +ch[d] || 0; });
+  function planTable(key, A, month, other, moLabel) { var X = VM(), E = EVL(), w = effAtlas(A), pid = planIdOf(w), c = pid && w.components && w.components[pid] ? w.components[pid] : { items: [] }, D = depsRows(w, c), o = other ? effAtlas(other) : null, oD = o ? depsRows(o, pid && o.components && o.components[pid] ? o.components[pid] : { items: [] }) : null, oBy = {}, changed = 0;
+    function cells(Aw, R) { var it = Aw.items[R.id], pc = planCells(Aw, R.id, null), ch = it ? E.charges(effItem(Aw, R.id) || it, month) : {}, m = 0; Object.keys(ch).forEach(function (d) { var n = +ch[d]; if (isFinite(n)) m += n; });
       return [R.seq, R.step, R.when, R.req, (typeof selLabel === 'function' && selLabel(Aw, R.id)) || String(pc[0]).replace(/ \(Exp7 Best\(\)\)$/, '').replace(/ \(no alternatives\)$/, ''), m ? BR.money(m) : '—']; }
     if (oD) oD.rows.forEach(function (R) { if (!R.broken) oBy[R.id] = cells(o, R); });
     var rows = D.rows.map(function (R) { if (R.broken) return { k: 'b:' + R.id, cells: [{ text: 'broken reference ' + R.id }] }; var cs = cells(w, R), was = oBy[R.id], diff = false;
@@ -14152,9 +14156,9 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     /* a step the other side has and this side does not: say so instead of leaving a silent gap */
     if (oD) oD.rows.forEach(function (R) { if (R.broken || D.rows.some(function (q) { return q.id === R.id; })) return; changed++; rows.push({ k: 'gone:' + R.id, cells: [{ text: '' }, { text: '* ' + R.step + ' is no longer a step', color: 'warnInk' }] }); });
     var f = budgetFigures(A, month);
-    return { changed: changed, steps: D.rows.length, figures: f, node: { t: 'table', k: key, cols: [{ k: 'seq', label: '#' }, { k: 'step', label: 'Step' }, { k: 'when', label: 'When' }, { k: 'req', label: 'Requires' }, { k: 'sel', label: 'Selected item' }, { k: 'mo', label: moLabel || 'This month' }], rows: rows } }; }
-  function compareVM(V, before, after, O) { var X = VM(), month = O.month || budgetMonthKey(), L = planTable('before', before, month, null, O.moLabel), R = planTable('after', after, month, before, O.moLabel);
-    var kids = [X.row('head', [X.text('t', O.title || 'Plan before and after', 'h'), O.closeAct && X.btn('close', O.closeLabel || 'Close', O.closeAct)].filter(Boolean))];
+    return { changed: changed, steps: D.rows.length, figures: f, node: { t: 'table', k: key, cols: [{ k: 'seq', label: '#' }, { k: 'step', label: 'Step' }, { k: 'when', label: 'When' }, { k: 'req', label: 'Requires' }, { k: 'sel', label: 'Selected item' }, { k: 'mo', label: moLabel }], rows: rows } }; }
+  function compareVM(V, before, after, O) { var X = VM(), month = O.month || budgetMonthKey(), L = planTable('before', before, month, null, monthName(month)), R = planTable('after', after, month, before, monthName(month));
+    var kids = [X.row('head', [typeof O.title === 'string' && X.text('t', O.title, 'h'), O.closeAct && typeof O.closeLabel === 'string' && X.btn('close', O.closeLabel, O.closeAct)].filter(Boolean))];
     if (O.note) kids.push(X.text('note', O.note, 'muted'));
     /* Phone-first: Before and After are stacked sections (dependencies and sequence, not a cost summary). */
     kids.push(X.col('b', [X.text('h', 'Before · ' + L.steps + (L.steps === 1 ? ' step' : ' steps'), 'body', { bold: true }), L.node], { gap: 8 }));
@@ -14262,10 +14266,11 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if (rp === 'monthdays' || rp === 'every') out.push(X.row('f:runtil', [X.text('l', 'Until (optional):', 'body', { bold: true }), X.field('f', 'runtil', 'YYYY-MM-DD', { w: 140, v: F.runtil != null ? F.runtil : '' })]));
     return out; }
   /* schedule values from the form; 'same' copies how another item repeats, from the new start date */
-  function schedFrom(F, start, like) { var rp = F.rep || (like ? 'same' : 'once');
-    if (rp === 'same' && like) { var lv = like.values || {}, o = { date: start, repeat: lv.repeat || 'once' }; if (lv.every != null) o.every = lv.every; if (lv.on != null) o.on = clone(lv.on);
+  function schedFrom(F, start, like) { var rp = F.rep;
+    if (rp === 'same' && like) { var lv = like.values || {}, o = { date: start }; if (lv.repeat != null) o.repeat = lv.repeat; if (lv.every != null) o.every = lv.every; if (lv.on != null) o.on = clone(lv.on);
       if (o.repeat === 'monthdays') o.date = firstMonthday(start, BR.monthDayList(o.on)) || start; if (o.repeat === 'dates') { o.repeat = 'once'; delete o.on; } return { ok: true, patch: o }; }
     if (rp === 'once') return { ok: true, patch: { date: start, repeat: 'once' } };
+    if (rp !== 'monthdays' && rp !== 'every') return { ok: false, error: 'Pick how it repeats.' };
     var R = repeatValues({ rep: rp, rdays: F.rdays, revery: F.revery, runtil: F.runtil }, start); if (!R.ok) return R; delete R.patch.days; return R; }
   function alt2FormVM(V, w, F) { var X = VM(), kids = [], lab = function (t) { return X.text('l', t, 'body', { bold: true }); }, e = w.items[F.item] || {};
     if (F.step === 'cat') { kids.push(X.text('title', 'Name the category', 'h'));
@@ -14283,7 +14288,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       if (F.error) kids.push(X.text('err', F.error, 'flag'));
       kids.push(X.row('acts', [X.btn('ok', 'Continue to requirements', 'alt2:ok', { kind: 'primary' }), X.btn('cancel', 'Cancel', 'form:cancel')])); }
     if (F.step === 'req') { var x = w.items[F.forItem] || {}, rep = F.replaces && w.items[F.replaces]; kids.push(X.text('title', 'New requirement of ' + (x.name || F.forItem), 'h'));
-      kids.push(X.text('hint', rep ? 'This takes the place of ' + rep.name + ' when ' + x.name + ' is used. ' + rep.name + ' itself is not changed.' : 'Something ' + (x.name || 'this') + ' needs, with its own cost and dates. It counts only while ' + (x.name || 'this') + ' is in use.', 'muted'));
+      if (typeof x.name === 'string') kids.push(X.text('hint', rep ? 'This takes the place of ' + rep.name + ' when ' + x.name + ' is used. ' + rep.name + ' itself is not changed.' : 'Something ' + x.name + ' needs, with its own cost and dates. It counts only while ' + x.name + ' is in use.', 'muted'));
       kids.push(X.row('f:rname', [lab('Name:'), X.field('f', 'rname', 'Requirement name', { w: 260, v: F.rname || '' })]));
       kids.push(X.row('f:ramount', [lab('Cost each time:'), X.field('f', 'ramount', '0.00', { w: 140, v: F.ramount || '' })]));
       kids.push(X.row('f:rdate', [lab('First date:'), X.field('f', 'rdate', 'YYYY-MM-DD', { w: 140, v: F.rdate || '' })]));
@@ -14294,16 +14299,16 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
 
   function uid(name, V, taken) { var id = uniqItemId(name, V), n = 2, base = id; while (taken.indexOf(id) >= 0) id = base + '_' + (n++); taken.push(id); return id; }
   function compsWith(w, ref) { return Object.keys(w.components || {}).filter(function (k) { var L = w.components[k] && w.components[k].items; return Array.isArray(L) && L.indexOf(ref) >= 0; }); }
-  function alt2Save(V) { var F = V.form, w = AW(V); if (!F || F.kind !== 'alt2') return; var e = w.items[F.item], ops = [], taken = [], calId = (w.meta && w.meta.calId) || 'budget';
+  function alt2Save(V) { var F = V.form, w = AW(V); if (!F || F.kind !== 'alt2') return; var e = w.items[F.item], ops = [], taken = [];
     function fail(m) { F.error = m; V.note = m; return redraw(V); }
     if (F.step === 'cat') { var cn = String(F.cname || '').trim(); if (!cn) return fail('Give the category a name.'); F.cname = cn; F.step = 'alt'; F.error = ''; V.formFocus = 'aname'; return redraw(V); }
     if (F.step === 'alt') { if (!e) return; var an = String(F.aname || '').trim(), amt = BR.num(F.aamount), start = String(F.adate || '').trim(); if (!an) return fail('Give the alternative a name.');
       if (String(F.aamount || '').trim() !== '' && !(amt >= 0)) return fail('Enter a cost of 0 or more.'); if (!BR.pdate(start)) return fail('Start date must be a real date, YYYY-MM-DD.');
       var isCat = !!e.alts, curRef = isCat ? selectedRef(w, F.item) : 'item:' + F.item, cur = curRef && w.items[bare(curRef)], ev = (cur && cur.values) || e.values || {}, S = schedFrom(F, start, cur); if (!S.ok) return fail(S.error);
-      var income = ev.flow === 'in' || ev.type === 'income', tv = Object.assign({ type: ev.type || 'expense', flow: ev.flow || 'out', allDay: true, charge: 'per' }, S.patch); if (ev.type === 'expense' || !ev.type) tv.consume = true;
+      var income = ev.flow === 'in' || ev.type === 'income', tv = Object.assign({ allDay: true, charge: 'per' }, S.patch); if (ev.type != null) tv.type = ev.type; if (ev.flow != null) tv.flow = ev.flow; if (ev.type === 'expense') tv.consume = true; /* 1.8.95: type and flow copy what is there; missing stays missing */
       if (amt > 0) tv.amount = BR.r2(income ? amt : -amt); else tv.amount = 0; if (ev.category) tv.category = ev.category;
       var tid = uid(an, V, taken), cid = F.item; ops.push({ path: 'items/' + tid, op: 'add', value: mkItemRecord(tid, an, { values: tv }) });
-      if (!isCat) { cid = uid(F.cname, V, taken); var cv = { type: ev.type || 'expense', flow: ev.flow || 'out', isCategory: true }; if (ev.category) cv.category = ev.category; if (cv.type === 'expense') cv.consume = true;
+      if (!isCat) { cid = uid(F.cname, V, taken); var cv = { isCategory: true }; if (ev.type != null) cv.type = ev.type; if (ev.flow != null) cv.flow = ev.flow; if (ev.category) cv.category = ev.category; if (cv.type === 'expense') cv.consume = true;
         var rec = mkItemRecord(cid, F.cname, { values: cv, alts: { members: ['item:' + F.item, 'item:' + tid], pref: F.preferred ? 'item:' + tid : null, unavail: [], method: 'best' } }); rec.state = { userPick: 'item:' + F.item };
         ops.push({ path: 'items/' + cid, op: 'add', value: rec });
         compsWith(w, 'item:' + F.item).forEach(function (k) { ops.push({ path: 'components/' + k + '/items', op: 'remove', value: 'item:' + F.item }, { path: 'components/' + k + '/items', op: 'add', value: 'item:' + cid }); }); }
@@ -14315,19 +14320,20 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if (F.step === 'req') { var x = w.items[F.forItem]; if (!x) return; var rn = String(F.rname || '').trim(), ra = BR.num(F.ramount), rd = String(F.rdate || '').trim(); if (!rn) return fail('Give the requirement a name.');
       if (String(F.ramount || '').trim() !== '' && !(ra >= 0)) return fail('Enter a cost of 0 or more.'); if (!BR.pdate(rd)) return fail('First date must be a real date, YYYY-MM-DD.');
       var RS = schedFrom(F, rd, null); if (!RS.ok) return fail(RS.error);
-      var rv = Object.assign({ type: 'expense', flow: 'out', consume: true, allDay: true, charge: 'per', forAlt: 'item:' + F.forItem, amount: ra > 0 ? -BR.r2(ra) : 0, category: (x.values || {}).category || 'Requirement' }, RS.patch); if (F.replaces) rv.replaces = 'item:' + F.replaces;
+      var rv = Object.assign({ type: 'expense', flow: 'out', consume: true, allDay: true, charge: 'per', forAlt: 'item:' + F.forItem, amount: ra > 0 ? -BR.r2(ra) : 0 }, RS.patch); if (x.values && x.values.category != null) rv.category = x.values.category; if (F.replaces) rv.replaces = 'item:' + F.replaces;
       var rid = uid(rn, V, taken); ops = reqAddOps(w, rid, rn, rv);
       var pid = F.pid, rep = F.replaces; clearFormFields(V); V.form = null; V.formFocus = null; V.note = 'added requirement ' + rn;
       var out = submitViews(ops, 'alt2:req', V); if (pid && rep) { var p = allProps().filter(function (q) { return q.id === pid; })[0]; if (p) { p.reviews = p.reviews || {}; p.reviews[rep] = { d: 'own', ref: 'item:' + rid }; putProp(p); refreshAll(); } } return out; } }
   var PENDING = null;
-  function reqAddOps(w, rid, name, values) { var calId = (w.meta && w.meta.calId) || 'budget', ops = [{ path: 'items/' + rid, op: 'add', value: mkItemRecord(rid, name, { values: values }) }, { path: 'components/' + finBoard('expense') + '/items', op: 'add', value: 'item:' + rid }, { path: 'components/' + calId + '/items', op: 'add', value: 'item:' + rid }];
-    if (w.meta && w.meta.planOwn) ops.push({ path: 'components/' + ((w.meta && w.meta.planId) || 'reqs') + '/items', op: 'add', value: 'item:' + rid }); return ops; }
+  function reqAddOps(w, rid, name, values) { var calId = calIdOf(w), pid = planIdOf(w), ops = [{ path: 'items/' + rid, op: 'add', value: mkItemRecord(rid, name, { values: values }) }, { path: 'components/' + finBoard('expense') + '/items', op: 'add', value: 'item:' + rid }];
+    if (calId) ops.push({ path: 'components/' + calId + '/items', op: 'add', value: 'item:' + rid });
+    if (w.meta && w.meta.planOwn && pid) ops.push({ path: 'components/' + pid + '/items', op: 'add', value: 'item:' + rid }); return ops; }
   function reqDropOps(w, rid) { var ops = []; compsWith(w, 'item:' + rid).forEach(function (k) { ops.push({ path: 'components/' + k + '/items', op: 'remove', value: 'item:' + rid }); }); ops.push({ path: 'items/' + rid, op: 'drop' }); return ops; }
   /* a reused requirement is a separate copy for the new choice, starting when that choice does; the original is not touched */
   function copyReq(w, V, rid, toId, taken) { var R = w.items[rid], T = w.items[toId]; if (!R || !T) return null; var v = clone(R.values || {}), start = (T.values || {}).date || budgetTodayKey(); delete v.ex; delete v.then; delete v.replaces; v.forAlt = 'item:' + toId; v.copyOf = 'item:' + rid;
-    if (v.date && String(v.date) < String(start)) { var rep = v.repeat || 'once';
-      if (rep === 'every') { var n = Math.max(1, Math.floor(+v.every || 1)), gap = BR.dayDiff(v.date, start); v.date = BR.addDays(v.date, Math.ceil(gap / n) * n); }
-      else if (rep === 'monthdays') v.date = firstMonthday(start, BR.monthDayList(v.on)) || start; else if (rep === 'monthly') v.date = firstMonthday(start, [BR.pdate(v.date).getDate()]) || start; else v.date = start; }
+    if (v.date && String(v.date) < String(start)) { var rep = v.repeat, n = Math.floor(+v.every); /* 1.8.95: a missing repeat or step leaves the date as it is */
+      if (rep === 'every') { if (n >= 1) v.date = BR.addDays(v.date, Math.ceil(BR.dayDiff(v.date, start) / n) * n); }
+      else if (rep === 'monthdays') v.date = firstMonthday(start, BR.monthDayList(v.on)) || start; else if (rep === 'monthly') v.date = firstMonthday(start, [BR.pdate(v.date).getDate()]) || start; else if (typeof rep === 'string') v.date = start; }
     if (v.until && String(v.until) < String(v.date)) delete v.until;
     var O = (R.values && R.values.copyOf && w.items[bare(R.values.copyOf)]) || R, nm = O.name || R.name; /* a copy of a copy keeps the original's name */
     var id = uid(nm + ' ' + T.name, V, taken || []); return { id: id, ops: reqAddOps(w, id, nm + ' (' + T.name + ')', v) }; }
@@ -14342,7 +14348,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     kids.push(X.row('head', [X.text('t', 'Alternatives and requirements: ' + it.name, 'h'), X.btn('close', 'Close', 'alt2:close')]));
     if (!it.alts) { kids.push(X.text('none', it.name + ' has no alternatives yet.', 'muted')); reqBlock(V, w, id).forEach(function (k) { kids.push(k); }); }
     else { var ref = selectedRef(w, id), un = [].concat(it.alts.unavail || []).map(memberRef), H = handoffOf(w, id);
-      kids.push(X.text('cat', 'Category ' + it.name + ' · in use: ' + (selLabel(w, id) || '—'), 'body'));
+      var inUse = selLabel(w, id); kids.push(X.text('cat', 'Category ' + it.name + (inUse ? ' · in use: ' + inUse : ''), 'body'));
       catMembers(it).forEach(function (m) { var mid = bare(m), a = w.items[mid]; if (!a) return; var cur = m === ref, pref = it.alts.pref != null && memberRef(it.alts.pref) === m, off = un.indexOf(m) >= 0, open = !!(st.open && st.open[mid]), n = reqsOf(w, mid).length;
         kids.push(X.row('m:' + mid, [X.text('n', (cur ? '● ' : '○ ') + a.name, 'body', { bold: cur }), X.text('s', schedLabel(a.values) + (cur ? ' · in use' : '') + (off ? ' · unavailable' : ''), 'small'),
           X.btn('pref', pref ? '✓ Preferred' : 'Prefer', 'alt2:pref:' + id + '/' + mid, { on: pref, disabled: off }), X.btn('un', off ? 'Mark available' : 'Mark unavailable', 'alt2:unavail:' + id + '/' + mid, { on: off }),
@@ -14362,8 +14368,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       out.push(X.text('pn', 'The plan below is the current plan. A proposal changes nothing until you accept it.', 'muted')); }
     if (open) out.push(reviewVM(V, w, open)); return out; }
   function reviewVM(V, w, p) { var X = VM(), kids = [], C = w.items[p.cat], T = w.items[bare(p.to)], P = w.items[bare(p.from)] || {}, F = V.form, un = unresolved(w, p), R = seedReqs(w, bare(p.from)).filter(function (r) { return w.items[r] && (!(w.items[r].values && w.items[r].values.forAlt) || reqActivity(w, w.items[r]).active); }), start = (T.values || {}).date || budgetTodayKey();
-    kids.push(X.row('head', [X.text('t', 'Proposal: ' + C.name + ' switches from ' + (P.name || '—') + ' to ' + T.name + ' from ' + start, 'h'), X.btn('close', 'Close and keep for later', 'prop:close')]));
-    kids.push(X.text('state', un.length ? 'Provisional: ' + un.length + ' requirement' + (un.length === 1 ? '' : 's') + ' of ' + (P.name || 'the current choice') + ' still to resolve. The current plan is unchanged.' : 'Every affected requirement is resolved. The current plan is unchanged until you accept.', un.length ? 'flag' : 'body'));
+    kids.push(X.row('head', [X.text('t', 'Proposal: ' + C.name + (typeof P.name === 'string' ? ' switches from ' + P.name + ' to ' : ' switches to ') + T.name + ' from ' + start, 'h'), X.btn('close', 'Close and keep for later', 'prop:close')]));
+    kids.push(X.text('state', un.length ? 'Provisional: ' + un.length + ' requirement' + (un.length === 1 ? '' : 's') + (typeof P.name === 'string' ? ' of ' + P.name : '') + ' still to resolve. The current plan is unchanged.' : 'Every affected requirement is resolved. The current plan is unchanged until you accept.', un.length ? 'flag' : 'body'));
     if (R.length) { kids.push(X.text('rh', 'Requirements of ' + P.name + ': what does ' + T.name + ' need instead?', 'body', { bold: true }));
       R.forEach(function (r) { var Ri = w.items[r], rv = (p.reviews || {})[r] || {}, ref = rv.ref && w.items[bare(rv.ref)], status = !rv.d ? 'not decided' : rv.d === 'none' ? 'not needed with ' + T.name : rv.d === 'reuse' ? (ref ? 'reused as a separate copy: ' + ref.name + ' · ' + schedLabel(ref.values) : 'copy missing') : (ref ? 'replaced by ' + ref.name + ' · ' + schedLabel(ref.values) : 'needs its own: not scheduled yet');
         kids.push(X.row('r:' + r, [X.text('n', Ri.name, 'body', { bold: true }), X.text('s', schedLabel(Ri.values), 'small'), X.btn('own', 'Needs its own', 'prop:rv:' + p.id + '/' + r + '/own', { on: rv.d === 'own' }), X.btn('reuse', 'Reuse a copy', 'prop:rv:' + p.id + '/' + r + '/reuse', { on: rv.d === 'reuse' }), X.btn('none', 'Not needed', 'prop:rv:' + p.id + '/' + r + '/none', { on: rv.d === 'none' })]));
@@ -14374,7 +14380,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     kids.push(X.row('xa', [X.btn('add', '+ Add requirement of ' + T.name, 'alt2:addreq:' + bare(p.to))]));
     if (F && F.kind === 'alt2' && F.step === 'req') kids.push(alt2FormVM(V, w, F));
     var month = String(start).slice(0, 7); if (month < budgetMonthKey()) month = budgetMonthKey();
-    kids.push(compareVM(V, w, afterAtlas(w, p), { title: 'Dependencies and sequence, before and after', month: month, moLabel: monthName(month), note: 'Money columns are for ' + monthName(month) + ', the month ' + T.name + ' starts.' }));
+    kids.push(compareVM(V, w, afterAtlas(w, p), { title: 'Dependencies and sequence, before and after', month: month, note: 'Money columns are for ' + monthName(month) + ', the month ' + T.name + ' starts.' }));
     kids.push(X.row('acts', [X.btn('accept', 'Accept proposal', 'prop:accept:' + p.id, { kind: 'primary', disabled: !!un.length }), X.btn('discard', 'Discard proposal', 'prop:discard:' + p.id), X.btn('close2', 'Close and keep for later', 'prop:close')]));
     return X.col('review', kids, { role: 'detail', slab: 'inner', gap: 6 }); }
 
@@ -14463,8 +14469,10 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     catMembers(c).forEach(function (m) { var id = bare(m), a = w.items[id]; if (!a || id === use || un.indexOf(m) >= 0) return; var v = a.values || {}; if (v.planBlocked) return; if (v.date && String(v.date) > String(day)) return;
       var extra = occAmt(a) - base; if (extra > Math.max(0, room)) return; out.push({ id: id, name: a.name, extra: extra }); });
     return out.sort(function (x, y) { return x.extra - y.extra; }); }
-  function resilience(w, HT, flat) { var E = EVL(), out = {}, cost = +HT.hc > 0 ? +HT.hc : 500, large = Math.max(cost, +HT.hm > 0 ? +HT.hm : 1500), delay = Math.max(1, Math.floor(+HT.delay || 3));
-    var cal = ((w.components[(w.meta && w.meta.calId) || 'budget'] || {}).items) || [], by = {}, months = {}; flat.forEach(function (D) { months[D.k.slice(0, 7)] = 1; });
+  function resilience(w, HT, flat) { var E = EVL(), out = {}, cost = +HT.hc, large = +HT.hm, delay = Math.floor(+HT.delay);
+    /* 1.8.95: the thresholds come from the caller. One that is missing or not a positive number leaves these notes out. */
+    if (!(cost > 0) || !(large > 0) || !(delay >= 1)) return out; large = Math.max(cost, large);
+    var cal = calItems(w, calIdOf(w)), by = {}, months = {}; flat.forEach(function (D) { months[D.k.slice(0, 7)] = 1; });
     cal.forEach(function (r) { var id = bare(r), raw = w.items[id], it = effItem(w, id); if (!raw || !it || !(it.values || {}).date || (raw.values || {}).planBlocked) return;
       Object.keys(months).forEach(function (m) { var ch = E.charges(it, m); E.occurrences(it, m).forEach(function (d) { (by[d] = by[d] || []).push({ id: id, amt: ch[d] == null ? 0 : Math.abs(+ch[d]) }); }); }); });
     var need = {}; Object.keys(w.items).forEach(function (id) { var it = w.items[id]; if (!it || !it.jreq || (it.values || {}).planBlocked) return; var j = bare(it.jreq); if (w.items[j]) (need[j] = need[j] || []).push(it.name); });
@@ -14558,10 +14566,10 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       X.text('g-repeat', 'Repeat', 'body', { bold: true })
     ];
     [['once', 'Does not repeat'], ['monthdays', 'Specific dates each month'], ['every', 'Every X days']].forEach(function (p) {
-      kids.push(X.btn('rp:' + p[0], p[1], 'add:rep:' + p[0], { on: (F.rep || 'once') === p[0] }));
+      kids.push(X.btn('rp:' + p[0], p[1], 'add:rep:' + p[0], { on: F.rep === p[0] }));
     });
     if (F.rep === 'monthdays') kids.push(X.row('f:on', [lab('Dates of the month:'), X.field('f', 'on', '1, 15', { w: 140, v: F.on || '' })]));
-    if (F.rep === 'every') kids.push(X.row('f:every', [lab('Every how many days:'), X.field('f', 'every', '14', { w: 80, v: F.every || '14' })]));
+    if (F.rep === 'every') kids.push(X.row('f:every', [lab('Every how many days:'), X.field('f', 'every', '14', { w: 80, v: F.every != null ? F.every : '' })]));
     kids.push(X.text('g-amt', 'Amount', 'body', { bold: true }));
     kids.push(X.row('f:amount', [lab('Amount (USD):'), X.field('f', 'amount', '0.00', { w: 140, v: F.amount || '' })]));
     if (F.error) kids.push(X.text('err', F.error, 'flag'));
@@ -14600,11 +14608,11 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       if (F.time) values.time = F.time;
       if (F.rep === 'monthdays') { var L = BR.monthDayList(F.on); if (!L.length) { F.error = 'Enter the days of the month, for example 1, 15.'; return redraw(V); } values.repeat = 'monthdays'; values.on = L; }
       else if (F.rep === 'every') { var n = Math.floor(BR.num(F.every)); if (!(n >= 1)) { F.error = 'Enter the number of days between repeats.'; return redraw(V); } values.repeat = 'every'; values.every = n; }
-      else values.repeat = 'once';
-      var id = uniqItemId(name, V), calId = (w.meta && w.meta.calId) || 'budget', ops = [
-        { path: 'items/' + id, op: 'add', value: mkItemRecord(id, name, { values: values }) },
-        { path: 'components/' + calId + '/items', op: 'add', value: 'item:' + id }
+      else if (F.rep === 'once') values.repeat = 'once'; else { F.error = 'Pick how it repeats.'; return redraw(V); }
+      var id = uniqItemId(name, V), calId = calIdOf(w), ops = [
+        { path: 'items/' + id, op: 'add', value: mkItemRecord(id, name, { values: values }) }
       ];
+      if (calId) ops.push({ path: 'components/' + calId + '/items', op: 'add', value: 'item:' + id });
       var ids = (w.meta && w.meta.boardIds) || {}; if (ids.expense) ops.push({ path: 'components/' + ids.expense + '/items', op: 'add', value: 'item:' + id });
       V.form = null; V.note = 'Added ' + name + ' on ' + date; return submitViews(ops, 'add:activity', V);
     }
@@ -18745,7 +18753,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.94",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.95",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
