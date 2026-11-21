@@ -1,6 +1,6 @@
 # The Exp7 circuit language
 
-**Status:** built in 1.8.95 (2026-11-21). Language v1, `Exp7Lang` in the lean, `circuit_version() = 1`.
+**Status:** built in 1.8.97 (2026-11-21). Language v1, `Exp7Lang` in the lean, `circuit_version() = 1`.
 
 Exp7's own text language for rules over an app's atlas. It is Verse-like: failure is part of the language, as Verse's
 `<decides>` is, so strict fail and carry on (Rule 1 of `design-system.md`, Matthew's rule of 2026-11-16) is how every
