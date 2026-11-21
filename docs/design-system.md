@@ -862,6 +862,8 @@ Now what may be missing is read through `hostRd`, `hostLs`, `hostStr` and `hostN
 
 On screen, for every app: Budget, its journal views and the Exp7 demo look the same. Of the 1,341 view states the tests lay out, the only ones that change are the stock look of a test board whose component has no name or title (a Budget atlas with its Budget flag taken off, which no app opens): it no longer shows its id, `budget_board · Board`, as its title. A view still writes into its atlas directly in seven places when nothing takes the write (the amount's sign, a rename, prefer, unavailable, removing an alternative or a resource, and the board's sort and filter); that is the next fallback to take out.
 
+Checked in Chrome on Matthew's Mac (2026-11-21, made-up data only): the lean fetched at this release's commit matched `release.json`. A blank Budget opened at 390 wide on Home. The Exp7 demo's Calendar, Board and Plan views drew with the same text and the same number of nodes as 1.8.102 (111, 173 and 143). On the demo's Board, a new item category with no name stayed open with the note "name the item category" and added nothing, and "Test category" was added. Reloaded at 1024 wide, Budget and the demo's three views opened again. No failure was recorded and no page error was thrown at any step. The test's storage was cleared after.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
