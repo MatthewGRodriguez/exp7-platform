@@ -788,6 +788,8 @@ The defaults in `budget-flows`, `journal-views` and `views-host`'s Budget code a
 
 Tests in exp7-jrender: Layer app checks each part fails alone with its own context and is left out, that only the definition's shape keeps an app closed, that a token set left out fails with `TOKEN_MISSING` when read, and that Budget opened without its screens set draws no Home or screen while its views set still reads; Layer art checks a pack missing a piece is assigned with each gap recorded, a pack with a bad piece loads with the rest, and Home with its chevron piece missing still lays out with only the chevrons left out; Layer views checks a view with no pack lays out with no art, each slot recorded; and the atlas check records each missing part alone.
 
+Checked in Chrome on Matthew's Mac (2026-11-21, the lean by its sha at 579fd58, which matches release.json, a blank Budget at 390 wide, made-up data only): Budget opened from a blank atlas with every part, and Home drew its calendar and Today. A made-up item ("Test lunch", 12.00) was added through Add to today and saved, and Today's schedule redrew with it. Reloaded at 1024 wide, the load path kept the item on Today and the cash note took it in. No failure was recorded and no page error was thrown at any step. The test's storage was cleared after.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
