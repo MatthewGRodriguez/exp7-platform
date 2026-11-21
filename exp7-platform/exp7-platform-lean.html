@@ -12104,8 +12104,16 @@ window.x7 = window.x7 || function (t) {
   ensureUtils();
   ensureTheme();
 
+  /* 1.8.107 (Matthew: "Yes, take them out"): this script makes up nothing. A part that is missing stays missing and is left
+   * out: no default options, kind, root, board sort, board title or plan title, and no atlas part made because it was not
+   * there. Making a blank atlas (blankMoneyAtlas, then normalizeDemoViews and ensureBudgetBoards) still writes what a new
+   * atlas has; it only acts on the parts the calendar template gave. */
+  function isObj(o) { return o !== null && typeof o === 'object' && !Array.isArray(o); }
+
   var _seq = 0;
   var _instances = Object.create(null);
+  /* each mounted view's propose hook, by host id, read by the patched setView/onHtml path */
+  if (!isObj(root.__exp7ViewsPropose)) root.__exp7ViewsPropose = Object.create(null);
 
   function requireDeps() {
     var missing = [];
@@ -12143,7 +12151,7 @@ window.x7 = window.x7 || function (t) {
    * @returns {object} handle
    */
   function mount(opts) {
-    opts = opts || {};
+    if (!isObj(opts)) throw new Error('Exp7Views.mount: options required');
     requireDeps();
     ensureUtils();
     ensureTheme();
@@ -12155,7 +12163,7 @@ window.x7 = window.x7 || function (t) {
     var host = opts.host;
     var id = ensureHostId(host);
     host.setAttribute('data-exp7-views', MODULE_ID);
-    host.setAttribute('data-exp7-view-kind', opts.kind || 'view');
+    if (typeof opts.kind === 'string') host.setAttribute('data-exp7-view-kind', opts.kind);
 
     var atlas = opts.atlas;
     if (!atlas || typeof atlas !== 'object') throw new Error('Exp7Views.mount: atlas required');
@@ -12166,10 +12174,8 @@ window.x7 = window.x7 || function (t) {
     var onUpdate = typeof opts.onUpdate === 'function' ? opts.onUpdate : null;
     var onError = typeof opts.onError === 'function' ? opts.onError : null;
 
-    // Instance-scoped propose hook read by patched setView/onHtml path
-    root.__exp7ViewsPropose = root.__exp7ViewsPropose || Object.create(null);
     root.__exp7ViewsPropose[id] = function (ops, proc, src) {
-      if (onPropose) return onPropose(ops, { proc: proc || 'ui:views', src: src, hostId: id });
+      if (onPropose) return onPropose(ops, { proc: proc, src: src, hostId: id });
       return null;
     };
 
@@ -12178,22 +12184,22 @@ window.x7 = window.x7 || function (t) {
       if (onUpdate) onUpdate(V);
     }
 
-    root.setView(id, atlas, viewRoot, cb, !!opts.readonly, { options: opts.options || null, tokens: opts.tokens || null });
+    root.setView(id, atlas, viewRoot, cb, !!opts.readonly, { options: opts.options, tokens: opts.tokens });
 
     var handle = {
       id: id,
       moduleId: MODULE_ID,
-      kind: opts.kind || null,
+      kind: opts.kind,
       root: viewRoot,
       host: host,
       update: function (nextAtlas, nextRoot) {
         if (nextAtlas) atlas = nextAtlas;
         if (nextRoot) { viewRoot = nextRoot; handle.root = viewRoot; }
-        root.setView(id, atlas, viewRoot, cb, !!opts.readonly, { options: opts.options || null, tokens: opts.tokens || null });
+        root.setView(id, atlas, viewRoot, cb, !!opts.readonly, { options: opts.options, tokens: opts.tokens });
         return handle;
       },
       getState: function () {
-        return (root.JVS && root.JVS[id]) || null;
+        return root.JVS ? root.JVS[id] : undefined;
       },
       dispose: function () {
         dispose(handle);
@@ -12258,7 +12264,7 @@ window.x7 = window.x7 || function (t) {
    *
    * @param {object} opts
    * @param {object} opts.atlas
-   * @param {Array<{host:HTMLElement,root:string[],kind?:string,id?:string}>} [opts.views]
+   * @param {Array<{host:HTMLElement,root:string[],id:string,kind?:string}>} [opts.views] (1.8.107: a view with no id is left out)
    *   If omitted, mounts calendar+board+plan using rootsFor(atlas) and opts.hosts.{calendar,board,plan}.
    * @param {object} [opts.hosts] - { calendar, board, plan } elements when using default trio
    * @param {function} [opts.onPropose]
@@ -12268,7 +12274,7 @@ window.x7 = window.x7 || function (t) {
    * @returns {object} surface handle
    */
   function mountSurface(opts) {
-    opts = opts || {};
+    if (!isObj(opts)) throw new Error('Exp7Views.mountSurface: options required');
     requireDeps();
     var atlas = opts.atlas;
     if (!atlas || typeof atlas !== 'object') throw new Error('Exp7Views.mountSurface: atlas required');
@@ -12276,7 +12282,7 @@ window.x7 = window.x7 || function (t) {
     var list = opts.views;
     if (!list || !list.length) {
       var R = rootsFor(atlas);
-      var H = opts.hosts || {};
+      var H = isObj(opts.hosts) ? opts.hosts : {};
       list = [];
       if (H.calendar) list.push({ id: 'calendar', host: H.calendar, root: R.calendar, kind: 'calendar' });
       if (H.board) list.push({ id: 'board', host: H.board, root: R.board, kind: 'board' });
@@ -12285,13 +12291,14 @@ window.x7 = window.x7 || function (t) {
     if (!list.length) throw new Error('Exp7Views.mountSurface: no views/hosts');
 
     var byId = Object.create(null);
-    var handles = list.map(function (v, i) {
-      var key = v.id || v.kind || ('view' + i);
+    /* a view with no id is left out (no id is made up for it) */
+    var handles = list.filter(function (v) { return isObj(v) && typeof v.id === 'string' && v.id; }).map(function (v) {
+      var key = v.id;
       var h = mount({
         host: v.host,
         atlas: atlas,
         root: v.root,
-        kind: v.kind || key,
+        kind: v.kind,
         readonly: !!opts.readonly,
         onPropose: opts.onPropose,
         onUpdate: opts.onUpdate,
@@ -12315,22 +12322,12 @@ window.x7 = window.x7 || function (t) {
         if (nextAtlas) atlas = nextAtlas;
         surface.atlas = atlas;
         surface.roots = rootsFor(atlas);
-        handles.forEach(function (h) {
-          /* Prefer the handle's own root (supports N boards). Fallback for default trio. */
-          var nextRoot = h.root;
-          if (!nextRoot || !nextRoot.length) {
-            var kind = h.kind;
-            nextRoot = kind === 'calendar' ? surface.roots.calendar
-              : kind === 'board' ? surface.roots.board
-                : kind === 'plan' ? surface.roots.plan
-                  : null;
-          }
-          h.update(atlas, nextRoot || undefined);
-        });
+        /* each handle keeps its own root (mount needs one), so N boards stay as mounted */
+        handles.forEach(function (h) { h.update(atlas, h.root); });
         surface.renderer = rendererInfo();
         return surface;
       },
-      get: function (id) { return byId[id] || null; },
+      get: function (id) { return byId[id]; },
       dispose: function () {
         handles.forEach(function (h) { dispose(h); });
         handles.length = 0;
@@ -12347,19 +12344,19 @@ window.x7 = window.x7 || function (t) {
     });
   }
 
-  /** Strip moneyPreset / moneyCalendarTemplate chrome so Cal/Board match Exp7 demo calendarTemplate.
-   * Also force Plan = comp:reqs (depsHtml). Mutates atlas in place; safe to call on IDB restores. */
+  /** Strip moneyPreset / moneyCalendarTemplate chrome so Cal/Board match Exp7 demo calendarTemplate, and make the Plan
+   * comp:reqs (depsHtml). Mutates the atlas in place. Part of making a blank atlas (1.8.94: no load calls it). 1.8.107: it acts
+   * only on the parts that are there; a missing meta, joys, blueprints, calendar state or blueprint list is left out. */
   function normalizeDemoViews(w) {
-    if (!w || !w.components) return w;
-    w.meta = w.meta || {};
-    w.joys = w.joys || {};
-    w.blueprints = w.blueprints || {};
+    if (!isObj(w) || !isObj(w.components)) return w;
     var R = rootsFor(w);
     var calId = R.calId, boardId = R.boardId;
-    w.meta.calId = calId;
-    w.meta.boardId = boardId;
-    w.meta.planId = 'reqs';
-    w.meta.exp7Views = MODULE_ID;
+    if (isObj(w.meta)) {
+      w.meta.calId = calId;
+      w.meta.boardId = boardId;
+      w.meta.planId = 'reqs';
+      w.meta.exp7Views = MODULE_ID;
+    }
 
     var cal = w.components[calId];
     if (cal && cal.view) {
@@ -12378,30 +12375,30 @@ window.x7 = window.x7 || function (t) {
         delete cal.view.states.low;
         delete cal.view.states.tight;
       }
-      cal.state = cal.state || {};
-      cal.state.detail = null;
-      cal.state.mode = '';
-      cal.state.range = [];
-      cal.state.dayStyles = {};
-      cal.state.dayLabels = {};
+      if (isObj(cal.state)) {
+        cal.state.detail = null;
+        cal.state.mode = '';
+        cal.state.range = [];
+        cal.state.dayStyles = {};
+        cal.state.dayLabels = {};
+      }
       cal.sub = [];
       /* Drop *_cash money blueprints; keep workload/drop if still present. */
-      cal.blueprints = (cal.blueprints || []).filter(function (r) {
-        var id = String(r).replace(/^bp:/, '');
-        if (/_cash$/.test(id)) { delete w.blueprints[id]; return false; }
-        return !!w.blueprints[id];
-      });
+      if (Array.isArray(cal.blueprints) && isObj(w.blueprints)) {
+        cal.blueprints = cal.blueprints.filter(function (r) {
+          var id = String(r).replace(/^bp:/, '');
+          if (/_cash$/.test(id)) { delete w.blueprints[id]; return false; }
+          return !!w.blueprints[id];
+        });
+      }
     }
 
     var brd = w.components[boardId];
-    if (brd && brd.view) {
+    if (brd && brd.view && calId !== null) {
       brd.view.layout = 'board';
       brd.view.target = 'comp:' + calId;
-      brd.view.sort = brd.view.sort || 'name';
-      brd.view.filter = brd.view.filter || 'all';
       brd.view.item = { show: ['date', 'repeat'] };
-      brd.state = brd.state || {};
-      delete brd.state.budgetType;
+      if (isObj(brd.state)) delete brd.state.budgetType;
       delete brd.view.budgetType;
     }
 
@@ -12413,22 +12410,15 @@ window.x7 = window.x7 || function (t) {
         items: [], blueprints: [], state: {}, sub: []
       };
     }
-    w.components.reqs.view = w.components.reqs.view || {};
-    w.components.reqs.view.layout = 'deps';
-    w.components.reqs.view.title = w.components.reqs.view.title || 'Dependencies & sequence';
-    w.components.reqs.view.item = w.components.reqs.view.item || { show: [] };
+    if (isObj(w.components.reqs.view)) w.components.reqs.view.layout = 'deps';
 
-    /* Demo Board host polish (+ Add resource / use: chips) reads components.resources.
-       Budget blankMoneyAtlas never seeded it — first resource add then broke items into a string. */
+    /* Demo Board host polish (+ Add resource / use: chips) reads components.resources: a new atlas has it, with no items. */
     if (!w.components.resources) {
       w.components.resources = {
         id: 'resources', name: 'Resources',
         view: { layout: 'board', title: 'Resources', item: { show: [] }, states: {} },
         items: [], blueprints: [], state: {}, sub: []
       };
-    } else if (!Array.isArray(w.components.resources.items)) {
-      var ri = w.components.resources.items;
-      w.components.resources.items = (typeof ri === 'string' && ri) ? [ri] : [];
     }
 
     /* Drop moneyPreset section comps hanging off *_plan. */
@@ -12441,11 +12431,11 @@ window.x7 = window.x7 || function (t) {
     });
 
     /* Drop orphan money joys (opening/warning/margin/asof) left by moneyPreset. */
-    Object.keys(w.joys).forEach(function (id) {
+    if (isObj(w.joys)) Object.keys(w.joys).forEach(function (id) {
       if (/_(opening|warning|margin|asof)$/.test(id)) delete w.joys[id];
     });
 
-    w.root = ['comp:' + calId, 'comp:' + boardId, 'comp:reqs'];
+    w.root = R.calendar.concat(R.board, ['comp:reqs']);
     return w;
   }
 
@@ -12458,11 +12448,12 @@ window.x7 = window.x7 || function (t) {
     return BUDGET_BOARD_TYPES.indexOf(t) < 0 ? null : 'board_' + t;
   }
   function ensureBudgetBoards(w) {
-    if (!w || !w.components) return w;
-    w.meta = w.meta || {};
+    if (!isObj(w) || !isObj(w.components)) return w;
     normalizeDemoViews(w);
     var R = rootsFor(w);
     var calId = R.calId;
+    /* 1.8.107: boards target the calendar the atlas names; with none named there is nothing for them to target */
+    if (calId === null) return w;
     var titles = {
       expense: 'Expense board',
       income: 'Income board',
@@ -12476,7 +12467,7 @@ window.x7 = window.x7 || function (t) {
       if (!w.components[id]) {
         w.components[id] = {
           id: id,
-          name: titles[t] || (t + ' board'),
+          name: titles[t],
           view: {
             layout: 'board',
             target: 'comp:' + calId,
@@ -12491,60 +12482,47 @@ window.x7 = window.x7 || function (t) {
           state: {},
           sub: []
         };
-      } else {
-        var c = w.components[id];
-        c.view = c.view || {};
-        c.view.layout = 'board';
-        c.view.target = 'comp:' + calId;
-        c.view.title = titles[t];
-        c.view.item = c.view.item || { show: ['date', 'repeat'] };
-        if (!Array.isArray(c.items)) c.items = [];
+      } else if (isObj(w.components[id].view)) {
+        var v = w.components[id].view;
+        v.layout = 'board';
+        v.target = 'comp:' + calId;
+        v.title = titles[t];
       }
     });
-    w.meta.boardIds = boardIds;
-    w.meta.budgetBoards = 1;
-    /* Keep meta.boardId as expense for legacy single-board callers; Cal/Plan union uses boardIds. */
-    w.meta.boardId = boardIds.expense;
-    /* Migrate items off the template aggregate board onto type boards (once). */
+    if (isObj(w.meta)) {
+      w.meta.boardIds = boardIds;
+      w.meta.budgetBoards = 1;
+      /* Keep meta.boardId as expense for legacy single-board callers; Cal/Plan union uses boardIds. */
+      w.meta.boardId = boardIds.expense;
+    }
+    /* Move items off the template's board onto the type boards. 1.8.107: an item with no values, or a type board with no item
+     * list, is left out (nothing is made for it); the debt and asset split for atlases saved before the four boards is gone,
+     * as no load moves anything on (1.8.94). */
     var legacy = w.components[R.boardId];
-    if (legacy && Array.isArray(legacy.items) && legacy.items.length && R.boardId !== boardIds.expense) {
+    if (legacy && Array.isArray(legacy.items) && legacy.items.length && R.boardId !== boardIds.expense && isObj(w.items)) {
       legacy.items.slice().forEach(function (ref) {
         var id = String(ref).replace(/^item:/, '');
         var it = w.items[id];
-        if (!it) return;
+        if (!isObj(it) || !isObj(it.values)) return;
         /* 1.8.100: an item whose type is not one of the four goes on no type board */
-        var t = (it.values || {}).type;
+        var t = it.values.type;
         if (BUDGET_BOARD_TYPES.indexOf(t) < 0) return;
         var dest = w.components[boardIds[t]];
-        if (!dest) return;
-        dest.items = dest.items || [];
+        if (!isObj(dest) || !Array.isArray(dest.items)) return;
         if (dest.items.indexOf(ref) < 0) dest.items.push(ref);
       });
       /* Clear aggregate board so UI mounts only the type boards. */
       legacy.items = [];
     }
-    /* Split any prior debt+assets combined board into separate debt/asset boards. */
-    if (w.components.board_debt && Array.isArray(w.components.board_debt.items)) {
-      w.components.board_debt.items.slice().forEach(function (ref) {
-        var id = String(ref).replace(/^item:/, '');
-        var it = w.items[id];
-        if (!it || ((it.values || {}).type) !== 'asset') return;
-        var dest = w.components.board_asset;
-        if (!dest) return;
-        dest.items = dest.items || [];
-        if (dest.items.indexOf(ref) < 0) dest.items.push(ref);
-        w.components.board_debt.items = w.components.board_debt.items.filter(function (r) { return r !== ref; });
-      });
-    }
-    w.root = ['comp:' + calId].concat(
+    w.root = R.calendar.concat(
       BUDGET_BOARD_TYPES.map(function (t) { return 'comp:' + boardIds[t]; }),
       ['comp:reqs']
     );
     return w;
   }
   function typeBoardIds(atlas) {
-    var meta = (atlas && atlas.meta) || {};
-    if (meta.boardIds && typeof meta.boardIds === 'object') {
+    var meta = isObj(atlas) && isObj(atlas.meta) ? atlas.meta : {};
+    if (isObj(meta.boardIds)) {
       return BUDGET_BOARD_TYPES.map(function (t) { return meta.boardIds[t]; }).filter(Boolean);
     }
     var R = rootsFor(atlas);
@@ -12558,8 +12536,9 @@ window.x7 = window.x7 || function (t) {
    * Do NOT use moneyCalendarTemplate — moneyPreset chrome is stripped by normalizeDemoViews. */
   function blankMoneyAtlas(label, month) {
     requireDeps();
+    if (typeof label !== 'string' || !label) throw new Error('Exp7Views.blankMoneyAtlas: label required');
     var M = root.JAtlasModel;
-    var w = M.empty(label || 'budget_atlas', label || 'Budget');
+    var w = M.empty(label, label);
     w.owner = {};
     w.pathRev = {};
     w.rev = 1000;
@@ -12569,36 +12548,28 @@ window.x7 = window.x7 || function (t) {
     if (typeof M.calendarTemplate !== 'function') {
       throw new Error('Exp7Views: calendarTemplate unavailable');
     }
-    T = M.calendarTemplate(w, label || 'Calendar', month);
+    T = M.calendarTemplate(w, label, month);
     function cid(ref) { return String(ref).replace(/^comp:/, ''); }
     var calId = cid(T.cal), boardId = cid(T.board);
     w.root = [T.cal, T.board, 'comp:reqs'];
-    w.meta = w.meta || {};
-    w.meta.exp7Views = MODULE_ID;
-    w.meta.calId = calId;
-    w.meta.boardId = boardId;
-    w.meta.planId = 'reqs';
+    /* a new atlas's meta starts here (JAtlasModel.empty makes none) */
+    w.meta = { exp7Views: MODULE_ID, calId: calId, boardId: boardId, planId: 'reqs' };
     return normalizeDemoViews(w);
   }
 
+  /* rootsFor(atlas): the calendar, board and plan the atlas names. The plan is comp:reqs when the atlas has it (depsHtml /
+   * Dependencies & sequence), else the plan its meta names. 1.8.107: a view the meta does not name is left out (its id is
+   * null and its root list is empty): no 'trip_calendar', no '<calendar>_board' or '<calendar>_plan' is made up. */
   function rootsFor(atlas) {
-    var meta = (atlas && atlas.meta) || {};
-    var cal = meta.calId || 'trip_calendar';
-    var brd = meta.boardId || (cal + '_board');
-    /* Demo Plan tab is ALWAYS comp:reqs (depsHtml / Dependencies & sequence), never calendarTemplate's *_plan (layout:plan). */
-    var plan = 'reqs';
-    if (atlas && atlas.components) {
-      if (!atlas.components[cal] && atlas.components.trip_calendar) cal = 'trip_calendar';
-      if (!atlas.components[brd] && atlas.components.trip_calendar_board) brd = 'trip_calendar_board';
-      if (!atlas.components.reqs) {
-        plan = meta.planId || (cal + '_plan');
-        if (!atlas.components[plan] && atlas.components.trip_calendar_plan) plan = 'trip_calendar_plan';
-      }
-    }
+    var meta = isObj(atlas) && isObj(atlas.meta) ? atlas.meta : {};
+    function named(v) { return typeof v === 'string' && v ? v : null; }
+    var cal = named(meta.calId), brd = named(meta.boardId);
+    var plan = isObj(atlas) && isObj(atlas.components) && atlas.components.reqs ? 'reqs' : named(meta.planId);
+    function roots(id) { return id === null ? [] : ['comp:' + id]; }
     return {
-      calendar: ['comp:' + cal],
-      board: ['comp:' + brd],
-      plan: ['comp:' + plan],
+      calendar: roots(cal),
+      board: roots(brd),
+      plan: roots(plan),
       calId: cal,
       boardId: brd,
       planId: plan
@@ -12614,7 +12585,7 @@ window.x7 = window.x7 || function (t) {
     mount: mount,
     mountSurface: mountSurface,
     rendererInfo: rendererInfo,
-    viewStore: function () { return root.Exp7ViewStore || null; },
+    viewStore: function () { return root.Exp7ViewStore; },
     dispose: dispose,
     disposeAll: disposeAll,
     ready: ready,
@@ -18950,7 +18921,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.106",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.107",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
