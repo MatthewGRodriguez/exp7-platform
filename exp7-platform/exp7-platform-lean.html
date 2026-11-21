@@ -5476,31 +5476,35 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
      The self-reference kind in refs() is 'atlas'; legacy 'world' is still accepted by fixRef. */
   var FORMAT = 'jeditor-atlas', LEGACY_FORMAT = 'jeditor-world', FORMATS = [FORMAT, LEGACY_FORMAT];
   function SELF(k) { return k === 'atlas' || k === 'world'; }
+  /* 1.8.108 (strict fail and carry on): no || fill-ins here. A missing part stays missing: a list, map or field that is
+     not there is left out of refs, walks and picks; nothing is made up in its place. */
+  function isObj(o) { return o !== null && typeof o === 'object' && !Array.isArray(o); }
   /** explicit migration: a copy with the current format value (nothing else changes) */
   function migrate(w) { var c = JSON.parse(JSON.stringify(w)); if (c && c.format === LEGACY_FORMAT) c.format = FORMAT; return c; }
-  function empty(id, title) { return { format: FORMAT, version: 5, id: id || 'atlas', title: title || id || 'atlas', items: {}, joys: {}, blueprints: {}, components: {}, root: [], clock: { joy: 'clock', ms: 1000, on: false } }; }
+  /* 1.8.108: an atlas needs its id and title (no made-up 'atlas'); a missing one fails first */
+  function empty(id, title) { if (typeof id !== 'string' || !id || typeof title !== 'string') throw new Error('JAtlasModel.empty: id and title required'); return { format: FORMAT, version: 5, id: id, title: title, items: {}, joys: {}, blueprints: {}, components: {}, root: [], clock: { joy: 'clock', ms: 1000, on: false } }; }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
-  function parse(ref) { var m = /^(item|joy|bp|comp):(.+)$/.exec(ref || ''); return m ? { kind: m[1], id: m[2] } : null; }
-  function get(w, ref) { var r = parse(ref); return r ? (w[KINDS[r.kind]] || {})[r.id] || null : null; }
+  function parse(ref) { if (typeof ref !== 'string') return null; var m = /^(item|joy|bp|comp):(.+)$/.exec(ref); return m ? { kind: m[1], id: m[2] } : null; }
+  function get(w, ref) { var r = parse(ref); if (!r) return null; var m = w[KINDS[r.kind]]; return isObj(m) && Object.prototype.hasOwnProperty.call(m, r.id) && isObj(m[r.id]) ? m[r.id] : null; }
   /** every reference in the atlas: {from:"kind:id", path, to, broken} */
   function refs(w) {
     var out = [];
     function add(from, path, to) { if (typeof to !== 'string' || !to) return; out.push({ from: from, path: path, to: to, broken: !get(w, to) }); }
     Object.keys(w.items).forEach(function (id) { var it = w.items[id], f = 'item:' + id;
-      Object.keys(it.factors || {}).forEach(function (j) { add(f, 'factors.' + j, 'joy:' + j); });
-      if (it.alts) { (it.alts.members || []).forEach(function (m, i) { add(f, 'alts.members.' + i, m); }); if (it.alts.pref) add(f, 'alts.pref', it.alts.pref); (it.alts.unavail || []).forEach(function (m, i) { add(f, 'alts.unavail.' + i, m); }); }
+      if (isObj(it.factors)) Object.keys(it.factors).forEach(function (j) { add(f, 'factors.' + j, 'joy:' + j); });
+      if (isObj(it.alts)) { if (Array.isArray(it.alts.members)) it.alts.members.forEach(function (m, i) { add(f, 'alts.members.' + i, m); }); if (it.alts.pref) add(f, 'alts.pref', it.alts.pref); if (Array.isArray(it.alts.unavail)) it.alts.unavail.forEach(function (m, i) { add(f, 'alts.unavail.' + i, m); }); }
       if (it.jreq) add(f, 'jreq', it.jreq); if (it.blueprint) add(f, 'blueprint', it.blueprint); });
     Object.keys(w.blueprints).forEach(function (id) { var b = w.blueprints[id], f = 'bp:' + id;
-      (b.nodes || []).forEach(function (n) { var p = n.p || {};
+      if (Array.isArray(b.nodes)) b.nodes.forEach(function (n) { if (!isObj(n) || !isObj(n.p)) return; var p = n.p;
         if (n.type === 'item' && p.item && p.item !== 'event' && p.item !== 'self') add(f, 'nodes.' + n.id + '.item', p.item);
         if (n.type === 'joy' && p.joy) add(f, 'nodes.' + n.id + '.joy', 'joy:' + p.joy);
         if ((n.type === 'component' || n.type === 'view') && p.comp) add(f, 'nodes.' + n.id + '.comp', p.comp);
         if (n.type === 'position' && p.parent) add(f, 'nodes.' + n.id + '.parent', p.parent); }); });
     Object.keys(w.components).forEach(function (id) { var c = w.components[id], f = 'comp:' + id;
-      (c.items || []).forEach(function (r, i) { add(f, 'items.' + i, r); }); (c.blueprints || []).forEach(function (r, i) { add(f, 'blueprints.' + i, r); });
-      (c.sub || []).forEach(function (s, i) { add(f, 'sub.' + i, s.comp); });
-      var V = c.view || {}; (V.group || []).forEach(function (r, i) { add(f, 'view.group.' + i, r); }); if (V.target) add(f, 'view.target', V.target); if (V.source) add(f, 'view.source', V.source); if (V.asof) add(f, 'view.asof', V.asof); (V.controls || []).forEach(function (x, i) { if (x && x.joy) add(f, 'view.controls.' + i + '.joy', x.joy); }); });
-    (w.root || []).forEach(function (r, i) { add('atlas', 'root.' + i, r); });
+      if (Array.isArray(c.items)) c.items.forEach(function (r, i) { add(f, 'items.' + i, r); }); if (Array.isArray(c.blueprints)) c.blueprints.forEach(function (r, i) { add(f, 'blueprints.' + i, r); });
+      if (Array.isArray(c.sub)) c.sub.forEach(function (s, i) { if (isObj(s)) add(f, 'sub.' + i, s.comp); });
+      if (!isObj(c.view)) return; var V = c.view; if (Array.isArray(V.group)) V.group.forEach(function (r, i) { add(f, 'view.group.' + i, r); }); if (V.target) add(f, 'view.target', V.target); if (V.source) add(f, 'view.source', V.source); if (V.asof) add(f, 'view.asof', V.asof); if (Array.isArray(V.controls)) V.controls.forEach(function (x, i) { if (x && x.joy) add(f, 'view.controls.' + i + '.joy', x.joy); }); });
+    if (Array.isArray(w.root)) w.root.forEach(function (r, i) { add('atlas', 'root.' + i, r); });
     if (w.clock && w.clock.on && w.clock.joy) add('atlas', 'clock.joy', 'joy:' + w.clock.joy);
     return out;
   }
@@ -5516,23 +5520,23 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
     var k = parse(r.from).kind;
     if (k === 'item') {
       if (P[0] === 'factors') { var wt = src.factors[P[1]]; delete src.factors[P[1]]; if (newRef) src.factors[nk.id] = wt; }
-      else if (P[0] === 'alts') { if (P[1] === 'pref') src.alts.pref = newRef || null; else arr(src.alts[P[1]], P[2]); }
+      else if (P[0] === 'alts') { if (P[1] === 'pref') src.alts.pref = newRef; else arr(src.alts[P[1]], P[2]); }
       else if (P[0] === 'jreq') { if (!newRef) src.jreq = null; else return setJreq(w, src.id, newRef); }
-      else if (P[0] === 'blueprint') src.blueprint = newRef || null;
-    } else if (k === 'bp') { var n = (src.nodes || []).filter(function (x) { return x.id === P[1]; })[0]; if (!n) return { ok: false, why: 'node gone' }; n.p = n.p || {};
+      else if (P[0] === 'blueprint') src.blueprint = newRef;
+    } else if (k === 'bp') { var n = Array.isArray(src.nodes) ? src.nodes.filter(function (x) { return isObj(x) && x.id === P[1]; })[0] : undefined; if (!n) return { ok: false, why: 'node gone' }; if (!isObj(n.p)) return { ok: false, why: 'node has no p' };
       n.p[P[2]] = newRef ? (P[2] === 'joy' ? nk.id : newRef) : '';
-    } else if (k === 'comp') { if (P[0] === 'view') { if (P[1] === 'group') arr(src.view.group, P[2]); else src.view[P[1]] = newRef || null; } else if (P[0] === 'sub') { if (newRef) src.sub[+P[1]].comp = newRef; else src.sub.splice(+P[1], 1); } else arr(src[P[0]], P[1]); }
+    } else if (k === 'comp') { if (P[0] === 'view') { if (P[1] === 'group') arr(src.view.group, P[2]); else src.view[P[1]] = newRef; } else if (P[0] === 'sub') { if (newRef) src.sub[+P[1]].comp = newRef; else src.sub.splice(+P[1], 1); } else arr(src[P[0]], P[1]); }
     return { ok: true };
   }
   function uniq(w, kind, base) { var m = w[KINDS[kind]], id = base, i = 2; while (m[id]) id = base + '_' + (i++); return id; }
   /** template: one-time deep copy under a new id; no link, no origin recorded */
   function copy(w, ref, newId) { var r = parse(ref), src = get(w, ref); if (!src) return null; var id = uniq(w, r.kind, newId || r.id + '_copy'), c = clone(src); c.id = id; w[KINDS[r.kind]][id] = c; return r.kind + ':' + id; }
   /** jreq chain from an item: list of refs followed (item jreqs, plus items read by conditional blueprints) */
-  function reach(w, ref, seen) {
-    seen = seen || {}; var out = [];
+  function reach(w, ref) {
+    var seen = {}, out = [];
     (function walk(x) { if (!x || seen[x]) return; seen[x] = 1; out.push(x); var o = get(w, x); if (!o) return; var r = parse(x);
       if (r.kind === 'item') walk(o.jreq);
-      else if (r.kind === 'bp') (o.nodes || []).forEach(function (n) { if (n.type === 'item' && n.p && n.p.item && n.p.item !== 'event') walk(n.p.item); }); })(ref);
+      else if (r.kind === 'bp' && Array.isArray(o.nodes)) o.nodes.forEach(function (n) { if (n.type === 'item' && n.p && n.p.item && n.p.item !== 'event') walk(n.p.item); }); })(ref);
     return out;
   }
   function jreqChain(w, itemId) { var it = w.items[itemId]; return it && it.jreq ? reach(w, it.jreq) : []; }
@@ -5545,7 +5549,7 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
     var ch = reach(w, ref); if (ch.indexOf(self) >= 0) return { ok: false, why: 'jreq chain comes back to this item: ' + ch.slice(0, ch.indexOf(self) + 1).join(' → ') };
     return { ok: true };
   }
-  function setJreq(w, itemId, ref) { var c = canSetJreq(w, itemId, ref); if (c.ok) w.items[itemId].jreq = ref || null; return c; }
+  function setJreq(w, itemId, ref) { var c = canSetJreq(w, itemId, ref); if (c.ok) w.items[itemId].jreq = ref; return c; }
   function validate(w) {
     var E = []; if (!w || FORMATS.indexOf(w.format) < 0) E.push('format must be ' + FORMAT + ' (or legacy jeditor-world)'); if (w && w.version !== 5) E.push('version must be 5');
     if (E.length) return E;
@@ -5557,10 +5561,10 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
   }
   /* records */
   function newItem(w, name) { var id = uniq(w, 'item', slug(name)); w.items[id] = { id: id, name: name, values: {}, factors: {}, state: {}, alts: null, jreq: null, blueprint: null }; return 'item:' + id; }
-  function newJoy(w, name, value) { var id = uniq(w, 'joy', slug(name)); w.joys[id] = { id: id, name: name, value: value || 0 }; return 'joy:' + id; }
+  function newJoy(w, name, value) { var id = uniq(w, 'joy', slug(name)); w.joys[id] = { id: id, name: name }; if (typeof value === 'number') w.joys[id].value = value; return 'joy:' + id; }
   function newBlueprint(w, name) { var id = uniq(w, 'bp', slug(name)); w.blueprints[id] = { id: id, name: name, nodes: [], wires: [] }; return 'bp:' + id; }
   function newComponent(w, name) { var id = uniq(w, 'comp', slug(name)); w.components[id] = { id: id, name: name, view: { layout: 'stack', theme: { tokens: { bg: '#121212', fg: '#e8e8e8', accent: '#e0af68' } }, item: { show: [] }, states: {} }, items: [], blueprints: [], state: {}, sub: [] }; return 'comp:' + id; }
-  function slug(s) { var t = String(s || 'x').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30); if (!/^[a-z]/.test(t)) t = 'x' + t; return t; }
+  function slug(s) { if (typeof s !== 'string' || !s) throw new Error('JAtlasModel.slug: name required'); var t = s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30); if (!/^[a-z]/.test(t)) t = 'x' + t; return t; }
   /** built-in starters (copied once, ADR 0083) */
   var STARTERS = {
     item: { id: 'item', name: 'Item', values: { cost: 0 }, factors: {}, state: {}, alts: null, jreq: null, blueprint: null },
@@ -5571,7 +5575,7 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
    *  a Board and a Plan component grouped under it by reference, and three editable blueprints (day workload, dependency
    *  conflicts, drop-onto-day). No link back, no origin, no instances. month: 'YYYY-MM' (default: this month). Returns refs. */
   function calendarTemplate(w, name, month) {
-    name = name || 'Calendar'; var b = slug(name), cal = uniq(w, 'comp', b), brd = uniq(w, 'comp', b + '_board'), pl = uniq(w, 'comp', b + '_plan');
+    var b = slug(name), cal = uniq(w, 'comp', b), brd = uniq(w, 'comp', b + '_board'), pl = uniq(w, 'comp', b + '_plan');
     var bw = uniq(w, 'bp', b + '_workload'), bc = uniq(w, 'bp', b + '_depconflict'), bd = uniq(w, 'bp', b + '_drop');
     if (!month) { var d = new Date(); month = d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1); }
     var T = function (a) { return { tokens: { bg: '#121212', fg: '#e8e8e8', accent: a } }; }, C = function (k) { return 'comp:' + k; };
@@ -5593,9 +5597,12 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
    *  Joys: opening cash, warning (default 1000), margin (default 0.1), as-of. Blueprint <cal>_cash: accumulate (opening) -> per-day
    *  conditions < 0 bad, < warning low, < warning*(1+margin) tight, + day workload busy -> merge -> calendar style; balance -> day labels.
    *  Sections (optional subs of the plan): Critical days, Previously occurred (before as-of). Returns refs. */
-  function moneyPreset(w, calRef, o) { o = o || {}; var cid = (calRef || '').replace(/^comp:/, ''), c = w.components[cid]; if (!c) return null; var C = function (k) { return 'comp:' + k; };
+  /* the preset's own starting values (its documented defaults above); o may set any of them */
+  var MONEY_START = { opening: 0, warning: 1000, margin: 0.1, asof: '' };
+  function moneyPreset(w, calRef, o) { if (typeof calRef !== 'string' || !isObj(o)) return null; var cid = calRef.replace(/^comp:/, ''), c = w.components[cid]; if (!isObj(c) || !isObj(c.view) || !isObj(c.view.states) || !Array.isArray(c.blueprints)) return null; var C = function (k) { return 'comp:' + k; };
     var J = function (k, n, v) { var id = uniq(w, 'joy', cid + '_' + k); w.joys[id] = { id: id, name: n, value: v }; return id; };
-    var jo = J('opening', 'Opening cash', o.opening != null ? +o.opening : 0), jw = J('warning', 'Warning below', o.warning != null ? +o.warning : 1000), jm = J('margin', 'Margin', o.margin != null ? +o.margin : 0.1), ja = J('asof', 'As of', o.asof || '');
+    var S = function (k) { return k in o ? o[k] : MONEY_START[k]; };
+    var jo = J('opening', 'Opening cash', +S('opening')), jw = J('warning', 'Warning below', +S('warning')), jm = J('margin', 'Margin', +S('margin')), ja = J('asof', 'As of', S('asof'));
     Object.assign(c.view.states, { bad: { bg: '#3a1418', border: '#f7768e', sm: 'invalid', anim: 'shake', label: 'below 0' }, low: { bg: '#3a2a10', border: '#ff9e64', sm: 'idle', anim: 'none', label: 'below warning' },
       tight: { bg: '#2e2a14', border: '#e0af68', sm: 'idle', anim: 'none', label: 'within margin' } });
     if (c.view.states.busy) c.view.states.busy.label = '2+ items';
@@ -5610,13 +5617,13 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
       wires: [Wr('jo', 'value', 'acc', 'opening'), Wr('acc', 'values', 'c0', 'a'), Wr('acc', 'values', 'c1', 'a'), Wr('jw', 'value', 'c1', 'b'), Wr('jw', 'value', 'mul', 'a'), Wr('jm', 'value', 'mul', 'b'), Wr('jw', 'value', 'add', 'a'), Wr('mul', 'out', 'add', 'b'),
         Wr('acc', 'values', 'c2', 'a'), Wr('add', 'out', 'c2', 'b'), Wr('dc', 'values', 'c3', 'a'), Wr('c0', 'state', 'mg', 'a'), Wr('c1', 'state', 'mg', 'b'), Wr('c2', 'state', 'mg', 'c'), Wr('c3', 'state', 'mg', 'd'), Wr('mg', 'out', 'v1', 'style'), Wr('acc', 'values', 'v1', 'label')] };
     c.blueprints.push('bp:' + bc);
-    var plan = (c.view.group || []).map(function (g) { return w.components[g.replace(/^comp:/, '')]; }).filter(function (p) { return p && p.view.layout === 'plan'; })[0], secs = [];
+    var plan = Array.isArray(c.view.group) ? c.view.group.map(function (g) { return get(w, g); }).filter(function (p) { return p && isObj(p.view) && p.view.layout === 'plan'; })[0] : undefined, secs = [];
     [['critical', 'Critical days', { rule: 'daystate', states: ['bad', 'low'] }], ['occurred', 'Previously occurred', { rule: 'past' }], ['upcoming', 'Upcoming', { rule: 'future' }]].forEach(function (x) {
       var id = uniq(w, 'comp', cid + '_' + x[0]); w.components[id] = { id: id, name: x[1], view: Object.assign({ layout: 'section', source: C(cid), theme: { tokens: { bg: '#141414', fg: '#e8e8e8', accent: '#7dcfff' } }, item: { show: [] }, states: {} }, x[2]), items: [], blueprints: [], state: {}, sub: [] }; secs.push(C(id)); });
-    if (plan) plan.sub = (plan.sub || []).concat(secs.map(function (r) { return { comp: r, pos: {} }; }));
+    if (plan && Array.isArray(plan.sub)) plan.sub = plan.sub.concat(secs.map(function (r) { return { comp: r, pos: {} }; }));
     return { joys: ['joy:' + jo, 'joy:' + jw, 'joy:' + jm, 'joy:' + ja], blueprint: 'bp:' + bc, sections: secs };
   }
-  function moneyCalendarTemplate(w, name, month) { var T = calendarTemplate(w, name || 'Money', month), P = moneyPreset(w, T.cal, {}); T.money = P; T.blueprints = T.blueprints.filter(function (r) { return w.blueprints[r.slice(3)]; }).concat([P.blueprint]); return T; }
+  function moneyCalendarTemplate(w, name, month) { var T = calendarTemplate(w, name, month), P = moneyPreset(w, T.cal, {}); T.money = P; T.blueprints = T.blueprints.filter(function (r) { return w.blueprints[r.slice(3)]; }).concat([P.blueprint]); return T; }
   var TEMPLATES = { calendar: { name: 'Calendar (Board + Plan)', make: calendarTemplate }, money: { name: 'Money calendar (cash after bills)', make: moneyCalendarTemplate } };
   function fromStarter(w, key, name) { var s = STARTERS[key]; if (!s) return null; var kind = key === 'item' ? 'item' : key === 'joy' ? 'joy' : 'comp', id = uniq(w, kind, slug(name || s.name)), c = clone(s); c.id = id; c.name = name || s.name; w[KINDS[kind]][id] = c; return kind + ':' + id; }
   /** alternative pick (ADR 0079): userPick > pref > highest score among available members. score(ref) supplied by the evaluator */
@@ -5627,12 +5634,14 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
     return Exp7Rank.rank(avail, sc);
   }
   function pickAlt(w, itemId, score) {
-    var it = w.items[itemId]; if (!it || !it.alts) return null; var A = it.alts, un = A.unavail || [];
+    var it = w.items[itemId]; if (!isObj(it) || !isObj(it.alts)) return null; var A = it.alts;
+    var out = function (m) { return Array.isArray(A.unavail) && A.unavail.indexOf(m) >= 0; };
     /* M20d (ADR 0103): values.needs = ['item:x' | 'item:x#KEY'] on the item or a member: met when x currently picks a member (whose key starts with KEY) */
-    var met = function (o) { return ((o && o.values && o.values.needs) || []).every(function (n) { var q = String(n).split('#'), t = get(w, q[0]), pk = t && t.state && (t.state.userPick || t.state.pick), pm = pk && get(w, pk);
-      if (!pm) return false; if (!q[1]) return true; var k = String((pm.values || {}).key || ''); return k === q[1] || k.indexOf(q[1]) === 0; }); };
+    var met = function (o) { if (!isObj(o) || !isObj(o.values) || !Array.isArray(o.values.needs)) return true; return o.values.needs.every(function (n) { var q = String(n).split('#'), t = get(w, q[0]), pk = t && t.state && (t.state.userPick || t.state.pick), pm = pk && get(w, pk);
+      if (!pm) return false; if (!q[1]) return true; var k = isObj(pm.values) ? pm.values.key : undefined; if (typeof k !== 'string') return false; return k === q[1] || k.indexOf(q[1]) === 0; }); };
     if (!met(it)) return null;
-    var avail = (A.members || []).filter(function (m) { return get(w, m) && un.indexOf(m) < 0 && met(get(w, m)); });
+    if (!Array.isArray(A.members)) return null;
+    var avail = A.members.filter(function (m) { return get(w, m) && !out(m) && met(get(w, m)); });
     if (!avail.length) return null;
     var up = it.state && it.state.userPick; if (up && avail.indexOf(up) >= 0) return { pick: up, why: 'user' };
     if (A.pref && avail.indexOf(A.pref) >= 0) return { pick: A.pref, why: 'pref' };
@@ -18921,7 +18930,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.107",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.108",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
