@@ -152,3 +152,12 @@ Exp7Lang.check(src);                     // { decls, invalid }, recording nothin
   still loads; only `Exp7Lang` fails.
 
 The circuit's text goes into WebAssembly with every request, so the host keeps no parsed state between calls.
+
+## Checked
+
+Checked in Chrome 157 on Matthew's Mac (2026-11-21, the lean by its sha at ab65d36, which matches release.json, made-up
+data only): the platform booted with no failure recorded and no page error, and `Exp7Lang` started (version 1, WebGPU
+present). The doc's `paid`, `pick` and `tick` rules did what they say; a bill not in the atlas and an unavailable option
+each failed their rule alone with nothing applied; a declaration that didn't parse and the one calling it were left out and
+the rest of the circuit worked; a rule fired inside a context that then failed applied nothing. A score over a
+20,000-item atlas took 42 ms and a rule on one item 14 ms. The test page's storage was cleared after.
