@@ -812,6 +812,8 @@ Layer 1 now lints the whole of `budget-flows` as it does `budget-rules`. Next is
 
 Tests in exp7-jrender: Layer 1 checks `budget-flows` has no `||` defaults, reads a missing record or list as a frozen nothing, starts each list it collects into explicitly, passes over a missing item or one with no values, and starts a copy's revision count at 1.
 
+Checked in Chrome on Matthew's Mac with made-up data: the lean fetched at this release's commit matched `release.json`, a cash item added from Today at 390 wide (42.50) showed on Cash and owned items and moved the day risk note, and after a reload at 1024 wide it was still there. No errors and no failures were recorded, and the test data was cleared.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
