@@ -854,6 +854,8 @@ Left for later: the shared Calendar, Board and Plan host code in views-host, whi
 
 Tests in exp7-jrender: Layer 1 checks that each of Budget's functions in `views-host` has no `||` default, that the readers give a frozen nothing, `''` and an empty list, that the screen state has no `||` around it, that there is no stand-in for the evaluator, and that `planRisk` reads a Budget's calendar and plan only as meta names them. The day risk test, and every Calendar, Board and Plan view state the views and journal layers lay out, start the screen state as the Budget app does. Layer 3 checks that Dismiss closes Home's open date picker and repaints, and that it does nothing with the picker closed.
 
+Checked in Chrome on Matthew's Mac before the PRs, with made-up data only: the lean at this release's commit, its sha256 the same as release.json, at 390 wide. Budget Home opened with no failure records and no page errors; the date picker opened, and Dismiss closed it; a made-up item added to a day showed on its schedule and in Home's figures. Reloaded at 1024 wide, the item was still there, with no failure records. Storage was cleared afterwards.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
