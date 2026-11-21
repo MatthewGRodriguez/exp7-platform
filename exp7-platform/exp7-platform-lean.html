@@ -12444,9 +12444,9 @@ window.x7 = window.x7 || function (t) {
    * Membership is per board; Cal/Plan see the combined item set via sync + union helpers. */
   var BUDGET_BOARD_TYPES = ['expense', 'income', 'debt', 'asset'];
   function budgetBoardId(type) {
-    var t = String(type || 'expense').toLowerCase();
-    if (BUDGET_BOARD_TYPES.indexOf(t) < 0) t = 'expense';
-    return 'board_' + t;
+    /* 1.8.100: a type that is not one of the four has no board */
+    var t = String(type).toLowerCase();
+    return BUDGET_BOARD_TYPES.indexOf(t) < 0 ? null : 'board_' + t;
   }
   function ensureBudgetBoards(w) {
     if (!w || !w.components) return w;
@@ -12503,8 +12503,9 @@ window.x7 = window.x7 || function (t) {
         var id = String(ref).replace(/^item:/, '');
         var it = w.items[id];
         if (!it) return;
-        var t = ((it.values || {}).type || 'expense');
-        if (BUDGET_BOARD_TYPES.indexOf(t) < 0) t = 'expense';
+        /* 1.8.100: an item whose type is not one of the four goes on no type board */
+        var t = (it.values || {}).type;
+        if (BUDGET_BOARD_TYPES.indexOf(t) < 0) return;
         var dest = w.components[boardIds[t]];
         if (!dest) return;
         dest.items = dest.items || [];
@@ -12778,15 +12779,17 @@ function planRisk(w){
      Plan feeds: dated reqs/calendar steps = fixed events; selected alt cost (Best()/userPick) → outflow;
      jreq slack (dayDiff), broken/conflict/cycle flags, resource stock pressure, what-if alt scores. */
   const w0=w; w=effAtlas(w);
-  const budget=!!(w0&&w0.meta&&w0.meta.budget), ht=budget?budgetRiskHT(w0):RISK_HT, CC=RISK_COL;
-  const cal=(w.components&&(w.components[(w.meta&&w.meta.calId)||'trip_calendar']||w.components.trip_calendar))||{}, req=(w.components&&(w.components[(w.meta&&w.meta.planId)||'reqs']||w.components.reqs))||{};
+  const budget=!!(w0&&w0.meta&&w0.meta.budget), ht=budget?w0.meta.riskHT:RISK_HT, CC=RISK_COL;
+  /* 1.8.100: a Budget reads only the calendar and plan its meta names, and its day risk limits only from meta.riskHT */
+  const cal=budget?((w.meta.calId&&w.components[w.meta.calId])||{}):((w.components&&(w.components[(w.meta&&w.meta.calId)||'trip_calendar']||w.components.trip_calendar))||{}), req=budget?((w.meta.planId&&w.components[w.meta.planId])||{}):((w.components&&(w.components[(w.meta&&w.meta.planId)||'reqs']||w.components.reqs))||{});
   const ids=new Set([...(cal.items||[]),...(req.items||[])].map(r=>String(r).replace(/^item:/,'')));
   const steps=[]; ids.forEach(id=>{ const it=w.items[id]; if(!it) return; const v=it.values||{}, d=v.date;
     const F=(typeof E!=='undefined'&&__jaEval().itemFlags)?__jaEval().itemFlags(w,'item:'+id):{};
     let pick=null, cost=0, hours=0, allBad=false, winBad=false, slack=null;
     if(it.alts&&it.alts.members&&it.alts.members.length){
-      let R=null; try{ R=rank(w,id); }catch(e){}
-      const pk=(it.state&&(it.state.userPick||it.state.pick||it.state.simPick))||(R&&R.pick&&R.pick.pick)||it.alts.members[0];
+      /* 1.8.100: no rank() is defined here, so this has always come back empty; a Budget no longer calls it and picks through selectedRef */
+      let R=null; if(!budget){ try{ R=rank(w,id); }catch(e){} }
+      const pk=budget?selectedRef(w,id):((it.state&&(it.state.userPick||it.state.pick||it.state.simPick))||(R&&R.pick&&R.pick.pick)||it.alts.members[0]);
       pick=pk; const o=w.items[String(pk).replace(/^item:/,'')]; if(o&&o.values){ cost=+o.values.cost||0; hours=+o.values.hours||0; }
       const scores=(R&&R.order)||[]; if(scores.length){ const worst=scores[scores.length-1]; winBad=pk===worst.ref; allBad=scores.every(x=>x.score!=null&&x.score<=0); }
     } else { cost=+(v.cost)||0; hours=+(v.hours)||0; }
@@ -12795,7 +12798,8 @@ function planRisk(w){
     const fixed=!!(d&&/^\d{4}-\d{2}-\d{2}$/.test(d));
     steps.push({id,name:it.name,date:d||null,fixed,impact,cost,hours,pick,slack,broken:!!F.broken,conflict:!!F.conflict,cycle:false,allBad,winBad,jreq:it.jreq||null});
   });
-  const days=budget?budgetDayRisk(w0,ht):legacyDays();
+  /* a Budget without meta.riskHT shows no day risk */
+  const days=budget?(ht?budgetDayRisk(w0,ht):{}):legacyDays();
   function legacyDays(){
   /* resource pressure: low stock raises outflow */
   let resPressure=0; resourcesOf(w).forEach(it=>{ const st=+((it.values||{}).stock); if(st===0) resPressure+=12; else if(st>0&&st<5) resPressure+=6; });
@@ -12826,49 +12830,44 @@ function planRisk(w){
     else if(s.winBad||(s.slack!=null&&s.slack<1)||(s.date&&days[s.date]&&days[s.date].c==='M')){ c='M'; why=s.winBad?'current pick is weakest alt':(s.slack!=null&&s.slack<1?'slack < 1 day to requirement':('on MODERATE day · '+(days[s.date]&&days[s.date].why||''))); }
     else if(s.date&&days[s.date]){ c=days[s.date].c; why=days[s.date].why; }
     stepRisk[s.id]={c,why,date:s.date,slack:s.slack,impact:s.impact,pick:s.pick}; });
-  return {days,steps:stepRisk,list:steps,ht,legend:['C','M','L'].map(k=>({k,color:CC[k][0],bg:CC[k][2],label:CC[k][1]})),rules:[
+  return {days,steps:stepRisk,list:steps,ht,legend:['C','M','L'].map(k=>({k,color:CC[k][0],bg:CC[k][2],label:CC[k][1]})),rules:budget?[]:[
     'CRITICAL: headroom (lowest cushion before next payday) < hc ('+ht.hc+'), or a fixed-date plan step that day',
     'MODERATE: headroom < hm ('+ht.hm+'), or a fixed-date plan step within ±3 days',
     'LOW otherwise',
     'Paydays 1st & 15th; cushion starts at '+ht.base+'; income '+ht.income+'/mo; outflows from Best()/selected alt cost÷10 (or hours)',
     'Step CRITICAL also if broken/conflict jreq or every alt BAD; MODERATE if weakest pick or slack<1 day',
     'Calendar day risk and Plan step risk share this map; both update live on plan/calendar edits']}; }
-/* 1.8.53: Budget day risk = the workbook's cash-criticality calendar (ranking_ui rdCalStrip), from the atlas's own money. */
-function budgetRiskHT(w){ return Object.assign({ hc:500, hm:1500, big:200, delay:3 }, (w&&w.meta&&w.meta.riskHT)||{}); }
-function budgetDayRisk(w,HT){ const E=window.JAtlasEval, ids=(w.meta&&w.meta.boardIds)||{}, out={};
-  const list=t=>{ const c=w.components&&w.components[ids[t]||('board_'+t)]; return (c&&c.items)||[]; }, rec=r=>effItem(w,String(r).replace(/^item:/,''));
+/* 1.8.53: Budget day risk = the workbook's cash-criticality calendar (ranking_ui rdCalStrip), from the atlas's own money.
+   1.8.100: the limits (hc, hm, big, delay) come only from meta.riskHT; planRisk shows no day risk without it. A limit that is
+   missing leaves out what it decides. The boards, plan and calendar are only the ones meta names, and an amount that is not
+   a number moves no money. BudgetFlows.resilience colours each day. */
+function budgetDayRisk(w,HT){ const E=window.JAtlasEval, ids=w.meta.boardIds||{}, num=x=>(x==null||x==='')?NaN:+x;
+  const list=t=>{ const c=ids[t]&&w.components[ids[t]]; return (c&&c.items)||[]; }, rec=r=>effItem(w,String(r).replace(/^item:/,''));
   const onBoard={}; ['expense','income','debt','asset'].forEach(t=>list(t).forEach(r=>{ onBoard[r]=1; }));
   /* a blocked plan step (values.planBlocked: its requirements can never be met) moves no money */
   const blocked=r=>!!(((w.items[String(r).replace(/^item:/,'')]||{}).values||{}).planBlocked);
-  const plan=((w.components[(w.meta&&w.meta.planId)||'reqs']||{}).items||[]).filter(r=>!blocked(r)), planOnly=plan.filter(r=>!onBoard[r]);
+  const pc=w.meta.planId&&w.components[w.meta.planId], plan=((pc&&pc.items)||[]).filter(r=>!blocked(r)), planOnly=plan.filter(r=>!onBoard[r]);
   /* opening cash, as the workbook's Cash-after start: checking minus credit-card balances (paid in full monthly) */
-  let chk=0, card=0; list('asset').forEach(r=>{ const it=rec(r); if(it&&(window.BudgetFlows?window.BudgetFlows.isCashAsset(it):((it.values||{}).assetKind==='cash'))) chk+=+((it.values||{}).amount)||0; });
-  list('debt').forEach(r=>{ const it=rec(r), v=(it&&it.values)||{}; if(/credit card/i.test((it&&it.name||'')+' '+(v.creditor||'')+' '+(v.purpose||''))) card+=+v.amount||0; });
-  const first=budgetTodayKey().slice(0,7), cal=w.components[(w.meta&&w.meta.calId)||'budget']||{}, cm=(cal.view&&cal.view.month)||first;
-  const lastM=budgetShiftMonth(cm>first?cm:first,2), months=[]; for(let m=first;m<=lastM&&months.length<40;m=budgetShiftMonth(m,1)) months.push(m);
+  let chk=0, card=0; list('asset').forEach(r=>{ const it=rec(r); if(!it||!window.BudgetFlows.isCashAsset(it)) return; const a=num((it.values||{}).amount); if(isFinite(a)) chk+=a; });
+  list('debt').forEach(r=>{ const it=rec(r); if(!it) return; const v=it.values||{}, a=num(v.amount); if(isFinite(a)&&/credit card/i.test([it.name,v.creditor,v.purpose].filter(Boolean).join(' '))) card+=a; });
+  const first=budgetTodayKey().slice(0,7), cal=w.meta.calId&&w.components[w.meta.calId], cm=cal&&cal.view&&cal.view.month;
+  const lastM=budgetShiftMonth(cm&&cm>first?cm:first,2), months=[]; for(let m=first;m<=lastM&&months.length<40;m=budgetShiftMonth(m,1)) months.push(m);
   let prev=chk-card; const flat=[];
-  months.forEach(m=>{ const F=budgetFigures(w,m), days=E.monthDays(m), inc={}, fix={}; let fixSum=0, extraIn=0, extraOut=0;
-    const put=(d,q)=>{ (fix[d]=fix[d]||[]).push(q); fixSum+=q.amt; };
-    list('income').forEach(r=>{ const ch=E.charges(rec(r)||{},m); Object.keys(ch).forEach(d=>{ inc[d]=(inc[d]||0)+(+ch[d]||0); }); });
-    /* fixed on its day: a one-off of $200+ or the rent; other recurring bills are spread like the workbook does */
-    const pinned=it=>{ const v=(it&&it.values)||{}, rp=String(v.repeat||'once'); return rp==='once'||rp==='dates'||/housing|rent/i.test(String(v.category||'')+' '+String(it&&it.name||'')); };
-    list('expense').forEach(r=>{ const it=rec(r), ch=E.charges(it||{},m); Object.keys(ch).forEach(d=>{ const a=+ch[d]||0; if(a&&((Math.abs(a)>=HT.big&&pinned(it))||((it.values||{}).charge==='per'))) put(d,{amt:a,lab:(it.name||r)+' '+budgetMoney(a),fixed:true}); }); });
+  months.forEach(m=>{ const F=budgetFigures(w,m), days=E.monthDays(m), inc={}, fix={}; let fixSum=0, extraOut=0;
+    const put=(d,a)=>{ (fix[d]=fix[d]||[]).push(a); fixSum+=a; };
+    list('income').forEach(r=>{ const it=rec(r); if(!it) return; const ch=E.charges(it,m); Object.keys(ch).forEach(d=>{ const a=+ch[d]; if(isFinite(a)) inc[d]=(inc[d]||0)+a; }); });
+    /* fixed on its day: a one-off of HT.big or more (no repeat is a one-off, as the evaluator reads it) or the rent; other recurring bills are spread like the workbook does */
+    const pinned=it=>{ const v=it.values||{}, rp=v.repeat; return !rp||rp==='once'||rp==='dates'||/housing|rent/i.test([v.category,it.name].filter(Boolean).join(' ')); };
+    list('expense').forEach(r=>{ const it=rec(r); if(!it) return; const ch=E.charges(it,m); Object.keys(ch).forEach(d=>{ const a=+ch[d]; if(isFinite(a)&&a&&((Math.abs(a)>=HT.big&&pinned(it))||((it.values||{}).charge==='per'))) put(d,a); }); });
     planOnly.forEach(r=>{ const it=rec(r); if(!it) return; const v=it.values||{}, ch=E.charges(it,m), sg=(v.flow==='in'||v.type==='income')?1:-1;
-      Object.keys(ch).forEach(d=>{ const a=sg*Math.abs(+ch[d]||0); if(!a) return; if(a>0){ inc[d]=(inc[d]||0)+a; extraIn+=a; } else if(-a>=HT.big&&pinned(it)){ put(d,{amt:a,lab:(it.name||r)+' '+budgetMoney(a),fixed:true}); extraOut-=a; } else extraOut-=a; }); });
-    /* a plan step that starts this month: the category hands off to its selected item on that day */
-    plan.forEach(r=>{ const it=rec(r), v=(it&&it.values)||{}, d=v.then&&!v.then.delta&&v.then.date; if(d&&String(d).slice(0,7)===m) put(String(d).slice(0,10),{amt:0,lab:(it.name||r)+' → '+(v.thenName||'plan')+' starts',fixed:true}); });
+      Object.keys(ch).forEach(d=>{ const a=sg*Math.abs(+ch[d]); if(!isFinite(a)||!a) return; if(a>0) inc[d]=(inc[d]||0)+a; else if(-a>=HT.big&&pinned(it)){ put(d,a); extraOut-=a; } else extraOut-=a; }); });
     /* everything else spread evenly: board spending (living + debt payments) and small plan-only spending, less the fixed events */
     const daily=(F.living+F.debtPay+extraOut+fixSum)/days.length; let b=prev;
-    days.forEach(d=>{ const pi=inc[d]||0; b+=pi-daily; (fix[d]||[]).forEach(q=>{ b+=q.amt; }); flat.push({k:d,b,evs:fix[d]||[],pay:pi>0,inc:pi}); });
+    days.forEach(d=>{ const pi=inc[d]||0; b+=pi-daily; (fix[d]||[]).forEach(a=>{ b+=a; }); flat.push({k:d,b,pay:pi>0,inc:pi}); });
     prev=b; });
-  for(let i=flat.length-1, run=Infinity; i>=0; i--){ const D=flat[i], nx=flat[i+1]; if(!nx||nx.pay) run=Infinity; run=Math.min(run,D.b); D.hr=run;
-    let j=i+1; while(flat[j]&&!flat[j].pay) j++; D.nextPay=flat[j]?flat[j].k:'—'; }
-  if(window.BudgetFlows&&window.BudgetFlows.resilience) return window.BudgetFlows.resilience(w,HT,flat);
-  flat.forEach((D,i)=>{ const near=[]; for(let t=Math.max(0,i-3); t<=Math.min(flat.length-1,i+3); t++) flat[t].evs.forEach(q=>{ near.push(q.lab+' '+flat[t].k.slice(5)); });
-    const today=D.evs.filter(q=>Math.abs(q.amt)>=HT.big||q.amt===0).length;
-    const c=(D.hr<HT.hc||today)?'C':(D.hr<HT.hm||near.length)?'M':'L';
-    out[D.k]={c,hr:D.hr,b:D.b,why:'headroom '+budgetMoney(D.hr)+' until '+D.nextPay+' pay · est. balance '+budgetMoney(D.b)+(near.length?' · '+near.join('; '):'')+(D.pay?' · payday':'')}; });
-  return out; }
+  /* headroom: the lowest balance from this day until the next pay */
+  for(let i=flat.length-1, run=Infinity; i>=0; i--){ const D=flat[i], nx=flat[i+1]; if(!nx||nx.pay) run=Infinity; run=Math.min(run,D.b); D.hr=run; }
+  return window.BudgetFlows.resilience(w,HT,flat); }
 function riskOf(w){ return planRisk(w||W); }
 
 function clearFormFields(V){ if(V&&V._tfOff){ try{ V._tfOff(); }catch(e){} V._tfOff=null; } if(V) V._tfLazy=null; if(V&&V.view){ V._tfTear=1; try{ V.view.clearFields(); } finally{ V._tfTear=0; } } V.tf={}; }
@@ -12950,6 +12949,10 @@ function boardIdForRef(AW,ref,fallbackBid,typeHint){
   if(!t&&window.Exp7Views&&typeof window.Exp7Views.budgetBoardId==='function'&&fallbackBid){
     const m=/^board_(expense|income|debt|asset)$/.exec(fallbackBid); if(m) t=m[1];
   }
+  /* 1.8.100: a Budget uses the board its meta names for the type; with no type, the board the item came from when it is one of them, else none */
+  if(AW.meta&&AW.meta.budget){ const ids=AW.meta.boardIds||{}, own=Object.keys(ids).map(k=>ids[k]);
+    if(typeof typeHint==='string'||(it&&it.values&&it.values.type)) return typeof ids[t]==='string'&&ids[t]?ids[t]:null;
+    return fallbackBid&&own.indexOf(fallbackBid)>=0?fallbackBid:null; }
   /* Type boards belong to Budget atlases; any other atlas keeps its own board. */
   if(window.Exp7Views&&typeof window.Exp7Views.budgetBoardId==='function'){
     const b=window.Exp7Views.budgetBoardId(t||'expense');
@@ -12958,17 +12961,20 @@ function boardIdForRef(AW,ref,fallbackBid,typeHint){
   return fallbackBid||((AW.meta&&AW.meta.boardId)||null);
 }
 function ensureMemOp(ops,path,op,value){
+  if(!path) return;
   if(!ops.some(o=>o.path===path&&o.op===op&&o.value===value)) ops.push({path,op,value});
 }
 /* Keep calendar / type-board / plan membership coherent (demo + Budget).
  * Multi-board: never fan an item onto sibling type boards — only its own type board + cal (if dated) + plan. */
 function syncCalPlanOps(ops,V){
   const AW=activeAtlas(V)||(typeof W!=='undefined'?W:null)||{};
-  const cid=(AW.meta&&AW.meta.calId)||calCompId(V)||'trip_calendar';
-  const pid=(AW.meta&&AW.meta.planId)||planCompId(V)||'reqs';
+  const budget=!!(AW.meta&&AW.meta.budget), bids=budget?(AW.meta.boardIds||{}):null;
+  /* 1.8.100: a Budget keeps only the calendar and plan its meta names; with none, no membership op for it */
+  const cid=budget?AW.meta.calId:((AW.meta&&AW.meta.calId)||calCompId(V)||'trip_calendar');
+  const pid=budget?AW.meta.planId:((AW.meta&&AW.meta.planId)||planCompId(V)||'reqs');
   const boards=typeBoardIdsOf(AW);
   const originBid=boardCompId(V);
-  const calP='components/'+cid+'/items', planP='components/'+pid+'/items';
+  const calP=cid?'components/'+cid+'/items':null, planP=pid?'components/'+pid+'/items':null;
   const boardPaths=boards.map(b=>'components/'+b+'/items');
   if(originBid&&boardPaths.indexOf('components/'+originBid+'/items')<0) boardPaths.push('components/'+originBid+'/items');
   const legacy=['components/trip_calendar/items','components/trip_calendar_board/items','components/reqs/items'];
@@ -12982,7 +12988,7 @@ function syncCalPlanOps(ops,V){
     const _rec=ops.find(o=>o.path==='items/'+r.slice(5)&&(o.op==='add'||o.op==='set')), _t=_rec&&_rec.value&&_rec.value.values&&_rec.value.values.type;
     const typeBid=fromBoard?(String(add[r]).replace(/^components\/|\/items$/g,'')) : boardIdForRef(AW,r,originBid||(AW.meta&&AW.meta.boardId),_t);
     /* On Plan, unless the atlas keeps its own Plan (meta.planOwn, 1.8.51). */
-    if(!(AW.meta&&AW.meta.planOwn)&&!/^board_(asset|debt)$/.test(String(typeBid||''))) ensureMemOp(ops,planP,'add',r);
+    if(!(AW.meta&&AW.meta.planOwn)&&!(budget?(typeBid&&(typeBid===bids.asset||typeBid===bids.debt)):/^board_(asset|debt)$/.test(String(typeBid||'')))) ensureMemOp(ops,planP,'add',r);
     /* Own type board only. */
     if(typeBid) ensureMemOp(ops,'components/'+typeBid+'/items','add',r);
     /* Calendar when dated or when the add originated on Cal. */
@@ -13083,7 +13089,7 @@ function budgetMoney(n){ if(n==null||!isFinite(+n)) return '—'; const sign=+n<
    DDI is this month's debt payments divided by net income. Net worth is assets minus debts across every month. */
 function budgetFigures(w, month){
   const E=window.JAtlasEval; const ids=(w&&w.meta&&w.meta.boardIds)||{};
-  function list(type){ const c=w&&w.components&&w.components[ids[type]||('board_'+type)]; return (c&&c.items)||[]; }
+  function list(type){ const c=ids[type]&&w.components[ids[type]]; return (c&&c.items)||[]; }
   /* A category counts through its selected item. */
   function rec(ref){ return effItem(w,String(ref).replace(/^item:/,''))||null; }
   function monthAmt(it){
@@ -13092,7 +13098,7 @@ function budgetFigures(w, month){
     /* A dated item counts only on the days it occurs. Another month, or no date, is not this month's flow. */
     if(!v.date) return 0;
     if(E&&typeof E.charges==='function'){ const ch=E.charges(it, month)||{}; let s=0; Object.keys(ch).forEach(function(d){ s+=+ch[d]||0; }); return s; }
-    return v.amount==null||v.amount===''?0:+v.amount;
+    return v.amount==null||v.amount===''?NaN:+v.amount;
   }
   let income=0, living=0, debtPay=0, assets=0, debts=0, assetN=0, debtN=0;
   list('income').forEach(function(r){ const a=monthAmt(rec(r)); if(isFinite(a)) income+=a; });
@@ -13134,8 +13140,11 @@ function selectedRef(w,id){
   let ref=null;
   if(avail.length){
     ref=has(st.userPick);
-    if(!ref){ try{ const B=bestRank(w,id); ref=has(B&&B.pick&&B.pick.pick); }catch(e){} }
-    if(!ref) ref=((w.meta&&w.meta.budget)?null:has(A.pref)||has(st.pick)||has(st.simPick))||avail[0]; /* 1.8.94: in Budget neither a preferred item nor a pick saved before 1.8.57 (state.pick, simPick) selects itself */
+    const budget=!!(w.meta&&w.meta.budget);
+    if(!ref){ if(budget){ const B=bestRank(w,id); ref=has(B&&B.pick&&B.pick.pick); } else { try{ const B=bestRank(w,id); ref=has(B&&B.pick&&B.pick.pick); }catch(e){} } }
+    /* 1.8.94: in Budget neither a preferred item nor a pick saved before 1.8.57 (state.pick, simPick) selects itself.
+       1.8.100: nor does the first available item; with no pick and no Best the category has no selected item. */
+    if(!ref&&!budget) ref=has(A.pref)||has(st.pick)||has(st.simPick)||avail[0];
   }
   CAT_SEL.set(it,{sig:sig,ref:ref}); return ref;
 }
@@ -13226,10 +13235,11 @@ function negateAmount(raw){
   if(!isFinite(n)) return s.charAt(0)==='-'?s.slice(1):('-'+s);
   return String(Object.is(n,-0)?0:-n);
 }
+/* 1.8.100: an item with no amount and no cost has no amount (NaN); the caller leaves it out */
 function budgetAmount(it){
-  const v=(it&&it.values)||{};
-  const raw=v.amount!=null&&v.amount!==''?v.amount:(v.cost!=null&&v.cost!==''?v.cost:0);
-  const n=Number(raw); return isFinite(n)?n:0;
+  const v=it.values||{};
+  const raw=v.amount!=null&&v.amount!==''?v.amount:v.cost;
+  return raw==null||raw===''?NaN:Number(raw);
 }
 /* A value is shown with its unit, not its name. Common units have their own form: usd reads $12.50, percent reads 12%, hours read 4 h. Any other unit follows the number. */
 const UNIT_PREFIX={usd:'$','$':'$','us$':'$',dollar:'$',dollars:'$',eur:'\u20ac','\u20ac':'\u20ac',euro:'\u20ac',euros:'\u20ac',gbp:'\u00a3','\u00a3':'\u00a3',pound:'\u00a3',pounds:'\u00a3',jpy:'\u00a5','\u00a5':'\u00a5',yen:'\u00a5',cad:'CA$',aud:'A$',mxn:'MX$'};
@@ -13352,7 +13362,7 @@ function hostFormAct(V,a){ const W=activeAtlas(V)||{items:{},components:{}};
         ops.push({path:'items/'+id,op:'add',value:mkItemRecord(id,name,{values:vals})});
         if(t==='routine'){ if(!W.components.routines) ops.push({path:'components/routines',op:'add',value:{id:'routines',name:'Routine',view:{layout:'board',title:'Routine',item:{show:['date','repeat']},states:{}},items:['item:'+id],blueprints:[],state:{},sub:[]}});
           else ops.push({path:'components/routines/items',op:'add',value:'item:'+id}); }
-        else { const bid=(window.Exp7Views&&window.Exp7Views.budgetBoardId)?window.Exp7Views.budgetBoardId(t):('board_'+t); if(W.components[bid]) ops.push({path:'components/'+bid+'/items',op:'add',value:'item:'+id}); } }
+        else { const bid=W.meta&&W.meta.boardIds&&W.meta.boardIds[t]; if(bid&&W.components[bid]) ops.push({path:'components/'+bid+'/items',op:'add',value:'item:'+id}); } }
       else { id=F.itemId; const it=id&&W.items[id]; if(!it){ V.note='choose a step or an item first'; return V.sess&&V.queue(V.sess,'form'); } name=it.name||id;
         const tid=dateTargetId(W,id), tv=(W.items[tid]||it).values||{};
         const setv=(k,val)=>ops.push({path:'items/'+tid+'/values/'+k,op:tv[k]!=null?'set':'add',value:val});
@@ -13701,7 +13711,7 @@ function boardRows(A,c){ const M=window.JAtlasModel, st=c.state||{}, cv=c.view||
   return {L,sort,fil}; }
 function valueText(w,it,owner){ const parts=budgetValueParts(w,it,owner), neg=valueConsuming(it); return {text:parts.length?parts.join(' · '):'no values',color:parts.length?(neg?VALUE_INK.consuming:VALUE_INK.kept):null,consuming:neg,empty:!parts.length}; }
 function boardVM(V,A,c,O){ const X=VMx(), M=window.JAtlasModel, o=O.board, AW=activeAtlas(V)||A, cid=c.id, Q=boardRows(A,c), bid=boardCompId(V);
-  if(window.Exp7Journal&&AW&&AW.meta&&AW.meta.budget){ const ids=(AW.meta.boardIds)||{}; if(c.id===(ids.asset||'board_asset')&&window.Exp7Journal.cashModel) return window.Exp7Journal.cashModel(V,A,c); }
+  if(window.Exp7Journal&&AW&&AW.meta&&AW.meta.budget){ const ids=(AW.meta.boardIds)||{}; if(ids.asset&&c.id===ids.asset&&window.Exp7Journal.cashModel) return window.Exp7Journal.cashModel(V,A,c); }
   if(window.Exp7Journal&&(o.presentation==='ledger')) return window.Exp7Journal.ledgerModel(V,A,c,O);
   const titles={board_expense:'Expense',board_income:'Income',board_debt:'Debt',board_asset:'Asset'};
   const title=AW&&AW.meta&&AW.meta.budgetBoards?((titles[bid]||((AW.components[bid]||{}).view||{}).title||bid)+' · Board'):x7(c.name||cid);
@@ -13765,7 +13775,7 @@ function boardFormVM(V,AW,F){ const X=VMx(), subj=F.kind==='alt'?AW.items[F.pare
     kids.push(X.row('uses',us)); }
   kids.push(X.row('acts',[X.btn('ok',F.kind==='values'?'Save':'Create','form:ok',{kind:'primary'}),X.btn('cancel','Cancel','form:cancel')]));
   return X.col('form',kids,{role:'detail',slab:'inner',enter:true}); }
-function paytoFormVM(V,AW,F){ const X=VMx(), ids=(AW.meta&&AW.meta.boardIds)||{}, debts=((AW.components[ids.debt||'board_debt']||{}).items)||[];
+function paytoFormVM(V,AW,F){ const X=VMx(), ids=(AW.meta&&AW.meta.boardIds)||{}, debts=((ids.debt&&AW.components[ids.debt])||{}).items||[];
   const kids=[X.text('title','Pays which debt','h')]; if(!debts.length) kids.push(X.text('none','No debt items yet.','muted'));
   kids.push(X.row('debts',debts.map(ref=>{ const did=String(ref).replace(/^item:/,''), d=AW.items[did]||{}; return X.btn('d:'+did,d.name||did,'brd:payto:'+F.item+'/'+did); }).concat([X.btn('clear','Not a debt payment','brd:payclear:'+F.item),X.btn('cancel','Cancel','form:cancel')])));
   return X.col('form',kids,{role:'detail',slab:'inner',enter:true}); }
@@ -13885,8 +13895,9 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
 
 /* ---- A. Starting finances: assets (cash or owned), debts with calculated payments, pay with deductions ---- */
   var FIN_TYPES = { asset: 'Asset', debt: 'Debt', income: 'Pay' };
-  function finBoard(type) { return (root.Exp7Views && root.Exp7Views.budgetBoardId) ? root.Exp7Views.budgetBoardId(type) : 'board_' + type; }
-  function isCashAsset(it) { return (typeof BR !== 'undefined' && BR.isCashAsset) ? BR.isCashAsset(it) : (rd(it && it.values).assetKind === 'cash'); }
+  /* 1.8.100: the board the atlas names for the type (meta.boardIds); with none, the item is not put on a board */
+  function finBoard(w, type) { var id = rd(rd(w.meta).boardIds)[type]; return typeof id === 'string' && id ? id : null; }
+  function isCashAsset(it) { return BR.isCashAsset(it); }
   function manualPayers(w, debtId) { var ref = 'item:' + debtId, out = []; Object.keys(rd(w.items)).forEach(function (k) { var v = rd(rd(w.items[k]).values); if (v.payTo === ref && v.autoFor !== ref) out.push(w.items[k]); }); return out; }
   function autoPayer(w, debtId) { var ref = 'item:' + debtId, hit = null; Object.keys(rd(w.items)).forEach(function (k) { var v = rd(rd(w.items[k]).values); if (v.autoFor === ref) hit = w.items[k]; }); return hit; }
   function debtInput(F) { return { balance: F.balance, asOf: F.asOf, apr: F.apr, terms: F.terms, every: F.every }; }
@@ -13896,13 +13907,14 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     for (var k = 0; k < 62; k++) { var x = new Date(d.getFullYear(), d.getMonth(), d.getDate() + k), dim = new Date(x.getFullYear(), x.getMonth() + 1, 0).getDate(); if (list.some(function (n) { return x.getDate() === Math.min(n, dim); })) return BR.ymd(x); } return null; }
 
   function finOpen(V, type, id, day) { var w = AW(V), it = id ? w.items[id] : null, v = rd(it && it.values), fromDay = opt(day || (V && V.addDay)), F = { kind: 'fin', type: type, item: opt(id), errors: [], fromDay: fromDay, asOfLocked: !!fromDay };
-    if (type === 'asset') Object.assign(F, { name: it ? it.name : '', assetKind: it ? (isCashAsset(it) ? 'cash' : (it.values && it.values.assetKind === 'owned' ? 'owned' : 'cash')) : 'cash', amount: v.amount == null ? '' : String(v.amount), asOf: fromDay || v.asOf || budgetTodayKey() });
+    /* 1.8.100: an existing item shows its own kind, as-of date and purpose, or none; a new one starts as cash, as of today, shown in the form */
+    if (type === 'asset') Object.assign(F, { name: it ? it.name : '', assetKind: it ? (v.assetKind === 'cash' || v.assetKind === 'owned' ? v.assetKind : '') : 'cash', amount: v.amount == null ? '' : String(v.amount), asOf: fromDay || (it ? str(v.asOf) : budgetTodayKey()) });
     if (type === 'debt') { var man = id ? manualPayers(w, id) : [], auto = id ? autoPayer(w, id) : null;
-      Object.assign(F, { creditor: str(v.creditor), purpose: str(v.purpose || (it && !v.creditor ? it.name : '')), balance: v.amount == null ? '' : String(v.amount), asOf: fromDay || v.asOf || budgetTodayKey(), apr: v.apr == null ? '' : String(v.apr),
+      Object.assign(F, { creditor: str(v.creditor), purpose: str(v.purpose), balance: v.amount == null ? '' : String(v.amount), asOf: fromDay || (it ? str(v.asOf) : budgetTodayKey()), apr: v.apr == null ? '' : String(v.apr),
         terms: v.terms == null ? '' : String(v.terms), every: v.every == null ? '' : String(v.every), schedule: auto ? true : !man.length, calc: !!(id && v.every) }); }
     if (type === 'income') { var D = Array.isArray(v.deductions) ? v.deductions : [], rep = v.repeat === 'every' ? 'every' : 'monthdays';
       Object.assign(F, { name: it ? it.name : '', gross: v.gross == null ? (v.amount != null && !D.length ? String(v.amount) : '') : String(v.gross), dedN: D.length, sched: rep, days: v.repeat === 'monthdays' ? BR.monthDayList(v.on).join(', ') : (v.pay ? BR.monthDayList(v.pay).join(', ') : ''),
-        every: v.every == null ? '' : String(v.every), start: fromDay || v.date || budgetTodayKey(), calc: !!id });
+        every: v.every == null ? '' : String(v.every), start: fromDay || (it ? str(v.date) : budgetTodayKey()), calc: !!id });
       /* opened from the Calendar with days selected: those days of the month, starting at the first of them */
       if (!id && typeof isCalRoot === 'function' && isCalRoot(V)) { var sd = sortedDays(rd(calSelOf(V).selected)); if (sd.length) { var dn = []; sd.forEach(function (d) { var n = +String(d).slice(8); if (dn.indexOf(n) < 0) dn.push(n); }); F.days = dn.sort(function (x, y) { return x - y; }).join(', '); F.start = sd[0]; } }
       D.forEach(function (d, i) { F['ded' + i + 'name'] = str(d.name); F['ded' + i + 'kind'] = d.kind === 'percent' ? 'percent' : 'fixed'; F['ded' + i + 'value'] = d.value == null ? '' : String(d.value); }); }
@@ -13913,7 +13925,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if (F.type === 'asset') {
       kids.push(f('name', 'Name', 'Checking account', 240));
       kids.push(X.row('kind', [X.text('l', 'Kind:', 'body', { bold: true }), X.btn('cash', 'Cash balance', 'fin:kind:cash', { on: F.assetKind === 'cash' }), X.btn('owned', 'Owned item', 'fin:kind:owned', { on: F.assetKind === 'owned' })]));
-      kids.push(X.text('kindhint', F.assetKind === 'cash' ? 'Money you can spend. It counts as cash available.' : 'Something you own, such as a car. Its value counts toward net worth, not toward cash available.', 'muted'));
+      kids.push(X.text('kindhint', F.assetKind === 'cash' ? 'Money you can spend. It counts as cash available.' : F.assetKind === 'owned' ? 'Something you own, such as a car. Its value counts toward net worth, not toward cash available.' : 'Choose cash balance or owned item.', 'muted'));
       kids.push(f('amount', F.assetKind === 'cash' ? 'Balance' : 'Value', '0.00', 140)); if (F.asOfLocked) kids.push(X.row('f:asOf', [X.text('l', 'As of:', 'body', { bold: true }), X.text('v', F.asOf, 'body')])); else kids.push(f('asOf', 'As of', 'YYYY-MM-DD', 140)); }
     if (F.type === 'debt') {
       kids.push(f('creditor', 'Creditor', 'Who is owed', 240)); kids.push(f('purpose', 'Purpose', 'What it paid for', 240));
@@ -13951,11 +13963,11 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       if (JSON.stringify(v[k]) !== JSON.stringify(val)) ops.push({ path: 'items/' + id + '/values/' + k, op: v[k] === undefined ? 'add' : 'set', value: val }); }); return ops; }
   function nameOp(id, it, name) { return it && it.name !== name ? [{ path: 'items/' + id + '/name', op: 'set', value: name }] : []; }
 
-  function finSave(V) { var F = V.form, w = AW(V); if (!F || F.kind !== 'fin') return; var E = [], ops = [], id = F.item, it = id ? w.items[id] : null, bid = finBoard(F.type), calId = calIdOf(w);
-    function fresh(name, values) { id = uniqItemId(name, V); ops.push({ path: 'items/' + id, op: 'add', value: mkItemRecord(id, name, { values: values }) }, { path: 'components/' + bid + '/items', op: 'add', value: 'item:' + id }); }
+  function finSave(V) { var F = V.form, w = AW(V); if (!F || F.kind !== 'fin') return; var E = [], ops = [], id = F.item, it = id ? w.items[id] : null, bid = finBoard(w, F.type), calId = calIdOf(w);
+    function fresh(name, values) { id = uniqItemId(name, V); ops.push({ path: 'items/' + id, op: 'add', value: mkItemRecord(id, name, { values: values }) }); if (bid) ops.push({ path: 'components/' + bid + '/items', op: 'add', value: 'item:' + id }); }
     if (F.type === 'asset') { var name = str(F.name).trim(), amt = BR.num(F.amount);
-      if (!name) E.push('Give the asset a name.'); if (!(amt >= 0)) E.push('Enter a balance or value of 0 or more.'); if (F.asOf && !BR.pdate(F.asOf)) E.push('As-of date must be a real date, YYYY-MM-DD.');
-      if (!E.length) { var av = { type: 'asset', assetKind: F.assetKind === 'owned' ? 'owned' : 'cash', amount: BR.r2(amt), asOf: F.asOf || budgetTodayKey() };
+      if (!name) E.push('Give the asset a name.'); if (F.assetKind !== 'cash' && F.assetKind !== 'owned') E.push('Choose cash balance or owned item.'); if (!(amt >= 0)) E.push('Enter a balance or value of 0 or more.'); if (F.asOf && !BR.pdate(F.asOf)) E.push('As-of date must be a real date, YYYY-MM-DD.');
+      if (!E.length) { var av = { type: 'asset', assetKind: F.assetKind, amount: BR.r2(amt) }; if (F.asOf) av.asOf = F.asOf;
         if (it) ops = nameOp(id, it, name).concat(setOps(id, it, av)); else fresh(name, av); } }
     if (F.type === 'debt') { var cred = str(F.creditor).trim(), purp = str(F.purpose).trim(), S = BR.debtSchedule(debtInput(F));
       if (!cred) E.push('Enter the creditor.'); if (!purp) E.push('Enter what the debt was for.'); if (!S.ok) E = E.concat(S.errors);
@@ -13965,8 +13977,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
         if (F.schedule) { var pname = purp + ' payment';
           if (auto) ops = ops.concat(nameOp(auto.id, auto, pname), setOps(auto.id, auto, pv));
           else { var pid = uniqItemId(pname, V); if (pid === id) pid = pid + '_pay';
-            ops.push({ path: 'items/' + pid, op: 'add', value: mkItemRecord(pid, pname, { values: pv }) }, { path: 'components/' + finBoard('expense') + '/items', op: 'add', value: 'item:' + pid }); if (calId) ops.push({ path: 'components/' + calId + '/items', op: 'add', value: 'item:' + pid }); } }
-        else if (auto) { ['expense'].forEach(function (t) { ops.push({ path: 'components/' + finBoard(t) + '/items', op: 'remove', value: 'item:' + auto.id }); }); if (calId) ops.push({ path: 'components/' + calId + '/items', op: 'remove', value: 'item:' + auto.id }); ops.push({ path: 'items/' + auto.id, op: 'drop' }); } } }
+            ops.push({ path: 'items/' + pid, op: 'add', value: mkItemRecord(pid, pname, { values: pv }) }); if (finBoard(w, 'expense')) ops.push({ path: 'components/' + finBoard(w, 'expense') + '/items', op: 'add', value: 'item:' + pid }); if (calId) ops.push({ path: 'components/' + calId + '/items', op: 'add', value: 'item:' + pid }); } }
+        else if (auto) { ['expense'].forEach(function (t) { if (finBoard(w, t)) ops.push({ path: 'components/' + finBoard(w, t) + '/items', op: 'remove', value: 'item:' + auto.id }); }); if (calId) ops.push({ path: 'components/' + calId + '/items', op: 'remove', value: 'item:' + auto.id }); ops.push({ path: 'items/' + auto.id, op: 'drop' }); } } }
     if (F.type === 'income') { var iname = str(F.name).trim(), T = BR.takeHome(incomeInput(F)), list = BR.monthDayList(F.days), ev = Math.floor(BR.num(F.every)), start = F.start, first = null;
       if (!iname) E.push('Give this pay a name.'); if (!T.ok) E = E.concat(T.errors);
       if (!BR.pdate(start)) E.push('Start date must be a real date, YYYY-MM-DD.');
@@ -14459,8 +14471,10 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
 
 /* ---- D. Day resilience: colours worked out from the plan, with the reason ----
    Three set disruptions are tried on every day, automatically (there is nothing to configure or run):
-     1. an unexpected cost on that day (meta.riskHT.hc, default $500; a larger one, hm, default $1,500, tells green from yellow);
-     2. the next pay arriving late (meta.riskHT.delay days, default 3);
+     1. an unexpected cost on that day (meta.riskHT.hc; a larger one, hm, tells green from yellow);
+     2. the next pay arriving late (meta.riskHT.delay days);
+   1.8.100: the limits are only what meta.riskHT holds (a new Budget starts with hc $500, hm $1,500, big $200, delay 3).
+   A Budget without them shows no day risk.
      3. an item in use that day being unavailable, when something depends on it (another step requires it, or it is a requirement of the choice in use).
    Room to recover is only what the plan already holds: cash before the next pay, and alternatives that are viable that day
    (available, not blocked, already started, and affordable from that cash). An alternative that fails any of these is not counted.
@@ -16579,15 +16593,15 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     var owners=catOwners(A), seen={};m.month=month;m.rows=[];
     var sources=[{component:c,role:'expense'}].concat(((O.board||{}).ledgerSources||[]).map(function(q){return {component:A.components[String(q.root).replace(/^comp:/,'')],role:q.role};}));
     sources.forEach(function(src){if(!src.component)return;boardRows(A,src.component).L.forEach(function(r){var id=r.replace(/^item:/,''),it=effItem(A,id);if(!it||(owners[r]&&owners[r]!==id)||seen[id]||(it.values||{}).kind==='resource'||(it.values||{}).type==='asset'||(it.values||{}).assetKind)return;seen[id]=1;
-      var v=it.values||{}; if(!v.date){ /* not a calendar charge: show only so the user can give it a date */ m.rows.push({id:id,date:'',name:it.name,category:v.category||'',type:src.role,amount:Math.abs(budgetAmount(it)||0),scheduled:false,undated:true,paid:false}); return; }
+      var v=it.values||{}; if(!v.date){ /* not a calendar charge: show only so the user can give it a date. 1.8.100: one with no amount is left out */ var ua=budgetAmount(it); if(!isFinite(ua))return; m.rows.push({id:id,date:'',name:it.name,category:v.category||'',type:src.role,amount:Math.abs(ua),scheduled:false,undated:true,paid:false}); return; }
       var charges=E.charges(it,month);
-      Object.keys(charges).forEach(function(d){m.rows.push({id:id,date:d,name:it.name,category:v.category||'',type:src.role,amount:src.role==='income'?charges[d]:Math.abs(charges[d]),scheduled:!!d&&d>m.day,undated:!d,paid:v.paid===true||v.status==='paid'});});
+      Object.keys(charges).forEach(function(d){if(!isFinite(charges[d]))return;m.rows.push({id:id,date:d,name:it.name,category:v.category||'',type:src.role,amount:src.role==='income'?charges[d]:Math.abs(charges[d]),scheduled:!!d&&d>m.day,undated:!d,paid:v.paid===true||v.status==='paid'});});
     });});
     m.rows.sort(function(a,b){return (a.date||'9999').localeCompare(b.date||'9999')||a.name.localeCompare(b.name);});return m;
   }
   function cashModel(V,A,c){
     var m=base(V,A,c,'cash'); m.rows={cash:[],owned:[],unmarked:[]};
-    (c.items||[]).forEach(function(r){var id=String(r).replace(/^item:/,''),it=A.items[id]; if(!it)return; var v=it.values||{}, amt=v.amount!=null?+v.amount:budgetAmount(it), row={id:id,name:it.name,amount:amt,asOf:v.asOf||''};
+    (c.items||[]).forEach(function(r){var id=String(r).replace(/^item:/,''),it=A.items[id]; if(!it)return; var v=it.values||{}, amt=budgetAmount(it); if(!isFinite(amt))return; /* 1.8.100: a balance with no amount is left out */ var row={id:id,name:it.name,amount:amt,asOf:v.asOf||''};
       if(v.assetKind==='cash')m.rows.cash.push(row); else if(v.assetKind==='owned')m.rows.owned.push(row); else m.rows.unmarked.push(row); });
     return m;
   }
@@ -17919,7 +17933,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     EV.typeBoardIds(w).forEach(function(bid){ if(w.components[bid]) w.components[bid].items=[]; });
     if(w.components.reqs) w.components.reqs.items=[];
     budgetNoTheme(w);
-    w.meta=Object.assign({},w.meta,{budget:1,label:'blank',calId:R.calId,planId:'reqs',viewsModule:EV.MODULE_ID,provenance:'Exp7Views journal Home → JRViews → JRender',selModel:2});
+    w.meta=Object.assign({},w.meta,{budget:1,label:'blank',calId:R.calId,planId:'reqs',riskHT:{hc:500,hm:1500,big:200,delay:3},viewsModule:EV.MODULE_ID,provenance:'Exp7Views journal Home → JRViews → JRender',selModel:2});
     return w;
   }
   function budgetAtlasLoad(w){
@@ -18892,7 +18906,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.99",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.100",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
