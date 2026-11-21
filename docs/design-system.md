@@ -880,6 +880,8 @@ Checked in Chrome on Matthew's Mac (2026-11-21, made-up data only): the lean fet
 
 On screen, for every app: nothing changes, since every grid the apps draw gives its columns and cell height, the motion config gives the lift and scale, and every day has its risk. One small fix: a table cell that is 0 was measured as empty but drawn as "0"; it is now measured as it is drawn, so its column is wide enough for it.
 
+Checked in Chrome on Matthew's Mac (2026-11-21, made-up data only): the lean fetched at this release's commit matched `release.json`. The Exp7 demo's Calendar, Board and Plan views drew at 390 wide with the same number of nodes (111, 173, 143), glyphs and heights as 1.8.105. A blank Budget opened at 390 wide on Home, and its date picker (a grid) opened and closed. Reloaded at 1024 wide, Budget and the demo's three views opened again. No failure was recorded and no page error was thrown at any step. The test's storage was cleared after.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
