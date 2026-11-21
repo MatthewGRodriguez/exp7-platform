@@ -822,7 +822,7 @@ Left for later: the screen-size reads (`clientWidth`, `devicePixelRatio`, scroll
 
 Tests in exp7-jrender: Layer 1 checks `journal-views` has no `try`, no made-up name and no made-up count, that a save asks for a missing name or amount, that an amount that is not a number shows nothing, that a repeat with no count is left out while every 7 days is kept, that no repeat picked reads as once, that there is no calendar id unless the atlas names one it has, that a copy's revision count starts at 1, and that `payDraft` is gone. Layer 2 checks Add pay with no gross pay shows no take-home pay, that a save's ask shows under the form's title on that form only and lays out, and the art layer allows that one node to be gone from Add pay while every other node draws as in 1.8.79.
 
-CHROME_PARA
+Checked in Chrome on Matthew's Mac (2026-11-21, made-up data only): the lean fetched at this release's commit matched `release.json`. At 390 wide, saving a blank Add pay showed "Enter an amount of 0 or more." under its title, and its Take-home pay showed no amount. Opening the cash form cleared the ask; saving it with an amount (25.00) and no name showed "Enter a name.", and once a name was typed ("Test wallet") the ask went and the save went through to Cash and owned items. Reloaded at 1024 wide, Today kept the item and the cash note took it in. No failure was recorded and no page error was thrown at any step. The test's storage was cleared after.
 
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
