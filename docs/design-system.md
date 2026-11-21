@@ -804,6 +804,8 @@ Left for 1.8.96: the `|| ''`, `|| null` and `|| 0` reads of form fields and coun
 
 Tests in exp7-jrender: Layer 1 checks `budget-flows` has no `||` default that puts in a name, id, repeat, category, outcome, label or number, no `budget` or `reqs` id, and no charge counted as 0, that a repeat not picked gives no repeat values and a picked one still does, that a write without its op is left out while the rest apply, that the day risk notes are left out without their thresholds, and that the Calendar's Add item opens at only the selected days.
 
+Checked in Chrome on Matthew's Mac (2026-11-21, the lean by its sha at 8b479c3, which matches release.json, a blank Budget at 390 wide, made-up data only): Home drew its calendar and the day risk notes. Add to today's activity form opened at Does not repeat with every 14 days ready; a made-up item ("Test lunch", 12.00, every 14 days) was saved and Today showed it as Every 14 days. In the page, a repeat not picked gave no repeat values and the day risk notes without thresholds were left out. Reloaded at 1024 wide, Today kept the item and the cash note took it in. No failure was recorded and no page error was thrown at any step. The test's storage was cleared after.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
