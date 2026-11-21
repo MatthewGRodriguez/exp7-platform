@@ -1,6 +1,6 @@
 # Exp7 design system
 
-**Status:** spec, 2026-11-14. Phase 1 is built in 1.8.77, phase 2 in 1.8.79, phase 3 in 1.8.80, the views half of phase 4 in 1.8.81, the TopBar and Apps picker in 1.8.82 and the journal's plan, ledger and cash views and Home's focus ring in 1.8.83, the Exp7 demo's frame, Atlas, Proposal console and About on canvas in 1.8.84, its Two writers, Storage and Circuit in 1.8.85, and its Paths, Calendar, Board and Plan tabs in 1.8.86, so the whole demo is on canvas, and in 1.8.87 every text is drawn in the font it is measured in and the views' marks are art; phase 5 started in 1.8.88 with Budget as the first app defined as its four parts and checked whole when it opens, in 1.8.89 the field being typed in is drawn on the canvas from Budget's tokens and art, in 1.8.90 every art state a node can be in is drawn from its art, pressed included, in 1.8.91 the Calendar, Board and Plan views are drawn pressed the same way, in 1.8.92 Budget's own code stops swallowing errors, and in 1.8.93 budget-rules leaves out what a record is missing (see [Migration](#10-migration)). It applies to Budget first and then to every Exp7 app, the platform chrome and the universal Calendar, Board and Plan views. Matthew answered the first eight questions on 2026-11-14; he answered the two follow-up questions (N1, N2) the same day. Every answer is written into the section it settles and listed in [Decisions](#11-decisions). No questions are open for him.
+**Status:** spec, 2026-11-14. Phase 1 is built in 1.8.77, phase 2 in 1.8.79, phase 3 in 1.8.80, the views half of phase 4 in 1.8.81, the TopBar and Apps picker in 1.8.82 and the journal's plan, ledger and cash views and Home's focus ring in 1.8.83, the Exp7 demo's frame, Atlas, Proposal console and About on canvas in 1.8.84, its Two writers, Storage and Circuit in 1.8.85, and its Paths, Calendar, Board and Plan tabs in 1.8.86, so the whole demo is on canvas, and in 1.8.87 every text is drawn in the font it is measured in and the views' marks are art; phase 5 started in 1.8.88 with Budget as the first app defined as its four parts and checked whole when it opens, in 1.8.89 the field being typed in is drawn on the canvas from Budget's tokens and art, in 1.8.90 every art state a node can be in is drawn from its art, pressed included, in 1.8.91 the Calendar, Board and Plan views are drawn pressed the same way, in 1.8.92 Budget's own code stops swallowing errors, in 1.8.93 budget-rules leaves out what a record is missing, and in 1.8.94 every part of an app fails alone when it opens and draws, its art and atlas included, by strict fail and carry on (see [Migration](#10-migration)). It applies to Budget first and then to every Exp7 app, the platform chrome and the universal Calendar, Board and Plan views. Matthew answered the first eight questions on 2026-11-14; he answered the two follow-up questions (N1, N2) the same day. Every answer is written into the section it settles and listed in [Decisions](#11-decisions). No questions are open for him.
 
 Evidence labels follow [EVIDENCE.md](./EVIDENCE.md). The three rules in section 1 are Matthew's own words **[REQ 2026-11-14]**.
 
@@ -34,6 +34,21 @@ A fallback is anything that quietly stands in for a missing or broken piece so t
 Fail first works the way Verse's `<decides>` does **[REQ 2026-11-14]**: "it'll work or not, no exception based control flow, at the fail point it'll exit to where it would work before that point and carry on. Errors are not allowed in verse to propagate outside the things marked with decides, same thing here." Failing is conditional logic: a failable step either succeeds or fails, a failure undoes everything since the last point where things worked, and the logic written for the fail case runs next. [Section 8](#8-failing-first-as-in-verse) defines it. Failures are found first by the tests in [section 9](#9-tests), so they rarely reach a release.
 
 The difference from a fallback: a fallback pretends the work happened by drawing a substitute. A failure leaves the app exactly as it was before the work began, and the code after it knows the work didn't happen.
+
+#### Strict fail and carry on
+
+Matthew named the rule **strict fail and carry on** (2026-11-16) and asked that it be written down for every bot and every app. In his words:
+
+> "Verse like decides is where the fail condition is managed inside the fail or not managed at all and just carried on. That's the no fall back preference I have stated, if there is a fail point that fail point will fail, the rest will carry on as if that fail point never existed." **[REQ 2026-11-16]**
+>
+> "Strict fail and carry on, if a pice of art is missing or the atlas, it'll carry on with the rest of the art / atlas and still work." **[REQ 2026-11-16]**
+
+What it means:
+
+- **Strict fail.** Every fail point fails on its own terms. Nothing stands in for what is missing or wrong: no default value, no placeholder, no substitute piece, no step that repairs or upgrades it, and no error that stops everything around it.
+- **Carry on.** Everything outside that fail point carries on as if the fail point never existed. The failure stays inside its own failure context, is recorded there, and goes no further.
+- **Each part is its own fail point.** A saved record missing a field keeps it missing, and the part that needs it is left out, with no error (1.8.93). A token set, route, alias, layout, screen component, piece of art or part of the atlas that is missing or bad fails alone: the app still opens and works with the rest, and only what reads that part fails, by itself (1.8.94).
+- **The fail logic is local.** A fail point either handles its own failure in its context (as a switch that cannot save says so) or does not handle it at all and is simply left out. It never reaches up and stops the parts beside it.
 
 Two things are not fallbacks and stay:
 
@@ -761,6 +776,20 @@ Tests in exp7-jrender: Layer 1 lints `budget-rules`, checks the rules leave out 
 
 Checked in Chrome on Matthew's Mac (2026-11-16, the lean by its sha at b45951c, a blank Budget at 390 wide, made-up data only): Home loaded; on Add pay a gross of 1,000 with a 10% deduction showed take-home 900.00, and in the page a deduction with no name left take-home at 1,000. No failure was recorded and no page error was thrown. The pay was not saved. The test's storage was cleared after.
 
+*1.8.94: every part of an app fails alone, by strict fail and carry on.* Matthew answered "Yes, fail alone" when asked whether one bad part of Budget should stop it opening (2026-11-16), and then extended it to art and the atlas the same day: "Strict fail and carry on, if a pice of art is missing or the atlas, it'll carry on with the rest of the art / atlas and still work." Rule 1 now spells out [strict fail and carry on](#strict-fail-and-carry-on). In 1.8.88 any single bad part kept all of Budget closed. Now:
+
+- **Opening an app** (`design-app`, `Exp7Apps.open`): only a definition that is not there, or not in the shape of its four parts, keeps the app closed, since there is nothing to open. Each token set, the pack, the blank atlas check, each route, alias, screen component and layout is checked in its own failure context (`app.open:<app>:<part>`). One that fails is recorded and left out, and the app opens with the rest. What reads a part that was left out fails then, by itself: `Exp7Apps.tokens(app, group)` fails with `TOKEN_MISSING` (Home, the screens, the views and the journal's fonts now read their token sets through it), and `route` with `APP_INVALID`.
+- **Art** (`design-art`): `load` checks each piece alone (`art.load:<pack>:<i>`), so a bad piece, or a second piece for a slot, is left out and the pack loads with the rest. `assign` checks each slot, variant and state alone (`art.assign:<app>:<component>/<slot>:<variant>:<state>`) and assigns the pack with what it has. `draw` is its own failure context (`art.draw:<app>:<component>/<slot>`): a slot whose art fails draws nothing, and its node and its screen carry on without it. That covers every draw: Home, the screens, the Calendar, Board and Plan views (whose shadow nodes are made only when their art is there) and the top bar and Apps picker, and a node resting in a state its component does not declare, or an avatar mode its art does not draw, is left undrawn the same way. With no pack at all, Budget opens and every slot fails alone. An override is one piece, so an override that fails its check still leaves the art that was there.
+- **The atlas** (Budget's `check`): each part is checked alone (`budget.atlas:<part>`: its mark, items, components, type boards, calendar, plan and each type board), recorded when it is missing, and Budget carries on with the rest.
+
+- **Loading saved data** (Budget's `load`): Matthew answered "Yes, stop both" (2026-11-16). Load no longer rebuilds a missing type board, puts entries back on the plan, the calendar or their boards, marks the atlas as Budget's, or moves picks saved before 1.8.57 to the new selection model. A part that is missing stays missing and is left out, and an old pick (an item's preferred choice, `state.pick` or `simPick`) never selects itself in Budget. Load still drops a stale view theme, as Budget's look is its token sets. Atlases saved by 1.8.57 or later already carry their boards, membership and selection model, so nothing changes for them.
+
+The defaults in `budget-flows`, `journal-views` and `views-host`'s Budget code are the next releases. Nothing changes on screen while every part is there.
+
+Tests in exp7-jrender: Layer app checks each part fails alone with its own context and is left out, that only the definition's shape keeps an app closed, that a token set left out fails with `TOKEN_MISSING` when read, and that Budget opened without its screens set draws no Home or screen while its views set still reads; Layer art checks a pack missing a piece is assigned with each gap recorded, a pack with a bad piece loads with the rest, and Home with its chevron piece missing still lays out with only the chevrons left out; Layer views checks a view with no pack lays out with no art, each slot recorded; and the atlas check records each missing part alone.
+
+Checked in Chrome on Matthew's Mac (2026-11-21, the lean by its sha at 579fd58, which matches release.json, a blank Budget at 390 wide, made-up data only): Budget opened from a blank atlas with every part, and Home drew its calendar and Today. A made-up item ("Test lunch", 12.00) was added through Add to today and saved, and Today's schedule redrew with it. Reloaded at 1024 wide, the load path kept the item on Today and the cash note took it in. No failure was recorded and no page error was thrown at any step. The test's storage was cleared after.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
@@ -792,6 +821,16 @@ Studies, as second priority: when a screen moves to components, its study (if an
 | The views' measure and draw font mismatch | "2 fix", as its own release | 10, 1.8.87 |
 | The views' marks (arrows, ticks, triangles, stars, dots) | "Art": every mark is swappable art | 6.2, 10, 1.8.87 |
 | The platform look's font: DejaVu Sans or Source Sans 3 | "DejaVu Sans is fine/ no extra work needed there" | 10, 1.8.87 |
+
+### Decided by Matthew, 2026-11-16
+
+| Question | His answer | Where it's written in |
+|---|---|---|
+| A saved record missing a field | It stays missing, with no error, and the part that needs it is left out ("Leave it out") | 10, 1.8.93 |
+| The rule behind it | "if there is a fail point that fail point will fail, the rest will carry on as if that fail point never existed" | Rule 1, strict fail and carry on |
+| One bad part of an app when it opens | "Yes, fail alone" | 10, 1.8.94 |
+| Missing art or atlas | "Strict fail and carry on": it carries on with the rest of the art and atlas and still works | Rule 1, 10, 1.8.94 |
+| Loading saved data: rebuilding missing boards, moving pre-1.8.57 picks | "Yes, stop both": a missing board and old picks are left out | 10, 1.8.94 |
 
 ## 12. Needs Ash
 
