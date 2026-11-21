@@ -842,6 +842,8 @@ Left for later: the `{}`, `[]` and `''` guards in Budget's part of views-host (`
 
 Tests in exp7-jrender: Layer 1 checks `journal-views` has no `||` default and no `||` text default, that it has the three readers, that the screen state is read as it is, that Home opens on its home route and is shown the caller's route, and each of the left-out cases above; it runs `journalApplyOps` on a board with no value and on an atlas with no components. The test page now has a `screen` (width 0) and Home's test host a `getBoundingClientRect`, as a browser does. All 15 layers pass.
 
+Checked in Chrome on Matthew's Mac (2026-11-21, made-up data only): the lean fetched at this release's commit matched `release.json`. A blank Budget opened at 390 wide on Home, with its calendar, day risk colours, legend and note, and the screen state as the Budget app started it. The date picker opened under the date heading, where views-host now names its anchor. A made-up activity ("Test lunch", does not repeat) was saved from Add to today and Today's schedule showed it. Reloaded at 1024 wide, Home opened and kept the item. No failure was recorded and no page error was thrown at any step. The test's storage was cleared after. Found on the way, the same in 1.8.100: the date picker's Dismiss does not close it.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
