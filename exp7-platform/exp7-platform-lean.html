@@ -16761,13 +16761,10 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     }
     return {w:Math.max(320,Math.round(w)), h:Math.max(1,Math.round(h)), dpr:dpr};
   }
+  /* 1.8.99: the journal's calendar is the one the atlas names (meta.calId) and has; with none, what would go on it is left out */
   function journalCalId(atlas){
-    try{ if(root.Exp7Views&&root.Exp7Views.rootsFor){ var R=root.Exp7Views.rootsFor(atlas||{}); if(R&&R.calId) return R.calId; } }catch(e){}
-    var meta=(atlas&&atlas.meta)||{}, comps=(atlas&&atlas.components)||{};
-    if(meta.calId&&comps[meta.calId]) return meta.calId;
-    if(comps.trip_calendar) return 'trip_calendar';
-    if(comps.budget) return 'budget';
-    return meta.calId||'trip_calendar';
+    var meta=atlas&&atlas.meta, cid=meta&&typeof meta.calId==='string'&&meta.calId?meta.calId:null;
+    return cid&&atlas.components&&atlas.components[cid]?cid:null;
   }
   function entriesForDay(atlas, day, existing){
     var out=[], seen={}, list=existing?existing.slice():[];
@@ -16780,7 +16777,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     });
     /* A day row shows that day's occurrence: a recorded or changed amount or time, not only the item's usual one. */
     var BF=root.BudgetFlows;
-    if(BF&&BF.entryOn) out=out.map(function(e){ var en=null; try{ en=atlas&&atlas.items&&atlas.items[e.id]?BF.entryOn(atlas,e.id,day):null; }catch(err){ en=null; }
+    if(BF&&BF.entryOn) out=out.map(function(e){ var en=atlas&&atlas.items&&atlas.items[e.id]?BF.entryOn(atlas,e.id,day):null;
       if(!en) return e; var nv=Object.assign({},e.values||{}); if(en.charge!=null) nv.amount=en.charge; if(en.ex&&en.ex.time!=null){ nv.time=en.ex.time; if(en.ex.time) nv.allDay=false; }
       return Object.assign({},e,{values:nv}); });
     return out;
@@ -16796,13 +16793,15 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   }
   /* The journal's Repeat choice in the evaluator's own terms: 'none' -> once, 'mdays' -> monthdays with on[] days of the month,
      'every' -> every N days. Any other repeat already on an item (monthly, weekly...) is left as it is. */
+  /* 1.8.99: a repeat is what the form picked. Every N days needs N (1 or more), else the repeat is left out; no repeat picked
+     leaves the repeat out, and 'none' is once. The save asks for N before it gets here. */
   function journalRepeat(draft, v, when){ var d=draft||{}, r=d.repeat;
-    if(r==='every'){ v.repeat='every'; v.every=Math.max(1,Math.floor(+d.every)||14); }
+    if(r==='every'){ var n=Math.floor(+d.every); if(n>=1){ v.repeat='every'; v.every=n; } }
     else if(r==='mdays'){ var BR=root.BudgetRules, L=BR&&BR.monthDayList?BR.monthDayList(d.mdays):[]; if(!L.length&&/^\d{4}-\d{2}-\d{2}$/.test(when||'')) L=[+String(when).slice(8)]; v.repeat='monthdays'; v.on=L; }
-    else if(r==='none'||r==null||r==='') v.repeat='once';
+    else if(r==='none') v.repeat='once';
     var tm=formatTime24(d.time); if(tm){ v.time=tm; v.allDay=false; } else v.allDay=true; return v; }
   /* an item's repeat as the journal form shows it */
-  function journalRepeatDraft(v){ v=v||{}; var r=v.repeat||'once'; return r==='monthdays'?'mdays':(r==='once'||r==='none'||r==='dates')?'none':r; }
+  function journalRepeatDraft(v){ v=v||{}; var r=v.repeat; if(typeof r!=='string'||!r) return ''; /* 1.8.99: a saved item with no repeat shows none picked */ return r==='monthdays'?'mdays':(r==='once'||r==='none'||r==='dates')?'none':r; }
   /* Apply view ops to a local atlas copy at any depth. add on a list appends once; add/set/ref on a key sets it; drop deletes it;
      remove takes a value out of a list. Applying the same ops twice gives the same atlas. */
   function journalApplyOps(list, A){
@@ -16818,7 +16817,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       if(op.op==='add'&&last==='items'&&path[0]==='components'&&cur[last]==null){ cur[last]=[op.value]; return; }
       cur[last]=op.value;
     });
-    A.rev=(A.rev||0)+1;
+    A.rev=typeof A.rev==='number'?A.rev+1:1;
     return A;
   }
   function journalWhen(draft, day, route){
@@ -16856,8 +16855,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if(/^(amount|gross|balance|apr|payment|every|terms|actual)$/.test(k)||/amount/.test(k)) return 'number';
     return 'text';
   }
-  function parseMoney(v){ var n=parseFloat(String(v==null?'':v).replace(/[^0-9.-]/g,'')); return isFinite(n)?n:0; }
-  function payDraft(d){ d=d||{}; var list=Array.isArray(d.deductions)?d.deductions.slice():[]; return {payee:d.payee||'', date:d.date||'', repeat:d.repeat||'every', every:d.every||'14', gross:d.gross!=null&&d.gross!==''?d.gross:'', deductions:list}; }
+  /* 1.8.99: what is not a number reads as NaN, never 0: the save that needs it asks for it */
+  function parseMoney(v){ var n=parseFloat(String(v==null?'':v).replace(/[^0-9.-]/g,'')); return isFinite(n)?n:NaN; }
   function viewMetrics(hostW, hostH, contentH, dpr, maxPx){
     dpr=Math.min(Math.max(+dpr||1,0.5),3);
     maxPx=maxPx>0?maxPx:8192;
@@ -17030,7 +17029,14 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   }
   /* screenModel(route, ctx) -> { route, parts }, or FAIL.
    * ctx: { day, today, ui (window.__budgetUi), draft (the form's draft from FORM_START and what was typed), atlas, plan, agenda, ledger, cash, risk } */
+  /* 1.8.99: what a save asked for (a name, an amount) shows under the form's title until the next step, so it is seen, not
+     only read out */
   function screenModel(route, ctx){
+    var m=screenParts(route, ctx), k=ctx&&ctx.ui&&ctx.ui.ask;
+    if(m&&m.parts&&k&&k.route===route&&k.text){ var at=m.parts.findIndex(function(p){ return p&&p.c==='Title'; }); m.parts.splice(at+1,0,note('ask',k.text,'secondary','ink')); }
+    return m;
+  }
+  function screenParts(route, ctx){
     var F=root.Exp7Fail, D=root.Exp7Components, FAIL=F.FAIL, where={screen:route};
     var app=budgetApp(); if(app===FAIL) return FAIL; if(root.Exp7Apps.route(app,route)===FAIL) return FAIL;
     var day=ctx.day, dayLong=dayTitle(day), dayShort=dateLabel(day), d=ctx.draft, ui=ctx.ui, parts=[];
@@ -17116,7 +17122,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       dateField(parts,'date','Pay date',d,ctx,'line'); parts.push(gap('labelGap'));
       repeatGroup(parts,d,'line');
       parts.push(fld('f:gross','line','Gross pay',d.gross===''?'':fmtMoney(gross),'0.00','field:gross',true),section('deductions','Deductions'));
-      d.deductions.forEach(function(x,i){ parts.push({c:'Pair',key:'ded'+i,left:plain(x.name),right:x.kind==='percent'?String(x.value)+'%':fmtMoney(parseMoney(x.value)),role:'body',bold:true,rightBold:true,height:'deductionH',toggle:x.kind==='fixed'?'fixed':'percent',idx:i,valueAct:'ded:value:'+i,nameAct:'ded:name:'+i}); });
+      d.deductions.forEach(function(x,i){ parts.push({c:'Pair',key:'ded'+i,left:plain(x.name),right:x.kind==='percent'?String(x.value)+'%':(isFinite(parseMoney(x.value))?fmtMoney(parseMoney(x.value)):''),role:'body',bold:true,rightBold:true,height:'deductionH',toggle:x.kind==='fixed'?'fixed':'percent',idx:i,valueAct:'ded:value:'+i,nameAct:'ded:name:'+i}); });
       parts.push({c:'LinkRow',key:'ded:add',label:'+ Add deduction',act:'ded:add',chevron:false,height:'target',role:'body'},gap('groupGap'),section('calc','Calculated'),note('calc-note','Resolved dollar amounts. This group is not editable.','secondary','captionInk'),gap('controlGap'));
       th.lines.forEach(function(ln,i){ parts.push({c:'Pair',key:'line'+i,left:plain(ln.name),right:fmtMoney(ln.amount),role:'secondary',height:'pairH'}); });
       parts.push({c:'Pair',key:'net',left:'Take-home pay',right:fmtMoney(th.net),role:'body',bold:true,rightBold:true,height:'pairH'},note('net-note','Take-home is gross pay minus these deductions.','secondary','captionInk'));
@@ -17292,7 +17298,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     return this.update(); };
   Home.prototype.update=function(A){if(A)this.atlas=A;var self=this,serial=++this.serial;
     this.chain=this.chain.catch(function(){}).then(async function(){if(self.dead||!self.r||serial!==self.serial)return;
-      var A=self.atlas,R=root.Exp7Views.rootsFor(A),ids=((A.meta||{}).boardIds)||{}, roots={calendar:R.calendar,agenda:R.calendar,plan:R.plan,ledger:['comp:'+(ids.expense||R.boardId)],cash:['comp:'+(ids.asset||'board_asset')]},old=self.session;
+      var A=self.atlas,R=root.Exp7Views.rootsFor(A),ids=((A.meta||{}).boardIds)||{}, roots={calendar:R.calendar,agenda:R.calendar,plan:R.plan,ledger:ids.expense?['comp:'+ids.expense]:[],cash:ids.asset?['comp:'+ids.asset]:[]},old=self.session;
       if(old)old.dispose();var V=self.context={id:self.id,atlasW:A,root:R.plan,plan:true,open:{},vmInfo:{},journalDay:budgetDateKey(),journalMonth:budgetMonthKey()};
       var S=self.session=startRuntime(A,[].concat(R.calendar,R.plan,roots.ledger),null,function(){},livePins(A));await S.ready;
       if(self.dead||serial!==self.serial){S.dispose();return;}if(S.errs.length)throw Error('Atlas evaluation: '+S.errs.join('; '));var models={};Object.keys(roots).forEach(function(k){var v=Object.assign({},V,{root:roots[k],plan:k==='plan',vmInfo:{},journalSources:k==='ledger'&&A.meta.boardIds&&A.meta.boardIds.income?[{root:'comp:'+A.meta.boardIds.income,role:'income'}]:[]});models[k]=model(v,S,k);});
@@ -17302,7 +17308,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       root.Exp7Fail.record({code:'CONTEXT_FAILED',context:'budget.update',app:'budget',screen:self.route||'home',component:null,slot:null,state:null,id:null,offered:null,needed:null,detail:self.error});
       if(self.o.onError)self.o.onError(e);});return this.chain;};
   /* Fill the item page's draft from the tapped entry: its name, the tapped day, that day's time and charge, and its repeat. */
-  Home.prototype.draftEntry=function(eid){ var it=this.atlas&&this.atlas.items&&this.atlas.items[eid]; if(it){ root.__budgetUi=Object.assign({},root.__budgetUi||{},{entry:eid}); var v=it.values||{}, d=this.uiDraft(), oday=root.__budgetUi.day||v.date||budgetDateKey(), BF=root.BudgetFlows, en=null; try{ en=BF&&BF.entryOn&&this.atlas?BF.entryOn(this.atlas,eid,oday):null; }catch(e){ en=null; } d.name=it.name; d.date=v.date&&(!en||!en.repeating)?v.date:oday; d.time=(en&&en.ex&&en.ex.time!=null)?en.ex.time:(v.time||''); d.amount=en&&en.charge!=null?String(Math.abs(+en.charge)):(v.amount!=null?String(Math.abs(+v.amount)):''); d.repeat=journalRepeatDraft(v); d.every=v.every||'14'; d.mdays=Array.isArray(v.on)?v.on.join(', '):(v.mdays||''); d.scope=d.scope||'future'; d.recScope='one'; d.rec='planned'; d.actual=''; root.__budgetUi.draft=d; } };
+  Home.prototype.draftEntry=function(eid){ var it=this.atlas&&this.atlas.items&&this.atlas.items[eid]; if(it){ root.__budgetUi=Object.assign({},root.__budgetUi||{},{entry:eid}); var v=it.values||{}, d=this.uiDraft(), oday=root.__budgetUi.day||v.date||budgetDateKey(), BF=root.BudgetFlows, en=BF&&BF.entryOn&&this.atlas?BF.entryOn(this.atlas,eid,oday):null; d.name=it.name; d.date=v.date&&(!en||!en.repeating)?v.date:oday; d.time=(en&&en.ex&&en.ex.time!=null)?en.ex.time:(v.time||''); d.amount=en&&en.charge!=null?String(Math.abs(+en.charge)):(v.amount!=null?String(Math.abs(+v.amount)):''); d.repeat=journalRepeatDraft(v); d.every=v.every!=null?String(v.every):''; d.mdays=Array.isArray(v.on)?v.on.join(', '):(v.mdays||''); d.scope=d.scope||'future'; d.recScope='one'; d.rec='planned'; d.actual=''; root.__budgetUi.draft=d; } };
   Home.prototype.show=function(route,day,extra){ var self=this; if(this.live) this.closeField(true);
     if(!this.models){ this.route=route||'home'; this.routeExtra=extra||null; return this.update(); }
     this.transact('budget.show:'+(route||'home'),function(){
@@ -17449,6 +17455,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
    * screen that worked stays. What act0 does after an await (saving, the network) runs after the context and is not
    * rolled back. show() is the same for a route opened from the shell. */
   Home.prototype.act=function(a,kind,n){ if(!a||this.dead) return; var self=this;
+    if(a!=='save'&&a!=='rightAct'&&root.__budgetUi&&root.__budgetUi.ask){ root.__budgetUi=Object.assign({},root.__budgetUi); delete root.__budgetUi.ask; } /* 1.8.99: a save's ask lasts until the next step */
     return this.transact('budget.act:'+a.replace(/:.*$/,''),function(){ return self.act0(a,kind,n); }); };
   Home.prototype.transact=function(name,body){ var FL=root.Exp7Fail, self=this, snap=this.snapshot(), out;
     var ok=FL.context(name,function(){ self.renderFailed=null; out=body(); return self.renderFailed?FL.with(self.renderFailed.code,self.renderFailed):true; },
@@ -17501,7 +17508,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     /* An item with no date is never listed in a month total. Tapping it opens its edit page with the date picker open, so it gets a date. */
     if(a.indexOf('date-needed:')===0){ var nid=a.slice(12), nit=this.atlas&&this.atlas.items&&this.atlas.items[nid]; if(!nit){ this.route='monthly'; return this.models?this.render():this.update(); }
       var tday=budgetTodayKey(), nv=nit.values||{}; root.__budgetUi=Object.assign({},root.__budgetUi||{},{entry:nid,day:tday,month:tday.slice(0,7)});
-      var nd=this.uiDraft(); nd.name=nit.name; nd.date=tday; nd.time=nv.time||''; nd.amount=nv.amount!=null?String(Math.abs(+nv.amount)):''; nd.repeat=journalRepeatDraft(nv); nd.every=nv.every||'14'; nd.mdays=Array.isArray(nv.on)?nv.on.join(', '):''; nd.scope='future'; root.__budgetUi.draft=nd;
+      var nd=this.uiDraft(); nd.name=nit.name; nd.date=tday; nd.time=nv.time||''; nd.amount=nv.amount!=null?String(Math.abs(+nv.amount)):''; nd.repeat=journalRepeatDraft(nv); nd.every=nv.every!=null?String(nv.every):''; nd.mdays=Array.isArray(nv.on)?nv.on.join(', '):''; nd.scope='future'; root.__budgetUi.draft=nd;
       this.route='schedule-editor'; if(this.o.onNavigate) this.o.onNavigate(this.route,tday,{entry:nid});
       var opened=this.openDateField('date',null); if(this.status) this.status.textContent='Give '+nit.name+' a date, then save.'; return opened; }
     if(a.indexOf('date:')===0){root.__budgetUi=Object.assign({},root.__budgetUi||{},{day:a.slice(5),month:a.slice(5,12)});this.route='schedule'; return this.models?this.render():this.update();}
@@ -17566,9 +17573,9 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   /* The review's requirements are those of the choice in use: the step's JReqs (a ref, a list, {jgroup:[...]} or a record, as in 1.8.72) while the step's own
      item is in use; after a switch, what that switch kept (a Reuse copy in place of the original, "Needs its own" as the original, "Not needed" dropped) and the
      requirements made for that choice. Then those added here for this choice. Each has a stable key; an atlas item keeps its id so its answer can be saved. */
-  function forAltOf(AT, ref){ var BF=root.BudgetFlows, out=[]; if(!ref) return out; if(BF&&typeof BF.reqsOf==='function'){ try{ return BF.reqsOf(AT, ref)||[]; }catch(e){} }
+  function forAltOf(AT, ref){ var BF=root.BudgetFlows, out=[]; if(!ref) return out; if(BF&&typeof BF.reqsOf==='function') return BF.reqsOf(AT, ref)||[];
     Object.keys(AT.items||{}).forEach(function(id){ var v=(AT.items[id]||{}).values; if(v&&v.forAlt===ref) out.push(id); }); return out; }
-  function inUseReqs(AT, step, seeded){ var cur=null; try{ cur=(typeof root.selectedRef==='function')?root.selectedRef(AT, step):null; }catch(e){ cur=null; }
+  function inUseReqs(AT, step, seeded){ var cur=(typeof root.selectedRef==='function')?root.selectedRef(AT, step):null;
     if(!cur||cur==='item:'+step) return seeded;
     var C=AT.items[String(cur).replace(/^item:/,'')]; if(!C) return seeded;
     var rv=(C.values&&C.values.reqReview&&typeof C.values.reqReview==='object')?C.values.reqReview:null, made=forAltOf(AT, cur);
@@ -17677,20 +17684,27 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   Home.prototype.saveJournal=async function(){
     this.dateTarget=null;
     if(this.closeField) this.closeField(true);
-    var route=this.route||'', ui=root.__budgetUi||{}, draft=this.uiDraft(), day=ui.day||budgetDateKey(), name=String(draft.name||draft.aname||draft.cname||draft.rname||'').trim()||'New item';
+    var route=this.route||'', ui=root.__budgetUi||{}, draft=this.uiDraft(), day=ui.day||budgetDateKey(), name=String(draft.name||draft.aname||draft.cname||draft.rname||'').trim();
     root.__budgetUi=Object.assign({},ui,{picking:'',formPick:'',dateField:''}); ui=root.__budgetUi;
-    var amount=parseMoney(draft.amount!=null&&draft.amount!==''?draft.amount:(draft.gross!=null&&draft.gross!==''?draft.gross:draft.balance||'0')); if(!(amount>=0)) amount=0;
-    var when=journalWhen(draft, day, route);
+    var amount=parseMoney(draft.amount!=null&&draft.amount!==''?draft.amount:(draft.gross!=null&&draft.gross!==''?draft.gross:draft.balance));
+    var when=journalWhen(draft, day, route), self=this;
+    /* 1.8.99: a save makes up nothing. What the page needs and was not given (a name, an amount, a repeat's days, a debt's
+       terms, what happened) is asked for, and nothing is saved until it is there. */
+    function ask(msg){ root.__budgetUi=Object.assign({},root.__budgetUi,{ask:{route:route,text:msg}}); if(self.status) self.status.textContent=msg; return self.models?self.render():self.update(); }
+    var NEEDS_AMOUNT={'cash-entry':1,'add-item-form':1,'schedule-editor':1,'pay-entry':1,'debt-entry':1,'add-alt-form':1,'add-req-form':1};
+    if(NEEDS_AMOUNT[route]&&!(amount>=0)) return ask('Enter an amount of 0 or more.');
+    if(NEEDS_AMOUNT[route]&&draft.repeat==='every'&&!(Math.floor(+draft.every)>=1)) return ask('Enter how many days apart it repeats.');
     var ops=[], atlas=this.atlas||{}, id='n'+Date.now().toString(36);
     var calId=journalCalId(atlas);
-    function boardId(kind){ var ids=(atlas.meta&&atlas.meta.boardIds)||{}, comps=atlas.components||{}; if(kind==='asset') return ids.asset||ids.cash||Object.keys(comps).find(function(k){return /asset|cash/i.test(k);})||'board_asset'; if(kind==='income'||kind==='pay') return ids.income||ids.pay||'board_income'; if(kind==='debt') return ids.debt||'board_debt'; return ids.expense||ids.ledger||'board_expense'; }
-    function addItem(values, board){ ops.push({path:'items/'+id,op:'add',value:{id:id,name:name,values:values,state:{},alts:null,jreq:[],blueprint:null}}); if(board) ops.push({path:'components/'+board+'/items',op:'add',value:'item:'+id}); if(values.date||values.asOf) ops.push({path:'components/'+calId+'/items',op:'add',value:'item:'+id}); }
+    /* the board the atlas names for the kind (meta.boardIds); with none, the item is not put on a board */
+    function boardId(kind){ var ids=atlas.meta&&atlas.meta.boardIds, id=ids?ids[kind]:null; return typeof id==='string'&&id?id:null; }
+    function addItem(values, board){ ops.push({path:'items/'+id,op:'add',value:{id:id,name:name,values:values,state:{},alts:null,jreq:[],blueprint:null}}); if(board) ops.push({path:'components/'+board+'/items',op:'add',value:'item:'+id}); if(calId&&(values.date||values.asOf)) ops.push({path:'components/'+calId+'/items',op:'add',value:'item:'+id}); }
     function repeatValues(v){ return journalRepeat(draft, v, when); }
-    if(route==='cash-entry'){ var kind=(draft.kind==='owned')?'owned':'cash'; name=String(draft.name||name).trim()||'New item'; addItem({type:'asset',assetKind:kind,amount:amount,asOf:when,date:when}, boardId('asset')); }
-    else if(route==='add-item-form'){ name=String(draft.name||name).trim()||'New item'; addItem(repeatValues({type:'expense',flow:'out',consume:true,charge:'per',amount:-amount,date:when}), boardId('expense')); }
+    if(route==='cash-entry'){ var kind=(draft.kind==='owned')?'owned':'cash'; name=String(draft.name||'').trim(); if(!name) return ask('Enter a name.'); addItem({type:'asset',assetKind:kind,amount:amount,asOf:when,date:when}, boardId('asset')); }
+    else if(route==='add-item-form'){ name=String(draft.name||'').trim(); if(!name) return ask('Enter a name.'); addItem(repeatValues({type:'expense',flow:'out',consume:true,charge:'per',amount:-amount,date:when}), boardId('expense')); }
     else if(route==='schedule-editor'){ var eid=(ui.entry||draft.entry||''); if(eid&&atlas.items&&atlas.items[eid]){ var it=atlas.items[eid], iv=it.values||{}, sgn=(iv.flow==='in'||iv.type==='income')?1:-1;
-      if(draft.name) name=String(draft.name).trim(); if(name&&name!==it.name) ops.push({path:'items/'+eid+'/name',op:'set',value:name});
-      var BF=root.BudgetFlows, en=null; try{ en=BF&&BF.entryOn?BF.entryOn(atlas,eid,day):null; }catch(e){ en=null; }
+      name=String(draft.name||'').trim(); if(name&&name!==it.name) ops.push({path:'items/'+eid+'/name',op:'set',value:name}); if(!name) name=it.name;
+      var BF=root.BudgetFlows, en=BF&&BF.entryOn?BF.entryOn(atlas,eid,day):null;
       var repNow=journalRepeatDraft(iv), repSame=!draft.repeat||draft.repeat===repNow;
       if(en&&en.repeating&&iv.date&&repSame&&BF.occOps){ var c={}, want=Math.round(sgn*amount*100)/100, had=en.charge==null?0:Math.round(en.charge*100)/100; if(want!==had) c.amount=want;
         var tm=formatTime24(draft.time)||'', hadT=(en.ex&&en.ex.time!=null)?en.ex.time:(en.values.allDay?'':(en.values.time||'')); if(tm!==hadT) c.time=tm;
@@ -17698,19 +17712,19 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
         ops=ops.concat(BF.occOps(atlas,en,c,draft.scope==='one'?'once':'future',day)); }
       else { var vals=Object.assign({},iv,repeatValues({charge:'per',amount:sgn*amount,date:when})); ops.push({path:'items/'+eid+'/values',op:'set',value:vals});
         /* an item that just got its date joins the calendar, so it shows on that day */
-        var calItems=((atlas.components||{})[calId]||{}).items||[]; if(vals.date&&calItems.indexOf('item:'+eid)<0) ops.push({path:'components/'+calId+'/items',op:'add',value:'item:'+eid}); } } else { name=String(draft.name||name).trim()||'Scheduled item'; addItem(repeatValues({type:'expense',flow:'out',consume:true,charge:'per',amount:-amount,date:when}), boardId('expense')); } }
-    else if(route==='pay-entry'){ name=String(draft.payee||draft.name||'').trim()||'Pay'; var dens=(draft.deductions||[]).map(function(d){return {name:d.name||'',kind:d.kind==='fixed'?'fixed':'percent',value:parseMoney(d.value)};}); var gross=parseMoney(draft.gross||amount), TH=(root.BudgetRules&&root.BudgetRules.takeHome)?root.BudgetRules.takeHome({gross:gross,deductions:dens}):null; addItem(repeatValues({type:'income',flow:'in',amount:TH&&TH.ok?TH.net:gross,date:when,gross:gross,deductions:dens,charge:'per',allDay:true}), boardId('income')); }
-    else if(route==='debt-entry'){ var cred=String(draft.creditor||'').trim()||'Creditor', purp=String(draft.purpose||draft.name||'').trim()||'Debt'; name=purp+' ('+cred+')'; var asOf=(draft.asOf&&/^\d{4}-\d{2}-\d{2}$/.test(draft.asOf))?draft.asOf:when; var apr=parseMoney(draft.apr), terms=Math.max(1,parseMoney(draft.terms)||36), ev=Math.max(1,parseMoney(draft.every)||30); var sch=(root.BudgetRules&&root.BudgetRules.debtSchedule)?root.BudgetRules.debtSchedule({balance:parseMoney(draft.balance||amount),apr:apr,terms:terms,every:ev,asOf:asOf}):null; addItem({type:'debt',creditor:cred,purpose:purp,amount:parseMoney(draft.balance||amount),asOf:asOf,apr:apr,terms:terms,every:ev,payment:sch&&sch.ok?sch.payment:0,date:asOf}, boardId('debt')); }
-    else if(route==='day-record'){ var eid=(ui.entry||draft.entry||''), BF=root.BudgetFlows, en=null; try{ en=eid&&BF&&BF.entryOn&&atlas.items&&atlas.items[eid]?BF.entryOn(atlas,eid,day):null; }catch(e){ en=null; }
+        if(calId){ var calItems=atlas.components[calId].items||[]; if(vals.date&&calItems.indexOf('item:'+eid)<0) ops.push({path:'components/'+calId+'/items',op:'add',value:'item:'+eid}); } } } else { name=String(draft.name||'').trim(); if(!name) return ask('Enter a name.'); addItem(repeatValues({type:'expense',flow:'out',consume:true,charge:'per',amount:-amount,date:when}), boardId('expense')); } }
+    else if(route==='pay-entry'){ name=String(draft.payee||draft.name||'').trim(); if(!name) return ask('Enter who pays.'); var dens=(draft.deductions||[]).map(function(d){return {name:d.name||'',kind:d.kind==='fixed'?'fixed':'percent',value:parseMoney(d.value)};}); var gross=amount, TH=root.BudgetRules.takeHome({gross:gross,deductions:dens}); if(!TH.ok) return ask(TH.errors.join(' ')); addItem(repeatValues({type:'income',flow:'in',amount:TH.net,date:when,gross:gross,deductions:dens,charge:'per',allDay:true}), boardId('income')); }
+    else if(route==='debt-entry'){ var cred=String(draft.creditor||'').trim(), purp=String(draft.purpose||draft.name||'').trim(); if(!cred) return ask('Enter who the debt is owed to.'); if(!purp) return ask('Enter what the debt is for.'); name=purp+' ('+cred+')'; var asOf=(draft.asOf&&/^\d{4}-\d{2}-\d{2}$/.test(draft.asOf))?draft.asOf:when; var apr=parseMoney(draft.apr), terms=parseMoney(draft.terms), ev=parseMoney(draft.every); if(!(terms>=1)) return ask('Enter how many payments are left.'); if(!(ev>=1)) return ask('Enter how many days apart the payments are.'); var sch=root.BudgetRules.debtSchedule({balance:amount,apr:apr,terms:terms,every:ev,asOf:asOf}); if(!sch.ok) return ask(sch.errors.join(' ')); addItem({type:'debt',creditor:cred,purpose:purp,amount:amount,asOf:asOf,apr:apr,terms:terms,every:ev,payment:sch.payment,date:asOf}, boardId('debt')); }
+    else if(route==='day-record'){ var eid=(ui.entry||draft.entry||''), BF=root.BudgetFlows, en=eid&&BF&&BF.entryOn&&atlas.items&&atlas.items[eid]?BF.entryOn(atlas,eid,day):null;
       if(!en||!BF.occOps){ if(this.status) this.status.textContent='Open the item from its day to record what happened.'; return; }
-      var rk=draft.rec||'planned', c={actual:true,outcome:rk==='diff'?'changed':rk==='none'?'skipped':'done'};
+      var rk=draft.rec; if(rk!=='planned'&&rk!=='diff'&&rk!=='none') return ask('Pick what happened.'); var c={actual:true,outcome:rk==='diff'?'changed':rk==='none'?'skipped':'done'};
       if(c.outcome==='skipped') c.skip=true;
-      if(c.outcome==='changed'){ var act=parseMoney(draft.actual); if(!(act>=0)||String(draft.actual==null?'':draft.actual).trim()===''){ if(this.status) this.status.textContent='Enter the actual amount.'; return; } c.amount=Math.round((en.income?1:-1)*act*100)/100; }
+      if(c.outcome==='changed'){ var act=parseMoney(draft.actual); if(!(act>=0)||String(draft.actual==null?'':draft.actual).trim()===''){ return ask('Enter the actual amount.'); } c.amount=Math.round((en.income?1:-1)*act*100)/100; }
       ops=BF.occOps(atlas,en,c,draft.recScope==='future'?'future':'once',day); name=en.name; when=day; }
     else if(route==='add-alt-form'||route==='add-alt-category'){
-      if(route==='add-alt-category'){ draft.cname=name; this.route='add-alt-form'; if(this.status) this.status.textContent='Category named. Now add the alternative.'; return this.models?this.render():this.update(); }
-      var step=ui.step, an=String(draft.aname||'').trim()||'New alternative', isPref=draft.preferred!==false; /* the star decides preferred */
-      name=an;
+      if(route==='add-alt-category'){ if(!name) return ask('Enter a name for the category.'); draft.cname=name; this.route='add-alt-form'; if(this.status) this.status.textContent='Category named. Now add the alternative.'; return this.models?this.render():this.update(); }
+      var step=ui.step, an=String(draft.aname||'').trim(), isPref=draft.preferred!==false; /* the star decides preferred */
+      if(!an) return ask('Enter a name for the alternative.'); name=an;
       /* An alternative is charged the same way as the item it replaces (per occurrence for an activity), so its amount reads as typed. */
       var sv=(step&&atlas.items&&atlas.items[step]&&atlas.items[step].values)||{}, sIn=sv.flow==='in';
       var base={type:sv.type||'expense',flow:sIn?'in':'out',amount:(sIn?1:-1)*amount,date:when}; if(sv.consume!=null) base.consume=sv.consume; if(sv.charge) base.charge=sv.charge;
@@ -17723,7 +17737,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       ui.choice='item:'+id; ui.choiceName=an; ui.preferred=isPref; rememberPlan(ui);
     }
     else if(route==='add-req-form'){
-      var rname=String(draft.rname||'').trim()||'New requirement';
+      var rname=String(draft.rname||'').trim(); if(!rname) return ask('Enter a name for the requirement.');
       var uiR=restorePlan(Object.assign({},ui)), items=reqAdded(uiR).slice();
       items.push({id:'req'+Date.now().toString(36), name:rname, date:when, time:formatTime24(draft.time)||'', repeat:draft.repeat||'none', every:draft.every, mdays:draft.mdays, amount:amount});
       root.__budgetUi=Object.assign({},ui,{reqItems:items, reqItemsFor:reqCtx(uiR), choiceName:ui.choiceName||planSession().choiceName, draft:Object.assign({},draft,{rname:''})});
@@ -17761,8 +17775,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       var RL=reviewReqs(this.atlas, ui), ans=reqAnswers(ui);
       if(RL.some(function(q){ return !ans[q.key]; })){ say('Resolve every requirement before you accept.'); this.route='plan-c'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey()); return this.models?this.render():this.update(); }
       var answers=RL.filter(function(q){ return q.id; }).map(function(q){ return {id:q.id,d:ans[q.key]}; });
-      var extra=RL.filter(function(q){ return q.added&&ans[q.key]!=='none'; }).map(function(q){ var r=q.added, d0=r.date||budgetDateKey();
-        return {name:r.name, values:journalRepeat({repeat:r.repeat,every:r.every,mdays:r.mdays,time:r.time},{type:'expense',flow:'out',consume:true,charge:'per',amount:-Math.abs(+r.amount||0),date:d0},d0)}; });
+      var extra=RL.filter(function(q){ return q.added&&ans[q.key]!=='none'&&/^\d{4}-\d{2}-\d{2}$/.test(q.added.date)&&isFinite(+q.added.amount); }).map(function(q){ var r=q.added, d0=r.date; /* 1.8.99: an added requirement without its date or amount is left out */
+        return {name:r.name, values:journalRepeat({repeat:r.repeat,every:r.every,mdays:r.mdays,time:r.time},{type:'expense',flow:'out',consume:true,charge:'per',amount:-Math.abs(+r.amount),date:d0},d0)}; });
       var res=BF.acceptChoice(this.atlas,this.context,step,ref,answers,extra); /* 1.8.92: a fault preparing the switch is not turned into a note */
       if(!res||!res.ok){ say((res&&res.note)||'The switch was not saved. The current plan is unchanged.'); return; }
       if(res.ops&&res.ops.length){
@@ -17842,7 +17856,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   };
   Home.prototype.dispose=function(){this.dead=true;this.closeField(false);this.detachLive();this.serial++;if(this.session)this.session.dispose();if(this.resize)this.resize.disconnect();this.abort.abort();if(root.__exp7ViewsPropose&&root.__exp7ViewsPropose[this.id]===this.proposalHook)delete root.__exp7ViewsPropose[this.id];Object.keys(this.views).forEach(function(k){var v=this.views[k];if(v.scene&&v.scene.h)v.scene.free();},this);if(this.r)this.r.destroy();if(this.cv)this.cv.remove();if(this.wrap)this.wrap.remove();if(this.status)this.status.remove();};
 
-  function fmtMoney(n){ n=+n; if(!isFinite(n)) n=0; var sign=n<0?'-':''; n=Math.abs(n); return sign+n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+  function fmtMoney(n){ n=+n; if(!isFinite(n)) return ''; /* 1.8.99: an amount that is not a number shows nothing, not 0.00 */ var sign=n<0?'-':''; n=Math.abs(n); return sign+n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
   function navigate(route, act){
     var A={
       'nav:home':'home','nav:back':'home','nav:cash':'cash-list','nav:ledger':'monthly',
@@ -17873,7 +17887,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if(act==='accept'||act==='proposal:accept') return route==='plan-switch-before'?'plan-switch-after':(route==='plan-switch-after'?'home':'plan-switch-before');
     if(act==='cash:view') return route;
     return route;
-    function ctxItem(id){ try{ var A=(typeof root!=='undefined'&&root.__budgetUi&&root.__budgetUi.atlas)||null; return (id&&A&&A.items&&A.items[id])||null; }catch(e){ return null; } }
+    function ctxItem(id){ var A=(typeof root!=='undefined'&&root.__budgetUi&&root.__budgetUi.atlas)||null; return (id&&A&&A.items&&A.items[id])||null; }
   }
   function session(start){
     var route=start||'home';
@@ -17932,7 +17946,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       return obj(c)&&Array.isArray(c.items)?true:no('has no '+p[0]+' with its items'); }); });
     return true;
   }
-  var api={journalRepeat:journalRepeat,journalRepeatDraft:journalRepeatDraft,journalApplyOps:journalApplyOps,bindFullDate:bindFullDate,screenModel:screenModel,screenLayout:screenLayout,budgetApp:budgetApp,screenDraft:screenDraft,navigate:navigate,session:session,fullModel:fullModel,datePicker:datePicker,calendarModel:calendarModel,planModel:planModel,ledgerModel:ledgerModel,cashModel:cashModel,selectionOps:selectionOps,viewLayout:viewLayout,homeLayout:homeLayout,overlay:overlay,model:model,viewMetrics:viewMetrics,maxTexPx:maxTexPx,Home:Home,fonts:journalFonts,journalCalId:journalCalId,journalWhen:journalWhen,formatTime24:formatTime24,dateLabel:dateLabel,hourLabel24:hourLabel24,fieldKey:fieldKey,fieldKind:fieldKind,payDraft:payDraft,hostCssSize:hostCssSize,mount:function(o){var h=new Home(o);h.ready=h.init();return h;}};
+  var api={journalRepeat:journalRepeat,journalRepeatDraft:journalRepeatDraft,journalApplyOps:journalApplyOps,bindFullDate:bindFullDate,screenModel:screenModel,screenLayout:screenLayout,budgetApp:budgetApp,screenDraft:screenDraft,navigate:navigate,session:session,fullModel:fullModel,datePicker:datePicker,calendarModel:calendarModel,planModel:planModel,ledgerModel:ledgerModel,cashModel:cashModel,selectionOps:selectionOps,viewLayout:viewLayout,homeLayout:homeLayout,overlay:overlay,model:model,viewMetrics:viewMetrics,maxTexPx:maxTexPx,Home:Home,fonts:journalFonts,journalCalId:journalCalId,journalWhen:journalWhen,formatTime24:formatTime24,dateLabel:dateLabel,hourLabel24:hourLabel24,fieldKey:fieldKey,fieldKind:fieldKind,hostCssSize:hostCssSize,mount:function(o){var h=new Home(o);h.ready=h.init();return h;}};
   root.Exp7Journal=api;root.Exp7Views.journal=api;
 })(typeof window!=='undefined'?window:globalThis);
 
@@ -18878,7 +18892,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.98",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.99",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
