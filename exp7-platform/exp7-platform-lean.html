@@ -12641,35 +12641,46 @@ function bestRank(w,gid){
   if(typeof window.bestRank==='function' && window.bestRank!==bestRank) return window.bestRank(w,gid);
   return {sc:{ok:false,fn:()=>0,errors:['bestRank unavailable']},pick:null,order:[],method:'best'};
 }
-var JVS=window.JVS=window.JVS||{}, PAGEERR=window.PAGEERR=window.PAGEERR||[];
+if(!window.JVS) window.JVS={}; if(!window.PAGEERR) window.PAGEERR=[]; /* a second load of this script keeps the views and errors it had */
+var JVS=window.JVS, PAGEERR=window.PAGEERR;
 /* gpu-motion + Exp7Slabs.verify look up views via window.exp7views.JVS — publish for every consumer (demo + Budget), not only demo-app-post. */
-window.exp7views=window.exp7views||{}; window.exp7views.JVS=JVS;
+if(!window.exp7views) window.exp7views={}; window.exp7views.JVS=JVS;
 var JRO=window.JRO=(typeof ResizeObserver!=='undefined'?new ResizeObserver(es=>es.forEach(e=>{ const V=JVS[e.target.id], w=Math.round(e.contentRect.width); if(V&&V.sess&&V.html!=null&&w>0&&Math.abs(w-V.w)>8){ V.w=Math.max(1,w); requestAnimationFrame(()=>V.queue(V.sess,'resize')); } })):null);
 if(!window.__exp7ViewsHostListeners){ window.__exp7ViewsHostListeners=1;
   window.addEventListener('error',e=>{ if(/^ResizeObserver loop/.test(String(e.message))) return; PAGEERR.push(String(e.message||e)+(e.lineno?' (line '+e.lineno+')':'')); if(PAGEERR.length>20) PAGEERR.shift(); });
   window.addEventListener('unhandledrejection',e=>{ PAGEERR.push('unhandled rejection: '+String(e.reason&&e.reason.message||e.reason)); });
 }
-function atlasRev(w){ return w.rev||0; } /* proposal checker: w.rev bumps once per accepted batch that wrote */
+function atlasRev(w){ return typeof w.rev==='number'?w.rev:0; } /* an atlas never written is at rev 0 */ /* proposal checker: w.rev bumps once per accepted batch that wrote */
 function activeAtlas(V){ return (V&&V.atlasW) || (typeof W!=='undefined'?W:null); }
+/* 1.8.103: the shared Calendar, Board and Plan host code reads what may be missing through hostRd, hostLs and hostStr, as
+ * Budget's own code does (budgetRd, budgetLs, budgetStr): a record or list that is not there reads as a frozen nothing (a write
+ * into it fails first), a text that is not there as ''. Nothing is made up in its place. */
+const HOST_NONE=Object.freeze({}), HOST_NO_LIST=Object.freeze([]);
+function hostRd(o){ return o!==null&&typeof o==='object'?o:HOST_NONE; }
+function hostLs(a){ return Array.isArray(a)?a:HOST_NO_LIST; }
+function hostStr(v){ return v==null||v===false?'':String(v); }
+/* a view drawn before its box has a width is laid out this wide (the demo's and Budget's widest panel) until it has one */
+const VIEW_START_W=900;
+function hostNum(x){ const n=+x; return x!=null&&x!==''&&isFinite(n)?n:null; } /* a number that is not there, or not a number, is none (null) */
 function rootCompId(V){ const r=V&&V.root&&V.root[0]; return (r&&String(r).indexOf('comp:')===0)?String(r).slice(5):null; }
-function rootComp(V){ const id=rootCompId(V), AW=activeAtlas(V); return (id&&AW&&AW.components&&AW.components[id])||null; }
+function rootComp(V){ const id=rootCompId(V), AW=activeAtlas(V); return id&&AW&&AW.components&&AW.components[id]?AW.components[id]:null; }
 function isCalRoot(V){ const c=rootComp(V); return !!(c&&c.view&&c.view.layout==='calendar'); }
 function isBoardRoot(V){ const c=rootComp(V); return !!(c&&c.view&&c.view.layout==='board'); }
-function calCompId(V){ if(isCalRoot(V)) return rootCompId(V); const AW=activeAtlas(V)||{}; if(AW.meta&&AW.meta.calId) return AW.meta.calId; if(AW.components&&AW.components.trip_calendar) return 'trip_calendar'; const id=rootCompId(V); return id||'trip_calendar'; }
-function boardCompId(V){ if(isBoardRoot(V)) return rootCompId(V); const AW=activeAtlas(V)||{}; if(AW.meta&&AW.meta.boardId) return AW.meta.boardId; const cid=calCompId(V); if(AW.components&&AW.components[cid+'_board']) return cid+'_board'; if(AW.components&&AW.components.trip_calendar_board) return 'trip_calendar_board'; return cid+'_board'; }
-function planCompId(V){ const AW=activeAtlas(V)||{}; if(AW.meta&&AW.meta.planId) return AW.meta.planId; if(AW.components&&AW.components.reqs) return 'reqs'; const cid=calCompId(V); if(AW.components&&AW.components[cid+'_plan']) return cid+'_plan'; return 'reqs'; }
+function calCompId(V){ if(isCalRoot(V)) return rootCompId(V); const AW=hostRd(activeAtlas(V)); /* the demo's names stay: trip_calendar */ if(AW.meta&&AW.meta.calId) return AW.meta.calId; if(AW.components&&AW.components.trip_calendar) return 'trip_calendar'; const id=rootCompId(V); return id?id:'trip_calendar'; }
+function boardCompId(V){ if(isBoardRoot(V)) return rootCompId(V); const AW=hostRd(activeAtlas(V)); if(AW.meta&&AW.meta.boardId) return AW.meta.boardId; const cid=calCompId(V); if(AW.components&&AW.components[cid+'_board']) return cid+'_board'; if(AW.components&&AW.components.trip_calendar_board) return 'trip_calendar_board'; return cid+'_board'; }
+function planCompId(V){ const AW=hostRd(activeAtlas(V)); /* the demo's names stay: reqs */ if(AW.meta&&AW.meta.planId) return AW.meta.planId; if(AW.components&&AW.components.reqs) return 'reqs'; const cid=calCompId(V); if(AW.components&&AW.components[cid+'_plan']) return cid+'_plan'; return 'reqs'; }
 
 function proposeOps(V, ops, proc, src){
   const id=V&&V.id; const hook=window.__exp7ViewsPropose&&id&&window.__exp7ViewsPropose[id];
   if(typeof hook==='function') return hook(ops, proc, src);
-  if(typeof submit==='function') return submit(ops, proc||'ui:views', src);
+  if(typeof submit==='function') return submit(ops, proc, src); /* every caller names its process */
   /* The demo consumer keeps submit inside its own scope and exports it as exp7.submit; use it only for views of its live atlas. */
-  const X=window.exp7; if(X&&typeof X.submit==='function'&&typeof X.W==='function'){ let live=null; try{ live=X.W(); }catch(e){} if(live&&live===activeAtlas(V)) return X.submit(ops, proc||'ui:views', src); }
+  const X=window.exp7; if(X&&typeof X.submit==='function'&&typeof X.W==='function'){ let live=null; try{ live=X.W(); }catch(e){} if(live&&live===activeAtlas(V)) return X.submit(ops, proc, src); }
   return null;
 }
 /* live runtime.js session on a snapshot */
 function startRuntime(w,root,carry,onHtml,pins){ const s=JSON.parse(JSON.stringify(w)); s.root=root; if(s.clock) s.clock.on=false;
-  if(pins) Object.keys(pins).forEach(k=>{ const it=s.items[k]; if(it&&it.alts&&pins[k]){ it.state=it.state||{}; if(!it.state.userPick) it.state.userPick=pins[k]; } });
+  if(pins) Object.keys(pins).forEach(k=>{ const it=s.items[k]; if(it&&it.alts&&pins[k]){ if(!it.state) it.state={}; if(!it.state.userPick) it.state.userPick=pins[k]; } });
   projectCategories(s,w);
   if(carry) Object.keys(carry).forEach(c=>{ if(s.components&&s.components[c]) s.components[c].state=JSON.parse(JSON.stringify(carry[c])); });
   const S={s,html:'',renders:0,errs:[],L:{},dead:false,settled:false,clicks:0}; let quiet=null, first; const timers=[]; S.ready=new Promise(r=>first=r);
@@ -12680,19 +12691,19 @@ function startRuntime(w,root,carry,onHtml,pins){ const s=JSON.parse(JSON.stringi
   const bodyStub={ classList:{ contains(){ return false; }, add(){}, remove(){}, toggle(){}, item(){ return null; } }, className:'', style:{}, appendChild(){ return null; }, removeChild(){ return null; }, querySelector(){ return null; }, querySelectorAll(){ return []; } };
   const fd={ body:bodyStub, documentElement:bodyStub,
     getElementById:id=>id==='ja-atlas'?{textContent:JSON.stringify(s)}:id==='app'?app:null,
-    addEventListener(t,f){ (S.L[t]=S.L[t]||[]).push(f); },
+    addEventListener(t,f){ if(!S.L[t]) S.L[t]=[]; S.L[t].push(f); },
     querySelector(){ return null; }, querySelectorAll(){ return []; }, elementFromPoint(){ return null; },
     createElement(){ return { style:{}, setAttribute(){}, appendChild(){}, classList:bodyStub.classList }; } };
   const fw={ JAtlasModel:window.JAtlasModel, JAtlasEval:window.JAtlasEval };
   const st=(f,ms)=>{ const t=setTimeout(()=>{ if(S.dead) return; try{ f(); }catch(e){ S.errs.push(String(e&&e.message||e)); } bump(); },ms); timers.push(t); return t; };
   S.dispose=()=>{ S.dead=true; timers.forEach(clearTimeout); clearTimeout(quiet); };
   S.call=f=>{ S.clicks++; try{ f(); }catch(e){ S.errs.push('action: '+String(e&&e.message||e)); } bump(); };
-  S.dispatch=(type,el)=>{ S.clicks++; const ev={type,target:el,clientX:0,clientY:0,button:0,preventDefault(){},stopPropagation(){}}; (S.L[type]||[]).forEach(f=>{ try{ f(ev); }catch(e){ S.errs.push(type+' handler: '+String(e&&e.message||e)); } }); bump(); };
+  S.dispatch=(type,el)=>{ S.clicks++; const ev={type,target:el,clientX:0,clientY:0,button:0,preventDefault(){},stopPropagation(){}}; hostLs(S.L[type]).forEach(f=>{ try{ f(ev); }catch(e){ S.errs.push(type+' handler: '+String(e&&e.message||e)); } }); bump(); };
   window.JA_RUNTIME_FACTORY(fw,fd,st,()=>0,undefined); S.J=fw.JAtlas;
   setTimeout(()=>{ if(!S.settled&&!S.dead){ S.errs.push('runtime passes did not settle within 4 s (rendered what it had)'); fire(); } },4000); bump(); return S; }
 /* atlas paths a view action changed in its session snapshot -> proposal ops (view-local components/<id>/state excluded) */
 var VROOTS=['items','components','joys'];
-function pick(s){ const o={}; VROOTS.forEach(k=>o[k]=JSON.parse(JSON.stringify(s[k]||{}))); return o; }
+function pick(s){ const o={}; VROOTS.forEach(k=>o[k]=JSON.parse(JSON.stringify(hostRd(s[k])))); return o; }
 function viewOps(a,b){ const ops=[]; const isObj=v=>v&&typeof v==='object'&&!Array.isArray(v);
   const walk=(x,y,p)=>{ if(JSON.stringify(x)===JSON.stringify(y)) return; if(/^components\/[^/]+\/state$/.test(p)||/^items\/[^/]+\/state\/(pick|pickWhy)$/.test(p)) return; /* view-local state; eval.js-derived pick */
     if(x===undefined){ ops.push({path:p,op:'add',value:y}); return; } if(y===undefined) return;
@@ -12702,17 +12713,19 @@ function viewOps(a,b){ const ops=[]; const isObj=v=>v&&typeof v==='object'&&!Arr
   VROOTS.forEach(r=>walk(a[r],b[r],r)); return ops; }
 /* draw a view: id = container element id (it holds one <canvas>); w = atlas; ro = read-only (replica: actions that write are not proposed) */
 function setView(id,w,root,cb,ro,mopt){ const box=$(id); if(!box) return;
-  const V=JVS[id]=JVS[id]||{id,n:0,err:'',view:new JRViews.View(),rerrs:[],loads:0,patches:0,clicks:0,chain:Promise.resolve()}; V.cb=cb; V.ro=!!ro; V.root=root; V.plan=root[0]==='comp:reqs'; V.open=V.open||{};
+  if(!JVS[id]) JVS[id]={id,n:0,err:'',view:new JRViews.View(),rerrs:[],loads:0,patches:0,clicks:0,chain:Promise.resolve()}; const V=JVS[id]; V.cb=cb; V.ro=!!ro; V.root=root; V.plan=root[0]==='comp:reqs'; if(!V.open) V.open={};
   if(mopt&&mopt.options){ V.opts=window.Exp7VM.options(mopt.options); }
   if(V.wi&&V.wi.rev!==atlasRev(w)){ V.wi=null; V.note='what-if cleared: the live atlas changed'; }
   if(JRO&&V.obs!==box){ JRO.observe(box); V.obs=box; }
-  V.w=Math.max(1,Math.round(box.clientWidth)||V.w||900);
+  /* a box with no width yet (hidden, or not laid out) keeps the view's last width, or VIEW_START_W before its first; the
+   * ResizeObserver redraws it at its own width once it has one */
+  const bw=Math.round(box.clientWidth); V.w=Math.max(1,bw>0?bw:V.w>0?V.w:VIEW_START_W);
   let cv=V.cv||box.querySelector('canvas'); if(!cv) cv=document.createElement('canvas'); if(cv.parentNode!==box){ box.querySelectorAll('canvas').forEach(c=>c!==cv&&c.remove()); box.appendChild(cv); } V.cv=cv; /* the same canvas (and its scene) follows the view when the panel is re-rendered */
-  const rev=atlasRev(w), VA=V.sess&&(V.sess.J&&V.sess.J.atlas||V.sess.s), carry=VA?Object.fromEntries(Object.keys(VA.components||{}).filter(c=>VA.components[c].state).map(c=>[c,VA.components[c].state])):null;
+  const rev=atlasRev(w), VA=V.sess&&(V.sess.J&&V.sess.J.atlas||V.sess.s), carry=VA?Object.fromEntries(Object.keys(hostRd(VA.components)).filter(c=>VA.components[c].state).map(c=>[c,VA.components[c].state])):null;
   if(V.sess) V.sess.dispose();
   /* 1.8.81: a view that cannot be drawn shows no error page. The last frame stays, and the failure goes to Exp7Fail.records()
      (and the diagnostics) for the logs; nothing is drawn in its place. */
-  const fail=e=>{ V.err=String(e&&e.message||e)+(e&&e.code?' [code '+e.code+']':''); V.code=e&&e.code||null; window.Exp7Fail.record({code:'CONTEXT_FAILED',context:'views.draw:'+id,detail:V.err}); try{ if(window.__exp7Dbg) window.__exp7Dbg.push('view-fail',{id:id,err:V.err}); }catch(_){} if(V.cb) V.cb(V); };
+  const fail=e=>{ V.err=String(e&&e.message||e)+(e&&e.code?' [code '+e.code+']':''); V.code=e&&e.code?e.code:null; window.Exp7Fail.record({code:'CONTEXT_FAILED',context:'views.draw:'+id,detail:V.err}); try{ if(window.__exp7Dbg) window.__exp7Dbg.push('view-fail',{id:id,err:V.err}); }catch(_){} if(V.cb) V.cb(V); };
   V.queue=(S,why)=>{ V.chain=V.chain.then(()=>draw(S,why)).catch(fail); return V.chain; };
   const draw=async(S,why)=>{ if(V.sess!==S) return;
     /* A rename that commits on blur remounts the views. A click that lands before the new session settles waits for it, so no empty frame is drawn. */
@@ -12722,18 +12735,18 @@ function setView(id,w,root,cb,ro,mopt){ const box=$(id); if(!box) return;
     let r; V._tfTear=1; try{ r=await V.view.show(cv,model,V.w,{rebuild:why==="reveal"}); } finally{ V._tfTear=0; }
     if(V.sess!==S) return;
     if(r.mode==='failed'){ const fs=window.Exp7Fail.records(), f=fs[fs.length-1]; V.err='not laid out: '+(f?f.code+(f.detail?' ('+f.detail+')':''):'no record'); V.code=f?f.code:null; if(V.cb) V.cb(V); return window.Exp7Fail.FAIL; }
-    if(V.form||isBoardRoot(V)) attachFormFields(V); const J=S.J||{}, L=r.L, I=V.vmInfo||{}; V.html=S.html; V.model=model; V.lastMode=r.mode;
+    if(V.form||isBoardRoot(V)) attachFormFields(V); const J=hostRd(S.J), L=r.L, I=V.vmInfo; /* buildModel sets vmInfo before every draw */ V.html=S.html; V.model=model; V.lastMode=r.mode;
     Object.assign(V,{n:V.n+1,err:'',code:null,tboxes:L.tboxes.length,tlines:L.tboxes.reduce((s,t)=>s+t.count,0),tbl:L.tboxes,notdef:L.notdef,why,items:L.items,rows:L.rows,glyphs:L.glyphs,nodes:L.nodes.length,hits:L.hits,H:L.H,VH:r.VH,ms:r.ms,px:r.px,handle:r.handle,loads:V.view.loads,patches:V.view.patches,lastOps:r.mode==='patch'?r.ops:V.lastOps,mode:r.mode,rev,
-      passes:J.passes,backend:J.backend,engine:J.engine,rerrs:S.errs.concat((J.last&&J.last.errors)||[]).map(String),conflicts:(J.conflicts||[]).length,cycles:(J.cycles||[]).length,deps:I.deps||null,
-      secs:[],days:I.days||0,dayItems:I.dayItems||{},chips:L.items,brows:(I.rows||[]).length,brownames:I.rows||[],month:I.month||null,show:null,detail:!!I.detail,flags:I.flags||[],text:modelText(model).replace(/\s+/g,' ').slice(0,4000),at:Date.now()});
+      passes:J.passes,backend:J.backend,engine:J.engine,rerrs:S.errs.concat(hostLs(J.last&&J.last.errors)).map(String),conflicts:hostLs(J.conflicts).length,cycles:hostLs(J.cycles).length,deps:I.deps,
+      secs:[],days:I.days,dayItems:I.dayItems,chips:L.items,brows:I.rows.length,brownames:I.rows,month:I.month,show:null,detail:!!I.detail,flags:I.flags,text:modelText(model).replace(/\s+/g,' ').slice(0,4000),at:Date.now()});
     cv.dataset.jrRev=rev; cv.dataset.jrDraw=V.n;
-    try{ if(window.__exp7Dbg&&(why==='reveal'||V.n===1)){ var sn=L&&L.nodes&&L.nodes.find(function(q){ return q.vm&&q.hov!=null; }); window.__exp7Dbg.push('draw',{id:id,why:why,mode:r.mode,n:V.n,vm:true,sample:sn?{key:sn.key,kinds:(sn.items||[]).slice(0,6).map(function(it){ return it[0]; })}:null}); } }catch(_){}
+    try{ if(window.__exp7Dbg&&(why==='reveal'||V.n===1)){ var sn=L&&L.nodes&&L.nodes.find(function(q){ return q.vm&&q.hov!=null; }); window.__exp7Dbg.push('draw',{id:id,why:why,mode:r.mode,n:V.n,vm:true,sample:sn?{key:sn.key,kinds:hostLs(sn.items).slice(0,6).map(function(it){ return it[0]; })}:null}); } }catch(_){}
     if(V.cb) V.cb(V); };
   V.view.onact=(el,act,n,mods)=>{ const S=V.sess; if(!S) return; const vm=n&&n.vm; if(!vm) return; V.clicks++;
-    if(vm.t==='day'){ if(isCalRoot(V)) hostDayClick(V,vm.day,mods||{}); return; }
-    if(vm.act==='reqrow'){ const it=vm.item, AW=activeAtlas(V)||{}, x=(AW.items||{})[String(it).replace(/^item:/,'')]; V.sel=it; V.note='selected '+it+(x?' ('+x.name+', jreq '+(x.jreq||'none')+')':''); if(V.cb) V.cb(V); return V.queue(S,'select'); }
+    if(vm.t==='day'){ if(isCalRoot(V)) hostDayClick(V,vm.day,mods); return; }
+    if(vm.act==='reqrow'){ const it=vm.item, x=hostRd(hostRd(activeAtlas(V)).items)[String(it).replace(/^item:/,'')]; V.sel=it; V.note='selected '+it+(x?' ('+x.name+', jreq '+(x.jreq?x.jreq:'none')+')':''); if(V.cb) V.cb(V); return V.queue(S,'select'); }
     if(vm.rt){ blurTextFields(V); return runtimeAct(V,S,vm); }
-    const a=vm.act||''; if(!a) return; blurTextFields(V);
+    const a=hostStr(vm.act); if(!a) return; blurTextFields(V);
     /* Budget / platform chrome drawn in-scene (same JRViews+slabs canvas as the view). */
     if(a.startsWith('budget:')||a.startsWith('plat:')){
       if(typeof window.__budgetChromeAct==='function'&&a.startsWith('budget:')) window.__budgetChromeAct(a);
@@ -12744,17 +12757,18 @@ function setView(id,w,root,cb,ro,mopt){ const box=$(id); if(!box) return;
     /* Host-drive Board sort/filter on *this* app's atlas (universal view behavior; data stays per-app). */
     if((a==='act:sort'||a==='act:filter')&&isBoardRoot(V)){
       const cid=vm.comp||boardCompId(V), AW=activeAtlas(V); if(!AW||!AW.components||!AW.components[cid]) return;
-      const c=AW.components[cid]; c.state=c.state||{}; c.view=c.view||{};
-      if(a==='act:sort'){ const cur=c.state.sort||c.view.sort||'name'; c.state.sort=cur==='name'?'date':cur==='date'?'category':'name'; V.note='sort: '+c.state.sort; }
-      else { const F=['all','unscheduled','scheduled']; const cur=c.state.filter||c.view.filter||'all'; c.state.filter=F[(F.indexOf(cur)+1)%3]; V.note='show: '+c.state.filter; }
+      const c=AW.components[cid]; if(!c.state) c.state={}; const cv=hostRd(c.view);
+      const sortOf=()=>c.state.sort?c.state.sort:cv.sort?cv.sort:BOARD_START.sort, filOf=()=>c.state.filter?c.state.filter:cv.filter?cv.filter:BOARD_START.filter;
+      if(a==='act:sort'){ const cur=sortOf(); c.state.sort=cur==='name'?'date':cur==='date'?'category':'name'; V.note='sort: '+c.state.sort; }
+      else { const F=['all','unscheduled','scheduled']; const cur=filOf(); c.state.filter=F[(F.indexOf(cur)+1)%3]; V.note='show: '+c.state.filter; }
       return submitViews([
-        {path:'components/'+cid+'/state/sort',op:'set',value:c.state.sort||c.view.sort||'name'},
-        {path:'components/'+cid+'/state/filter',op:'set',value:c.state.filter||c.view.filter||'all'}
+        {path:'components/'+cid+'/state/sort',op:'set',value:sortOf()},
+        {path:'components/'+cid+'/state/filter',op:'set',value:filOf()}
       ],'board:'+a.slice(4),V); }
     if(a.startsWith('cal:')||a.startsWith('form:')||a.startsWith('pick:')||a.startsWith('use:')||a.startsWith('res:')||a.startsWith('alt:')||a.startsWith('brd:')){
       if(a.startsWith('cal:')) hostCalAct(V,a); else if(a.startsWith('use:')||a.startsWith('res:')||a.startsWith('alt:')||a.startsWith('brd:')) hostBoardAct(V,a); else hostFormAct(V,a); return; }
     planAct(V,a); };
-  V.view.ondrag=(phase,n,mods,e)=>{ if(isCalRoot(V)) hostDayDrag(V,phase,n,mods||{},e); };
+  V.view.ondrag=(phase,n,mods,e)=>{ if(isCalRoot(V)) hostDayDrag(V,phase,n,mods,e); };
   const onHtml=S=>{ if(V.sess!==S) return; const P=V.pending; V.pending=null;
     if(P){ const ops=viewOps(P.before,pick(S.J&&S.J.atlas||S.s)); V.lastAct={act:P.act,label:P.label,ops};
       if(ops.length){ if(V.ro){ V.note='replica view: "'+P.label+'" would write '+ops.length+' path(s); replica views do not propose'; setView(id,w,root,cb,ro); return; }
@@ -12767,7 +12781,7 @@ function setView(id,w,root,cb,ro,mopt){ const box=$(id); if(!box) return;
 /* ---------- Exp7 host UX: calendar selection + board resources/forms (JRender-drawn) ----------
    Text entry: native JRender TextField (glue owns the hidden textarea). Drag-range via EV.DRAGSTART/DRAG/DRAGEND + NF.DRAG on days.
    Plan-risk highlighting (legacy easy228 system) drives calendar days + plan steps from the same planRisk() map. */
-var MODS=window.exp7mods=window.exp7mods||{shift:false,ctrl:false,meta:false};
+if(!window.exp7mods) window.exp7mods={shift:false,ctrl:false,meta:false}; var MODS=window.exp7mods;
 if(!window.__exp7ViewsModListeners){ window.__exp7ViewsModListeners=1;
   document.addEventListener('keydown',e=>{ if(e.key==='Shift') MODS.shift=true; if(e.key==='Control') MODS.ctrl=true; if(e.key==='Meta') MODS.meta=true; });
   document.addEventListener('keyup',e=>{ if(e.key==='Shift') MODS.shift=false; if(e.key==='Control') MODS.ctrl=false; if(e.key==='Meta') MODS.meta=false; });
@@ -12779,6 +12793,10 @@ const BUDGET_NONE=Object.freeze({}), BUDGET_NO_LIST=Object.freeze([]);
 function budgetRd(o){ return o!==null&&typeof o==='object'?o:BUDGET_NONE; }
 function budgetLs(a){ return Array.isArray(a)?a:BUDGET_NO_LIST; }
 function budgetStr(v){ return v==null||v===false?'':String(v); }
+/* the platform Plan view's step risk rules (ranking_ui's): a step weighs a tenth of its cost, else twice its hours, else
+ * the unpriced weight, and never less than the floor. These are the rules themselves, named here, not stand-ins for data. */
+const RISK_IMPACT=Object.freeze({floor:8, unpriced:15});
+function riskNum(x){ const n=+x; return x!=null&&x!==''&&isFinite(n)?n:null; }
 function planRisk(w){
   /* Port of ranking_ui easy228 rdCalStrip / path-health rules, computed from PLAN data:
      Legacy: headroom = min balance until next payday (1st/15th); CRITICAL if hr<hc OR fixed event that day;
@@ -12788,30 +12806,29 @@ function planRisk(w){
   const w0=w; w=effAtlas(w);
   const budget=!!(w0&&w0.meta&&w0.meta.budget), ht=budget?w0.meta.riskHT:RISK_HT, CC=RISK_COL;
   /* 1.8.100: a Budget reads only the calendar and plan its meta names, and its day risk limits only from meta.riskHT */
-  const cal=budget?budgetRd(w.meta.calId&&w.components[w.meta.calId]):((w.components&&(w.components[(w.meta&&w.meta.calId)||'trip_calendar']||w.components.trip_calendar))||{}), req=budget?budgetRd(w.meta.planId&&w.components[w.meta.planId]):((w.components&&(w.components[(w.meta&&w.meta.planId)||'reqs']||w.components.reqs))||{});
+  const cal=budget?budgetRd(w.meta.calId&&w.components[w.meta.calId]):hostRd(w.components&&(w.components[w.meta&&w.meta.calId?w.meta.calId:'trip_calendar']||w.components.trip_calendar)), req=budget?budgetRd(w.meta.planId&&w.components[w.meta.planId]):hostRd(w.components&&(w.components[w.meta&&w.meta.planId?w.meta.planId:'reqs']||w.components.reqs));
   const ids=new Set([...budgetLs(cal.items),...budgetLs(req.items)].map(r=>String(r).replace(/^item:/,'')));
   const steps=[]; ids.forEach(id=>{ const it=w.items[id]; if(!it) return; const v=budgetRd(it.values), d=v.date;
     const F=(typeof E!=='undefined'&&__jaEval().itemFlags)?__jaEval().itemFlags(w,'item:'+id):{};
-    let pick=null, cost=0, hours=0, allBad=false, winBad=false, slack=null;
+    let pick=null, cost=null, hours=null, slack=null; const allBad=false, winBad=false; /* 1.8.103: a cost or hours that is not a number is none */
     if(it.alts&&it.alts.members&&it.alts.members.length){
-      /* 1.8.100: no rank() is defined here, so this has always come back empty; a Budget no longer calls it and picks through selectedRef */
-      let R=null; if(!budget){ try{ R=rank(w,id); }catch(e){} }
-      const pk=budget?selectedRef(w,id):((it.state&&(it.state.userPick||it.state.pick||it.state.simPick))||(R&&R.pick&&R.pick.pick)||it.alts.members[0]);
-      pick=pk; const o=w.items[String(pk).replace(/^item:/,'')]; if(o&&o.values){ cost=+o.values.cost||0; hours=+o.values.hours||0; }
-      const scores=(R&&R.order)||[]; if(scores.length){ const worst=scores[scores.length-1]; winBad=pk===worst.ref; allBad=scores.every(x=>x.score!=null&&x.score<=0); }
-    } else { cost=+(v.cost)||0; hours=+(v.hours)||0; }
+      /* 1.8.103: rank() is not defined in this script, so the old try/catch around it always came back empty and every
+       * score test after it was dead code: it is gone (winBad and allBad stay false, as they always were) */
+      const pk=budget?selectedRef(w,id):((it.state&&(it.state.userPick||it.state.pick||it.state.simPick))||it.alts.members[0]);
+      pick=pk; const o=w.items[String(pk).replace(/^item:/,'')]; if(o&&o.values){ cost=riskNum(o.values.cost); hours=riskNum(o.values.hours); }
+    } else { cost=riskNum(v.cost); hours=riskNum(v.hours); }
     if(it.jreq&&d){ const j=w.items[String(it.jreq).replace(/^item:/,'')]; const jd=j&&j.values&&j.values.date; if(jd){ const a=new Date(d+'T00:00:00'), b=new Date(jd+'T00:00:00'); slack=Math.round((a-b)/86400000); } }
-    const impact=Math.max(8, Math.round((cost||0)/10)||(hours?Math.round(hours*2):15));
+    const byCost=cost!==null?Math.round(cost/10):0, impact=Math.max(RISK_IMPACT.floor, byCost?byCost:hours?Math.round(hours*2):RISK_IMPACT.unpriced);
     const fixed=!!(d&&/^\d{4}-\d{2}-\d{2}$/.test(d));
-    steps.push({id,name:it.name,date:d||null,fixed,impact,cost,hours,pick,slack,broken:!!F.broken,conflict:!!F.conflict,cycle:false,allBad,winBad,jreq:it.jreq||null});
+    steps.push({id,name:it.name,date:d?d:null,fixed,impact,cost,hours,pick,slack,broken:!!F.broken,conflict:!!F.conflict,cycle:false,allBad,winBad,jreq:it.jreq?it.jreq:null});
   });
   /* a Budget without meta.riskHT shows no day risk */
   const days=budget?(ht?budgetDayRisk(w0,ht):{}):legacyDays();
   function legacyDays(){
   /* resource pressure: low stock raises outflow */
-  let resPressure=0; resourcesOf(w).forEach(it=>{ const st=+((it.values||{}).stock); if(st===0) resPressure+=12; else if(st>0&&st<5) resPressure+=6; });
+  let resPressure=0; resourcesOf(w).forEach(it=>{ const st=+hostRd(it.values).stock; if(st===0) resPressure+=12; else if(st>0&&st<5) resPressure+=6; });
   /* build day series spanning calendar month ± a few days around dated steps */
-  const month=(cal.view&&cal.view.month)||'2027-04';
+  const month=window.JAtlasEval.monthOf(cal); /* 1.8.103: the month the calendar shows, not a made-up 2027-04 */
   const y=+month.slice(0,4), mo=+month.slice(5,7);
   const start=new Date(y,mo-2,1), end=new Date(y,mo+1,0); /* prev month through current */
   const flat=[]; let b=ht.base;
@@ -12834,7 +12851,7 @@ function planRisk(w){
   const stepRisk={}; steps.forEach(s=>{ let c='L', why='low plan risk';
     if(s.broken||s.conflict||s.allBad){ c='C'; why=s.broken?'broken jreq':(s.conflict?'jreq conflict':'every alternative is BAD'); }
     else if(s.date&&days[s.date]&&days[s.date].c==='C'){ c='C'; why='fixed-date step on CRITICAL day · '+days[s.date].why; }
-    else if(s.winBad||(s.slack!=null&&s.slack<1)||(s.date&&days[s.date]&&days[s.date].c==='M')){ c='M'; why=s.winBad?'current pick is weakest alt':(s.slack!=null&&s.slack<1?'slack < 1 day to requirement':('on MODERATE day · '+(days[s.date]&&days[s.date].why||''))); }
+    else if(s.winBad||(s.slack!=null&&s.slack<1)||(s.date&&days[s.date]&&days[s.date].c==='M')){ c='M'; why=s.winBad?'current pick is weakest alt':(s.slack!=null&&s.slack<1?'slack < 1 day to requirement':('on MODERATE day · '+days[s.date].why)); }
     else if(s.date&&days[s.date]){ c=days[s.date].c; why=days[s.date].why; }
     stepRisk[s.id]={c,why,date:s.date,slack:s.slack,impact:s.impact,pick:s.pick}; });
   return {days,steps:stepRisk,list:steps,ht,legend:['C','M','L'].map(k=>({k,color:CC[k][0],bg:CC[k][2],label:CC[k][1]})),rules:budget?[]:[
@@ -12879,7 +12896,7 @@ function riskOf(w){ return planRisk(w||W); }
 
 function clearFormFields(V){ if(V&&V._tfOff){ try{ V._tfOff(); }catch(e){} V._tfOff=null; } if(V) V._tfLazy=null; if(V&&V.view){ V._tfTear=1; try{ V.view.clearFields(); } finally{ V._tfTear=0; } } V.tf={}; }
 /* 1.8.35: category-name fields exist only for Board rows near the viewport. lazy = rows sorted by y; band = one screen above to two below. */
-function tfBand(V,extra){ const L=V.view&&V.view.L, s=V.view&&V.view.s; if(!L||!(L.VH>0)||!s) return null; const sy=+(s.scrollPos(JRViews.GID)||[0,0])[1]||0, e=extra||0; return [sy-L.VH*(1+e), sy+L.VH*(2+e)]; }
+function tfBand(V,extra){ const L=V.view&&V.view.L, s=V.view&&V.view.s; if(!L||!(L.VH>0)||!s) return null; const p=s.scrollPos(JRViews.GID); if(!Array.isArray(p)) return null; const sy=+p[1], e=extra; return [sy-L.VH*(1+e), sy+L.VH*(2+e)]; }
 function syncLazyFields(V){ const Z=V&&V._tfLazy; if(!Z||!V.view) return; const band=tfBand(V,0), keep=tfBand(V,2); if(!band) return;
   let lo=0, hi=Z.rows.length; while(lo<hi){ const mid=(lo+hi)>>1; if(Z.rows[mid].y+Z.rows[mid].h<band[0]) lo=mid+1; else hi=mid; }
   for(let k=lo;k<Z.rows.length&&Z.rows[k].y<band[1];k++){ const row=Z.rows[k]; if(!V.tf[row.f]) Z.make(row.n); }
@@ -12887,7 +12904,7 @@ function syncLazyFields(V){ const Z=V&&V._tfLazy; if(!Z||!V.view) return; const 
     if(row.y+row.h>=keep[0]&&row.y<keep[1]) continue;
     try{ if(Z.slabs&&Z.slabs.release) Z.slabs.release(tf.id); }catch(e){}
     V._tfTear=1; try{ tf.remove(); }catch(e){} finally{ V._tfTear=0; }
-    const fl=V.view.fields||[], at=fl.indexOf(tf); if(at>=0) fl.splice(at,1); delete V.tf[f]; } }
+    const fl=hostLs(V.view.fields), at=fl.indexOf(tf); if(at>=0) fl.splice(at,1); delete V.tf[f]; } }
 /* Library TextField owns Safari-safe opacity/z-index (jrender-exp7 v4). Host only keeps pointer-events off when blurred
    so canvas buttons under the shared textarea still receive hits (Create / Place). */
 function guardTextFieldPointer(){ try{ const t=document.querySelector('textarea[data-jrender="textfield"]'); if(!t) return;
@@ -12895,22 +12912,23 @@ function guardTextFieldPointer(){ try{ const t=document.querySelector('textarea[
   if(!t._jrPeHook){ t._jrPeHook=1; t.addEventListener('focus',()=>{ t.style.pointerEvents='auto'; }); t.addEventListener('blur',()=>{ t.style.pointerEvents='none'; }); }
 }catch(e){} }
 function blurTextFields(V){ try{ if(V&&V.tf) Object.keys(V.tf).forEach(k=>{ try{ V.tf[k].blur&&V.tf[k].blur(); }catch(e){} }); const t=document.querySelector('textarea[data-jrender="textfield"]'); if(t){ t.blur(); t.style.pointerEvents='none'; } }catch(e){} }
+function firstFormField(tf){ const k=Object.keys(tf).find(k=>k.indexOf('ren:')!==0); return k?k:null; }
 function attachFormFields(V){ /* pull live values before tear-down so a re-layout mid-edit (use: chips, etc.) keeps what was typed */
   if(V&&V.tf&&V.form) Object.keys(V.tf).forEach(f=>{ if(f.indexOf('ren:')===0) return; try{ const v=V.tf[f]&&V.tf[f].value; if(v!=null) V.form[f]=v; }catch(e){} });
   const wantFocus=V&&V.formFocus; clearFormFields(V); if(!V||!V.view||!V.view.L||!V.view.r) return;
   const rgba=window.JRender.rgba;
-  const AW=activeAtlas(V)||{items:{}};
-  let i=0; V.tf=V.tf||{};
+  const AW=hostRd(activeAtlas(V)), AI=hostRd(AW.items);
+  let i=0; if(!V.tf) V.tf={};
   /* A popover is the last thing drawn. Fields go in under it. */
   const popNode=V.view.L.nodes.find(n=>n.pop), slabs=V.view._slabs, wake=()=>{ try{ if(window.Exp7Slabs&&window.Exp7Slabs.notify) window.Exp7Slabs.notify(); }catch(e){} };
   const make=n=>{ if(!n.tf||!n.hit) return; const f=n.tf; const [x,y,w,h]=n.hit;
     /* ren:<id> is a category name on its Board row. It keeps what is typed across redraws and renames on Enter or when focus leaves. */
     const ren=f.indexOf('ren:')===0?f.slice(4):null; if(!ren&&!V.form) return;
-    const cur=ren?((V.ren&&V.ren[ren]!=null)?V.ren[ren]:((AW.items[ren]||{}).name||'')):(V.form[f]!=null?V.form[f]:'');
+    const cur=ren?((V.ren&&V.ren[ren]!=null)?V.ren[ren]:hostStr(hostRd(AI[ren]).name)):hostStr(V.form[f]);
     const id=(0x50000000+(i++) )>>>0; /* keep away from TextField derived id XOR bands */
     const tf=V.view.textField({id,parent:JRViews.GID,before:popNode?popNode.id:null,x,y,w:Math.max(120,w),h:Math.max(28,h),...Exp7VM.fieldStyle(V.view.L.tokens),selColor:rgba(36,88,166,55),
       value:String(cur),placeholder:n.ph||f,label:ren?'Item category name':f,
-      oninput:ren?(v=>{ (V.ren=V.ren||{})[ren]=v; }):(v=>{ if(V.form) V.form[f]=v; }),
+      oninput:ren?(v=>{ if(!V.ren) V.ren={}; V.ren[ren]=v; }):(v=>{ if(V.form) V.form[f]=v; }),
       onsubmit:ren?(()=>commitRename(V,ren)):(()=>hostFormAct(V,'form:ok')),
       onfocus:()=>{ V.formFocus=f; if(ren) wake(); }, onblur:()=>{ if(ren&&!V._tfTear){ commitRename(V,ren); wake(); } /* form fields keep formFocus for re-attach */ }});
     if(tf&&ren&&slabs&&slabs.adopt) slabs.adopt(tf.id,n.id);
@@ -12918,7 +12936,7 @@ function attachFormFields(V){ /* pull live values before tear-down so a re-layou
   /* Form fields: all of them. Category names: only rows near the viewport (and the one that had focus); the rest on scroll. */
   const lazyRows=[], byF={};
   V.view.L.nodes.forEach(n=>{ if(!n.tf||!n.hit) return; if(n.tf.indexOf('ren:')!==0||n.tf===wantFocus){ make(n); return; }
-    const row={n,f:n.tf,y:+n.hit[1]||0,h:+n.hit[3]||0}; lazyRows.push(row); byF[n.tf]=row; });
+    const row={n,f:n.tf,y:+n.hit[1],h:+n.hit[3]}; /* a field's hit box is always four numbers */ lazyRows.push(row); byF[n.tf]=row; });
   if(lazyRows.length){ lazyRows.sort((a,b)=>a.y-b.y); V._tfLazy={rows:lazyRows,byF,make,slabs};
     try{ V._tfOff=V.view.s.on(e=>{ if(e&&e.kind===JRender.EV.SCROLL) syncLazyFields(V); }); }catch(e){}
     syncLazyFields(V); }
@@ -12926,14 +12944,14 @@ function attachFormFields(V){ /* pull live values before tear-down so a re-layou
   /* Focus only the remembered field; clicking a field focuses synchronously inside TextField.ev (user gesture).
      Auto-focus after async queue is best-effort (Safari may ignore outside the gesture). */
   /* A category name never takes focus by itself. Only a form's first field does. */
-  const focusKey=wantFocus&&V.tf[wantFocus]?wantFocus:(V.form?(Object.keys(V.tf).find(k=>k.indexOf('ren:')!==0)||null):null);
+  const focusKey=wantFocus&&V.tf[wantFocus]?wantFocus:(V.form?firstFormField(V.tf):null);
   /* Keep the focused field on screen with its label. Do not pin it to y=0. */
-  if(focusKey&&V.view&&V.view.s&&V.view.L){ const n=(V.view.L.nodes||[]).find(q=>q.tf===focusKey&&q.hit); if(n){ const y=n.hit[1], h=n.hit[3]||28, VH=V.view.L.VH||0, H=V.view.L.H||0; if(VH>0&&H>VH){ const sp=V.view.s.scrollPos(JRViews.GID)||[0,0]; if(y<sp[1]+12||y+h>sp[1]+VH-12){ const next=Math.max(0, Math.min(H-VH, y-72)); V.view.s.scroll(JRViews.GID, sp[0]||0, next); } } } }
+  if(focusKey&&V.view&&V.view.s&&V.view.L){ const n=V.view.L.nodes.find(q=>q.tf===focusKey&&q.hit); if(n){ const y=n.hit[1], h=n.hit[3], VH=+V.view.L.VH, H=+V.view.L.H; if(VH>0&&H>VH){ const sp=V.view.s.scrollPos(JRViews.GID); if(Array.isArray(sp)&&(y<sp[1]+12||y+h>sp[1]+VH-12)){ const next=Math.max(0, Math.min(H-VH, y-72)); V.view.s.scroll(JRViews.GID, sp[0], next); } } } }
   if(focusKey&&V.tf[focusKey]) try{ V.tf[focusKey].focus(); guardTextFieldPointer(); if(V.tf[focusKey].place) V.tf[focusKey].place(); }catch(e){} }
 
-function slugId(n){ return String(n||'item').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,28)||('i'+Date.now().toString(36)); }
-function uniqItemId(base,V){ const AW=activeAtlas(V)||{items:{}}; let id=slugId(base), n=2; while(AW.items[id]) id=slugId(base)+'_'+(n++); return id; }
-function calSelOf(V){ return V.calSel=V.calSel||{selected:Object.create(null),anchor:null,repeatAllYears:false}; }
+function slugId(n){ return hostStr(n).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,28)||('i'+Date.now().toString(36)); }
+function uniqItemId(base,V){ const AI=hostRd(hostRd(activeAtlas(V)).items); let id=slugId(base), n=2; while(AI[id]) id=slugId(base)+'_'+(n++); return id; }
+function calSelOf(V){ if(!V.calSel) V.calSel={selected:Object.create(null),anchor:null,repeatAllYears:false}; return V.calSel; }
 function sortedDays(sel){ return Object.keys(sel).filter(k=>sel[k]).sort(); }
 function daysBetween(a,b){ const lo=a<b?a:b, hi=a<b?b:a, out=[]; let d=new Date(+lo.slice(0,4),+lo.slice(5,7)-1,+lo.slice(8));
   const end=new Date(+hi.slice(0,4),+hi.slice(5,7)-1,+hi.slice(8)); while(d<=end){ const y=d.getFullYear(),m=d.getMonth()+1,dd=d.getDate();
@@ -12942,30 +12960,31 @@ function expandYears(sel){ const out=Object.create(null); Object.keys(sel).forEa
     for(let y=2025;y<=2031;y++) out[y+'-'+m[2]+'-'+m[3]]=1; }); return out; }
 /* Type-board ids when Budget multi-board meta is present; else single meta.boardId. */
 function typeBoardIdsOf(AW){
-  if(window.Exp7Views&&typeof window.Exp7Views.typeBoardIds==='function') return window.Exp7Views.typeBoardIds(AW)||[];
-  const meta=(AW&&AW.meta)||{};
+  if(window.Exp7Views&&typeof window.Exp7Views.typeBoardIds==='function') return hostLs(window.Exp7Views.typeBoardIds(AW));
+  const meta=hostRd(AW&&AW.meta);
   if(meta.boardIds&&typeof meta.boardIds==='object') return Object.keys(meta.boardIds).map(k=>meta.boardIds[k]).filter(Boolean);
   const bid=meta.boardId; return bid?[bid]:[];
 }
 function boardIdForRef(AW,ref,fallbackBid,typeHint){
-  const id=String(ref||'').replace(/^item:/,'');
-  const it=(AW.items&&AW.items[id])||null;
-  let t=typeHint||(it&&it.values&&it.values.type)||null;
+  const id=hostStr(ref).replace(/^item:/,'');
+  const it=hostRd(AW.items)[id];
+  let t=typeHint?typeHint:it&&it.values&&it.values.type?it.values.type:null;
   if(t==='routine') return null; /* 1.8.54: routines are schedule-only and live in the 'routines' list */
   /* Batch may include the item add — read type from pending ops via values already on record. */
   if(!t&&window.Exp7Views&&typeof window.Exp7Views.budgetBoardId==='function'&&fallbackBid){
     const m=/^board_(expense|income|debt|asset)$/.exec(fallbackBid); if(m) t=m[1];
   }
   /* 1.8.100: a Budget uses the board its meta names for the type; with no type, the board the item came from when it is one of them, else none */
-  if(AW.meta&&AW.meta.budget){ const ids=AW.meta.boardIds||{}, own=Object.keys(ids).map(k=>ids[k]);
+  if(AW.meta&&AW.meta.budget){ const ids=hostRd(AW.meta.boardIds), own=Object.keys(ids).map(k=>ids[k]);
     if(typeof typeHint==='string'||(it&&it.values&&it.values.type)) return typeof ids[t]==='string'&&ids[t]?ids[t]:null;
     return fallbackBid&&own.indexOf(fallbackBid)>=0?fallbackBid:null; }
   /* Type boards belong to Budget atlases; any other atlas keeps its own board. */
-  if(window.Exp7Views&&typeof window.Exp7Views.budgetBoardId==='function'){
-    const b=window.Exp7Views.budgetBoardId(t||'expense');
+  /* 1.8.103: with no type there is no type board to pick (no made-up 'expense') */
+  if(t&&window.Exp7Views&&typeof window.Exp7Views.budgetBoardId==='function'){
+    const b=window.Exp7Views.budgetBoardId(t);
     if(b&&((AW.meta&&(AW.meta.budget||AW.meta.budgetBoards))||(AW.components&&AW.components[b]))) return b;
   }
-  return fallbackBid||((AW.meta&&AW.meta.boardId)||null);
+  return fallbackBid?fallbackBid:AW.meta&&AW.meta.boardId?AW.meta.boardId:null;
 }
 function ensureMemOp(ops,path,op,value){
   if(!path) return;
@@ -12974,11 +12993,11 @@ function ensureMemOp(ops,path,op,value){
 /* Keep calendar / type-board / plan membership coherent (demo + Budget).
  * Multi-board: never fan an item onto sibling type boards — only its own type board + cal (if dated) + plan. */
 function syncCalPlanOps(ops,V){
-  const AW=activeAtlas(V)||(typeof W!=='undefined'?W:null)||{};
-  const budget=!!(AW.meta&&AW.meta.budget), bids=budget?(AW.meta.boardIds||{}):null;
+  const AW=hostRd(activeAtlas(V)); /* activeAtlas already falls to the page atlas */
+  const budget=!!(AW.meta&&AW.meta.budget), bids=budget?hostRd(AW.meta.boardIds):null;
   /* 1.8.100: a Budget keeps only the calendar and plan its meta names; with none, no membership op for it */
-  const cid=budget?AW.meta.calId:((AW.meta&&AW.meta.calId)||calCompId(V)||'trip_calendar');
-  const pid=budget?AW.meta.planId:((AW.meta&&AW.meta.planId)||planCompId(V)||'reqs');
+  const cid=budget?AW.meta.calId:((AW.meta&&AW.meta.calId)||calCompId(V)); /* calCompId always names one */
+  const pid=budget?AW.meta.planId:((AW.meta&&AW.meta.planId)||planCompId(V)); /* planCompId always names one */
   const boards=typeBoardIdsOf(AW);
   const originBid=boardCompId(V);
   const calP=cid?'components/'+cid+'/items':null, planP=pid?'components/'+pid+'/items':null;
@@ -12995,13 +13014,13 @@ function syncCalPlanOps(ops,V){
     const _rec=ops.find(o=>o.path==='items/'+r.slice(5)&&(o.op==='add'||o.op==='set')), _t=_rec&&_rec.value&&_rec.value.values&&_rec.value.values.type;
     const typeBid=fromBoard?(String(add[r]).replace(/^components\/|\/items$/g,'')) : boardIdForRef(AW,r,originBid||(AW.meta&&AW.meta.boardId),_t);
     /* On Plan, unless the atlas keeps its own Plan (meta.planOwn, 1.8.51). */
-    if(!(AW.meta&&AW.meta.planOwn)&&!(budget?(typeBid&&(typeBid===bids.asset||typeBid===bids.debt)):/^board_(asset|debt)$/.test(String(typeBid||'')))) ensureMemOp(ops,planP,'add',r);
+    if(!(AW.meta&&AW.meta.planOwn)&&!(budget?(typeBid&&(typeBid===bids.asset||typeBid===bids.debt)):/^board_(asset|debt)$/.test(hostStr(typeBid)))) ensureMemOp(ops,planP,'add',r);
     /* Own type board only. */
     if(typeBid) ensureMemOp(ops,'components/'+typeBid+'/items','add',r);
     /* Calendar when dated or when the add originated on Cal. */
-    const id=r.slice(5); const it=(AW.items&&AW.items[id])||null;
+    const id=r.slice(5); const it=hostRd(AW.items)[id];
     const addRec=ops.find(o=>o.path==='items/'+id&&(o.op==='add'||o.op==='set'));
-    const vals=(it&&it.values)||(addRec&&addRec.value&&addRec.value.values)||{};
+    const vals=it&&it.values?it.values:hostRd(addRec&&addRec.value&&addRec.value.values);
     if(fromCal||vals.date) ensureMemOp(ops,calP,'add',r);
   });
   Object.keys(rem).forEach(r=>{
@@ -13018,44 +13037,45 @@ function syncCalPlanOps(ops,V){
   });
   /* A category sits on the calendar on its selected item's date. A date on the category or on an item under it puts the category there. */
   const owners=catOwners(AW), touched={};
-  ops.forEach(o=>{ const m=/^items\/([^/]+)\/(values\/date|alts(\/.*)?|state\/userPick)$/.exec(String(o.path||'')); if(!m) return; const r='item:'+m[1]; touched[owners[r]?('item:'+owners[r]):r]=1; });
-  const calNow=((AW.components&&AW.components[cid])||{}).items||[];
+  ops.forEach(o=>{ const m=/^items\/([^/]+)\/(values\/date|alts(\/.*)?|state\/userPick)$/.exec(hostStr(o.path)); if(!m) return; const r='item:'+m[1]; touched[owners[r]?('item:'+owners[r]):r]=1; });
+  const calNow=hostLs(hostRd(hostRd(AW.components)[cid]).items);
   Object.keys(touched).forEach(r=>{ if(rem[r]||calNow.indexOf(r)>=0) return; const id=r.slice(5), it=AW.items&&AW.items[id]; if(!it) return;
     const onBoard=boardPaths.some(bp=>{ const c=AW.components&&AW.components[bp.replace(/^components\/|\/items$/g,'')]; return !!(c&&Array.isArray(c.items)&&c.items.indexOf(r)>=0); });
     if(!onBoard) return;
     const dated=[id].concat(catMembers(it).map(x=>x.slice(5))).some(x=>{ const o=ops.find(q=>q.path==='items/'+x+'/values/date'); if(o) return !!o.value; const xi=AW.items[x]; return !!(xi&&xi.values&&xi.values.date); });
     if(dated) ensureMemOp(ops,calP,'add',r); });
   return ops; }
-function submitViews(ops,src,V){ const synced=syncCalPlanOps(ops.map(o=>Object.assign({},o)),V); return proposeOps(V||{id:src},synced,'ui:views',src); }
-function mkItemRecord(id,name,extra){ return {id,name,values:Object.assign({},extra&&extra.values||{}),factors:{},state:{},alts:extra&&extra.alts||null,jreq:extra&&extra.jreq||null,blueprint:null}; }
-function resourcesOf(w){ const raw=((w.components&&w.components.resources)||{}).items; const L=Array.isArray(raw)?raw:(typeof raw==='string'&&raw?[raw]:[]);
+function submitViews(ops,src,V){ const synced=syncCalPlanOps(ops.map(o=>Object.assign({},o)),V); return proposeOps(V,synced,'ui:views',src); } /* every caller gives its view */
+function mkItemRecord(id,name,extra){ return {id,name,values:Object.assign({},hostRd(extra&&extra.values)),factors:{},state:{},alts:extra&&extra.alts?extra.alts:null,jreq:extra&&extra.jreq?extra.jreq:null,blueprint:null}; }
+function resourcesOf(w){ const raw=hostRd(hostRd(w.components).resources).items; const L=Array.isArray(raw)?raw:(typeof raw==='string'&&raw?[raw]:[]);
   return L.map(r=>w.items[String(r).replace(/^item:/,'')]).filter(Boolean); }
 function eachBoardRef(w,fn){
   let boards=typeBoardIdsOf(w).slice();
   if(!boards.length){
-    const bid=(w.meta&&w.meta.boardId)||'trip_calendar_board';
+    const bid=w.meta&&w.meta.boardId?w.meta.boardId:'trip_calendar_board'; /* the demo's name stays */
     boards=[bid];
     if(w.components&&w.components.trip_calendar_board&&bid!=='trip_calendar_board') boards.push('trip_calendar_board');
   }
   const seenPath={};
   boards.forEach(bid=>{ if(!bid||seenPath[bid]) return; seenPath[bid]=1;
-    (((w.components&&w.components[bid])||{}).items||[]).forEach(r=>fn(r,bid)); });
+    hostLs(hostRd(hostRd(w.components)[bid]).items).forEach(r=>fn(r,bid)); });
 }
 function boardPickList(w){ w=w||W; const out=[]; const seen={}; const owners=catOwners(w);
   eachBoardRef(w,r=>{ const id=String(r).replace(/^item:/,''); if(seen[id]) return; const it=w.items[id]; if(!it) return;
-    if(((it.values||{}).kind)==='resource') return; if(owners['item:'+id]&&owners['item:'+id]!==id) return; seen[id]=1;
-    out.push({id,name:it.name||id,jreq:it.jreq||null,alts:((it.alts&&it.alts.members)||[]).map(m=>{ const aid=m.slice(5), a=w.items[aid]; return {id:aid,name:(a&&a.name)||aid}; })});
+    if(hostRd(it.values).kind==='resource') return; if(owners['item:'+id]&&owners['item:'+id]!==id) return; seen[id]=1;
+    /* 1.8.103: names are the items' own (empty when not there); an alternative whose item is gone is left out */
+    out.push({id,name:hostStr(it.name),jreq:it.jreq?it.jreq:null,alts:hostLs(it.alts&&it.alts.members).filter(m=>w.items[m.slice(5)]).map(m=>{ const aid=m.slice(5); return {id:aid,name:hostStr(w.items[aid].name)}; })});
   }); return out; }
-function boardItemsNonRes(w){ const raw=((w.components.resources||{}).items); const R=new Set(Array.isArray(raw)?raw:(typeof raw==='string'&&raw?[raw]:[]));
+function boardItemsNonRes(w){ const raw=hostRd(w.components.resources).items; const R=new Set(Array.isArray(raw)?raw:(typeof raw==='string'&&raw?[raw]:[]));
   const out=[], seen={};
-  eachBoardRef(w,r=>{ if(seen[r]||R.has(r)) return; const it=w.items[String(r).replace(/^item:/,'')]; if(((it||{}).values||{}).kind==='resource') return; seen[r]=1; out.push(r); });
+  eachBoardRef(w,r=>{ if(seen[r]||R.has(r)) return; const it=w.items[String(r).replace(/^item:/,'')]; if(hostRd(hostRd(it).values).kind==='resource') return; seen[r]=1; out.push(r); });
   return out; }
 
 function calNavOf(V){ if(!V.calNav) V.calNav={level:'month', day:null, year:null, saved:{scroll:0, selected:null, anchor:null, month:null}}; return V.calNav; }
-function calMonthOf(V){ const AW=activeAtlas(V)||{}; const cal=AW.components[calCompId(V)]||{}; return (cal.view&&cal.view.month)||'2027-04'; }
-function itemsOnDay(w,day,V){ w=effAtlas(w); const E=window.JAtlasEval, cid=(V&&calCompId(V))||(w.meta&&w.meta.calId)||'trip_calendar'; const cal=w.components[cid]||w.components.trip_calendar||{}; const out=[];
-  (cal.items||[]).forEach(r=>{ const id=r.slice(5), it=w.items[id]; if(!it) return; const v=it.values||{}, start=v.date; if(!start) return;
-    if(E.occurrences(it,String(day).slice(0,7)).indexOf(day)>=0) out.push({id,name:it.name,r,start,days:Math.max(1,Number(v.days)||1),jreq:it.jreq,values:v}); }); return out; }
+function calMonthOf(V){ return window.JAtlasEval.monthOf(hostRd(activeAtlas(V)).components[calCompId(V)]); } /* 1.8.103: the month the calendar shows, not a made-up 2027-04 */
+function itemsOnDay(w,day,V){ w=effAtlas(w); const E=window.JAtlasEval, cid=V?calCompId(V):hostRd(w.meta).calId, cal=hostRd(w.components[cid]), out=[];
+  hostLs(cal.items).forEach(r=>{ const id=r.slice(5), it=w.items[id]; if(!it) return; const v=hostRd(it.values), start=v.date; if(!start) return;
+    if(E.occurrences(it,String(day).slice(0,7)).indexOf(day)>=0) out.push({id,name:it.name,r,start,days:Number(v.days),jreq:it.jreq,values:v}); }); return out; } /* 1.8.103: days is the item's own (a span when 2 or more) */
 
 /* ---- ViewStates bridge (report §11): state-only visual updates without HTML→DL relayout ---- */
 function budgetMonthKey(){
@@ -13131,15 +13151,15 @@ function memberRef(m){ const s=String(m==null?'':m); if(!s) return ''; return s.
 const CAT_KEYS=['date','repeat','days','on','until','amount','lastAmount','charge','pay','time','endTime','allDay','every','ex','then'];
 const CAT_SEL=new WeakMap();
 function catMembers(it){ const m=it&&it.alts&&it.alts.members; return (Array.isArray(m)?m:(m?[m]:[])).map(memberRef).filter(Boolean); }
-function catHasValues(it){ const v=(it&&it.values)||{}; return ['date','repeat','amount','cost','hours'].some(k=>v[k]!=null&&v[k]!==''); }
+function catHasValues(it){ const v=hostRd(it&&it.values); return ['date','repeat','amount','cost','hours'].some(k=>v[k]!=null&&v[k]!==''); }
 function catOwners(w){ const out={}; if(!w||!w.items) return out;
   eachBoardRef(w,r=>{ const id=String(r).replace(/^item:/,''); catMembers(w.items[id]).forEach(m=>{ if(m!=='item:'+id&&!out[m]) out[m]=id; }); });
   return out; }
 function selectedRef(w,id){
   const it=w&&w.items&&w.items[id]; const mem=catMembers(it); if(!mem.length) return null;
   const A=it.alts, st=(it.state&&typeof it.state==='object')?it.state:{};
-  const un=[].concat(A.unavail||[]).map(memberRef);
-  const sig=(w.rev||0)+'|'+mem.join(',')+'|'+un.join(',')+'|'+(A.pref||'')+'|'+(st.userPick||'')+'|'+(typeof window.bestRank==='function'?1:0);
+  const un=hostLs(A.unavail).map(memberRef);
+  const sig=hostStr(w.rev)+'|'+mem.join(',')+'|'+un.join(',')+'|'+hostStr(A.pref)+'|'+hostStr(st.userPick)+'|'+(typeof window.bestRank==='function'?1:0);
   const hit=CAT_SEL.get(it); if(hit&&hit.sig===sig) return hit.ref;
   const avail=mem.filter(m=>w.items[m.slice(5)]&&un.indexOf(m)<0);
   const has=x=>{ const r=x?memberRef(x):''; return r&&avail.indexOf(r)>=0?r:null; };
@@ -13147,17 +13167,18 @@ function selectedRef(w,id){
   if(avail.length){
     ref=has(st.userPick);
     const budget=!!(w.meta&&w.meta.budget);
-    if(!ref){ if(budget){ const B=bestRank(w,id); ref=has(B&&B.pick&&B.pick.pick); } else { try{ const B=bestRank(w,id); ref=has(B&&B.pick&&B.pick.pick); }catch(e){} } }
+    /* 1.8.103: bestRank never throws (with no ranker it gives no pick), so the try/catch around it is gone */
+    if(!ref){ const B=bestRank(w,id); ref=has(B&&B.pick&&B.pick.pick); }
     /* 1.8.94: in Budget neither a preferred item nor a pick saved before 1.8.57 (state.pick, simPick) selects itself.
        1.8.100: nor does the first available item; with no pick and no Best the category has no selected item. */
     if(!ref&&!budget) ref=has(A.pref)||has(st.pick)||has(st.simPick)||avail[0];
   }
   CAT_SEL.set(it,{sig:sig,ref:ref}); return ref;
 }
-function catOverlay(base,sel){ const v=Object.assign({},base||{}), sv=(sel&&sel.values)||{};
+function catOverlay(base,sel){ const v=Object.assign({},hostRd(base)), sv=hostRd(sel&&sel.values);
   /* Handoff: the category's own schedule (today's actual) runs until the selected item's later start, then the item's. */
   if(v.date&&sv.date&&String(sv.date)>String(v.date)&&(v.amount!=null&&v.amount!=='')&&!(v.then&&v.then.delta)){ const t={}; CAT_KEYS.forEach(k=>{ if(sv[k]!=null&&sv[k]!=='') t[k]=sv[k]; });
-    if(t.amount==null) t.amount=0; v.then=t; v.thenName=sel.name||sel.id||''; return v; }
+    if(t.amount==null) t.amount=0; v.then=t; if(sel.name) v.thenName=sel.name; /* 1.8.103: no name means no plan name, not the id */ return v; }
   CAT_KEYS.forEach(k=>{ if(sv[k]!=null&&sv[k]!=='') v[k]=sv[k]; }); return v; }
 function effItem(w,id){ const it=w&&w.items&&w.items[id]; if(!it) return it;
   if(w.meta&&w.meta.budget&&window.BudgetFlows&&window.BudgetFlows.eff) return window.BudgetFlows.eff(w,id,it);
@@ -13172,15 +13193,15 @@ function projectCategories(s,w){ if(!s||!s.items||!w||!w.items) return;
   Object.keys(w.items).forEach(id=>{ const it=s.items[id]; if(!it||!it.alts) return; const ref=selectedRef(w,id), sel=ref&&s.items[ref.slice(5)]; if(sel) it.values=catOverlay(it.values,sel); }); }
 /* A calendar placement dates the selected item when that item carries its own date. Otherwise the date is the category's, shared by every item. */
 function dateTargetId(w,id){ const ref=selectedRef(w,id), sel=ref&&w.items[ref.slice(5)]; return sel&&sel.values&&sel.values.date!=null&&sel.values.date!==''?ref.slice(5):id; }
-function itemInUse(w,ref,except){ const C=(w&&w.components)||{};
+function itemInUse(w,ref,except){ const C=hostRd(w&&w.components);
   if(Object.keys(C).some(k=>{ const L=C[k]&&C[k].items; return Array.isArray(L)?L.indexOf(ref)>=0:L===ref; })) return true;
-  return Object.keys((w&&w.items)||{}).some(k=>k!==except&&catMembers(w.items[k]).indexOf(ref)>=0); }
-function commitRename(V,id){ const AW=activeAtlas(V)||{items:{}}; const it=AW.items[id]; const raw=V.ren?V.ren[id]:null;
+  return Object.keys(hostRd(w&&w.items)).some(k=>k!==except&&catMembers(w.items[k]).indexOf(ref)>=0); }
+function commitRename(V,id){ const it=hostRd(hostRd(activeAtlas(V)).items)[id]; const raw=V.ren?V.ren[id]:null;
   if(V.ren) delete V.ren[id]; if(V.formFocus==='ren:'+id) V.formFocus=null;
   if(!it||raw==null) return null;
   const name=String(raw).replace(/\s+/g,' ').trim();
   /* An empty name is not a rename. The row goes back to the name it has. */
-  if(!name||name===it.name){ if(V.sess&&String(raw)!==String(it.name||'')) V.queue(V.sess,'rename'); return null; }
+  if(!name||name===it.name){ if(V.sess&&String(raw)!==hostStr(it.name)) V.queue(V.sess,'rename'); return null; }
   V.note='renamed '+id+' to '+name;
   const ent=submitViews([{path:'items/'+id+'/name',op:'set',value:name}],'board:rename',V);
   if(!ent||(ent.r&&ent.r.ok===false)){ it.name=name; if(V.sess) V.queue(V.sess,'rename'); }
@@ -13261,7 +13282,7 @@ function unitLabel(val,unit){ const n=Number(val); if(val==null||val===''||!isFi
 /* An amount takes the unit of the first resource its category uses. With none, a Budget amount is money. Cost is money and hours are hours. */
 function valueUnit(w,it,owner,key){
   if(key==='hours') return 'h'; if(key==='cost') return 'usd';
-  const uses=[].concat(((owner&&owner.values)||{}).uses||[],((it&&it.values)||{}).uses||[]);
+  const u1=hostRd(owner&&owner.values).uses, u2=hostRd(it&&it.values).uses, uses=[].concat(u1!=null?u1:HOST_NO_LIST,u2!=null?u2:HOST_NO_LIST);
   for(let i=0;i<uses.length;i++){ const r=w&&w.items&&w.items[String(uses[i]).replace(/^item:/,'')]; const u=r&&r.values&&r.values.unit; if(u) return u; }
   return (w&&w.meta&&w.meta.budget)?'usd':''; }
 function budgetValueParts(w,it,owner){
@@ -13275,8 +13296,8 @@ function budgetValueParts(w,it,owner){
 /* Consuming values are red and the rest are green. Both hold 4.5:1 on a row and on the debt-payment wash. */
 const VALUE_INK={consuming:'dangerInk',kept:'keptInk'};
 /* An amount below zero consumes. With no amount, a cost or hours above zero is what the item takes, so it consumes too. */
-function valueConsuming(it){ const v=(it&&it.values)||{}; const num=k=>{ const n=Number(v[k]); return v[k]!=null&&v[k]!==''&&isFinite(n)?n:null; };
-  const a=num('amount'); if(a!=null) return a<0; return (num('cost')||0)>0||(num('hours')||0)>0; }
+function valueConsuming(it){ const v=hostRd(it&&it.values); const num=k=>{ const n=Number(v[k]); return v[k]!=null&&v[k]!==''&&isFinite(n)?n:null; };
+  const a=num('amount'); if(a!=null) return a<0; const c=num('cost'), h=num('hours'); return (c!==null&&c>0)||(h!==null&&h>0); }
 function budgetFactsInner(w){
   const month=budgetMonthKey(); const f=budgetFigures(w, month);
   const ddi=f.ddi==null?'—':(f.ddi*100).toFixed(1)+'%';
@@ -13289,28 +13310,30 @@ function budgetFactsInner(w){
 }
 window.__budgetFactsHtml=function(w){ return budgetFactsInner(w); };
 window.budgetShiftMonth=budgetShiftMonth; window.budgetTodayKey=budgetTodayKey;
-function hostFormAct(V,a){ const W=activeAtlas(V)||{items:{},components:{}};
+function hostFormAct(V,a){ const W=hostRd(activeAtlas(V)); if(!W.items||!W.components) return; /* 1.8.103: with no atlas a form does nothing (no made-up empty atlas) */
   if(a==='form:sign'){ if(!V.form||V.form.kind!=='values'||!V.form.item) return;
     let raw=V.form.amount; if(V.tf&&V.tf.amount){ try{ const v=V.tf.amount.value; if(v!=null) raw=v; }catch(e){} }
     const next=negateAmount(raw); const id=V.form.item, it=W.items[id];
     if(!it){ V.note='missing item'; return V.sess&&V.queue(V.sess,'form'); }
-    const n=+next; const has=it.values&&it.values.amount!=null;
-    V.form.amount=next; V.note=(n<0?'consuming ':'not consuming ')+id;
-    const ent=submitViews([{path:'items/'+id+'/values/amount',op:has?'set':'add',value:isFinite(n)?n:0}],'board:sign',V);
-    if(!ent||(ent.r&&ent.r.ok===false)){ it.values=it.values||{}; it.values.amount=isFinite(n)?n:0; if(V.sess) V.queue(V.sess,'form'); }
+    /* 1.8.103: an amount that is not a number is not saved (no made-up 0) */
+    const n=hostNum(next); const has=it.values&&it.values.amount!=null;
+    V.form.amount=next; if(n===null){ V.note='the amount is not a number'; return V.sess&&V.queue(V.sess,'form'); }
+    V.note=(n<0?'consuming ':'not consuming ')+id;
+    const ent=submitViews([{path:'items/'+id+'/values/amount',op:has?'set':'add',value:n}],'board:sign',V);
+    if(!ent||(ent.r&&ent.r.ok===false)){ if(!it.values) it.values={}; it.values.amount=n; if(V.sess) V.queue(V.sess,'form'); }
     return ent; }
-  if(a.startsWith('pick:')){ const id=a.slice(5); if(!V.form) return; V.form.itemId=id; const it=W.items[id]; V.note='picked '+(it&&it.name||id)+' · requires '+((it&&it.jreq)?String(it.jreq).replace(/^item:/,''):'—'); return V.sess&&V.queue(V.sess,'form'); }
+  if(a.startsWith('pick:')){ const id=a.slice(5); if(!V.form) return; V.form.itemId=id; const it=W.items[id]; V.note='picked '+hostStr(it&&it.name)+' · requires '+((it&&it.jreq)?String(it.jreq).replace(/^item:/,''):'—'); return V.sess&&V.queue(V.sess,'form'); }
   if(a==='form:cancel'){ clearFormFields(V); V.form=null; V.formFocus=null; V.note='form cancelled'; return V.sess&&V.queue(V.sess,'form'); }
   /* Requirement is a dropdown of the other item categories. */
   if(a==='form:req'){ if(!V.form) return; V.form.reqOpen=!V.form.reqOpen; return V.sess&&V.queue(V.sess,'form'); }
   if(a.startsWith('form:reqpick:')){ if(!V.form) return; const rid=a.slice(13); V.form.jreq=rid&&W.items[rid]?rid:''; V.form.reqOpen=false;
-    V.note='requires '+(V.form.jreq?(W.items[V.form.jreq].name||V.form.jreq):'nothing'); return V.sess&&V.queue(V.sess,'form'); }
+    V.note='requires '+(V.form.jreq?hostStr(W.items[V.form.jreq].name):'nothing'); return V.sess&&V.queue(V.sess,'form'); }
   if(a.startsWith('form:calopen:')){ if(!V.form) return; const k=a.slice(13); V.form.open=V.form.open===k?null:k;
-    if(k==='new'){ V.form.src='new'; V.form.itemId=null; V.form.open=null; V.form.newType=V.form.newType||'expense'; }
+    if(k==='new'){ V.form.src='new'; V.form.itemId=null; V.form.open=null; } /* the kind is the one cal:add started the form with, or the one chosen since */
     return V.sess&&V.queue(V.sess,'form'); }
   if(a.startsWith('form:calpick:')){ if(!V.form) return; const m=/^(step|item):(.+)$/.exec(a.slice(13)); if(!m||!W.items[m[2]]) return;
-    V.form.src=m[1]; V.form.itemId=m[2]; V.form.open=null; const e=effItem(W,m[2])||W.items[m[2]], v=e.values||{};
-    V.form.allDay=!v.time||!!v.allDay; V.form.time=v.time||''; V.form.endTime=v.endTime||''; V.note='picked '+(W.items[m[2]].name||m[2])+' · set its time';
+    V.form.src=m[1]; V.form.itemId=m[2]; V.form.open=null; const e=effItem(W,m[2])||W.items[m[2]], v=hostRd(e.values);
+    V.form.allDay=!v.time||!!v.allDay; V.form.time=hostStr(v.time); V.form.endTime=hostStr(v.endTime); V.note='picked '+hostStr(W.items[m[2]].name)+' · set its time';
     return V.sess&&V.queue(V.sess,'form'); }
   if(a.startsWith('form:caltype:')){ if(!V.form) return; V.form.newType=a.slice(13); return V.sess&&V.queue(V.sess,'form'); }
   if(a==='form:allday'){ if(!V.form) return; V.form.allDay=!V.form.allDay; return V.sess&&V.queue(V.sess,'form'); }
@@ -13318,12 +13341,13 @@ function hostFormAct(V,a){ const W=activeAtlas(V)||{items:{},components:{}};
   if(a==='form:span'){ if(!V.form) return; V.form.kind='span'; return hostFormAct(V,'form:ok'); }
   if(a==='form:ok'&&V.form&&window.BudgetFlows&&window.BudgetFlows.submitForm(V)) return;
   if(a==='form:ok'){ if(!V.form) return; /* pull live TextField values (keep non-empty form values if field still empty) */ if(V.tf) Object.keys(V.tf).forEach(f=>{ if(f.indexOf('ren:')===0) return; try{ const v=V.tf[f].value; if(v!=null&&String(v).length) V.form[f]=v; }catch(e){} });
-    const F=V.form||{};     if(F.kind==='resource'){ const id=uniqItemId(F.name||'resource',V); const name=(F.name||'').trim()||('Resource '+id);
-      /* Ensure resources membership array exists on live atlas before propose (Budget blank had none). */
-      if(W.components&&!W.components.resources){ W.components.resources={id:'resources',name:'Resources',view:{layout:'board',title:'Resources',item:{show:[]},states:{}},items:[],blueprints:[],state:{},sub:[]}; }
-      else if(W.components&&W.components.resources&&!Array.isArray(W.components.resources.items)) W.components.resources.items=[];
-      const ops=[{path:'items/'+id,op:'add',value:mkItemRecord(id,name,{values:{kind:'resource',unit:(F.unit||'').trim()||'u',stock:Number(F.stock)||0}})},
-        {path:'components/resources/items',op:'add',value:'item:'+id}];
+    /* 1.8.103: a new resource, item category or item needs a name (none is made up from its id); a unit or stock that is not
+     * given is left out (no made-up 'u' or 0); a missing Resources list is added through the same write, not into the atlas first */
+    const F=V.form;     if(F.kind==='resource'){ const name=hostStr(F.name).trim(); if(!name){ V.note='name the resource'; return V.sess&&V.queue(V.sess,'form'); } const id=uniqItemId(name,V);
+      const vals={kind:'resource'}, unit=hostStr(F.unit).trim(), stock=hostNum(F.stock); if(unit) vals.unit=unit; if(stock!==null) vals.stock=stock;
+      const ops=[{path:'items/'+id,op:'add',value:mkItemRecord(id,name,{values:vals})}];
+      if(!W.components.resources) ops.push({path:'components/resources',op:'add',value:{id:'resources',name:'Resources',view:{layout:'board',title:'Resources',item:{show:[]},states:{}},items:['item:'+id],blueprints:[],state:{},sub:[]}});
+      else ops.push({path:'components/resources/items',op:'add',value:'item:'+id});
       clearFormFields(V); V.form=null; V.note='added resource '+name; submitViews(ops,'board:resource',V); return; }
     if(F.kind==='values'){ const id=F.item; const it=id&&W.items[id]; if(!it){ V.note='missing item'; return V.sess&&V.queue(V.sess,'form'); }
       const ops=[]; function setv(k,val){ const has=it.values&&it.values[k]!=null; ops.push({path:'items/'+id+'/values/'+k,op:has?'set':'add',value:val}); }
@@ -13331,68 +13355,72 @@ function hostFormAct(V,a){ const W=activeAtlas(V)||{items:{},components:{}};
       if(F.repeat!=null&&String(F.repeat).trim()) setv('repeat', String(F.repeat).trim());
       if(F.amount!=null&&String(F.amount).trim()!=='') setv('amount', +F.amount);
       clearFormFields(V); V.form=null; V.note='values saved'; submitViews(ops,'board:values',V); return; }
-    if(F.kind==='newitem'){ const id=uniqItemId(F.name||'item',V); const name=(F.name||'').trim()||('Item '+id);
-      const uses=Object.keys(F.usesIds||{}).filter(k=>F.usesIds[k]&&W.items[k]).map(k=>'item:'+k);
+    if(F.kind==='newitem'){ const name=hostStr(F.name).trim(); if(!name){ V.note='name the item category'; return V.sess&&V.queue(V.sess,'form'); } const id=uniqItemId(name,V);
+      const uses=Object.keys(hostRd(F.usesIds)).filter(k=>F.usesIds[k]&&W.items[k]).map(k=>'item:'+k);
       const vals={}; if(uses.length) vals.uses=uses;
       /* Budget multi-board: stamp finance type from the mounted board id. */
-      const _bid=boardCompId(V); const bm=/^board_(expense|income|debt|asset)$/.exec(_bid||''); if(bm&&vals.type==null) vals.type=bm[1];
+      const _bid=boardCompId(V); const bm=/^board_(expense|income|debt|asset)$/.exec(hostStr(_bid)); if(bm&&vals.type==null) vals.type=bm[1];
       if(bm&&vals.flow==null) vals.flow=bm[1]==='income'?'in':'out';
       if(bm&&vals.consume==null) vals.consume=bm[1]==='expense';
-      const jid=String(F.jreq||'').replace(/^item:/,''); const jref=jid&&W.items[jid]?'item:'+jid:null;
+      const jid=hostStr(F.jreq).replace(/^item:/,''); const jref=jid&&W.items[jid]?'item:'+jid:null;
       const rec=mkItemRecord(id,name,{values:vals,jreq:jref});
       const ops=[{path:'items/'+id,op:'add',value:rec},{path:'components/'+_bid+'/items',op:'add',value:'item:'+id}];
       clearFormFields(V); V.form=null; V.formFocus=null; V.note='added item category '+name; submitViews(ops,'board:newitem',V); return; }
     /* An alternative is an item under its category. It is not a Board row of its own. */
     if(F.kind==='alt'){ const p=F.parent&&W.items[F.parent]; if(!p){ V.note='missing item category'; return V.sess&&V.queue(V.sess,'form'); }
-      const id=uniqItemId(F.name||'item',V); const name=(F.name||'').trim()||('Item '+id); const ref='item:'+id;
+      const name=hostStr(F.name).trim(); if(!name){ V.note='name the item'; return V.sess&&V.queue(V.sess,'form'); } const id=uniqItemId(name,V); const ref='item:'+id;
       const ops=[{path:'items/'+id,op:'add',value:mkItemRecord(id,name,{})}];
       if(p.alts&&Array.isArray(p.alts.members)) ops.push({path:'items/'+F.parent+'/alts/members',op:'add',value:ref});
       else { const A=(p.alts&&typeof p.alts==='object'&&!Array.isArray(p.alts))?p.alts:{};
-        ops.push({path:'items/'+F.parent+'/alts',op:Object.prototype.hasOwnProperty.call(p,'alts')?'set':'add',value:{members:[ref],pref:A.pref||null,unavail:Array.isArray(A.unavail)?A.unavail:[],method:A.method||'best'}}); }
-      V.open=V.open||{}; V.open[F.parent]=true;
+        ops.push({path:'items/'+F.parent+'/alts',op:Object.prototype.hasOwnProperty.call(p,'alts')?'set':'add',value:{members:[ref],pref:A.pref?A.pref:null,unavail:Array.isArray(A.unavail)?A.unavail:[],method:A.method?A.method:'best'}}); } /* a new alternative set ranks by best */
+      if(!V.open) V.open={}; V.open[F.parent]=true;
       clearFormFields(V); V.form=null; V.formFocus=null; V.note='added item '+name; submitViews(ops,'board:alt',V); return; }
     if(F.kind==='caladd'||F.kind==='span'){ const CS=calSelOf(V); let days=sortedDays(CS.selected); if(!days.length){ V.note='select days first'; return V.sess&&V.queue(V.sess,'form'); }
       if(CS.repeatAllYears){ const exp=expandYears(CS.selected); days=sortedDays(exp); }
       const start=days[0], end=days[days.length-1], dur=daysBetween(start,end).length, span=F.kind==='span'&&dur>1;
-      const hm=t=>{ const q=/^\s*(\d{1,2})(?::(\d{2}))?\s*$/.exec(String(t||'')); if(!q) return ''; const h=Math.min(23,+q[1]), mi=Math.min(59,+(q[2]||0)); return String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0'); };
+      const hm=t=>{ const q=/^\s*(\d{1,2})(?::(\d{2}))?\s*$/.exec(hostStr(t)); if(!q) return ''; const h=Math.min(23,+q[1]), mi=q[2]?Math.min(59,+q[2]):0; /* '9' is 9:00 */ return String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0'); };
       const allDay=!!F.allDay||!hm(F.time), time=allDay?'':hm(F.time), endTime=allDay?'':hm(F.endTime);
       const ops=[], _cid=calCompId(V); let id, name;
       const RV=(!span&&window.BudgetFlows&&W.meta&&W.meta.budget)?window.BudgetFlows.repeatValues(F,start):{ok:true,patch:null};
       if(!RV.ok){ V.note=RV.error; F.error=RV.error; return V.sess&&V.queue(V.sess,'form'); }
-      if(F.src==='new'){ name=String(F.name||'').trim(); if(!name){ V.note='name the new item'; return V.sess&&V.queue(V.sess,'form'); }
-        id=uniqItemId(name,V); const t=F.newType||'expense', vals={type:t,date:start,repeat:'once',allDay:allDay};
-        if(time) vals.time=time; if(endTime) vals.endTime=endTime; if(String(F.category||'').trim()) vals.category=String(F.category).trim();
-        if(t!=='routine'){ const n=Math.abs(+F.amount||0); vals.flow=t==='income'?'in':'out'; vals.consume=t==='expense'; vals.amount=t==='income'?n:-n; }
+      if(F.src==='new'){ name=hostStr(F.name).trim(); if(!name){ V.note='name the new item'; return V.sess&&V.queue(V.sess,'form'); }
+        const t=F.newType; if(!t){ V.note='choose what kind of item it is'; return V.sess&&V.queue(V.sess,'form'); }
+        id=uniqItemId(name,V); const vals={type:t,date:start,repeat:'once',allDay:allDay};
+        if(time) vals.time=time; if(endTime) vals.endTime=endTime; if(hostStr(F.category).trim()) vals.category=String(F.category).trim();
+        /* 1.8.103: an amount that is not given is left out (no made-up $0) */
+        if(t!=='routine'){ const n=hostNum(F.amount); vals.flow=t==='income'?'in':'out'; vals.consume=t==='expense'; if(n!==null) vals.amount=t==='income'?Math.abs(n):-Math.abs(n); }
         if(span) vals.days=dur; else if(RV.patch) Object.assign(vals,RV.patch); else if(days.length>1){ vals.repeat='dates'; vals.on=days.slice(); }
         if(t!=='routine'&&W.meta&&W.meta.budget&&!span) vals.charge='per';
         ops.push({path:'items/'+id,op:'add',value:mkItemRecord(id,name,{values:vals})});
         if(t==='routine'){ if(!W.components.routines) ops.push({path:'components/routines',op:'add',value:{id:'routines',name:'Routine',view:{layout:'board',title:'Routine',item:{show:['date','repeat']},states:{}},items:['item:'+id],blueprints:[],state:{},sub:[]}});
           else ops.push({path:'components/routines/items',op:'add',value:'item:'+id}); }
         else { const bid=W.meta&&W.meta.boardIds&&W.meta.boardIds[t]; if(bid&&W.components[bid]) ops.push({path:'components/'+bid+'/items',op:'add',value:'item:'+id}); } }
-      else { id=F.itemId; const it=id&&W.items[id]; if(!it){ V.note='choose a step or an item first'; return V.sess&&V.queue(V.sess,'form'); } name=it.name||id;
-        const tid=dateTargetId(W,id), tv=(W.items[tid]||it).values||{};
+      else { id=F.itemId; const it=id&&W.items[id]; if(!it){ V.note='choose a step or an item first'; return V.sess&&V.queue(V.sess,'form'); } name=hostStr(it.name);
+        const tid=dateTargetId(W,id), tv=hostRd((W.items[tid]?W.items[tid]:it).values);
         const setv=(k,val)=>ops.push({path:'items/'+tid+'/values/'+k,op:tv[k]!=null?'set':'add',value:val});
         setv('date',start); setv('allDay',allDay); setv('time',time); setv('endTime',endTime);
         if(span){ setv('days',dur); setv('repeat','once'); }
         else if(RV.patch){ Object.keys(RV.patch).forEach(k=>setv(k,RV.patch[k])); if(RV.patch.repeat==='every'&&tv.on!=null) ops.push({path:'items/'+tid+'/values/on',op:'drop'}); if(!RV.patch.until&&tv.until!=null) ops.push({path:'items/'+tid+'/values/until',op:'drop'}); }
         else { if(tv.days!=null&&+tv.days!==1) setv('days',1); if(days.length>1){ setv('repeat','dates'); setv('on',days.slice()); } else if(tv.repeat==='dates') setv('on',[start]); } }
-      const cal=(W.components[_cid]||{}).items||[], ref='item:'+id; if(cal.indexOf(ref)<0) ops.push({path:'components/'+_cid+'/items',op:'add',value:ref});
+      const cal=hostLs(hostRd(W.components[_cid]).items), ref='item:'+id; if(cal.indexOf(ref)<0) ops.push({path:'components/'+_cid+'/items',op:'add',value:ref});
       clearFormFields(V); V.form=null; V.formFocus=null;
       V.note=(span?'spanned ':'added ')+name+' '+(span?start+'…'+end:days.length+' day(s)')+(time?' at '+time+(endTime?'–'+endTime:''):' all day');
       submitViews(ops,'cal:add',V); return; }
   }
 }
-function hostCalAct(V,a){ V._dragJust=false; V.drag=null; const W=activeAtlas(V)||{items:{},components:{}}; const CS=calSelOf(V); const S=V.sess; const Nav=calNavOf(V);
+/* the calendar's scroll, or null when it is not drawn (nothing made up) */
+function calScrollY(V){ const p=V.view&&V.view.s?V.view.s.scrollPos(JRViews.GID):null; return Array.isArray(p)?p[1]:null; }
+function hostCalAct(V,a){ V._dragJust=false; V.drag=null; const W=hostRd(activeAtlas(V)); const CS=calSelOf(V); const S=V.sess; const Nav=calNavOf(V);
   if(a==='cal:back'){ if(Nav.level==='day'){ Nav.level='month'; Nav.day=null;
-      if(Nav.saved){ if(Nav.saved.selected) CS.selected=Object.assign(Object.create(null),Nav.saved.selected); CS.anchor=Nav.saved.anchor||null;
+      if(Nav.saved){ if(Nav.saved.selected) CS.selected=Object.assign(Object.create(null),Nav.saved.selected); CS.anchor=Nav.saved.anchor;
         if(Nav.saved.month){ const cur=calMonthOf(V); if(Nav.saved.month!==cur){ submitViews([{path:'components/'+calCompId(V)+'/view/month',op:'set',value:Nav.saved.month}],'cal:back-month',V); } }
-        V._restoreScroll=Nav.saved.scroll||0; }
+        V._restoreScroll=Nav.saved.scroll; } /* 1.8.103: null when the view had no scroll to keep */
       V.note='back to month'; return S&&V.queue(S,'nav'); }
-    Nav.level='year'; Nav.year=+(calMonthOf(V).slice(0,4)); Nav.saved={scroll:(V.view&&V.view.s&&V.view.s.scrollPos(JRViews.GID)||[0,0])[1], selected:Object.assign({},CS.selected), anchor:CS.anchor, month:calMonthOf(V)};
+    Nav.level='year'; Nav.year=+(calMonthOf(V).slice(0,4)); Nav.saved={scroll:calScrollY(V), selected:Object.assign({},CS.selected), anchor:CS.anchor, month:calMonthOf(V)};
     V.note='year overview '+Nav.year; return S&&V.queue(S,'nav'); }
   if(a==='cal:openday'){ const days=sortedDays(CS.selected); if(!days.length){ V.note='select a day first, then Open day'; return S&&V.queue(S,'sel'); }
     const day=days.length===1?days[0]:(CS.anchor&&CS.selected[CS.anchor]?CS.anchor:days[0]);
-    Nav.saved={scroll:(V.view&&V.view.s&&V.view.s.scrollPos(JRViews.GID)||[0,0])[1], selected:Object.assign({},CS.selected), anchor:CS.anchor, month:calMonthOf(V)};
+    Nav.saved={scroll:calScrollY(V), selected:Object.assign({},CS.selected), anchor:CS.anchor, month:calMonthOf(V)};
     Nav.level='day'; Nav.day=day; V.note='day view '+day; return S&&V.queue(S,'nav'); }
   if(a.startsWith('cal:goto:')){ const mo=a.slice(9); Nav.level='month'; Nav.year=null; Nav.day=null;
     submitViews([{path:'components/'+calCompId(V)+'/view/month',op:'set',value:mo}],'cal:goto',V); V.note='month '+mo; return; }
@@ -13404,9 +13432,9 @@ function hostCalAct(V,a){ V._dragJust=false; V.drag=null; const W=activeAtlas(V)
     V.form={kind:a==='cal:span'?'span':'caladd', itemId:null, src:null, open:null, allDay:true, newType:'expense', rep:'days'}; /* 1.8.95: repeat starts at only the selected days */ V.formFocus=null;
     V.note='add item: choose a step, an item or a new item, then its time'; return S&&V.queue(S,'form'); }
   if(a==='cal:remove'){ const days=new Set(sortedDays(CS.selected)); if(!days.size){ V.note='select days first, then Remove'; return S&&V.queue(S,'sel'); }
-    const ops=[]; const seen={}; const _cid=calCompId(V), _pid=planCompId(V); const cal=(W.components[_cid]||{}).items||[];
-    cal.forEach(r=>{ const id=r.slice(5), it=effItem(W,id); if(!it||seen[r]) return; const v=it.values||{}, start=v.date; if(!start) return;
-      const dur=Math.max(1, Number(v.days)||1); const cover=daysBetween(start, (()=>{ const ds=daysBetween(start,'2099-12-31'); return ds[Math.min(dur,ds.length)-1]; })()).slice(0,dur);
+    const ops=[]; const seen={}; const _cid=calCompId(V), _pid=planCompId(V); const cal=hostLs(hostRd(hostRd(W.components)[_cid]).items);
+    cal.forEach(r=>{ const id=r.slice(5), it=effItem(W,id); if(!it||seen[r]) return; const v=hostRd(it.values), start=v.date; if(!start) return;
+      const dur=Number(v.days); const cover=dur>1?daysBetween(start, (()=>{ const ds=daysBetween(start,'2099-12-31'); return ds[Math.min(dur,ds.length)-1]; })()).slice(0,dur):[start]; /* 1.8.103: an item that is not a span covers its own day */
       if(!cover.some(k=>days.has(k))) return; seen[r]=1;
       ops.push({path:'components/'+_cid+'/items',op:'remove',value:r});
       ops.push({path:'components/'+_pid+'/items',op:'remove',value:r});
@@ -13415,7 +13443,7 @@ function hostCalAct(V,a){ V._dragJust=false; V.drag=null; const W=activeAtlas(V)
     if(!ops.length){ V.note='no steps on the '+days.size+' selected day(s)'; return S&&V.queue(S,'sel'); }
     const n=Object.keys(seen).length; V.note='removed '+n+' step(s) from calendar+plan'; submitViews(ops,'cal:remove',V); return; }
 }
-function hostDayClick(V,day,mods){ if(!day||!/^\d{4}-\d{2}-\d{2}$/.test(day)) return; if(V._dragJust||V.drag){ V._dragJust=false; return; } const CS=calSelOf(V); const m=mods||{}; mods={shift:!!(MODS.shift||m.shift),ctrl:!!(MODS.ctrl||m.ctrl),meta:!!(MODS.meta||m.meta),alt:!!(MODS.alt||m.alt)};
+function hostDayClick(V,day,mods){ if(!day||!/^\d{4}-\d{2}-\d{2}$/.test(day)) return; if(V._dragJust||V.drag){ V._dragJust=false; return; } const CS=calSelOf(V); const m=hostRd(mods); mods={shift:!!(MODS.shift||m.shift),ctrl:!!(MODS.ctrl||m.ctrl),meta:!!(MODS.meta||m.meta),alt:!!(MODS.alt||m.alt)};
   const add=mods.ctrl||mods.meta;
   if(mods.shift&&CS.anchor){ daysBetween(CS.anchor,day).forEach(k=>{ CS.selected[k]=1; }); V.note='range '+CS.anchor+' to '+day; }
   else if(add){ if(CS.selected[day]) delete CS.selected[day]; else CS.selected[day]=1; CS.anchor=day; V.note=(CS.selected[day]?'added ':'removed ')+day; }
@@ -13427,24 +13455,24 @@ function hostDayDrag(V,phase,n,mods,e){ if(!n||!n.vm||n.vm.t!=='day') return;
   if(e&&V.view&&V.view.s&&(phase==='move'||phase==='end')){
     const x=e.sx!=null?e.sx:e.x, y=e.sy!=null?e.sy:e.y;
     if(x!=null&&y!=null){ const hid=V.view.s.hit(x,y); const hn=hid!=null&&V.view.byId&&V.view.byId.get(hid);
-      if(hn&&hn.vm&&hn.vm.t==='day') day=hn.vm.day||day; }
+      if(hn&&hn.vm&&hn.vm.t==='day'&&hn.vm.day) day=hn.vm.day; }
   }
   if(!day) return;
-  const CS=calSelOf(V); const m=mods||{}; mods={shift:!!(MODS.shift||m.shift),ctrl:!!(MODS.ctrl||m.ctrl),meta:!!(MODS.meta||m.meta),alt:!!(MODS.alt||m.alt)};
+  const CS=calSelOf(V); const m=hostRd(mods); mods={shift:!!(MODS.shift||m.shift),ctrl:!!(MODS.ctrl||m.ctrl),meta:!!(MODS.meta||m.meta),alt:!!(MODS.alt||m.alt)};
   if(phase==='start'){ V.drag={from:day, to:day, mods:mods, base:Object.assign(Object.create(null),CS.selected)}; CS.anchor=day;
     if(!(mods.shift||mods.ctrl||mods.meta)){ CS.selected=Object.create(null); CS.selected[day]=1; }
     else CS.selected[day]=1;
     V.note='drag start '+day; return; }
   if(phase==='move'&&V.drag){ V.drag.to=day;
     if(!(V.drag.mods&&(V.drag.mods.ctrl||V.drag.mods.meta))) CS.selected=Object.create(null);
-    else CS.selected=Object.assign(Object.create(null),V.drag.base||{});
+    else CS.selected=Object.assign(Object.create(null),V.drag.base);
     daysBetween(V.drag.from,day).forEach(k=>{ CS.selected[k]=1; }); V.note='drag '+V.drag.from+' to '+day;
     /* live range highlight: redraw while dragging (throttle to one frame) */
     if(!V._dragRaf){ V._dragRaf=1; requestAnimationFrame(()=>{ V._dragRaf=0; if(V.drag&&V.sess) V.queue(V.sess,'drag'); }); }
     return; }
-  if(phase==='end'){ if(V.drag){ const to=day||V.drag.to||V.drag.from;
+  if(phase==='end'){ if(V.drag){ const to=day; /* 1.8.103: day is known here (no day returned above) */
       if(!(V.drag.mods&&(V.drag.mods.ctrl||V.drag.mods.meta))) CS.selected=Object.create(null);
-      else CS.selected=Object.assign(Object.create(null),V.drag.base||{});
+      else CS.selected=Object.assign(Object.create(null),V.drag.base);
       daysBetween(V.drag.from,to).forEach(k=>{ CS.selected[k]=1; });
       V.note='drag range '+V.drag.from+' to '+to+' ('+sortedDays(CS.selected).length+' days)';
       /* always suppress the CLICK JRender may emit after DRAGEND (same-day micro-drag would toggle off; cross-day would double-fire). Cleared on the next day click or any cal chrome action. */
@@ -13452,17 +13480,17 @@ function hostDayDrag(V,phase,n,mods,e){ if(!n||!n.vm||n.vm.t!=='day') return;
     V.drag=null; return V.sess&&V.queue(V.sess,'sel'); }
 }
 function hostBoardAct(V,a){
-  const W=activeAtlas(V)||{items:{},components:{}};
+  const W=hostRd(activeAtlas(V)); if(!W.items||!W.components) return; /* 1.8.103: with no atlas a board action does nothing */
   if(a.startsWith('brd:remove:')){ const id=a.slice(11); const bid=boardCompId(V); const ref='item:'+id;
     const ops=[{path:'components/'+bid+'/items',op:'remove',value:ref}];
     if(W.meta&&W.meta.budget){ ops.push({path:'items/'+id,op:'drop'});
       /* The items under a removed category go with it, unless something else still lists them. */
       catMembers(W.items[id]).forEach(function(m){ if(m!==ref&&W.items[m.slice(5)]&&!itemInUse(W,m,id)) ops.push({path:'items/'+m.slice(5),op:'drop'}); }); }
-    Object.keys(W.items||{}).forEach(function(oid){ const v=(W.items[oid].values||{}); if(String(v.payTo||'').replace(/^item:/,'')===id) ops.push({path:'items/'+oid+'/values/payTo',op:'set',value:''}); });
+    Object.keys(W.items).forEach(function(oid){ const v=hostRd(W.items[oid].values); if(hostStr(v.payTo).replace(/^item:/,'')===id) ops.push({path:'items/'+oid+'/values/payTo',op:'set',value:''}); });
     if(V.ren) delete V.ren[id];
     V.note='removed '+id; return submitViews(ops,'board:remove',V); }
-  if(a.startsWith('brd:values:')){ const id=a.slice(11); const it=W.items[id]||{}; const v=it.values||{};
-    V.form={kind:'values',item:id,date:v.date||'',repeat:v.repeat||'',amount:v.amount==null?'':String(v.amount)}; V.formFocus='amount'; return V.sess&&V.queue(V.sess,'form'); }
+  if(a.startsWith('brd:values:')){ const id=a.slice(11); const v=hostRd(hostRd(W.items[id]).values);
+    V.form={kind:'values',item:id,date:hostStr(v.date),repeat:hostStr(v.repeat),amount:v.amount==null?'':String(v.amount)}; V.formFocus='amount'; return V.sess&&V.queue(V.sess,'form'); }
   if(a.startsWith('brd:pay:')){ const id=a.slice(8); V.form={kind:'payto',item:id}; V.note='choose the debt this expense pays'; return V.sess&&V.queue(V.sess,'form'); }
   if(a.startsWith('brd:payto:')){ const pair=a.slice(10).split('/'); const id=pair[0], did=pair[1]; const it=W.items[id]; if(!it||!did) return;
     const has=it.values&&it.values.payTo!=null; const ops=[{path:'items/'+id+'/values/payTo',op:has?'set':'add',value:'item:'+did}];
@@ -13478,7 +13506,7 @@ function hostBoardAct(V,a){
     const comp=W.components&&W.components.resources;
     if(comp){ const raw=comp.items; const L=Array.isArray(raw)?raw:(raw?[raw]:[]); comp.items=L.filter(function(x){ return memberRef(x)!==ref; }); }
     Object.keys(W.items).forEach(function(oid){ if(oid===id) return; const uses=W.items[oid]&&W.items[oid].values&&W.items[oid].values.uses; if(Array.isArray(uses)) W.items[oid].values.uses=uses.filter(function(x){ return memberRef(x)!==ref; }); });
-    const name=W.items[id].name||id; delete W.items[id];
+    const name=hostStr(W.items[id].name); delete W.items[id];
     V.note='removed resource '+name;
     return submitViews(ops,'board:res-remove',V); }
   if(W.meta&&W.meta.budget&&window.BudgetFlows&&window.BudgetFlows.altPanelVM){
@@ -13487,21 +13515,21 @@ function hostBoardAct(V,a){
     if(a.startsWith('alt:add:')) return window.BudgetFlows.act(V,'alt2:addalt:'+a.slice(8)); }
   if(a.startsWith('alt:pref:')){ const pair=a.slice(9).split('/'); const id=pair[0], mid=pair[1]; const it=W.items[id]; if(!it||!mid) return;
     if(!it.alts) ensureAlts(it);
-    const r=preferOps(id, it, mid); if(!r) return; V.open=V.open||{}; V.open[id]=true;
+    const r=preferOps(id, it, mid); if(!r) return; if(!V.open) V.open={}; V.open[id]=true;
     V.note=r.next?('preferred '+mid):('cleared preference '+mid);
     const ent=submitViews(r.ops,'board:pref',V);
     if(!ent||(ent.r&&ent.r.ok===false)){ applyAltOps(it, 'pref', mid); if(V.sess) V.queue(V.sess,'alt'); }
     return ent; }
   if(a.startsWith('alt:restrict:')){ const pair=a.slice(13).split('/'); const id=pair[0], mid=pair[1]; const it=W.items[id]; if(!it||!mid) return;
     if(!it.alts) ensureAlts(it);
-    const r=restrictOps(id, it, mid); if(!r) return; V.open=V.open||{}; V.open[id]=true;
+    const r=restrictOps(id, it, mid); if(!r) return; if(!V.open) V.open={}; V.open[id]=true;
     V.note=r.unavailable?('unavailable '+mid):('available '+mid);
     const ent=submitViews(r.ops,'board:restrict',V);
     if(!ent||(ent.r&&ent.r.ok===false)){ applyAltOps(it, 'restrict', mid); if(V.sess) V.queue(V.sess,'alt'); }
     return ent; }
   /* The list is open until its arrow hides it. */
-  if(a.startsWith('alt:tog:')){ const id=a.slice(8); V.open=V.open||{}; V.open[id]=!V.open[id]; V.note=(V.open[id]?'opened':'hid')+' items of '+id; return V.sess&&V.queue(V.sess,'alt'); }
-  if(a.startsWith('alt:add:')){ const id=a.slice(8); V.open=V.open||{}; V.open[id]=true; V.form={kind:'alt',parent:id,name:''}; V.formFocus='name'; return V.sess&&V.queue(V.sess,'form'); }
+  if(a.startsWith('alt:tog:')){ const id=a.slice(8); if(!V.open) V.open={}; V.open[id]=!V.open[id]; V.note=(V.open[id]?'opened':'hid')+' items of '+id; return V.sess&&V.queue(V.sess,'alt'); }
+  if(a.startsWith('alt:add:')){ const id=a.slice(8); if(!V.open) V.open={}; V.open[id]=true; V.form={kind:'alt',parent:id,name:''}; V.formFocus='name'; return V.sess&&V.queue(V.sess,'form'); }
   if(a.startsWith('alt:remove:')){ const pair=a.slice(11).split('/'); const id=pair[0], mid=pair[1]; const it=W.items[id]; if(!it||!mid||!it.alts) return;
     const A=it.alts, ref=memberRef(mid), same=function(x){ return memberRef(x)===ref; }; const ops=[];
     if(Array.isArray(A.members)&&A.members.some(same)) ops.push({path:'items/'+id+'/alts/members',op:'remove',value:A.members.find(same)});
@@ -13510,7 +13538,7 @@ function hostBoardAct(V,a){
     if(it.state&&it.state.userPick!=null&&same(it.state.userPick)) ops.push({path:'items/'+id+'/state/userPick',op:'ref',value:null});
     if(W.meta&&W.meta.budget&&W.items[mid]&&!itemInUse(W,ref,id)) ops.push({path:'items/'+mid,op:'drop'});
     if(!ops.length) return;
-    V.open=V.open||{}; V.open[id]=true; V.note='removed item '+((W.items[mid]||{}).name||mid);
+    if(!V.open) V.open={}; V.open[id]=true; V.note='removed item '+hostStr(hostRd(W.items[mid]).name);
     if(V.form&&V.form.item===mid){ clearFormFields(V); V.form=null; V.formFocus=null; }
     const ent=submitViews(ops,'board:alt-remove',V);
     if(!ent||(ent.r&&ent.r.ok===false)){
@@ -13520,7 +13548,7 @@ function hostBoardAct(V,a){
       if(it.state&&it.state.userPick!=null&&same(it.state.userPick)) it.state.userPick=null;
       if(V.sess) V.queue(V.sess,'alt'); }
     return ent; }
-  if(a.startsWith('use:')){ const id=a.slice(4); V.form=V.form||{}; V.form.usesIds=V.form.usesIds||{}; V.form.usesIds[id]=!V.form.usesIds[id]; return V.sess&&V.queue(V.sess,'form'); }
+  if(a.startsWith('use:')){ const id=a.slice(4); if(!V.form) return; if(!V.form.usesIds) V.form.usesIds={}; /* a use chip is only in a form */ V.form.usesIds[id]=!V.form.usesIds[id]; return V.sess&&V.queue(V.sess,'form'); }
 }
 
 /* ---------- host-side document edits before JRender layout (runtime.js output itself is untouched) ---------- */
@@ -13531,10 +13559,10 @@ function hostBoardAct(V,a){
    Selected and never rewrites Best (bestRank ignores userPick). */
 function livePins(w){ const P={}; Object.keys(w.items).forEach(id=>{ const it=w.items[id]; if(it&&it.alts&&!(it.state&&it.state.userPick)){ const B=bestRank(w,id); if(B.pick) P[id]=B.pick.pick; } }); return P; }
 const sg=v=>v==null||v===''?'—':(v>0?'+':v<0?'−':'')+Math.abs(v);
-function planCells(A,id,pins,wiPick){ const it=A.items[id]; if(!it) return ['—','—']; const st=it.state||{};
+function planCells(A,id,pins,wiPick){ const it=A.items[id]; if(!it) return ['—','—']; const st=hostRd(it.state);
   let sel; if(it.alts){ const B=bestRank(A,id); const bestRef=B.pick&&B.pick.pick; const bestName=bestRef&&A.items[bestRef.slice(5)]?A.items[bestRef.slice(5)].name:'—';
     /* wiPick is a boolean (this row is the what-if step); Selected ref is still state.userPick / pick */
-    const up=(it.state&&it.state.userPick)||null;
+    const up=st.userPick;
     const runRef=up||(st.pick||st.simPick)||bestRef; const runIt=runRef&&A.items[String(runRef).slice(5)];
     if(wiPick){ sel=(runIt?runIt.name:'—')+' (what-if Selected)'; if(bestRef&&bestRef!==runRef) sel+=' · Best: '+bestName; }
     else if(up){ const un=A.items[up.slice(5)]; sel=(un?un.name:'—')+' (Selected)'; if(bestRef&&bestRef!==up) sel+=' · Best: '+bestName; else sel+=' · also Best'; }
@@ -13546,17 +13574,17 @@ function planCells(A,id,pins,wiPick){ const it=A.items[id]; if(!it) return ['—
   return [sel,joy]; }
 /* A step without joy state shows what it runs on: the selected item's money (amount, how often, from when) and value score. */
 function stepEffect(A,it){ let run=it;
-  if(it.alts&&!((effItem(A,it.id)||{}).values||{}).then){ const st=it.state||{}, B=bestRank(A,it.id), r=(A.meta&&A.meta.budget)?selectedRef(A,it.id):((st.userPick)||(st.pick||st.simPick)||(it.alts.pref)||(B.pick&&B.pick.pick)); const x=r&&A.items[String(r).slice(5)]; if(x) run=x; }
-  const v=Object.assign({},(it.values||{}),(run!==it?run.values:{})||{}), out=[];
+  if(it.alts&&!hostRd(hostRd(effItem(A,it.id)).values).then){ const st=hostRd(it.state), B=bestRank(A,it.id), r=(A.meta&&A.meta.budget)?selectedRef(A,it.id):((st.userPick)||(st.pick||st.simPick)||(it.alts.pref)||(B.pick&&B.pick.pick)); const x=r&&A.items[String(r).slice(5)]; if(x) run=x; }
+  const v=Object.assign({},hostRd(it.values),run!==it?hostRd(run.values):HOST_NONE), out=[];
   const amt=v.amount==null||v.amount===''?NaN:+v.amount;
-  if(isFinite(amt)&&amt!==0){ const rep=v.repeat||'once', n=Array.isArray(v.on)?v.on.length:0;
+  if(isFinite(amt)&&amt!==0){ const rep=v.repeat, n=Array.isArray(v.on)?v.on.length:0; /* 1.8.103: no repeat says nothing about how often */
     const how=rep==='once'?' once':rep==='dates'?(n>1?' × '+n+' dates':' once'):rep==='monthly'||rep==='monthdays'||rep==='daily'||rep==='weekdays'||rep==='weekly'?'/mo':'';
     const when=v.date?(String(v.date)>budgetTodayKey()?' from '+v.date:' since '+v.date):'';
     out.push((amt<0?'spend ':'income ')+budgetMoney(Math.abs(amt))+how+when); }
   else if(v.date) out.push('$0'+(String(v.date)>budgetTodayKey()?' from '+v.date:''));
   if(v.value!=null&&v.value!==''&&isFinite(+v.value)) out.push('value '+(+v.value));
-  { const ev=(effItem(A,it.id)||{}).values||{}; if(ev.then&&ev.then.delta){ const E2=window.JAtlasEval, nv=E2.phases(ev)[1], a2=+nv.amount||0; out.push('changes from '+(ev.then.cut||ev.then.date)+(ev.then.amount!=null?': '+(a2<0?'spend ':'income ')+budgetMoney(Math.abs(a2)):'')); }
-    else if(ev.then){ const a1=+ev.then.amount||0; out.push('→ '+(ev.thenName||'plan')+' '+(a1?(a1<0?'spend ':'income ')+budgetMoney(Math.abs(a1)):'$0')+' from '+ev.then.date); } }
+  { const ev=hostRd(hostRd(effItem(A,it.id)).values); if(ev.then&&ev.then.delta){ const E2=window.JAtlasEval, nv=E2.phases(ev)[1], a2=riskNum(nv.amount); out.push('changes from '+(ev.then.cut||ev.then.date)+(ev.then.amount!=null&&a2!==null?': '+(a2<0?'spend ':'income ')+budgetMoney(Math.abs(a2)):'')); }
+    else if(ev.then){ const a1=riskNum(ev.then.amount); out.push(['→',ev.thenName,a1===null?'':a1?(a1<0?'spend ':'income ')+budgetMoney(Math.abs(a1)):'$0','from '+ev.then.date].filter(Boolean).join(' ')); } } /* 1.8.103: no name or amount is left out, not shown as plan or $0 */
   if(it.jreq){ const q=A.items[String(it.jreq).slice(5)]; if(q) out.push('needs '+q.name); }
   return out.length?out.join(' · '):'no money or score set'; }
 /* what-if: clone the live atlas, pin the clicked alternative as userPick on the clone, run the REAL runtime.js session on it
@@ -13573,18 +13601,18 @@ async function planAct(V,a){ if(!a) return; const S=V.sess;
     V.note='what-if '+step+' to '+alt+' (live atlas unchanged: '+V.wi.liveUnchanged+')'; if(V.sess===S) return V.queue(S,'whatif'); } }
 function diagText(){ const m=JRViews.metrics('jr-font'); const L=['Exp7 demo diagnostics '+new Date().toISOString(),'userAgent: '+navigator.userAgent,'location.protocol: '+location.protocol+' · isSecureContext: '+window.isSecureContext,
   'WebAssembly: '+(typeof WebAssembly)+' · navigator.gpu: '+!!navigator.gpu+' · devicePixelRatio: '+devicePixelRatio,
-  'JRender v3: jrender.classic.js + jrender_full_small.wasm '+JR_WASM_BYTES+' B · one Core for all views · font dejavu.jrf '+JR_FONT_BYTES+' B · bold '+(typeof JR_FONT_BOLD_BYTES!=='undefined'?JR_FONT_BOLD_BYTES:'?')+' B, '+(m?m.glyphs+' glyphs, upm '+m.upm:'not loaded')+' · wasm memory '+JRViews.mem()+' B · shared GPUContext: '+(JRViews.gc()?'pipelines built '+(JRViews.gc().builds||0)+', renderers '+JRViews.gc().users:'none')];
-  Object.keys(JVS).forEach(id=>{ const V=JVS[id]; L.push(id+': '+(V.err?'ERROR '+V.err:V.n?'drawn '+V.n+'x · scene handle '+V.handle+' · nodes '+V.nodes+' (hit '+V.hits+') · glyphs '+V.glyphs+(V.notdef&&V.notdef.length?' (notdef for '+V.notdef.join('')+')':'')+' · text boxes '+V.tboxes+' ('+V.tlines+' lines) · items '+V.items+' · rows '+V.rows+' · content '+V.w+'x'+V.H+' view '+V.VH+' · px '+V.px.join('x')+' · last '+V.mode+' '+V.ms.toFixed(1)+' ms · full loads '+V.loads+' · patches '+V.patches+(V.lastOps?' (last '+JSON.stringify(V.lastOps)+')':'')+' · clicks '+V.clicks+' · atlas rev '+V.rev+' · runtime pass '+V.passes+' '+V.backend+' '+x7(V.engine)+' (runtime.js engine id "'+V.engine+'")'+' · runtime errors '+(V.rerrs.join(' | ')||'none'):'not drawn yet')); });
+  'JRender v3: jrender.classic.js + jrender_full_small.wasm '+JR_WASM_BYTES+' B · one Core for all views · font dejavu.jrf '+JR_FONT_BYTES+' B · bold '+(typeof JR_FONT_BOLD_BYTES!=='undefined'?JR_FONT_BOLD_BYTES:'?')+' B, '+(m?m.glyphs+' glyphs, upm '+m.upm:'not loaded')+' · wasm memory '+JRViews.mem()+' B · shared GPUContext: '+(JRViews.gc()?'pipelines built '+hostStr(JRViews.gc().builds)+', renderers '+JRViews.gc().users:'none')];
+  Object.keys(JVS).forEach(id=>{ const V=JVS[id]; L.push(id+': '+(V.err?'ERROR '+V.err:V.n?'drawn '+V.n+'x · scene handle '+V.handle+' · nodes '+V.nodes+' (hit '+V.hits+') · glyphs '+V.glyphs+(V.notdef&&V.notdef.length?' (notdef for '+V.notdef.join('')+')':'')+' · text boxes '+V.tboxes+' ('+V.tlines+' lines) · items '+V.items+' · rows '+V.rows+' · content '+V.w+'x'+V.H+' view '+V.VH+' · px '+V.px.join('x')+' · last '+V.mode+' '+V.ms.toFixed(1)+' ms · full loads '+V.loads+' · patches '+V.patches+(V.lastOps?' (last '+JSON.stringify(V.lastOps)+')':'')+' · clicks '+V.clicks+' · atlas rev '+V.rev+' · runtime pass '+V.passes+' '+V.backend+' '+x7(V.engine)+' (runtime.js engine id "'+V.engine+'")'+' · runtime errors '+(V.rerrs.length?V.rerrs.join(' | '):'none'):'not drawn yet')); });
   L.push('page errors: '+(PAGEERR.length?PAGEERR.join(' | '):'none')); return L.join('\n'); }
 window.exp7diag=diagText;
 /* test hook: CSS-px position (relative to the view canvas, after scroll) of the first hit node matching act / text */
-function where(id,act,text){ const V=JVS[id]; if(!V||!V.view.L) return null; const s=V.view.s, sp=s.scrollPos(JRViews.GID); const n=V.view.L.nodes.find(n=>n.vm&&n.hit&&(n.flags&1)&&(!act||act==='jv'||n.vm.act===act||(act==='day'&&n.vm.t==='day')||(act==='reqrow'&&n.vm.act==='reqrow'))&&(!text||String(n.vm.label||n.vm.text||'').indexOf(text)>=0||(n.vm.cells||[]).some(c=>String(c&&c.text||'').indexOf(text)>=0)));
-  if(!n) return null; return {x:n.hit[0]+n.hit[2]/2,y:n.hit[1]+n.hit[3]/2-sp[1],cy:n.hit[1]+n.hit[3]/2,scroll:sp[1],VH:V.VH,H:V.H,id:n.id,dep:n.vm.item||null}; }
+function where(id,act,text){ const V=JVS[id]; if(!V||!V.view.L) return null; const s=V.view.s, sp=s.scrollPos(JRViews.GID); const n=V.view.L.nodes.find(n=>n.vm&&n.hit&&(n.flags&1)&&(!act||act==='jv'||n.vm.act===act||(act==='day'&&n.vm.t==='day')||(act==='reqrow'&&n.vm.act==='reqrow'))&&(!text||hostStr(n.vm.label?n.vm.label:n.vm.text).indexOf(text)>=0||hostLs(n.vm.cells).some(c=>hostStr(c&&c.text).indexOf(text)>=0)));
+  if(!n) return null; return {x:n.hit[0]+n.hit[2]/2,y:n.hit[1]+n.hit[3]/2-sp[1],cy:n.hit[1]+n.hit[3]/2,scroll:sp[1],VH:V.VH,H:V.H,id:n.id,dep:n.vm.item?n.vm.item:null}; }
 function whereDay(id,day){ const V=JVS[id]; if(!V||!V.view.L) return null; const s=V.view.s, sp=s.scrollPos(JRViews.GID); const n=V.view.L.nodes.find(n=>n.vm&&n.vm.t==='day'&&n.hit&&n.vm.day===day);
   if(!n) return null; /* aim at day-number corner so chips do not steal the click */ return {x:n.hit[0]+14,y:n.hit[1]+12-sp[1],cy:n.hit[1]+12,scroll:sp[1],VH:V.VH,H:V.H,id:n.id,day}; }
 
 /* real per-item flags (eval.js itemFlags / sequence) over the same atlas */
-function flagsOf(w){ return Object.keys(w.items).map(id=>{ const F=__jaEval().itemFlags(w,'item:'+id), it=w.items[id], seq=it.jreq?__jaEval().sequence(w,id):[]; return {id,name:it.name,date:(it.values||{}).date||'',jreq:it.jreq,broken:F.broken,conflict:F.conflict,cycle:seq.indexOf('item:'+id)>=0,seq}; }); }
+function flagsOf(w){ return Object.keys(w.items).map(id=>{ const F=__jaEval().itemFlags(w,'item:'+id), it=w.items[id], seq=it.jreq?__jaEval().sequence(w,id):[]; return {id,name:it.name,date:hostStr(hostRd(it.values).date),jreq:it.jreq,broken:F.broken,conflict:F.conflict,cycle:seq.indexOf('item:'+id)>=0,seq}; }); }
 window.VP={
  cal:[['Move travel to 2027-04-12 (after hotel: conflict)',[{path:'items/getthere/values/date',op:'set',value:'2027-04-12'}],'r'],
       ['Move travel back to 2027-04-09',[{path:'items/getthere/values/date',op:'set',value:'2027-04-09'}]],
@@ -13611,16 +13639,16 @@ function VMx(){ return window.Exp7VM; }
 function sessAtlas(V,S){ return (S&&S.J&&S.J.atlas)||(S&&S.s)||activeAtlas(V); }
 /* the views' token set (Exp7Tokens.views): the platform's, with the first root component's theme ({ bg, fg, accent }, all three
    or none) over it. Budget's full views take Budget's look in Exp7Journal.fullModel. A bad theme fails the layout (no default). */
-function vmTokens(V,c){ const T=window.Exp7Tokens, F=window.Exp7Fail, th=((c&&c.view&&c.view.theme)||{}).tokens;
+function vmTokens(V,c){ const T=window.Exp7Tokens, F=window.Exp7Fail, th=hostRd(c&&c.view&&c.view.theme).tokens;
   if(!th) return T.views('exp7',{}); const o=T.theme('exp7',th); return o===F.FAIL?o:T.views('exp7',o); }
 function vmOpts(V){ if(!V.opts){ var AW=activeAtlas(V), over=null; if(AW&&AW.meta&&AW.meta.budget) over={budget:{facts:false,tabs:false},plan:{presentation:'compact',summary:false,columns:['step','selected']},board:{presentation:'ledger'},calendar:{}}; V.opts=VMx().options(over);} return V.opts; }
 function buildModel(V,S,opts){ const X=VMx(), A=sessAtlas(V,S), AW=activeAtlas(V)||A, O=opts!==undefined?opts:vmOpts(V), kids=[];
   V.vmInfo={rows:[],days:0,dayItems:{},chips:0,flags:[],month:null,deps:null,detail:false};
   if(AW&&AW.meta&&AW.meta.budget&&(O.budget.facts||O.budget.tabs)) kids.push(budgetChromeVM(V,AW,O));
-  const roots=(V.root||[]).map(String);
+  const roots=hostLs(V.root).map(String);
   roots.forEach((r,i)=>{ const id=r.indexOf('comp:')===0?r.slice(5):r, c=A&&A.components&&A.components[id];
     if(!c){ kids.push(X.col('broken:'+id,[X.text('t','broken reference '+r,'flag')],{role:'view'})); return; }
-    const lay=(c.view||{}).layout||'stack';
+    const lay=hostRd(c.view).layout; /* a layout that is none of the three is drawn as a plain list */
     if(V.plan&&!V.ro&&lay!=='deps') return;
     if(lay==='calendar'&&i===0) kids.push(calVM(V,A,c,O));
     else if(lay==='board') kids.push(i===0&&isBoardRoot(V)?boardVM(V,A,c,O):simpleBoardVM(V,A,c));
@@ -13629,16 +13657,16 @@ function buildModel(V,S,opts){ const X=VMx(), A=sessAtlas(V,S), AW=activeAtlas(V
   const first=roots[0]&&A&&A.components&&A.components[roots[0].replace(/^comp:/,'')];
   const model={__vm:true,app:'exp7',tokens:vmTokens(V,first),kids}; return AW&&AW.meta&&AW.meta.budget&&window.Exp7Journal?window.Exp7Journal.fullModel(model,V):model; }
 function modelText(m){ const out=[]; (function walk(n){ if(!n) return; if(n.label) out.push(n.label); if(n.text) out.push(n.text); if(n.lines) n.lines.forEach(l=>out.push(l.text)); if(n.num) out.push(String(n.num));
-    if(Array.isArray(n.cols)) n.cols.forEach(c=>out.push(c.label)); if(Array.isArray(n.rows)) n.rows.forEach(r=>{ (r.cells||[]).forEach(c=>out.push(c&&c.text!=null?c.text:String(c||''))); walk(r.sub); }); (n.kids||[]).forEach(walk); })(m); return out.join(' '); }
-function asofDayOf(A,c){ const ref=(c.view||{}).asof, j=ref&&window.JAtlasModel.get(A,ref), x=j&&j.value; return /^\d{4}-\d{2}-\d{2}$/.test(x||'')?x:budgetTodayKey(); }
-function labelFmt(c,v){ if(typeof v!=='number'||!isFinite(v)) return v==null?'':String(v); if((c.view||{}).labelFmt==='money'){ const a=Math.abs(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); return (v<0?'−$':'$')+a; } return String(Math.round(v*100)/100); }
+    if(Array.isArray(n.cols)) n.cols.forEach(c=>out.push(c.label)); if(Array.isArray(n.rows)) n.rows.forEach(r=>{ hostLs(r.cells).forEach(c=>out.push(c&&c.text!=null?c.text:hostStr(c))); walk(r.sub); }); hostLs(n.kids).forEach(walk); })(m); return out.join(' '); }
+function asofDayOf(A,c){ const ref=hostRd(c.view).asof, j=ref&&window.JAtlasModel.get(A,ref), x=j&&j.value; return /^\d{4}-\d{2}-\d{2}$/.test(hostStr(x))?x:budgetTodayKey(); }
+function labelFmt(c,v){ if(typeof v!=='number'||!isFinite(v)) return v==null?'':String(v); if(hostRd(c.view).labelFmt==='money'){ const a=Math.abs(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); return (v<0?'−$':'$')+a; } return String(Math.round(v*100)/100); }
 
 /* ---- Calendar ---- */
 function calVM(V,A,c,O){ const X=VMx(), M=window.JAtlasModel, E=window.JAtlasEval, o=O.calendar, AW=activeAtlas(V)||A, Nav=calNavOf(V), CS=calSelOf(V), R=riskOf(AW), cid=c.id;
   if(window.Exp7Journal&&(o.presentation==='mini'||o.presentation==='agenda')) return window.Exp7Journal.calendarModel(V,A,c,O);
   V.risk=R; V.calRisk=R; V.riskDays=Object.fromEntries(Object.keys(R.days).map(k=>[k,R.days[k].c]));
-  const kids=[X.text('title',x7(c.name||cid),'title')], card=k=>X.col('cal:'+cid,k,{role:'view',slab:'outer'});
-  if(Nav.level==='year'){ const y=Nav.year||(+calMonthOf(V).slice(0,4)), cur=calMonthOf(V);
+  const kids=c.name?[X.text('title',x7(c.name),'title')]:[], card=k=>X.col('cal:'+cid,k,{role:'view',slab:'outer'});
+  if(Nav.level==='year'){ const y=Nav.year, cur=calMonthOf(V); /* cal:back sets the year */
     kids.push(X.row('bar',[X.btn('back','← Back','cal:back'),X.text('t','Year '+y+' · pick a month','h')]));
     const ms=[]; for(let m=1;m<=12;m++){ const mo=y+'-'+(m<10?'0':'')+m; ms.push(X.btn('m'+m,BUDGET_MONTHS[m-1].slice(0,3)+' '+y,'cal:goto:'+mo,{minW:104,on:mo===cur})); }
     kids.push(X.row('months',ms,{gap:8})); V.calSelCount=sortedDays(CS.selected).length; V.vmInfo.detail=false; return card(kids); }
@@ -13647,11 +13675,11 @@ function calVM(V,A,c,O){ const X=VMx(), M=window.JAtlasModel, E=window.JAtlasEva
     if(AW.meta&&AW.meta.budget&&window.BudgetFlows) kids.push(X.col('detail',window.BudgetFlows.dayVM(V,AW,day),{role:'detail',slab:'inner',enter:true,bar:rk?rk.c:null,gap:8}));
     else kids.push(X.col('detail',its.length?its.map((it,i)=>X.text('it'+i,it.name+(it.days>1?' · '+it.days+'d from '+it.start:'')+(it.jreq?' · requires '+String(it.jreq).replace(/^item:/,''):''))):[X.text('empty','No steps on this day.','muted')],{role:'detail',slab:'inner',enter:true,bar:rk?rk.c:null}));
     V.calSelCount=1; V.vmInfo.detail=true; return card(kids); }
-  const month=E.monthOf(c), days=E.monthDays(month), cs=c.state||{}, lb=cs.dayLabels||{}, ds=cs.dayStyles||{}, by={}, today=asofDayOf(A,c), states=(c.view||{}).states||{};
-  (c.items||[]).forEach(r=>{ E.occurrences(M.get(A,r),month).forEach(d=>{ (by[d]=by[d]||[]).push(r); }); });
+  const month=E.monthOf(c), days=E.monthDays(month), cs=hostRd(c.state), lb=hostRd(cs.dayLabels), ds=hostRd(cs.dayStyles), by={}, today=asofDayOf(A,c), states=hostRd(hostRd(c.view).states);
+  hostLs(c.items).forEach(r=>{ E.occurrences(M.get(A,r),month).forEach(d=>{ (by[d]?by[d]:(by[d]=[])).push(r); }); });
   V.vmInfo.month=month;
   kids.push(X.row('nav',[X.btn('prev','‹',null,{kind:'icon',rt:{a:'month',comp:cid,v:-1},minW:32}),X.text('month',month,'h'),X.btn('next','›',null,{kind:'icon',rt:{a:'month',comp:cid,v:1},minW:32}),
-    X.btn('today','Today',null,{rt:{a:'month',comp:cid,v:0}}),o.count&&X.text('count',(c.items||[]).length+' items','muted')]));
+    X.btn('today','Today',null,{rt:{a:'month',comp:cid,v:0}}),o.count&&X.text('count',hostLs(c.items).length+' items','muted')]));
   const n=sortedDays(CS.selected).length, has=k=>X.has(o.toolbar,k);
   const bar=[has('year')&&X.btn('year','← Year','cal:back'),has('openday')&&X.btn('openday','Open day','cal:openday'),has('clear')&&X.btn('clear','Clear selection','cal:clear',{disabled:!n}),
     has('repeat')&&X.btn('repeat',CS.repeatAllYears?'✓ Repeat over all years':'Repeat over all years','cal:repeat',{on:CS.repeatAllYears}),has('expand')&&X.btn('expand','Select same days across years','cal:expand'),
@@ -13662,19 +13690,19 @@ function calVM(V,A,c,O){ const X=VMx(), M=window.JAtlasModel, E=window.JAtlasEva
   if(V.form&&V.form.kind==='fin'&&window.BudgetFlows) kids.push(window.BudgetFlows.finFormVM(V,AW,V.form));
   /* multi-day spans already on the calendar */
   const spanCover=Object.create(null);
-  ((AW.components[calCompId(V)]||{}).items||[]).forEach(r=>{ const it=effItem(AW,String(r).replace(/^item:/,'')); if(!it) return; const v=it.values||{}, start=v.date, dur=Math.max(1,Number(v.days)||1); if(!start||dur<2) return;
-    const ds2=daysBetween(start,'2099-12-31'); daysBetween(start,ds2[Math.min(dur,ds2.length)-1]).slice(0,dur).forEach(k=>{ spanCover[k]=it.name||r; }); });
-  const dragSet=Object.create(null); if(V.drag&&V.drag.from) daysBetween(V.drag.from,V.drag.to||V.drag.from).forEach(k=>{ dragSet[k]=1; });
+  hostLs(hostRd(AW.components[calCompId(V)]).items).forEach(r=>{ const it=effItem(AW,String(r).replace(/^item:/,'')); if(!it) return; const v=hostRd(it.values), start=v.date, dur=Number(v.days); if(!start||!(dur>=2)) return; /* 1.8.103: a span is an item of 2 days or more */
+    const ds2=daysBetween(start,'2099-12-31'); daysBetween(start,ds2[Math.min(dur,ds2.length)-1]).slice(0,dur).forEach(k=>{ spanCover[k]=r; }); });
+  const dragSet=Object.create(null); if(V.drag&&V.drag.from) daysBetween(V.drag.from,V.drag.to).forEach(k=>{ dragSet[k]=1; });
   const cells=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d,i)=>({t:'dow',k:'w'+i,text:d})), first=new Date(+month.slice(0,4),+month.slice(5,7)-1,1).getDay();
   for(let i=0;i<first;i++) cells.push({t:'pad',k:'p'+i});
   days.forEach(d=>{ const rk=R.days[d], sel=!!CS.selected[d], drag=!!dragSet[d], name=rk?riskName(rk.c,sel,drag):null, st=name&&states[name];
     const lines=[]; if(d in lb) lines.push({text:labelFmt(c,lb[d]),color:'noteInk'});
-    (by[d]||[]).map(r=>{ const it=M.get(A,r); if(!it) return null; const e=effItem(A,String(r).replace(/^item:/,''))||it, v0=e.values||{}, v=E.valuesOn?E.valuesOn(v0,d).values:v0, xo=(v.ex&&v.ex[d])||null, tm=xo&&xo.time!=null?String(xo.time):(!v.allDay&&v.time?String(v.time):'');
+    hostLs(by[d]).map(r=>{ const it=M.get(A,r); if(!it) return null; const e=effItem(A,String(r).replace(/^item:/,'')), v0=hostRd(e.values), v=E.valuesOn(v0,d).values, xo=hostRd(v.ex)[d], tm=xo&&xo.time!=null?String(xo.time):(!v.allDay&&v.time?String(v.time):'');
       return {at:tm, text:(tm?tm.replace(/^0(\d)/,'$1')+' ':'')+it.name, chip:true, tone:v.type==='routine'?'routine':(v.flow==='in'||v.type==='income')?'in':(v.payTo||v.type==='debt')?'debt':'out'}; })
       .filter(Boolean).sort((p,q)=>p.at<q.at?-1:p.at>q.at?1:0).forEach(L=>lines.push(L));
-    V.vmInfo.days++; if(by[d]&&by[d].length) V.vmInfo.dayItems[d]=(by[d]||[]).map(r=>(M.get(A,r)||{}).name||r);
-    cells.push({t:'day',k:d,day:d,num:+d.slice(8),lines,count:(by[d]||[]).length,risk:rk?rk.c:null,badge:rk?((A.meta&&A.meta.budget&&window.BudgetFlows&&window.BudgetFlows.resLetter)?window.BudgetFlows.resLetter(rk.c):rk.c):null,badgeInk:rk?'riskText'+rk.c:null,sel,drag,anchor:CS.anchor===d,span:!!spanCover[d],today:d===today,
-      state:name,anim:st&&st.anim||null,title:rk?d+' · '+((A.meta&&A.meta.budget&&window.BudgetFlows&&window.BudgetFlows.resLabel)?window.BudgetFlows.resLabel(rk.c):RISK_COL[rk.c][1])+' · '+rk.why:d,styleName:ds[d]||null}); });
+    V.vmInfo.days++; if(by[d]&&by[d].length) V.vmInfo.dayItems[d]=by[d].map(r=>M.get(A,r).name);
+    cells.push({t:'day',k:d,day:d,num:+d.slice(8),lines,count:hostLs(by[d]).length,risk:rk?rk.c:null,badge:rk?((A.meta&&A.meta.budget&&window.BudgetFlows&&window.BudgetFlows.resLetter)?window.BudgetFlows.resLetter(rk.c):rk.c):null,badgeInk:rk?'riskText'+rk.c:null,sel,drag,anchor:CS.anchor===d,span:!!spanCover[d],today:d===today,
+      state:name,anim:st&&st.anim?st.anim:null,title:rk?d+' · '+((A.meta&&A.meta.budget&&window.BudgetFlows&&window.BudgetFlows.resLabel)?window.BudgetFlows.resLabel(rk.c):RISK_COL[rk.c][1])+' · '+rk.why:d,styleName:ds[d]?ds[d]:null}); });
   kids.push({t:'grid',k:'grid',cols:7,gap:5,cellH:80,kids:cells});
   if(o.legend&&A.meta&&A.meta.budget&&window.BudgetFlows&&window.BudgetFlows.resLabel){ kids.push(X.row('legend',['L','M','C'].map(k=>X.text(k,window.BudgetFlows.resLetter(k)+'  '+window.BudgetFlows.resLabel(k),'small',{color:'riskText'+k,bold:true})),{gap:14})); kids.push(X.text('legendnote',window.BudgetFlows.RES_NOTE,'muted')); }
   else if(o.legend) kids.push(X.row('legend',R.legend.map(L=>X.text(L.k,L.k+' '+L.label,'small',{color:'riskText'+L.k,bold:true})),{gap:14}));
@@ -13683,18 +13711,18 @@ function calVM(V,A,c,O){ const X=VMx(), M=window.JAtlasModel, E=window.JAtlasEva
   return card(kids); }
 function riskName(c,sel,drag){ const base=c==='C'?'critical':c==='M'?'moderate':'low'; if(drag) return 'drag'; if(sel) return base+'_sel'; return base; }
 /* 1.8.54: Calendar Add item. Three dropdowns (a Plan step, an existing item, a new item), then the item's time. */
-function calStepList(AW){ const P=(AW.components[(AW.meta&&AW.meta.planId)||'reqs']||{}).items||[]; return P.map(r=>{ const id=String(r).replace(/^item:/,''), it=AW.items[id]; return it?{id,name:it.name||id}:null; }).filter(Boolean); }
+function calStepList(AW,V){ const P=hostLs(hostRd(AW.components[planCompId(V)]).items); return P.map(r=>{ const id=String(r).replace(/^item:/,''), it=AW.items[id]; return it&&it.name?{id,name:it.name}:null; }).filter(Boolean); } /* 1.8.103: the plan the view uses (planCompId); a step with no name is left out */
 function calItemList(AW){ const out=boardPickList(AW).map(P=>({id:P.id,name:P.name})), seen={}; out.forEach(P=>{ seen[P.id]=1; });
-  (((AW.components||{}).routines||{}).items||[]).forEach(r=>{ const id=String(r).replace(/^item:/,''), it=AW.items[id]; if(it&&!seen[id]){ seen[id]=1; out.push({id,name:it.name||id,routine:true}); } }); return out; }
-function calFormVM(V,AW){ const X=VMx(), F=V.form, open=F.open||null, src=F.src||null, it=F.itemId&&AW.items[F.itemId];
+  hostLs(hostRd(hostRd(AW.components).routines).items).forEach(r=>{ const id=String(r).replace(/^item:/,''), it=AW.items[id]; if(it&&it.name&&!seen[id]){ seen[id]=1; out.push({id,name:it.name,routine:true}); } }); return out; } /* 1.8.103: a routine with no name is left out */
+function calFormVM(V,AW){ const X=VMx(), F=V.form, open=F.open, src=F.src, it=F.itemId&&AW.items[F.itemId], newName=hostStr(F.name).trim();
   const kids=[X.text('title',F.kind==='span'?'Span an item across the selected days':'Add an item to the selected days','h'),
     X.text('hint','Choose a plan step, an existing item, or a new item. Then set its time.','muted')];
-  const cur=k=>src===k?(k==='new'?((F.name||'').trim()||'new item'):(it?it.name:'')):'';
+  const cur=k=>src===k?(k==='new'?(newName?newName:'new item'):(it?it.name:'')):''; /* 'new item' is the button's own words while the name is empty */
   const dd=(k,lab)=>X.btn('dd:'+k,lab+(cur(k)?': '+cur(k):'')+(open===k?'':'  ▸'),'form:calopen:'+k,{on:open===k||src===k});
   kids.push(X.row('dds',[dd('step','Step'),dd('item','Item'),dd('new','New item')]));
-  if(open==='step'){ const L=calStepList(AW); kids.push(X.row('steps',L.length?L.map(P=>X.btn('s:'+P.id,P.name,'form:calpick:step:'+P.id,{on:src==='step'&&F.itemId===P.id})):[X.text('none','No plan steps.','muted')])); }
+  if(open==='step'){ const L=calStepList(AW,V); kids.push(X.row('steps',L.length?L.map(P=>X.btn('s:'+P.id,P.name,'form:calpick:step:'+P.id,{on:src==='step'&&F.itemId===P.id})):[X.text('none','No plan steps.','muted')])); }
   if(open==='item'){ const L=calItemList(AW); kids.push(X.row('items',L.length?L.map(P=>X.btn('i:'+P.id,P.name+(P.routine?' · routine':''),'form:calpick:item:'+P.id,{on:src==='item'&&F.itemId===P.id})):[X.text('none','No items yet.','muted')])); }
-  if(src==='new'){ const nt=F.newType||'expense';
+  if(src==='new'){ const nt=F.newType; /* cal:add starts it at expense */
     kids.push(X.row('f:name',[X.text('l','Name:','body',{bold:true}),X.field('f','name','Name',{w:260,v:F.name!=null?F.name:''})]));
     kids.push(X.row('kind',[X.text('l','Kind:','body',{bold:true})].concat([['expense','Spending'],['income','Income'],['routine','Routine']].map(([k,lab])=>X.btn('t:'+k,lab,'form:caltype:'+k,{on:nt===k})))));
     if(nt!=='routine') kids.push(X.row('f:amount',[X.text('l',nt==='income'?'Amount each time:':'Cost each time:','body',{bold:true}),X.field('f','amount','Amount',{w:140,v:F.amount!=null?F.amount:''})]));
@@ -13703,60 +13731,66 @@ function calFormVM(V,AW){ const X=VMx(), F=V.form, open=F.open||null, src=F.src|
     if(!F.allDay){ tr.push(X.text('a','from','muted'),X.field('f','time','07:00',{w:90,v:F.time!=null?F.time:''}),X.text('b','to','muted'),X.field('f2','endTime','16:00',{w:90,v:F.endTime!=null?F.endTime:''})); }
     kids.push(X.row('f:time',tr)); }
   if(src&&F.kind!=='span'&&window.BudgetFlows&&AW.meta&&AW.meta.budget) window.BudgetFlows.calRepeatVM(V,F).forEach(k=>kids.push(k));
-  const ready=!!(src&&(src!=='new'||it||true));
+  const ready=!!src;
   if(F.error) kids.push(X.text('err',F.error,'flag'));
   kids.push(X.row('acts',[X.btn('ok','Add on selected days','form:ok',{kind:F.kind==='span'?null:'primary',disabled:!ready}),X.btn('span','Span across selection','form:span',{kind:F.kind==='span'?'primary':null,disabled:!ready}),X.btn('cancel','Cancel','form:cancel')]));
   if(F.kind==='span') kids.push(X.text('spanhint','A span shows on every day from the first to the last selected day; its amount applies on the last day.','muted'));
   return X.col('form',kids,{role:'detail',slab:'inner',enter:true}); }
 
 /* ---- Board (an item category per row; the root board of the view) ---- */
-function boardRows(A,c){ const M=window.JAtlasModel, st=c.state||{}, cv=c.view||{}, sort=st.sort||cv.sort||'name', fil=st.filter||cv.filter||'all';
-  const L=(c.items||[]).filter(r=>{ const it=M.get(A,r), d=it&&(it.values||{}).date; return fil==='all'||(fil==='scheduled'?!!d:!d); });
-  const ord=o=>{ const v=o.values||{}; return (v.categoryOrder!=null?String(1e6+(+v.categoryOrder)):'9999999')+'|'+String(v.category||'~').toLowerCase()+'|'+(v.lineOrder!=null?String(1e6+(+v.lineOrder)):String(o.name||'').toLowerCase()); };
-  L.sort((a,b)=>{ const x=M.get(A,a)||{}, y=M.get(A,b)||{}, k=sort==='date'?(o=>(o.values||{}).date||'9999'):sort==='category'?ord:(o=>String(o.name||'').toLowerCase()); return k(x)<k(y)?-1:k(x)>k(y)?1:0; });
+/* 1.8.103: a board starts sorted by name and showing all, until its state or view names another sort or filter */
+const BOARD_START=Object.freeze({sort:'name',filter:'all'});
+function boardRows(A,c){ const M=window.JAtlasModel, st=hostRd(c.state), cv=hostRd(c.view), sort=st.sort?st.sort:cv.sort?cv.sort:BOARD_START.sort, fil=st.filter?st.filter:cv.filter?cv.filter:BOARD_START.filter;
+  const L=hostLs(c.items).filter(r=>{ const it=M.get(A,r), d=it&&hostRd(it.values).date; return fil==='all'||(fil==='scheduled'?!!d:!d); });
+  /* sort keys: what is not there sorts last ('9999999', '~', '9999') */
+  const ord=o=>{ const v=hostRd(o.values); return (v.categoryOrder!=null?String(1e6+(+v.categoryOrder)):'9999999')+'|'+(v.category?String(v.category):'~').toLowerCase()+'|'+(v.lineOrder!=null?String(1e6+(+v.lineOrder)):hostStr(o.name).toLowerCase()); };
+  L.sort((a,b)=>{ const x=hostRd(M.get(A,a)), y=hostRd(M.get(A,b)), k=sort==='date'?(o=>{ const d=hostRd(o.values).date; return d?d:'9999'; }):sort==='category'?ord:(o=>hostStr(o.name).toLowerCase()); return k(x)<k(y)?-1:k(x)>k(y)?1:0; });
   return {L,sort,fil}; }
 function valueText(w,it,owner){ const parts=budgetValueParts(w,it,owner), neg=valueConsuming(it); return {text:parts.length?parts.join(' · '):'no values',color:parts.length?(neg?VALUE_INK.consuming:VALUE_INK.kept):null,consuming:neg,empty:!parts.length}; }
 function boardVM(V,A,c,O){ const X=VMx(), M=window.JAtlasModel, o=O.board, AW=activeAtlas(V)||A, cid=c.id, Q=boardRows(A,c), bid=boardCompId(V);
-  if(window.Exp7Journal&&AW&&AW.meta&&AW.meta.budget){ const ids=(AW.meta.boardIds)||{}; if(ids.asset&&c.id===ids.asset&&window.Exp7Journal.cashModel) return window.Exp7Journal.cashModel(V,A,c); }
+  if(window.Exp7Journal&&AW&&AW.meta&&AW.meta.budget){ const ids=hostRd(AW.meta.boardIds); if(ids.asset&&c.id===ids.asset&&window.Exp7Journal.cashModel) return window.Exp7Journal.cashModel(V,A,c); }
   if(window.Exp7Journal&&(o.presentation==='ledger')) return window.Exp7Journal.ledgerModel(V,A,c,O);
   const titles={board_expense:'Expense',board_income:'Income',board_debt:'Debt',board_asset:'Asset'};
-  const title=AW&&AW.meta&&AW.meta.budgetBoards?((titles[bid]||((AW.components[bid]||{}).view||{}).title||bid)+' · Board'):x7(c.name||cid);
-  const kids=[X.text('title',title,'title')], ht=k=>X.has(o.toolbar,k);
-  const finT=AW&&AW.meta&&AW.meta.budget&&window.BudgetFlows?(/^board_(asset|debt|income)$/.exec(bid||'')||[])[1]:null;
+  /* 1.8.103: a board with no name or title shows no title (its id is not made into one) */
+  const tn=AW&&AW.meta&&AW.meta.budgetBoards?(titles[bid]?titles[bid]:hostStr(hostRd(hostRd(AW.components[bid]).view).title)):'', title=AW&&AW.meta&&AW.meta.budgetBoards?(tn?tn+' · Board':''):(c.name?x7(c.name):'');
+  const kids=title?[X.text('title',title,'title')]:[], ht=k=>X.has(o.toolbar,k);
+  const finM=/^board_(asset|debt|income)$/.exec(hostStr(bid)), finT=AW&&AW.meta&&AW.meta.budget&&window.BudgetFlows&&finM?finM[1]:null;
   const bar=[ht('new')&&X.btn('new',finT?('+ New '+(finT==='income'?'pay':finT)):'+ New item',finT?('fin:new:'+finT):'act:new',{comp:cid}),ht('sort')&&X.btn('sort','sort: '+Q.sort,'act:sort',{comp:cid}),ht('filter')&&X.btn('filter','show: '+Q.fil,'act:filter',{comp:cid})].filter(Boolean);
   if(bar.length) kids.push(X.row('bar',bar));
   const F=V.form, owners=catOwners(AW);
   if(F&&F.kind==='fin'&&window.BudgetFlows) kids.push(window.BudgetFlows.finFormVM(V,AW,F));
   if(o.resources){ const res=resourcesOf(AW);
-    kids.push(X.col('resources',[X.text('h','Resources','h')].concat(res.map(it=>X.row('r:'+it.id,[X.text('n',it.name+' · '+(it.values.stock!=null?unitLabel(it.values.stock,it.values.unit):(it.values.unit||''))),X.btn('rm','Remove','res:remove:'+it.id)]))).concat([X.btn('add','+ Add resource','res:add')]),{role:'section',slab:'inner'}));
+    kids.push(X.col('resources',[X.text('h','Resources','h')].concat(res.map(it=>X.row('r:'+it.id,[X.text('n',it.name+' · '+(it.values.stock!=null?unitLabel(it.values.stock,it.values.unit):hostStr(it.values.unit))),X.btn('rm','Remove','res:remove:'+it.id)]))).concat([X.btn('add','+ Add resource','res:add')]),{role:'section',slab:'inner'}));
     if(F&&F.kind==='resource') kids.push(boardFormVM(V,AW,F)); }
-  const budgetBoard=/^board_(expense|income|debt|asset)$/.test(bid||''), viewMonth=budgetBoard?budgetMonthKey():'', hc=k=>X.has(o.category,k), hi=k=>X.has(o.item,k);
+  const budgetBoard=/^board_(expense|income|debt|asset)$/.test(hostStr(bid)), viewMonth=budgetBoard?budgetMonthKey():'', hc=k=>X.has(o.category,k), hi=k=>X.has(o.item,k);
   /* sort 'category': a header per values.category with that section's money this month */
-  const E7=window.JAtlasEval, secMoney={}, secOf=id=>String(((AW.items[id]||{}).values||{}).category||'Other');
-  if(Q.sort==='category'&&E7) Q.L.forEach(r=>{ const id=String(r).replace(/^item:/,''), e=effItem(AW,id); if(!e) return; const ch=(e.values||{}).date?E7.charges(e,viewMonth||budgetMonthKey()):{}; let a=0; Object.keys(ch).forEach(d=>{ a+=+ch[d]||0; }); secMoney[secOf(id)]=(secMoney[secOf(id)]||0)+a; });
+  /* 'Other' is the section's own word for items with no category; a charge that is not a number fails alone and is not counted */
+  const E7=window.JAtlasEval, secMoney={}, secOf=id=>{ const k=hostRd(hostRd(AW.items[id]).values).category; return k!=null&&k!==''?String(k):'Other'; };
+  if(Q.sort==='category'&&E7) Q.L.forEach(r=>{ const id=String(r).replace(/^item:/,''), e=effItem(AW,id); if(!e) return; const ch=hostRd(e.values).date?E7.charges(e,viewMonth?viewMonth:budgetMonthKey()):HOST_NONE; let a=0; Object.keys(ch).forEach(d=>{ const n=hostNum(ch[d]); if(n!==null) a+=n; }); const k=secOf(id); secMoney[k]=(k in secMoney?secMoney[k]:0)+a; });
   let lastSec=null;
-  Q.L.forEach(r=>{ const id=(M.parse(r)||{}).id||String(r).replace(/^item:/,''), it=AW.items[id]; if(!it) return; if(((it.values||{}).kind)==='resource') return;
+  Q.L.forEach(r=>{ const p=M.parse(r), id=p&&p.id?p.id:String(r).replace(/^item:/,''), it=AW.items[id]; if(!it) return; if(hostRd(it.values).kind==='resource') return;
     if(owners['item:'+id]&&owners['item:'+id]!==id) return;
-    if(Q.sort==='category'&&secOf(id)!==lastSec){ lastSec=secOf(id); const m=secMoney[lastSec]||0;
+    if(Q.sort==='category'&&secOf(id)!==lastSec){ lastSec=secOf(id); const m=lastSec in secMoney?secMoney[lastSec]:0;
       kids.push(X.row('sec:'+lastSec,[X.text('h',lastSec,'h'),X.text('t',(bid==='board_income'?'':'this month ')+(m<0?'−':'')+budgetMoney(Math.abs(m)),'small')],{role:'section'})); }
     const mem=catMembers(it).map(x=>x.slice(5)).filter(mid=>AW.items[mid]);
     if(budgetBoard&&![effItem(AW,id)].concat(mem.map(mid=>AW.items[mid])).some(x=>budgetItemOnView(x,viewMonth,''))) return;
-    const own=catHasValues(it), selRef=selectedRef(AW,id), selId=selRef?selRef.slice(5):null, paying=!!((it.values||{}).payTo), open=!!(V.open&&V.open[id]), self=own&&!mem.length, count=mem.length+(self?1:0);
-    V.vmInfo.rows.push(it.name||id);
-    const rk=[X.row('head',[X.field('name','ren:'+id,'Item category name',{rest:true,w:300,v:(V.ren&&V.ren[id]!=null)?V.ren[id]:(it.name||'')}),hc('remove')&&X.btn('rm','Remove','brd:remove:'+id)])];
-    const line=[hc('items')&&X.btn('tog',(open?'▾':'▸')+' Items ('+count+')','alt:tog:'+id,{on:open}),X.text('picked','Selected: '+(selId?(AW.items[selId].name||selId):(self?(it.name||id):'none')),'muted')];
+    const own=catHasValues(it), selRef=selectedRef(AW,id), selId=selRef?selRef.slice(5):null, paying=!!hostRd(it.values).payTo, open=!!(V.open&&V.open[id]), self=own&&!mem.length, count=mem.length+(self?1:0);
+    V.vmInfo.rows.push(hostStr(it.name)); /* 1.8.103: an item with no name has an empty name, not its id */
+    const rk=[X.row('head',[X.field('name','ren:'+id,'Item category name',{rest:true,w:300,v:(V.ren&&V.ren[id]!=null)?V.ren[id]:hostStr(it.name)}),hc('remove')&&X.btn('rm','Remove','brd:remove:'+id)])];
+    const line=[hc('items')&&X.btn('tog',(open?'▾':'▸')+' Items ('+count+')','alt:tog:'+id,{on:open}),X.text('picked','Selected: '+(selId?hostStr(AW.items[selId].name):(self?hostStr(it.name):'none')),'muted')];
     if(budgetBoard&&bid==='board_expense'&&hc('pay')){ const debt=paying?AW.items[String(it.values.payTo).replace(/^item:/,'')]:null; line.push(X.btn('pay',debt?('pays '+debt.name):'pays debt','brd:pay:'+id,{on:paying})); }
     if(hc('addAlt')) line.push(X.btn('add','+ Add alternative','alt:add:'+id));
     rk.push(X.row('list',line));
     if(finT) window.BudgetFlows.rowExtras(V,AW,id,bid).forEach(k=>rk.push(k));
     if(AW.meta&&AW.meta.budget&&window.BudgetFlows&&window.BudgetFlows.altPanelVM&&V.alt2&&V.alt2.item===id) rk.push(window.BudgetFlows.altPanelVM(V,AW,id));
-    { const ev=(effItem(AW,id)||{}).values||{}; if(ev.then&&ev.then.delta){ rk.push(X.text('plan','Changes from '+(ev.then.cut||ev.then.date)+(ev.then.amount!=null?': '+budgetMoney(Math.abs(+ev.then.amount||0)):''),'small',{color:'linkInk'})); }
-      else if(ev.then){ const a0=+ev.amount||0, a1=+ev.then.amount||0;
-        rk.push(X.text('plan','★ today '+(a0<0?'−':'')+budgetMoney(Math.abs(a0))+' · plan '+(ev.thenName||'')+' '+(a1<0?'−':'')+budgetMoney(Math.abs(a1))+' (from '+ev.then.date+')','small',{color:'linkInk'})); } }
+    /* 1.8.103: an amount or plan name that is not there is left out of the line, not shown as $0 or blank */
+    { const ev=hostRd(hostRd(effItem(AW,id)).values), sg=n=>(n<0?'−':'')+budgetMoney(Math.abs(n)); if(ev.then&&ev.then.delta){ const an=hostNum(ev.then.amount); rk.push(X.text('plan','Changes from '+(ev.then.cut||ev.then.date)+(an!==null?': '+budgetMoney(Math.abs(an)):''),'small',{color:'linkInk'})); }
+      else if(ev.then){ const a0=hostNum(ev.amount), a1=hostNum(ev.then.amount);
+        rk.push(X.text('plan',['★ today'+(a0!==null?' '+sg(a0):''),'· plan'+(ev.thenName?' '+ev.thenName:'')+(a1!==null?' '+sg(a1):''),'(from '+ev.then.date+')'].join(' '),'small',{color:'linkInk'})); } }
     if(open){ const lines=[];
-      if(own){ const vt=valueText(AW,it,it); lines.push(X.row('own',[self?X.chip('nm',it.name||id,{on:true}):X.text('nm','Shared by every item:','muted'),X.text('v',vt.text,'small',{color:vt.color}),hi('values')&&X.btn('set','Set values','brd:values:'+id)])); }
-      mem.forEach(mid=>{ const m=AW.items[mid], ref='item:'+mid, pref=it.alts.pref!=null&&memberRef(it.alts.pref)===ref, restricted=[].concat(it.alts.unavail||[]).some(x=>memberRef(x)===ref), sel=selId===mid, vt=valueText(AW,m,it);
-        lines.push(X.row('m:'+mid,[X.chip('nm',(m.name||mid)+(restricted?' · unavailable':''),{on:sel,dim:restricted}),X.text('v',vt.text,'small',{color:vt.color}),hi('values')&&X.btn('set','Set values','brd:values:'+mid)]));
+      if(own){ const vt=valueText(AW,it,it); lines.push(X.row('own',[self?X.chip('nm',hostStr(it.name),{on:true}):X.text('nm','Shared by every item:','muted'),X.text('v',vt.text,'small',{color:vt.color}),hi('values')&&X.btn('set','Set values','brd:values:'+id)])); }
+      mem.forEach(mid=>{ const m=AW.items[mid], ref='item:'+mid, pref=it.alts.pref!=null&&memberRef(it.alts.pref)===ref, restricted=hostLs(it.alts.unavail).some(x=>memberRef(x)===ref), sel=selId===mid, vt=valueText(AW,m,it);
+        lines.push(X.row('m:'+mid,[X.chip('nm',hostStr(m.name)+(restricted?' · unavailable':''),{on:sel,dim:restricted}),X.text('v',vt.text,'small',{color:vt.color}),hi('values')&&X.btn('set','Set values','brd:values:'+mid)]));
         const sub=[hi('prefer')&&X.btn('pref',pref?'★':'☆','alt:pref:'+id+'/'+mid,{kind:'icon',on:pref,minW:36}),hi('restrict')&&X.btn('restrict','×','alt:restrict:'+id+'/'+mid,{kind:'icon',invalid:restricted,minW:36}),hi('remove')&&X.btn('rm','Remove','alt:remove:'+id+'/'+mid)].filter(Boolean);
         if(sub.length) lines.push(X.row('a:'+mid,sub,{indent:18})); });
       if(!count) lines.push(X.text('none','No items yet. Add an alternative, then set its values.','muted'));
@@ -13769,47 +13803,49 @@ function boardVM(V,A,c,O){ const X=VMx(), M=window.JAtlasModel, o=O.board, AW=ac
   V.boardHasTrip=false; V.boardRes=resourcesOf(AW).map(x=>x.name);
   return X.col('brd:'+cid,kids,{role:'view',slab:'outer'}); }
 function boardFormVM(V,AW,F){ const X=VMx(), subj=F.kind==='alt'?AW.items[F.parent]:F.kind==='values'?AW.items[F.item]:null, titles={newitem:'New item',resource:'Add resource',alt:'Add alternative',values:'Set values'};
-  const kids=[X.text('title',(titles[F.kind]||'Form')+(subj?' · '+(subj.name||subj.id):''),'h')];
+  const kids=[X.text('title',titles[F.kind]+(subj&&subj.name?' · '+subj.name:''),'h')];
   const fields=F.kind==='resource'?[['name','Name'],['unit','Unit'],['stock','Stock']]:F.kind==='values'?[['date','Date'],['repeat','Repeat'],['amount','Amount']]:F.kind==='newitem'?[['name','Item category name']]:[['name','Name']];
   fields.forEach(([f,lab])=>{ const r=[X.text('l',lab+':','body',{bold:true}),X.field('f',f,lab,{w:260,v:V.form&&V.form[f]!=null?V.form[f]:''})];
     if(F.kind==='values'&&f==='amount'){ const n=Number(F.amount), neg=isFinite(n)&&n<0; r.push(X.btn('sign',neg?'consuming':'not consuming','form:sign',{on:neg})); }
     kids.push(X.row('f:'+f,r)); });
-  if(F.kind==='newitem'){ const cur=F.jreq?AW.items[F.jreq]:null, rq=[X.text('l','Requirement:','body',{bold:true}),X.btn('req',(cur?(cur.name||F.jreq):'None')+' '+(F.reqOpen?'▾':'▸'),'form:req',{on:F.reqOpen})];
+  if(F.kind==='newitem'){ const cur=F.jreq?AW.items[F.jreq]:null, rq=[X.text('l','Requirement:','body',{bold:true}),X.btn('req',(cur?hostStr(cur.name):'None')+' '+(F.reqOpen?'▾':'▸'),'form:req',{on:F.reqOpen})];
     if(F.reqOpen){ rq.push(X.btn('none','None','form:reqpick:',{on:!cur})); boardPickList(AW).forEach(P=>rq.push(X.btn('r:'+P.id,P.name,'form:reqpick:'+P.id,{on:!!(cur&&F.jreq===P.id)}))); }
     kids.push(X.row('req',rq)); const res=resourcesOf(AW), us=[X.text('l','Resources used:','body',{bold:true})];
-    if(!res.length) us.push(X.text('none','none yet','muted')); res.forEach(r=>{ const on=!!(F.usesIds||{})[r.id]; us.push(X.btn('u:'+r.id,(on?'✓ ':'')+r.name,'use:'+r.id,{on})); });
+    if(!res.length) us.push(X.text('none','none yet','muted')); res.forEach(r=>{ const on=!!hostRd(F.usesIds)[r.id]; us.push(X.btn('u:'+r.id,(on?'✓ ':'')+r.name,'use:'+r.id,{on})); });
     kids.push(X.row('uses',us)); }
   kids.push(X.row('acts',[X.btn('ok',F.kind==='values'?'Save':'Create','form:ok',{kind:'primary'}),X.btn('cancel','Cancel','form:cancel')]));
   return X.col('form',kids,{role:'detail',slab:'inner',enter:true}); }
-function paytoFormVM(V,AW,F){ const X=VMx(), ids=(AW.meta&&AW.meta.boardIds)||{}, debts=((ids.debt&&AW.components[ids.debt])||{}).items||[];
+function paytoFormVM(V,AW,F){ const X=VMx(), ids=hostRd(AW.meta&&AW.meta.boardIds), debts=hostLs(hostRd(ids.debt&&AW.components[ids.debt]).items).filter(ref=>AW.items[String(ref).replace(/^item:/,'')]);
   const kids=[X.text('title','Pays which debt','h')]; if(!debts.length) kids.push(X.text('none','No debt items yet.','muted'));
-  kids.push(X.row('debts',debts.map(ref=>{ const did=String(ref).replace(/^item:/,''), d=AW.items[did]||{}; return X.btn('d:'+did,d.name||did,'brd:payto:'+F.item+'/'+did); }).concat([X.btn('clear','Not a debt payment','brd:payclear:'+F.item),X.btn('cancel','Cancel','form:cancel')])));
+  kids.push(X.row('debts',debts.map(ref=>{ const did=String(ref).replace(/^item:/,''), d=AW.items[did]; return X.btn('d:'+did,hostStr(d.name),'brd:payto:'+F.item+'/'+did); }).concat([X.btn('clear','Not a debt payment','brd:payclear:'+F.item),X.btn('cancel','Cancel','form:cancel')])));
   return X.col('form',kids,{role:'detail',slab:'inner',enter:true}); }
 /* a board that is not the view's root board (replica views): the plain list, its actions go to the runtime */
-function simpleBoardVM(V,A,c){ const X=VMx(), M=window.JAtlasModel, Q=boardRows(A,c), cid=c.id, T=M.get(A,(c.view||{}).target), inT=(T&&T.items)||[];
-  const kids=[X.text('title',x7(c.name||cid),'title'),X.row('bar',[X.btn('new','+ New item',null,{rt:{a:'new',comp:cid}}),X.btn('sort','sort: '+Q.sort,null,{rt:{a:'sort',comp:cid}}),X.btn('filter','show: '+Q.fil,null,{rt:{a:'filter',comp:cid}})])];
-  Q.L.forEach(r=>{ const it=M.get(A,r), p=M.parse(r)||{}; if(!it) return; const v=it.values||{};
-    kids.push(X.row('r:'+p.id,[X.chip('c',it.name,{rt:{item:p.id,comp:cid}}),X.text('d',(v.date||'unscheduled')+(v.repeat&&v.repeat!=='once'?' · '+v.repeat:''),'muted'),
+function simpleBoardVM(V,A,c){ const X=VMx(), M=window.JAtlasModel, Q=boardRows(A,c), cid=c.id, T=M.get(A,hostRd(c.view).target), inT=hostLs(T&&T.items);
+  const kids=(c.name?[X.text('title',x7(c.name),'title')]:[]).concat([X.row('bar',[X.btn('new','+ New item',null,{rt:{a:'new',comp:cid}}),X.btn('sort','sort: '+Q.sort,null,{rt:{a:'sort',comp:cid}}),X.btn('filter','show: '+Q.fil,null,{rt:{a:'filter',comp:cid}})])]);
+  Q.L.forEach(r=>{ const it=M.get(A,r), p=hostRd(M.parse(r)); if(!it) return; const v=hostRd(it.values);
+    kids.push(X.row('r:'+p.id,[X.chip('c',it.name,{rt:{item:p.id,comp:cid}}),X.text('d',(v.date?v.date:'unscheduled')+(v.repeat&&v.repeat!=='once'?' · '+v.repeat:''),'muted'),
       T&&inT.indexOf(r)<0?X.btn('tocal','→ '+T.name,null,{rt:{a:'tocal',comp:cid,v:r}}):(T?X.text('on','on '+T.name,'small'):null)])); });
   return X.col('brd:'+cid,kids,{role:'view',slab:'outer'}); }
-function genericVM(V,A,c){ const X=VMx(), M=window.JAtlasModel; return X.col('comp:'+c.id,[X.text('title',x7(c.name||c.id),'title'),X.row('items',((c.state&&c.state.viewItems)||c.items||[]).map(r=>{ const it=M.get(A,r), p=M.parse(r)||{}; return X.chip('i:'+(p.id||r),it?it.name:String(r),{rt:{item:p.id,comp:c.id}}); }))],{role:'view',slab:'outer'}); }
+function genericVM(V,A,c){ const X=VMx(), M=window.JAtlasModel; /* 1.8.103: no title made from the id, and a reference to an item that is not there is left out */
+  return X.col('comp:'+c.id,(c.name?[X.text('title',x7(c.name),'title')]:[]).concat([X.row('items',(c.state&&c.state.viewItems?c.state.viewItems:hostLs(c.items)).filter(r=>M.get(A,r)).map(r=>{ const it=M.get(A,r), p=hostRd(M.parse(r)); return X.chip('i:'+(p.id||r),hostStr(it.name),{rt:{item:p.id,comp:c.id}}); }))]),{role:'view',slab:'outer'}); }
 
 /* ---- Plan: dependencies & sequence over jreq chains, with risk, Selected item, Joy and the what-if ---- */
 function depsOrderOf(A,L){ const M=window.JAtlasModel, ids=L.map(r=>{ const p=M.parse(r); return p?p.id:r; }), pos={}, out=[], st={}; ids.forEach((id,i)=>{ pos[id]=i; });
-  const dt=id=>{ const v=((A.items[id]||{}).values)||{}; return String(v.date||v.when||'9999'); };
-  const srt=ids.slice().sort((a,b)=>dt(a)<dt(b)?-1:dt(a)>dt(b)?1:pos[a]-pos[b]);
-  function visit(id){ if(st[id]) return; st[id]=1; const j=(A.items[id]||{}).jreq, p=j&&M.parse(j); if(p&&p.kind==='item'&&p.id in pos) visit(p.id); out.push(id); }
+  const dt=id=>{ const v=hostRd(hostRd(A.items[id]).values); return v.date?String(v.date):v.when?String(v.when):null; };
+  /* 1.8.103: by date, undated last, then as listed (no made-up 9999 date) */
+  const srt=ids.slice().sort((a,b)=>{ const x=dt(a), y=dt(b); if(x!==y){ if(x===null) return 1; if(y===null) return -1; return x<y?-1:1; } return pos[a]-pos[b]; });
+  function visit(id){ if(st[id]) return; st[id]=1; const j=hostRd(A.items[id]).jreq, p=j&&M.parse(j); if(p&&p.kind==='item'&&p.id in pos) visit(p.id); out.push(id); }
   srt.forEach(visit); return out; }
-function depsRows(A,c){ const M=window.JAtlasModel, E=window.JAtlasEval, V0=c.view||{}, L0=(c.state&&c.state.viewItems)||c.items||[], BFp=(A.meta&&A.meta.budget&&window.BudgetFlows&&window.BudgetFlows.planList)?window.BudgetFlows:null, L=BFp?BFp.planList(A,L0):L0, ids=V0.order==='given'?L.map(r=>{ const p=M.parse(r); return p?p.id:r; }):depsOrderOf(A,L), at={}, need={}, cols=V0.extra||[];
-  ids.forEach((id,i)=>{ at[id]=i; const j=(A.items[id]||{}).jreq, p=j&&M.parse(j); if(p&&p.kind==='item') (need[p.id]=need[p.id]||[]).push(id); });
+function depsRows(A,c){ const M=window.JAtlasModel, E=window.JAtlasEval, V0=hostRd(c.view), L0=c.state&&c.state.viewItems?c.state.viewItems:hostLs(c.items), BFp=(A.meta&&A.meta.budget&&window.BudgetFlows&&window.BudgetFlows.planList)?window.BudgetFlows:null, L=BFp?BFp.planList(A,L0):L0, ids=V0.order==='given'?L.map(r=>{ const p=M.parse(r); return p?p.id:r; }):depsOrderOf(A,L), at={}, need={}, cols=hostLs(V0.extra);
+  ids.forEach((id,i)=>{ at[id]=i; const j=hostRd(A.items[id]).jreq, p=j&&M.parse(j); if(p&&p.kind==='item') (need[p.id]?need[p.id]:(need[p.id]=[])).push(id); });
   let nf=0; const rows=ids.map((id,i)=>{ const it=A.items[id]; if(!it) return {id,broken:true};
-    const v=it.values||{}, ref='item:'+id, F=E.itemFlags(A,ref), seq=it.jreq?E.sequence(A,id):[], jp=it.jreq&&M.parse(it.jreq), jid=jp&&jp.id, fl=[];
-    if(jid&&jid in at&&at[jid]>i) fl.push('⚠ order: '+((A.items[jid]||{}).name)+' is listed after'); if(seq.indexOf(ref)>=0) fl.push('⟳ cycle');
+    const v=hostRd(it.values), ref='item:'+id, F=E.itemFlags(A,ref), seq=it.jreq?E.sequence(A,id):[], jp=it.jreq&&M.parse(it.jreq), jid=jp&&jp.id, fl=[];
+    if(jid&&jid in at&&at[jid]>i) fl.push('⚠ order: '+hostStr(hostRd(A.items[jid]).name)+' is listed after'); if(seq.indexOf(ref)>=0) fl.push('⟳ cycle');
     nf+=fl.length+(F.broken?1:0)+(F.conflict?1:0);
-    const chain=seq.length?seq.slice().reverse().map(x=>{ const o=M.get(A,x); return o?o.name:x; }).join(' → '):'—', nb=(need[id]||[]).map(x=>(A.items[x]||{}).name).join(', ')||'—';
+    const chain=seq.length?seq.slice().reverse().map(x=>{ const o=M.get(A,x); return o?o.name:x; }).join(' → '):'—', nbs=hostLs(need[id]).map(x=>A.items[x].name), nb=nbs.length?nbs.join(', '):'—'; /* — is the table's word for none */
     const PI=BFp?BFp.planInfo(A,id):{};
-    return {id,seq:v.seq!=null?String(v.seq):String(i+1),step:(v.step!=null?v.step:it.name)+(fl.length?' '+fl.join(' '):''),flags:fl,when:v.when!=null?v.when:(PI.when||v.date||'—'),req:v.reqText!=null?v.reqText:(PI.req?(chain!=='—'?chain+' · ':'')+PI.req:chain),
-      extra:cols.map(k=>v[k.field]==null?'':String(v[k.field])),nb:v.neededBy!=null?v.neededBy:(PI.nb||nb),btn:V0.btn?String(v[V0.btn]||''):null}; });
+    return {id,seq:v.seq!=null?String(v.seq):String(i+1),step:(v.step!=null?v.step:it.name)+(fl.length?' '+fl.join(' '):''),flags:fl,when:v.when!=null?v.when:PI.when?PI.when:v.date?v.date:'—',req:v.reqText!=null?v.reqText:(PI.req?(chain!=='—'?chain+' · ':'')+PI.req:chain),
+      extra:cols.map(k=>v[k.field]==null?'':String(v[k.field])),nb:v.neededBy!=null?v.neededBy:(PI.nb||nb),btn:V0.btn?hostStr(v[V0.btn]):null}; });
   return {rows,cols,nf,btn:!!V0.btn,title:'Dependencies & sequence'}; }
 function planVM(V,A,c,O){ const X=VMx(), o=O.plan, AW=activeAtlas(V)||A, D=depsRows(A,c), RR=riskOf(AW), hc=k=>X.has(o.columns,k);
   if(AW.meta&&AW.meta.budget) V.wi=null; /* Budget: no what-if state, no Clear what-if */
@@ -13817,24 +13853,24 @@ function planVM(V,A,c,O){ const X=VMx(), o=O.plan, AW=activeAtlas(V)||A, D=depsR
   V.risk=RR; V.riskSteps={}; V.riskDays=Object.fromEntries(Object.keys(RR.days).map(k=>[k,RR.days[k].c])); V.planRows=[];
   const cols=[]; if(hc('risk')) cols.push({k:'risk',label:'Risk'}); if(hc('seq')) cols.push({k:'seq',label:'#'}); if(hc('step')) cols.push({k:'step',label:'Step'}); if(hc('when')) cols.push({k:'when',label:'When'}); if(hc('requires')) cols.push({k:'req',label:'Requires'});
   if(hc('extra')) D.cols.forEach((k,i)=>cols.push({k:'x'+i,label:k.label})); if(hc('selected')) cols.push({k:'sel',label:'Selected item'}); if(hc('joy')) cols.push({k:'joy',label:'Joy (this step)'}); if(hc('neededBy')) cols.push({k:'nb',label:'Needed by'}); if(D.btn&&hc('btn')) cols.push({k:'btn',label:''});
-  const W2=V.wi&&V.wi.A, D2=W2?depsRows(W2,(W2.components||{})[c.id]||c):null, si=V.wi?D.rows.findIndex(r=>r.id===V.wi.step):-1;
+  const W2=V.wi&&V.wi.A, c2=W2&&hostRd(W2.components)[c.id], D2=c2?depsRows(W2,c2):null, /* 1.8.103: no what-if without the plan in the what-if atlas */ si=V.wi?D.rows.findIndex(r=>r.id===V.wi.step):-1;
   const cellOf=(R,live,k,i)=>k==='risk'?null:k==='seq'?R.seq:k==='step'?R.step:k==='when'?R.when:k==='req'?R.req:k==='sel'?live[0]:k==='joy'?live[1]:k==='nb'?R.nb:k==='btn'?R.btn:k[0]==='x'?R.extra[+k.slice(1)]:'';
   const rows=D.rows.map((R,i)=>{ if(R.broken) return {k:'b:'+R.id,cells:[{text:'broken reference '+R.id,color:'dangerInk'}]};
     const rid=R.id, rk=RR.steps[rid]; if(rk) V.riskSteps[rid]=rk.c; const live=planCells(A,rid,V.pins), rec={id:rid,sel:live[0],joy:live[1],changed:[]};
     const rl=(AW.meta&&AW.meta.budget&&window.BudgetFlows&&window.BudgetFlows.resLetter)?window.BudgetFlows.resLetter:(x=>x);
-    let cells=cols.map(cl=>cl.k==='risk'?{text:rl(rk?rk.c:'L'),color:'riskText'+(rk?rk.c:'L'),bold:true}:{text:cellOf(R,live,cl.k)});
-    if(W2&&si>=0&&i>=si){ const R2=D2.rows.find(x=>x.id===rid)||R, wc=planCells(W2,rid,null,rid===V.wi.step);
+    let cells=cols.map(cl=>cl.k==='risk'?(rk?{text:rl(rk.c),color:'riskText'+rk.c,bold:true}:{text:''}):{text:cellOf(R,live,cl.k)}); /* 1.8.103: a step with no risk shows none, not Low */
+    const R2=D2&&si>=0&&i>=si?D2.rows.find(x=>x.id===rid):null; if(R2){ const wc=planCells(W2,rid,null,rid===V.wi.step);
       cells=cells.map((cell,ci)=>{ const k=cols[ci].k; if(k==='risk') return cell; const nt=cellOf(R2,wc,k); if(nt!=null&&String(nt)!==String(cell.text)){ rec.changed.push(cols[ci].label||k); return {text:'* '+nt+' (was: '+cell.text+')',color:'warnInk'}; } return cell; });
       rec.wsel=wc[0]; rec.wjoy=wc[1]; rec.whatif=true; }
     V.planRows.push(rec);
     let sub=null; if(o.alternatives&&AW.meta&&AW.meta.budget&&window.BudgetFlows&&window.BudgetFlows.planAltsVM) sub=window.BudgetFlows.planAltsVM(V,AW,rid);
-    else if(o.alternatives){ const it=(AW.items||{})[rid], mem=it&&it.alts?it.alts.members.filter(m=>(it.alts.unavail||[]).indexOf(m)<0):[], open=!!V.open[rid];
+    else if(o.alternatives){ const it=hostRd(AW.items)[rid], mem=it&&it.alts?it.alts.members.filter(m=>hostLs(it.alts.unavail).indexOf(m)<0&&AW.items[m.slice(5)]&&AW.items[m.slice(5)].name):[], open=!!V.open[rid]; /* 1.8.103: a member that is missing or has no name is left out */
       const ks=[X.btn('tog',(open?'▾':'▸')+' Alternatives for '+(it?it.name:rid)+' ('+mem.length+')','tog:'+rid,{kind:'ghost',on:open})];
       if(open){ if(!mem.length) ks.push(X.text('none','no alternatives for this step in the atlas','muted'));
-        mem.forEach(m=>{ const a=AW.items[m.slice(5)]||{}, v=a.values||{}, cur=V.wi&&V.wi.step===rid&&V.wi.alt===m; ks.push(X.btn('wi:'+m,(cur?'● ':'')+(a.name||m)+' · comfort '+v.comfort+' · fun '+v.fun+' · cost '+v.cost+' · '+v.hours+' h','wi:'+rid+':'+m,{on:cur})); }); }
+        mem.forEach(m=>{ const a=AW.items[m.slice(5)], v=hostRd(a.values), cur=V.wi&&V.wi.step===rid&&V.wi.alt===m; ks.push(X.btn('wi:'+m,(cur?'● ':'')+a.name+' · comfort '+v.comfort+' · fun '+v.fun+' · cost '+v.cost+' · '+v.hours+' h','wi:'+rid+':'+m,{on:cur})); }); }
       sub=X.row('alts',ks); }
     return {k:rid,cells,risk:rk?rk.c:null,act:'reqrow',item:rid,sel:V.sel===rid||V.sel==='item:'+rid,sub}; });
-  const sum=D.rows.length+' steps'+(V.wi?' · what-if: '+((AW.items[V.wi.step]||{}).name||V.wi.step)+' to '+((AW.items[String(V.wi.alt).slice(5)]||{}).name||V.wi.alt)+' (not committed; '+V.planRows.filter(r=>r.changed.length).length+' row(s) changed)':'');
+  const sum=D.rows.length+' steps'+(V.wi?' · what-if: '+hostStr(hostRd(AW.items[V.wi.step]).name)+' to '+hostStr(hostRd(AW.items[String(V.wi.alt).slice(5)]).name)+' (not committed; '+V.planRows.filter(r=>r.changed.length).length+' row(s) changed)':'');
   V.vmInfo.deps=sum; V.vmInfo.flags=D.rows.filter(r=>r.flags&&r.flags.length).map(r=>r.flags.join(' '));
   const kids=[X.text('title',D.title,'title')];
   if(AW.meta&&AW.meta.budget&&window.BudgetFlows&&window.BudgetFlows.planTopVM) window.BudgetFlows.planTopVM(V,AW).forEach(k=>kids.push(k));
@@ -13853,7 +13889,7 @@ function budgetChromeVM(V,AW,O){ const X=VMx(), o=O.budget, ui=window.__budgetUi
   return X.col('budget',kids,{gap:8}); }
 
 /* runtime actions without HTML: the runtime's own handlers, with the same before/after diff that becomes a proposal */
-function runtimeAct(V,S,vm){ const rt=vm.rt||{}; V.pending={before:pick(S.J&&S.J.atlas||S.s),act:rt.item?'item':'act:'+rt.a,label:String(vm.label||rt.a||'').slice(0,40)};
+function runtimeAct(V,S,vm){ const rt=vm.rt; V.pending={before:pick(S.J&&S.J.atlas||S.s),act:rt.item?'item':'act:'+rt.a,label:hostStr(vm.label?vm.label:rt.a).slice(0,40)};
   const attrs={'data-comp':rt.comp,'data-ja-act':rt.a,'data-v':rt.v==null?null:String(rt.v)};
   S.call(()=>{ if(rt.item){ S.J.event('click','comp:'+rt.comp,'item:'+rt.item); return; } S.J.compAct({getAttribute:k=>attrs[k]==null?null:attrs[k]}); }); }
 
@@ -18919,7 +18955,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.102",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.103",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
