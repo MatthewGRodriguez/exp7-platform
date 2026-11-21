@@ -12772,6 +12772,13 @@ if(!window.__exp7ViewsModListeners){ window.__exp7ViewsModListeners=1;
   document.addEventListener('keydown',e=>{ if(e.key==='Shift') MODS.shift=true; if(e.key==='Control') MODS.ctrl=true; if(e.key==='Meta') MODS.meta=true; });
   document.addEventListener('keyup',e=>{ if(e.key==='Shift') MODS.shift=false; if(e.key==='Control') MODS.ctrl=false; if(e.key==='Meta') MODS.meta=false; });
 }
+/* 1.8.102: Budget's own code in views-host has no || defaults. What may be missing is read through budgetRd, budgetLs and
+ * budgetStr, as in budget-flows and journal-views: a record or list that is not there reads as a frozen nothing, a text that
+ * is not there as ''. The screen state (window.__budgetUi) is read as the Budget app started it. */
+const BUDGET_NONE=Object.freeze({}), BUDGET_NO_LIST=Object.freeze([]);
+function budgetRd(o){ return o!==null&&typeof o==='object'?o:BUDGET_NONE; }
+function budgetLs(a){ return Array.isArray(a)?a:BUDGET_NO_LIST; }
+function budgetStr(v){ return v==null||v===false?'':String(v); }
 function planRisk(w){
   /* Port of ranking_ui easy228 rdCalStrip / path-health rules, computed from PLAN data:
      Legacy: headroom = min balance until next payday (1st/15th); CRITICAL if hr<hc OR fixed event that day;
@@ -12781,9 +12788,9 @@ function planRisk(w){
   const w0=w; w=effAtlas(w);
   const budget=!!(w0&&w0.meta&&w0.meta.budget), ht=budget?w0.meta.riskHT:RISK_HT, CC=RISK_COL;
   /* 1.8.100: a Budget reads only the calendar and plan its meta names, and its day risk limits only from meta.riskHT */
-  const cal=budget?((w.meta.calId&&w.components[w.meta.calId])||{}):((w.components&&(w.components[(w.meta&&w.meta.calId)||'trip_calendar']||w.components.trip_calendar))||{}), req=budget?((w.meta.planId&&w.components[w.meta.planId])||{}):((w.components&&(w.components[(w.meta&&w.meta.planId)||'reqs']||w.components.reqs))||{});
-  const ids=new Set([...(cal.items||[]),...(req.items||[])].map(r=>String(r).replace(/^item:/,'')));
-  const steps=[]; ids.forEach(id=>{ const it=w.items[id]; if(!it) return; const v=it.values||{}, d=v.date;
+  const cal=budget?budgetRd(w.meta.calId&&w.components[w.meta.calId]):((w.components&&(w.components[(w.meta&&w.meta.calId)||'trip_calendar']||w.components.trip_calendar))||{}), req=budget?budgetRd(w.meta.planId&&w.components[w.meta.planId]):((w.components&&(w.components[(w.meta&&w.meta.planId)||'reqs']||w.components.reqs))||{});
+  const ids=new Set([...budgetLs(cal.items),...budgetLs(req.items)].map(r=>String(r).replace(/^item:/,'')));
+  const steps=[]; ids.forEach(id=>{ const it=w.items[id]; if(!it) return; const v=budgetRd(it.values), d=v.date;
     const F=(typeof E!=='undefined'&&__jaEval().itemFlags)?__jaEval().itemFlags(w,'item:'+id):{};
     let pick=null, cost=0, hours=0, allBad=false, winBad=false, slack=null;
     if(it.alts&&it.alts.members&&it.alts.members.length){
@@ -12841,29 +12848,29 @@ function planRisk(w){
    1.8.100: the limits (hc, hm, big, delay) come only from meta.riskHT; planRisk shows no day risk without it. A limit that is
    missing leaves out what it decides. The boards, plan and calendar are only the ones meta names, and an amount that is not
    a number moves no money. BudgetFlows.resilience colours each day. */
-function budgetDayRisk(w,HT){ const E=window.JAtlasEval, ids=w.meta.boardIds||{}, num=x=>(x==null||x==='')?NaN:+x;
-  const list=t=>{ const c=ids[t]&&w.components[ids[t]]; return (c&&c.items)||[]; }, rec=r=>effItem(w,String(r).replace(/^item:/,''));
+function budgetDayRisk(w,HT){ const E=window.JAtlasEval, ids=budgetRd(w.meta.boardIds), num=x=>(x==null||x==='')?NaN:+x;
+  const list=t=>{ const c=ids[t]&&w.components[ids[t]]; return budgetLs(c&&c.items); }, rec=r=>effItem(w,String(r).replace(/^item:/,''));
   const onBoard={}; ['expense','income','debt','asset'].forEach(t=>list(t).forEach(r=>{ onBoard[r]=1; }));
   /* a blocked plan step (values.planBlocked: its requirements can never be met) moves no money */
-  const blocked=r=>!!(((w.items[String(r).replace(/^item:/,'')]||{}).values||{}).planBlocked);
-  const pc=w.meta.planId&&w.components[w.meta.planId], plan=((pc&&pc.items)||[]).filter(r=>!blocked(r)), planOnly=plan.filter(r=>!onBoard[r]);
+  const blocked=r=>!!budgetRd(budgetRd(w.items[String(r).replace(/^item:/,'')]).values).planBlocked;
+  const pc=w.meta.planId&&w.components[w.meta.planId], plan=budgetLs(pc&&pc.items).filter(r=>!blocked(r)), planOnly=plan.filter(r=>!onBoard[r]);
   /* opening cash, as the workbook's Cash-after start: checking minus credit-card balances (paid in full monthly) */
-  let chk=0, card=0; list('asset').forEach(r=>{ const it=rec(r); if(!it||!window.BudgetFlows.isCashAsset(it)) return; const a=num((it.values||{}).amount); if(isFinite(a)) chk+=a; });
-  list('debt').forEach(r=>{ const it=rec(r); if(!it) return; const v=it.values||{}, a=num(v.amount); if(isFinite(a)&&/credit card/i.test([it.name,v.creditor,v.purpose].filter(Boolean).join(' '))) card+=a; });
+  let chk=0, card=0; list('asset').forEach(r=>{ const it=rec(r); if(!it||!window.BudgetFlows.isCashAsset(it)) return; const a=num(budgetRd(it.values).amount); if(isFinite(a)) chk+=a; });
+  list('debt').forEach(r=>{ const it=rec(r); if(!it) return; const v=budgetRd(it.values), a=num(v.amount); if(isFinite(a)&&/credit card/i.test([it.name,v.creditor,v.purpose].filter(Boolean).join(' '))) card+=a; });
   const first=budgetTodayKey().slice(0,7), cal=w.meta.calId&&w.components[w.meta.calId], cm=cal&&cal.view&&cal.view.month;
   const lastM=budgetShiftMonth(cm&&cm>first?cm:first,2), months=[]; for(let m=first;m<=lastM&&months.length<40;m=budgetShiftMonth(m,1)) months.push(m);
   let prev=chk-card; const flat=[];
   months.forEach(m=>{ const F=budgetFigures(w,m), days=E.monthDays(m), inc={}, fix={}; let fixSum=0, extraOut=0;
-    const put=(d,a)=>{ (fix[d]=fix[d]||[]).push(a); fixSum+=a; };
-    list('income').forEach(r=>{ const it=rec(r); if(!it) return; const ch=E.charges(it,m); Object.keys(ch).forEach(d=>{ const a=+ch[d]; if(isFinite(a)) inc[d]=(inc[d]||0)+a; }); });
+    const put=(d,a)=>{ (fix[d]?fix[d]:(fix[d]=[])).push(a); fixSum+=a; };
+    list('income').forEach(r=>{ const it=rec(r); if(!it) return; const ch=E.charges(it,m); Object.keys(ch).forEach(d=>{ const a=+ch[d]; if(isFinite(a)) inc[d]=d in inc?inc[d]+a:a; }); });
     /* fixed on its day: a one-off of HT.big or more (no repeat is a one-off, as the evaluator reads it) or the rent; other recurring bills are spread like the workbook does */
-    const pinned=it=>{ const v=it.values||{}, rp=v.repeat; return !rp||rp==='once'||rp==='dates'||/housing|rent/i.test([v.category,it.name].filter(Boolean).join(' ')); };
-    list('expense').forEach(r=>{ const it=rec(r); if(!it) return; const ch=E.charges(it,m); Object.keys(ch).forEach(d=>{ const a=+ch[d]; if(isFinite(a)&&a&&((Math.abs(a)>=HT.big&&pinned(it))||((it.values||{}).charge==='per'))) put(d,a); }); });
-    planOnly.forEach(r=>{ const it=rec(r); if(!it) return; const v=it.values||{}, ch=E.charges(it,m), sg=(v.flow==='in'||v.type==='income')?1:-1;
-      Object.keys(ch).forEach(d=>{ const a=sg*Math.abs(+ch[d]); if(!isFinite(a)||!a) return; if(a>0) inc[d]=(inc[d]||0)+a; else if(-a>=HT.big&&pinned(it)){ put(d,a); extraOut-=a; } else extraOut-=a; }); });
+    const pinned=it=>{ const v=budgetRd(it.values), rp=v.repeat; return !rp||rp==='once'||rp==='dates'||/housing|rent/i.test([v.category,it.name].filter(Boolean).join(' ')); };
+    list('expense').forEach(r=>{ const it=rec(r); if(!it) return; const ch=E.charges(it,m); Object.keys(ch).forEach(d=>{ const a=+ch[d]; if(isFinite(a)&&a&&((Math.abs(a)>=HT.big&&pinned(it))||(budgetRd(it.values).charge==='per'))) put(d,a); }); });
+    planOnly.forEach(r=>{ const it=rec(r); if(!it) return; const v=budgetRd(it.values), ch=E.charges(it,m), sg=(v.flow==='in'||v.type==='income')?1:-1;
+      Object.keys(ch).forEach(d=>{ const a=sg*Math.abs(+ch[d]); if(!isFinite(a)||!a) return; if(a>0) inc[d]=d in inc?inc[d]+a:a; else if(-a>=HT.big&&pinned(it)){ put(d,a); extraOut-=a; } else extraOut-=a; }); });
     /* everything else spread evenly: board spending (living + debt payments) and small plan-only spending, less the fixed events */
     const daily=(F.living+F.debtPay+extraOut+fixSum)/days.length; let b=prev;
-    days.forEach(d=>{ const pi=inc[d]||0; b+=pi-daily; (fix[d]||[]).forEach(a=>{ b+=a; }); flat.push({k:d,b,pay:pi>0,inc:pi}); });
+    days.forEach(d=>{ const pi=d in inc?inc[d]:0; b+=pi-daily; budgetLs(fix[d]).forEach(a=>{ b+=a; }); flat.push({k:d,b,pay:pi>0,inc:pi}); });
     prev=b; });
   /* headroom: the lowest balance from this day until the next pay */
   for(let i=flat.length-1, run=Infinity; i>=0; i--){ const D=flat[i], nx=flat[i+1]; if(!nx||nx.pay) run=Infinity; run=Math.min(run,D.b); D.hr=run; }
@@ -13052,20 +13059,20 @@ function itemsOnDay(w,day,V){ w=effAtlas(w); const E=window.JAtlasEval, cid=(V&&
 
 /* ---- ViewStates bridge (report §11): state-only visual updates without HTML→DL relayout ---- */
 function budgetMonthKey(){
-  const ui=window.__budgetUi||{};
-  if(/^\d{4}-\d{2}$/.test(ui.month||'')) return ui.month;
+  const ui=window.__budgetUi;
+  if(/^\d{4}-\d{2}$/.test(budgetStr(ui.month))) return ui.month;
   const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 }
 const BUDGET_MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 function budgetTodayKey(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 /* The selected date. An older saved view had a month and no day; that reads as the first of the month, or today in the current month. */
 function budgetDateKey(){
-  const ui=window.__budgetUi||{}, month=budgetMonthKey();
-  if(/^\d{4}-\d{2}-\d{2}$/.test(ui.day||'')&&ui.day.slice(0,7)===month) return ui.day;
+  const ui=window.__budgetUi, month=budgetMonthKey();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(budgetStr(ui.day))&&ui.day.slice(0,7)===month) return ui.day;
   const today=budgetTodayKey(); return today.slice(0,7)===month?today:month+'-01';
 }
-function budgetDateLabel(key){ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(key||'')); if(!m) return String(key||''); return BUDGET_MONTHS[+m[2]-1].slice(0,3)+' '+(+m[3])+', '+m[1]; }
-function budgetPickMonth(){ const p=(window.__budgetUi||{}).pick; return /^\d{4}-\d{2}$/.test(p||'')?p:''; }
+function budgetDateLabel(key){ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(budgetStr(key)); if(!m) return budgetStr(key); return BUDGET_MONTHS[+m[2]-1].slice(0,3)+' '+(+m[3])+', '+m[1]; }
+function budgetPickMonth(){ const p=window.__budgetUi.pick; return /^\d{4}-\d{2}$/.test(budgetStr(p))?p:''; }
 /* Mini calendar for the date button: month stepper, Today, and one button per day. Drawn by the same layout as a popover. */
 function budgetDatePickHtml(month, sel){
   const y=+month.slice(0,4), m=+month.slice(5,7), first=new Date(y,m-1,1).getDay(), n=budgetDaysInMonth(month), today=budgetTodayKey();
@@ -13079,7 +13086,7 @@ function budgetDatePickHtml(month, sel){
   return h+'</div></div>';
 }
 function budgetShiftMonth(month, delta){
-  const y=+String(month).slice(0,4), m=+String(month).slice(5,7)-1+(delta||0);
+  const y=+String(month).slice(0,4), m=+String(month).slice(5,7)-1+delta; /* 1.8.102: every caller gives the step */
   const d=new Date(y, m, 1);
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 }
@@ -13088,25 +13095,25 @@ function budgetMoney(n){ if(n==null||!isFinite(+n)) return '—'; const sign=+n<
 /* One atlas. Month and day are a view. Surplus is this month's income minus living cost minus debt payments.
    DDI is this month's debt payments divided by net income. Net worth is assets minus debts across every month. */
 function budgetFigures(w, month){
-  const E=window.JAtlasEval; const ids=(w&&w.meta&&w.meta.boardIds)||{};
-  function list(type){ const c=ids[type]&&w.components[ids[type]]; return (c&&c.items)||[]; }
+  const E=window.JAtlasEval; const ids=budgetRd(budgetRd(w.meta).boardIds);
+  function list(type){ const c=ids[type]&&w.components[ids[type]]; return budgetLs(c&&c.items); }
   /* A category counts through its selected item. */
-  function rec(ref){ return effItem(w,String(ref).replace(/^item:/,''))||null; }
+  function rec(ref){ return effItem(w,String(ref).replace(/^item:/,'')); }
   function monthAmt(it){
     if(!it) return NaN;
-    const v=it.values||{};
+    const v=budgetRd(it.values);
     /* A dated item counts only on the days it occurs. Another month, or no date, is not this month's flow. */
     if(!v.date) return 0;
-    if(E&&typeof E.charges==='function'){ const ch=E.charges(it, month)||{}; let s=0; Object.keys(ch).forEach(function(d){ s+=+ch[d]||0; }); return s; }
-    return v.amount==null||v.amount===''?NaN:+v.amount;
+    /* 1.8.102: a charge that is not a number moves no money; the evaluator is always there (no amount-only stand-in) */
+    const ch=budgetRd(E.charges(it, month)); let s=0; Object.keys(ch).forEach(function(d){ const a=+ch[d]; if(isFinite(a)) s+=a; }); return s;
   }
   let income=0, living=0, debtPay=0, assets=0, debts=0, assetN=0, debtN=0;
   list('income').forEach(function(r){ const a=monthAmt(rec(r)); if(isFinite(a)) income+=a; });
   /* Spending is stored negative. Living cost and debt payments are what was spent, so a refund (positive) lowers them. */
   list('expense').forEach(function(r){ const it=rec(r); const a=monthAmt(it); if(!isFinite(a)) return; if(it&&it.values&&it.values.payTo) debtPay-=a; else living-=a; });
   list('asset').forEach(function(r){ const a=Number(rec(r)&&rec(r).values&&rec(r).values.amount); if(isFinite(a)){ assets+=a; assetN++; } });
-  const BRx=window.BudgetRules, vday=(typeof budgetDateKey==='function')?budgetDateKey():'';
-  list('debt').forEach(function(r){ const dv=(rec(r)&&rec(r).values)||{}; let a=Number(dv.amount); if(BRx&&dv.every&&isFinite(a)&&vday.slice(0,7)===month) a=BRx.debtBalanceOn({balance:dv.amount,asOf:dv.asOf,apr:dv.apr,terms:dv.terms,every:dv.every},vday); if(isFinite(a)){ debts+=a; debtN++; } });
+  const BRx=window.BudgetRules, vday=budgetDateKey();
+  list('debt').forEach(function(r){ const dv=budgetRd(rec(r)&&rec(r).values); let a=Number(dv.amount); if(BRx&&dv.every&&isFinite(a)&&vday.slice(0,7)===month) a=BRx.debtBalanceOn({balance:dv.amount,asOf:dv.asOf,apr:dv.apr,terms:dv.terms,every:dv.every},vday); if(isFinite(a)){ debts+=a; debtN++; } });
   return {month:month, surplus:income-living-debtPay, ddi:income>0?debtPay/income:null, netIncome:income, living:living, debtPay:debtPay, netWorth:(assetN||debtN)?assets-debts:null};
 }
 window.__budgetFigures=budgetFigures;
@@ -13114,8 +13121,7 @@ function budgetItemOnView(it, month, day){
   const date=it&&it.values&&it.values.date;
   if(!date) return !day;
   const E=window.JAtlasEval;
-  if(!E||typeof E.occurrences!=='function') return day?String(date)===day:String(date).slice(0,7)===month;
-  const occ=E.occurrences(it, month)||[];
+  const occ=budgetLs(E.occurrences(it, month));
   return day?occ.indexOf(day)>=0:occ.length>0;
 }
 function memberRef(m){ const s=String(m==null?'':m); if(!s) return ''; return s.indexOf(':')>=0?s:('item:'+s); }
@@ -13237,7 +13243,7 @@ function negateAmount(raw){
 }
 /* 1.8.100: an item with no amount and no cost has no amount (NaN); the caller leaves it out */
 function budgetAmount(it){
-  const v=it.values||{};
+  const v=budgetRd(it.values);
   const raw=v.amount!=null&&v.amount!==''?v.amount:v.cost;
   return raw==null||raw===''?NaN:Number(raw);
 }
@@ -13259,7 +13265,7 @@ function valueUnit(w,it,owner,key){
   for(let i=0;i<uses.length;i++){ const r=w&&w.items&&w.items[String(uses[i]).replace(/^item:/,'')]; const u=r&&r.values&&r.values.unit; if(u) return u; }
   return (w&&w.meta&&w.meta.budget)?'usd':''; }
 function budgetValueParts(w,it,owner){
-  const v=(it&&it.values)||{}; const parts=[];
+  const v=budgetRd(it&&it.values); const parts=[];
   ['date','repeat','amount','cost','hours'].forEach(function(k){
     if(v[k]==null||v[k]==='') return;
     parts.push(k==='date'||k==='repeat'?String(v[k]):unitLabel(v[k],valueUnit(w,it,owner,k)));
@@ -13837,7 +13843,7 @@ function planVM(V,A,c,O){ const X=VMx(), o=O.plan, AW=activeAtlas(V)||A, D=depsR
   return X.col('plan:'+c.id,kids,{role:'view',slab:'outer'}); }
 
 /* ---- Budget chrome in the scene: month figures, the date button and its mini calendar, Calendar/Board/Plan tabs ---- */
-function budgetChromeVM(V,AW,O){ const X=VMx(), o=O.budget, ui=window.__budgetUi||{tab:'cal',boardTab:'expense'}, month=budgetMonthKey(), f=budgetFigures(AW,month), date=budgetDateKey(), pick=budgetPickMonth(), kids=[];
+function budgetChromeVM(V,AW,O){ const X=VMx(), o=O.budget, ui=window.__budgetUi, month=budgetMonthKey(), f=budgetFigures(AW,month), date=budgetDateKey(), pick=budgetPickMonth(), kids=[];
   if(o.facts){ const ddi=f.ddi==null?'—':(f.ddi*100).toFixed(1)+'%', fact=(k,v)=>X.text('f:'+k,k+'  '+v,'body');
     const facts=X.row('facts',[X.btn('date',budgetDateLabel(date)+' ▾','budget:date',{on:!!pick}),fact('surplus',budgetMoney(f.surplus)),fact('ddi',ddi),fact('net income',budgetMoney(f.netIncome)),fact('living cost',budgetMoney(f.living)),fact('net worth',budgetMoney(f.netWorth))],{gap:12});
     kids.push(X.col('figs',[facts],{role:'section',slab:'inner'}));
@@ -17506,6 +17512,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       if(this.o.onNavigate)this.o.onNavigate(this.route,d);
       return this.models?this.render():this.update();
     }
+    /* 1.8.102: Dismiss under the picker closes it (it went to no handler, so the picker stayed open) */
+    if(a==='budget:date'){ if(!root.__budgetUi.pick) return; root.__budgetUi=Object.assign({},root.__budgetUi,{pick:''}); if(this.status) this.status.textContent='Date picker closed.'; return this.models?this.render():this.update(); }
     if(a.indexOf('budget:pick')===0)return this.dateAct(a);
     if(a==='view:day'){ var day=root.__budgetUi.day?root.__budgetUi.day:budgetDateKey(); this.route='schedule'; if(this.o.onNavigate)this.o.onNavigate(this.route,day); return this.models?this.render():this.update(); }
     if(a.indexOf('picker:')===0){var id=a.slice(7),pm=journalOf(this.models.plan),r=ls(pm.rows).find(function(q){return q.id===id;});root.__budgetUi=Object.assign({},root.__budgetUi,{step:id,stepName:r&&r.name,selected:r&&r.selected,choices:r&&r.choices,scrollPlanStep:id});rememberPlan(root.__budgetUi);this.route=navigate(this.route,a);if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey(),{step:id});this.status.textContent=r?('Alternatives for '+r.name):'Alternatives';return this.models?this.render():this.update();}
@@ -18911,7 +18919,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.101",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.102",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
