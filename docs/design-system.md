@@ -886,6 +886,8 @@ Checked in Chrome on Matthew's Mac (2026-11-21, made-up data only): the lean fet
 
 On screen, for every app: nothing changes. A new Budget atlas comes out exactly as in 1.8.106 (checked field by field, with the test fixtures' atlases), since the calendar template gives every part the making acts on, and every Budget atlas names its calendar, boards and plan in its meta. A saved Budget atlas whose meta named no calendar would now show no calendar, with that part failing alone, instead of a guessed one. The Exp7 demo does not use this script's atlas code.
 
+Checked in Chrome on Matthew's Mac (2026-11-21, made-up data only): the lean fetched at this release's commit matched `release.json`. The Exp7 demo's Calendar, Board and Plan views drew at 390 wide with the same nodes (111, 173, 143), glyphs and heights as 1.8.106. A blank Budget opened at 390 wide on Home and its date picker opened and closed; Budget and the demo at 1024 wide opened with no failure records or page errors. Storage was cleared afterwards.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
