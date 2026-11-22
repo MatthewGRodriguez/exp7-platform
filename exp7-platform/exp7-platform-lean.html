@@ -5663,6 +5663,14 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
  * The same source runs in node, on the page main thread, and inside a Blob-URL worker. window.JAtlasEval / module.exports. */
 (function (root) {
   'use strict';
+  /* 1.8.108-109 (strict fail and carry on): no || fill-ins here. What may be missing is read through rd (a record) and ls (a list),
+     which give a frozen nothing, so the part that needs it is left out; num gives a number or nothing. */
+  var NONE = Object.freeze({}), NO_LIST = Object.freeze([]);
+  function isObj(o) { return o !== null && typeof o === 'object' && !Array.isArray(o); }
+  function rd(o) { return isObj(o) ? o : NONE; }
+  function ls(a) { return Array.isArray(a) ? a : NO_LIST; }
+  /** an item's own span: values.days when it is more than one day; an item with no span lasts its own day */
+  function span(v) { var d = Math.floor(+v.days); return d > 1 ? d : 1; }
   var NODES = {
     item: { ins: ['set', 'add', 'state'], outs: ['value', 'ref'], params: { item: 'itemref', field: 'field', out: 'out' } },
     joy: { ins: ['add', 'set'], outs: ['value'], params: { joy: 'joy' } },
@@ -5689,9 +5697,9 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
   /* ---- calendar helpers (ADR 0091/0092): items carry values.date (YYYY-MM-DD), values.repeat (once|daily|weekly|weekdays|monthly), values.days (duration) ---- */
   function pad(n) { return (n < 10 ? '0' : '') + n; }
   function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
-  function pdate(s) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
-  function monthOf(c) { var m = ((c && c.view) || {}).month; if (/^\d{4}-\d{2}$/.test(m || '')) return m; var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1); }
-  function monthDays(month) { var y = +month.slice(0, 4), mo = +month.slice(5, 7) - 1, n = new Date(y, mo + 1, 0).getDate(), out = []; for (var i = 1; i <= n; i++) out.push(month + '-' + pad(i)); return out; }
+  function pdate(s) { if (typeof s !== 'string') return null; var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+  function monthOf(c) { var m = rd(rd(c).view).month; if (typeof m === 'string' && /^\d{4}-\d{2}$/.test(m)) return m; var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1); }
+  function monthDays(month) { if (typeof month !== 'string' || !/^\d{4}-\d{2}$/.test(month)) return []; var y = +month.slice(0, 4), mo = +month.slice(5, 7) - 1, n = new Date(y, mo + 1, 0).getDate(), out = []; for (var i = 1; i <= n; i++) out.push(month + '-' + pad(i)); return out; }
   /** days of `month` an item occupies (start date + recurrence, each occurrence lasting values.days days) */
   function dimOf(d) { return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); }
   function onList(v) { return String(v == null ? '' : v).split(/[ ,]+/).filter(Boolean); }
@@ -5703,44 +5711,45 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
     var next = v.then; if (next.delta) { next = Object.assign({}, v, v.then); delete next.delta; delete next.cut; delete next.ex; if (v.then.ex) next.ex = v.then.ex; if (!v.then.then) delete next.then; }
     return [first, next]; }
   /** the values in force on a day (after any this-and-future changes), and where they sit: path = ['then', ...] under the item's values */
-  function valuesOn(v, day) { var cur = v || {}, path = [], guard = 0; while (cur && cur.then && guard++ < 500) { var ph = phases(cur); if (!ph) break; var c = (cur.then.delta && cur.then.cut) || cur.then.date;
+  function valuesOn(v, day) { var cur = rd(v), path = [], guard = 0; while (cur && cur.then && guard++ < 500) { var ph = phases(cur); if (!ph) break; var c = (cur.then.delta && cur.then.cut) || cur.then.date;
       if (String(day) >= String(c)) { cur = ph[1]; path.push('then'); } else { cur = ph[0]; break; } }
     var out = Object.assign({}, cur); delete out.then; return { values: out, path: path }; }
-  function occurrences(it, month) { var v = (it && it.values) || {}, ph = phases(v);
+  function occurrences(it, month) { var v = rd(rd(it).values), ph = phases(v);
     if (ph) { var seen = {}; ph.forEach(function (pv) { occurrences({ values: pv }, month).forEach(function (d) { seen[d] = 1; }); }); return Object.keys(seen).sort(); }
-    var s = pdate(v.date); if (!s) return []; var rep = v.repeat || 'once', dur = Math.max(1, Math.floor(+v.days || 1)), out = {},
+    var s = pdate(v.date); if (!s) return []; var rep = v.repeat, dur = span(v), out = {},
       ON = onList(v.on).map(Number).filter(isFinite), DS = onList(v.on), U = pdate(v.until);
     /* 1.8.55: repeat 'every' = every values.every days from the start date. values.ex[date] changes one occurrence:
        {skip} drops it, {moved:'YYYY-MM-DD'} shows it on another day (its amount goes with it). Other occurrences are untouched. */
-    var EVN = Math.max(1, Math.floor(+v.every || 1)), X = v.ex && typeof v.ex === 'object' ? v.ex : null, IN = {};
+    /* 1.8.109: a repeat of every N days without N is left out (only the start date is an occurrence) */
+    var EVN = Math.floor(+v.every), X = v.ex && typeof v.ex === 'object' ? v.ex : null, IN = {};
     if (X) Object.keys(X).forEach(function (k) { var m = X[k] && X[k].moved; if (m && pdate(m) && pdate(k)) IN[m] = k; });
     function baseHit(st) { if (st < s) return false; if (U && st > U) return false;
       return rep === 'daily' || (rep === 'weekdays' && st.getDay() > 0 && st.getDay() < 6) || (rep === 'weekly' && (ON.length ? ON.indexOf(st.getDay()) >= 0 : st.getDay() === s.getDay())) ||
         (rep === 'monthly' && st.getDate() === Math.min(s.getDate(), dimOf(st))) || (rep === 'monthdays' && ON.some(function (x) { return st.getDate() === Math.min(x, dimOf(st)); })) || (rep === 'dates' && DS.indexOf(ymd(st)) >= 0) ||
-        (rep === 'every' && Math.round((Date.UTC(st.getFullYear(), st.getMonth(), st.getDate()) - Date.UTC(s.getFullYear(), s.getMonth(), s.getDate())) / 86400000) % EVN === 0) || ymd(st) === ymd(s); }
+        (rep === 'every' && EVN >= 1 && Math.round((Date.UTC(st.getFullYear(), st.getMonth(), st.getDate()) - Date.UTC(s.getFullYear(), s.getMonth(), s.getDate())) / 86400000) % EVN === 0) || ymd(st) === ymd(s); }
     function startHit(st) { var key = ymd(st); if (IN[key] && baseHit(pdate(IN[key]))) return true; if (X && X[key] && (X[key].skip || X[key].moved)) return false; return baseHit(st); }
     monthDays(month).forEach(function (ds) { var d = pdate(ds); for (var k = 0; k < dur; k++) { var st = new Date(d.getFullYear(), d.getMonth(), d.getDate() - k);
         if (startHit(st)) { out[ds] = 1; break; } } });
     return Object.keys(out).sort(); }
   /** an item is in conflict when its jreq item is scheduled on/after it; broken when its jreq points at nothing */
   function itemFlags(w, ref) { var it = rec(w, ref), f = { broken: false, conflict: false }; if (!it || !it.jreq) return f; var j = rec(w, it.jreq); if (!j) { f.broken = true; return f; }
-    if (parse(it.jreq).kind === 'item') { var a = pdate((it.values || {}).date), b = pdate((j.values || {}).date); if (a && b && b >= a) f.conflict = true; } return f; }
+    if (parse(it.jreq).kind === 'item') { var a = pdate(rd(it.values).date), b = pdate(rd(j.values).date); if (a && b && b >= a) f.conflict = true; } return f; }
   function dayMap(w, compRef, measure, field) { var c = rec(w, compRef), out = {}; if (!c) return out; var month = monthOf(c);
     monthDays(month).forEach(function (d) { out[d] = 0; });
-    (c.items || []).forEach(function (r) { var it = rec(w, r); if (!it) return; var add = measure === 'sum' ? num((it.values || {})[field || 'hours']) : measure === 'conflicts' ? (itemFlags(w, r).conflict ? 1 : 0) : 1; if (!add) return;
-      (measure === 'conflicts' ? [((it.values || {}).date || '')].filter(function (d) { return d in out; }) : occurrences(it, month)).forEach(function (d) { out[d] += add; }); });
+    ls(c.items).forEach(function (r) { var it = rec(w, r); if (!it) return; var add = measure === 'sum' ? num(rd(it.values)[field || 'hours']) : measure === 'conflicts' ? (itemFlags(w, r).conflict ? 1 : 0) : 1; if (!add) return;
+      (measure === 'conflicts' ? [rd(it.values).date].filter(function (d) { return typeof d === 'string' && d in out; }) : occurrences(it, month)).forEach(function (d) { out[d] += add; }); });
     return out; }
   /** M19 (ADR 0095): money-free amounts per day. values.amount per month, values.charge each|last|first|per (default each = amount split
    *  evenly over the month's occurrences), values.flow in|out (sign) */
-  function charges(it, month) { var v0 = (it && it.values) || {}, ph = phases(v0);
-    if (ph) { var sum = {}; ph.forEach(function (pv) { var c = charges({ values: pv }, month); Object.keys(c).forEach(function (d) { sum[d] = (sum[d] || 0) + c[d]; }); }); return sum; }
+  function charges(it, month) { var v0 = rd(rd(it).values), ph = phases(v0);
+    if (ph) { var sum = {}; ph.forEach(function (pv) { var c = charges({ values: pv }, month); Object.keys(c).forEach(function (d) { sum[d] = d in sum ? sum[d] + c[d] : c[d]; }); }); return sum; }
     /* charge 'per' = the amount on every occurrence; its lastAmount applies to the occurrence on the until day only (1.8.55) */
     var v = v0, fin = v.charge !== 'per' && v.until && v.lastAmount != null && String(v.until).slice(0, 7) === month, a = num(fin ? v.lastAmount : v.amount);
     /* final-payment month: lastAmount is charged on the month's schedule even after the until day (legacy rule, ADR 0098) */
     /* values.pay (day-of-month list) = charge days separate from presence (e.g. paid on 1,15 for work done on weekdays) */
     var until = monthDays(month)[monthDays(month).length - 1], cv = v.pay ? Object.assign({}, v, { repeat: 'monthdays', on: v.pay }) : v, occ = occurrences({ values: fin ? Object.assign({}, cv, { until: until }) : cv }, month), out = {};
     /* 1.8.54: a span (values.days > 1) shows on every day it covers but its amount applies on its last day */
-    var dur = Math.max(1, Math.floor(+v.days || 1)); if (dur > 1) { var one = Object.assign({}, fin ? Object.assign({}, cv, { until: until }) : cv, { days: 1 }), yy = +month.slice(0, 4), mo = +month.slice(5, 7), ends = [];
+    var dur = span(v); if (dur > 1) { var one = Object.assign({}, fin ? Object.assign({}, cv, { until: until }) : cv, { days: 1 }), yy = +month.slice(0, 4), mo = +month.slice(5, 7), ends = [];
       for (var k = Math.ceil(dur / 28) + 1; k >= 0; k--) { var dm = new Date(yy, mo - 1 - k, 1), mm = dm.getFullYear() + '-' + String(dm.getMonth() + 1).padStart(2, '0');
         occurrences({ values: one }, mm).forEach(function (sd) { var s0 = pdate(sd), es = ymd(new Date(s0.getFullYear(), s0.getMonth(), s0.getDate() + dur - 1)); if (es.slice(0, 7) === month && ends.indexOf(es) < 0) ends.push(es); }); }
       occ = ends.sort(); }
@@ -5753,48 +5762,49 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
       occ.forEach(function (d) { var o = X[FROM[d] || d]; if (o && o.amount != null && o.amount !== '') out[d] = num(o.amount); }); }
     Object.keys(out).forEach(function (d) { if (!out[d]) delete out[d]; });
     return out; }
-  function sign(it) { return ((it && it.values) || {}).flow === 'in' ? 1 : -1; }
+  function sign(it) { return rd(rd(it).values).flow === 'in' ? 1 : -1; }
   function ledger(w, compRef, opening) { var c = rec(w, compRef), L = { values: {}, flows: {}, ins: {}, ahead: {}, min: 0, end: 0, lines: {} }; if (!c) return L; var month = monthOf(c), days = monthDays(month);
     days.forEach(function (d) { L.flows[d] = 0; L.lines[d] = []; });
-    (c.items || []).forEach(function (r) { var it = rec(w, r); if (!it) return; var pk = it.alts && it.state && (it.state.pick || it.state.simPick), pm = pk && rec(w, pk);
+    ls(c.items).forEach(function (r) { var it = rec(w, r); if (!it) return; var pk = it.alts && it.state && (it.state.pick || it.state.simPick), pm = pk && rec(w, pk);
       if (pm && pm.values && pm.values.amount != null) it = { values: Object.assign({}, it.values, { amount: pm.values.amount }) }; /* ADR 0097: a picked alternative's amount replaces the item's on its schedule */
       var ch = charges(it, month), sg = sign(it);
       Object.keys(ch).forEach(function (d) { if (!(d in L.flows)) return; L.flows[d] += sg * ch[d]; L.lines[d].push({ item: r, amt: sg * ch[d] }); if (sg > 0) L.ins[d] = 1; }); });
-    var bal = num(opening); days.forEach(function (d) { bal += L.flows[d]; L.values[d] = bal; });
+    /* 1.8.109: with no opening number there is no balance: the flows stand, the balances, minimum and end are left out */
+    var bal = num(opening); if (bal === undefined) { delete L.min; delete L.end; return L; } days.forEach(function (d) { bal += L.flows[d]; L.values[d] = bal; });
     for (var i = days.length - 1, run = Infinity; i >= 0; i--) { var nx = days[i + 1]; if (!nx || L.ins[nx]) run = Infinity; run = Math.min(run, L.values[days[i]]); L.ahead[days[i]] = run; }
     L.min = days.length ? Math.min.apply(null, days.map(function (d) { return L.values[d]; })) : 0; L.end = days.length ? L.values[days[days.length - 1]] : bal; return L; }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
-  function parse(ref) { var m = /^(item|joy|bp|comp):(.+)$/.exec(ref || ''); return m ? { kind: m[1], id: m[2] } : null; }
+  function parse(ref) { if (typeof ref !== 'string') return null; var m = /^(item|joy|bp|comp):(.+)$/.exec(ref); return m ? { kind: m[1], id: m[2] } : null; }
   var COL = { item: 'items', joy: 'joys', bp: 'blueprints', comp: 'components' };
-  function rec(w, ref) { var r = parse(ref); return r ? (w[COL[r.kind]] || {})[r.id] || null : null; }
+  function rec(w, ref) { var r = parse(ref); if (!r) return null; var m = rd(w[COL[r.kind]]); return Object.prototype.hasOwnProperty.call(m, r.id) && isObj(m[r.id]) ? m[r.id] : null; }
   /** node order inside one blueprint (wires must be acyclic within a graph) */
   function graphOrder(bp) {
-    var ns = bp.nodes || [], ind = {}, out = {}, res = [];
+    var ns = ls(bp.nodes), ind = {}, out = {}, res = [];
     ns.forEach(function (n) { ind[n.id] = 0; out[n.id] = []; });
-    (bp.wires || []).forEach(function (e) { if (ind[e.to[0]] == null || !out[e.from[0]]) return; ind[e.to[0]]++; out[e.from[0]].push(e.to[0]); });
+    ls(bp.wires).forEach(function (e) { if (ind[e.to[0]] == null || !out[e.from[0]]) return; ind[e.to[0]]++; out[e.from[0]].push(e.to[0]); });
     var q = ns.map(function (n) { return n.id; }).filter(function (id) { return !ind[id]; }).sort();
     while (q.length) { var id = q.shift(); res.push(id); out[id].forEach(function (t) { if (!--ind[t]) { q.push(t); q.sort(); } }); }
     return res.length === ns.length ? res : null;
   }
-  function wiresInto(bp, nid, port) { return (bp.wires || []).filter(function (e) { return e.to[0] === nid && e.to[1] === port; }); }
+  function wiresInto(bp, nid, port) { return ls(bp.wires).filter(function (e) { return e.to[0] === nid && e.to[1] === port; }); }
   /** static reads / writes of a blueprint (record-level keys) */
   function access(bp) {
     var R = {}, Wr = {}, own = {};
-    (bp.nodes || []).forEach(function (n) { var p = n.p || {}, wired = function (port) { return wiresInto(bp, n.id, port).length > 0; }, outUsed = function (port) { return (bp.wires || []).some(function (e) { return e.from[0] === n.id && e.from[1] === port; }); };
+    ls(bp.nodes).forEach(function (n) { var p = rd(n.p), wired = function (port) { return wiresInto(bp, n.id, port).length > 0; }, outUsed = function (port) { return ls(bp.wires).some(function (e) { return e.from[0] === n.id && e.from[1] === port; }); };
       if (n.type === 'item') { if (p.item === 'event') R.events = 1; else if (p.item === 'self') R.self = 1; else if (p.item) R[p.item] = 1;
         if (wired('set') || wired('add') || wired('state')) Wr[p.item === 'event' ? 'event-item' : p.item] = 1; }
       /* M20 fix: a joy node that only SETS (value output unused; set is idempotent, add accumulates) does not read the joy -> no false loop */
       if (n.type === 'joy' && p.joy) { var jw = wired('add') || wired('set'); if (!wired('set') || wired('add') || outUsed('value')) R['joy:' + p.joy] = 1; if (jw) Wr['joy:' + p.joy] = 1; }
       if (n.type === 'component' && p.comp) R[p.comp] = 1;
-      if (n.type === 'position' && wired('comp')) { (bp.wires || []).forEach(function (e) { if (e.to[0] === n.id) { var src = (bp.nodes || []).filter(function (m) { return m.id === e.from[0]; })[0]; if (src && src.p && src.p.comp) Wr[src.p.comp] = 1; } }); }
+      if (n.type === 'position' && wired('comp')) { ls(bp.wires).forEach(function (e) { if (e.to[0] === n.id) { var src = ls(bp.nodes).filter(function (m) { return m.id === e.from[0]; })[0]; if (src && src.p && src.p.comp) Wr[src.p.comp] = 1; } }); }
       /* M18: a view node only READS its component when its 'changed' output is used (styling a view is not reading it, so no self-loop) */
-      if (n.type === 'view' && p.comp) { var usesOut = function (port) { return (bp.wires || []).some(function (e) { return e.from[0] === n.id && e.from[1] === port; }); };
+      if (n.type === 'view' && p.comp) { var usesOut = function (port) { return ls(bp.wires).some(function (e) { return e.from[0] === n.id && e.from[1] === port; }); };
         if (usesOut('changed')) R[p.comp] = 1; if (usesOut('events')) R.events = 1; if (wired('style') || wired('items') || wired('comps')) Wr[p.comp] = 1; }
       if (n.type === 'condition' && p.op === 'event') R.events = 1;
       if (n.type === 'accumulate' && p.comp) { R['members:' + p.comp] = 1; R['items*'] = 1; }
       if ((n.type === 'formula' || n.type === 'walk') && p.comp) { R['members:' + p.comp] = 1; R['items*'] = 1; if (p.target) R['joy:' + p.target] = 1;
         /* field-level state keys: a formula writes state:<out>, reads state:<identifier> for each name in its expression; walk writes state:live/left/gap/events */
-        if (n.type === 'formula') { Wr['state:' + (p.out || 'calc')] = 1; own['state:' + (p.out || 'calc')] = 1; String(p.expr || '').replace(/'[^']*'/g, '').replace(/(J\.)?([A-Za-z_][A-Za-z0-9_]*)/g, function (_, jj, id) { if (jj) R['joy:' + id] = 1; else if (!FN[id] && id !== 'gmax' && id !== 'paid' && id !== 'grank' && id !== 'linked' && id !== 'hshare' && id !== 'gsum' && id !== 'DAYS' && id !== 'pmax' && id !== 'via') R['state:' + id] = 1; }); }
+        if (n.type === 'formula') { Wr['state:' + (p.out || 'calc')] = 1; own['state:' + (p.out || 'calc')] = 1; (typeof p.expr === 'string' ? p.expr : '').replace(/'[^']*'/g, '').replace(/(J\.)?([A-Za-z_][A-Za-z0-9_]*)/g, function (_, jj, id) { if (jj) R['joy:' + id] = 1; else if (!FN[id] && id !== 'gmax' && id !== 'paid' && id !== 'grank' && id !== 'linked' && id !== 'hshare' && id !== 'gsum' && id !== 'DAYS' && id !== 'pmax' && id !== 'via') R['state:' + id] = 1; }); }
         else { ['live', 'left', 'gap', 'events'].forEach(function (f) { Wr['state:' + f] = 1; own['state:' + f] = 1; }); ['start', 'from', 'rate', 'day', 'pay', 'count'].forEach(function (q) { if (p[q]) R['state:' + p[q]] = 1; }); R['state:initial'] = R['state:asOf'] = R['state:apr'] = R['state:payDay'] = R['state:cashPay'] = R['state:terms0'] = 1; } }
       if (n.type === 'sum' && p.comp) { R['members:' + p.comp] = 1; R['items*'] = 1; R['state:' + (p.field || 'amount')] = 1; if (p.match) R['state:' + p.match] = 1; }
       if (n.type === 'days' && p.comp) { R['members:' + p.comp] = 1; R['items*'] = 1; } });
@@ -5802,7 +5812,7 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
   }
   /** wiring-dependency order between blueprints + cycles (read/write graph); ties by id */
   function deps(w) {
-    var ids = Object.keys(w.blueprints || {}).sort(), A = {}, edges = {};
+    var ids = Object.keys(rd(w.blueprints)).sort(), A = {}, edges = {};
     ids.forEach(function (id) { A[id] = access(w.blueprints[id]); edges[id] = []; });
     ids.forEach(function (a) { ids.forEach(function (b) { var hit = A[a].writes.some(function (k) { return k === 'event-item' || (a === b && A[a].own.indexOf(k) >= 0) ? false : A[b].reads.indexOf(k) >= 0 || (/^item:/.test(k) && A[b].reads.indexOf('items*') >= 0); }) ||
       (A[a].writes.indexOf('event-item') >= 0 && A[b].reads.indexOf('items*') >= 0) ||
@@ -5822,12 +5832,13 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
     while (q.length) { var i = q.shift(); order = order.concat(sccs[i]); Object.keys(cout[i]).forEach(function (j) { if (!--ind[j]) { q.push(+j); q.sort(function (a, b) { return key(a) < key(b) ? -1 : 1; }); } }); }
     return { order: order, edges: edges, cycles: cycles, access: A };
   }
-  function num(v) { return typeof v === 'number' && isFinite(v) ? v : (v === true ? 1 : (+v || 0)); }
-  function cmp(op, a, b) { a = num(a); b = num(b); return op === '>' ? a > b : op === '>=' ? a >= b : op === '<' ? a < b : op === '<=' ? a <= b : op === '==' ? a === b : op === '!=' ? a !== b : false; }
-  function fv(it, f) { if (!it) return undefined; if (f === 'name') return it.name; var v = it.values || {}; if (f in v) return v[f]; return (it.state || {})[f]; }
+  /* 1.8.109: a number, true as 1, or a string that reads as a number; anything else is no number (undefined), and what needs it is left out */
+  function num(v) { if (typeof v === 'number') return isFinite(v) ? v : undefined; if (v === true) return 1; if (typeof v === 'string' && v.trim() !== '' && isFinite(+v)) return +v; return undefined; }
+  function cmp(op, a, b) { a = num(a); b = num(b); if (a === undefined || b === undefined) return false; return op === '>' ? a > b : op === '>=' ? a >= b : op === '<' ? a < b : op === '<=' ? a <= b : op === '==' ? a === b : op === '!=' ? a !== b : false; }
+  function fv(it, f) { if (!it) return undefined; if (f === 'name') return it.name; var v = rd(it.values); if (f in v) return v[f]; return rd(it.state)[f]; }
   function today() { var d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
   /* tiny safe expression compiler: numbers, 'strings', identifiers (fields / J.joy), + - * / % ( ) comparisons && || ! and functions; no eval */
-  var FN = { min: Math.min, max: Math.max, abs: Math.abs, round: function (x, d) { var k = Math.pow(10, d || 0); return Math.round(x * k) / k; }, ceil: Math.ceil, floor: Math.floor, ln: Math.log,
+  var FN = { min: Math.min, max: Math.max, abs: Math.abs, round: function (x, d) { if (d === undefined) return Math.round(x); var k = Math.pow(10, d); return Math.round(x * k) / k; }, ceil: Math.ceil, floor: Math.floor, ln: Math.log,
     if: function (c, a, b) { return c ? a : b; }, num: function (x) { return num(x); }, has: function (x) { return x != null && x !== ''; } };
   var CC = {};
   function compile(src) { if (CC[src]) return CC[src]; var T = [], i = 0, re = /\s*(?:(\d+\.?\d*(?:e[+-]?\d+)?)|('[^']*')|([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)?)|(==|!=|>=|<=|&&|\|\||[-+*\/%()<>!,?:]))/y, m;
@@ -5860,87 +5871,95 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
       if (bal > 0.005) { var d2 = dd(last, tgt); if (d2 > 0) bal = bal + rate / 365 * bal * d2; } }
     if (bal < 0.005) bal = 0; var gap = Math.max(0, bal0 - bal), left = Math.max(0, count - ev); if (!(bal > 0.005)) left = 0;
     return { live: Math.round(bal * 100) / 100, gap: Math.round(gap * 100) / 100, events: ev, left: left }; }
-  function sumItems(w, cref, deep, d) { var c = rec(w, cref); if (!c || d > 12) return []; var out = (c.items || []).slice(); if (deep) (c.sub || []).forEach(function (s) { out = out.concat(sumItems(w, s.comp, true, d + 1)); }); return out; }
+  function sumItems(w, cref, deep, d) { var c = rec(w, cref); if (!c || d > 12) return []; var out = ls(c.items).slice(); if (deep) ls(c.sub).forEach(function (s) { if (!isObj(s)) return; out = out.concat(sumItems(w, s.comp, true, d + 1)); }); return out; }
   /** evaluate one blueprint against a snapshot. ctx: {self, events, changed}. returns {writes, outs:{score, jreq}, error} */
   function evalBlueprint(w, bpId, ctx) {
-    var bp = w.blueprints[bpId], order = bp && graphOrder(bp); ctx = ctx || {};
-    if (!bp) return { writes: [], outs: {}, error: 'missing' }; if (!order) return { writes: [], outs: {}, error: 'wires form a cycle inside the blueprint' };
-    var byId = {}, V = {}, writes = [], outs = {}; (bp.nodes || []).forEach(function (n) { byId[n.id] = n; });
-    var events = ctx.events || [];
-    function inp(nid, port) { var ws = wiresInto(bp, nid, port); if (!ws.length) return undefined; var vals = ws.map(function (e) { return (V[e.from[0]] || {})[e.from[1]]; });
+    var bp = rd(w.blueprints)[bpId], order = isObj(bp) && graphOrder(bp);
+    if (!isObj(bp)) return { writes: [], outs: {}, error: 'missing' }; if (!isObj(ctx)) return { writes: [], outs: {}, error: 'no context' }; if (!order) return { writes: [], outs: {}, error: 'wires form a cycle inside the blueprint' };
+    var byId = {}, V = {}, writes = [], outs = {}; ls(bp.nodes).forEach(function (n) { byId[n.id] = n; });
+    var events = ls(ctx.events);
+    function inp(nid, port) { var ws = wiresInto(bp, nid, port); if (!ws.length) return undefined; var vals = ws.map(function (e) { return rd(V[e.from[0]])[e.from[1]]; });
       return NODES[byId[nid].type].multi && NODES[byId[nid].type].multi[port] ? vals : vals[0]; }
     function W(target, path, op, v, nid) { writes.push({ target: target, path: path, op: op, v: v, bp: bpId, node: nid }); }
-    order.forEach(function (nid) { var n = byId[nid], p = n.p || {}, o = V[nid] = {};
-      if (n.type === 'item') { var ref = p.item === 'event' ? (events.filter(function (e) { return e.item; }).map(function (e) { return e.item; })[0] || null) : p.item === 'self' ? ctx.self : p.item;
+    order.forEach(function (nid) { var n = byId[nid], p = rd(n.p), o = V[nid] = {};
+      if (n.type === 'item') { var ref = p.item === 'event' ? (events.filter(function (e) { return e.item; }).map(function (e) { return e.item; })[0]) : p.item === 'self' ? ctx.self : p.item;
         var it = rec(w, ref); o.ref = it ? ref : null; var f = p.field || 'name';
         o.value = it ? (it.values && f in it.values ? it.values[f] : (it.state && f in it.state ? it.state[f] : (f === 'name' ? it.name : undefined))) : undefined;
         if (it) { var s = inp(nid, 'set'), a = inp(nid, 'add'), st = inp(nid, 'state');
-          if (s !== undefined) W(ref, ['values', f], 'set', s, nid); if (a !== undefined) W(ref, ['values', f], 'add', num(a), nid); if (st !== undefined) W(ref, ['state', f], 'set', st, nid); }
+          if (s !== undefined) W(ref, ['values', f], 'set', s, nid); if (a !== undefined && num(a) !== undefined) W(ref, ['values', f], 'add', num(a), nid); if (st !== undefined) W(ref, ['state', f], 'set', st, nid); }
         if (p.out === 'jreq') outs.jreq = o.ref; }
-      else if (n.type === 'joy') { var j = (w.joys || {})[p.joy]; o.value = j ? j.value : undefined;
-        if (j) { var ja = inp(nid, 'add'), js = inp(nid, 'set'); if (ja !== undefined) W('joy:' + p.joy, ['value'], 'add', num(ja), nid); if (js !== undefined) W('joy:' + p.joy, ['value'], 'set', num(js), nid); } }
+      else if (n.type === 'joy') { var j = rd(w.joys)[p.joy]; o.value = j ? j.value : undefined;
+        if (j) { var ja = inp(nid, 'add'), js = inp(nid, 'set'); if (num(ja) !== undefined) W('joy:' + p.joy, ['value'], 'add', num(ja), nid); if (num(js) !== undefined) W('joy:' + p.joy, ['value'], 'set', num(js), nid); } }
       else if (n.type === 'math') { var A = num(inp(nid, 'a')), B = num(inp(nid, 'b')), op = p.op || 'const'; if (op === 'if') { o.out = B ? A : undefined; return; }
+        /* 1.8.109: an input that is not a number leaves the output out */ if (op === 'const' ? num(p.value) === undefined : A === undefined || (op !== 'neg' && op !== 'clamp01' && B === undefined)) return;
         o.out = op === 'const' ? num(p.value) : op === 'add' ? A + B : op === 'sub' ? A - B : op === 'mul' ? A * B : op === 'div' ? (B ? A / B : 0) : op === 'min' ? Math.min(A, B) : op === 'max' ? Math.max(A, B) : op === 'neg' ? -A : Math.max(0, Math.min(1, A));
         if (typeof o.out === 'number' && isFinite(o.out)) o.out = +o.out.toFixed(9);
         if (p.out === 'score') outs.score = o.out; }
       else if (n.type === 'condition') { var ok;
-        if (p.op === 'event') { var src = inp(nid, 'a'), evs = Array.isArray(src) ? src : events; var m = evs.filter(function (e) { return !p.event || e.type === p.event; }); ok = m.length > 0; o.item = ok ? m[0].item || null : undefined; o.target = ok ? m[0].target || null : undefined; }
-        else { var av = inp(nid, 'a'), bv = inp(nid, 'b'); if (av && typeof av === 'object' && !Array.isArray(av)) { var sm = {}, cnt = 0; Object.keys(av).forEach(function (k) { var y = cmp(p.op || '>', av[k], bv === undefined ? p.value : (bv && typeof bv === 'object' ? bv[k] : bv)); if (y) cnt++; sm[k] = y ? (p.then || 'on') : (p.else || ''); });
+        if (p.op === 'event') { var src = inp(nid, 'a'), evs = Array.isArray(src) ? src : events; var m = evs.filter(function (e) { return !p.event || e.type === p.event; }); ok = m.length > 0; o.item = ok ? m[0].item : undefined; o.target = ok ? m[0].target : undefined; }
+        else { var av = inp(nid, 'a'), bv = inp(nid, 'b'); if (av && typeof av === 'object' && !Array.isArray(av)) { var sm = {}, cnt = 0; Object.keys(av).forEach(function (k) { var y = cmp(p.op || '>', av[k], bv === undefined ? p.value : (bv && typeof bv === 'object' ? bv[k] : bv)); if (y) cnt++; var sv = y ? (p.then || 'on') : p.else; if (typeof sv === 'string') sm[k] = sv; });
             o.ok = cnt; o.state = sm; return; } ok = cmp(p.op || '>', av, bv === undefined ? p.value : bv); }
-        o.ok = ok ? 1 : 0; o.state = ok ? (p.then || 'on') : (p.else || ''); }
+        o.ok = ok ? 1 : 0; o.state = ok ? (p.then || 'on') : p.else; }
       else if (n.type === 'accumulate') { var op0 = inp(nid, 'opening'), LG = ledger(w, p.comp, op0 === undefined ? p.opening : op0); o.values = LG.values; o.flows = LG.flows; o.ahead = LG.ahead; o.min = LG.min; o.end = LG.end; }
       else if (n.type === 'merge') { var mo = {}; ['a', 'b', 'c', 'd'].forEach(function (k) { var m = inp(nid, k); if (m && typeof m === 'object') Object.keys(m).forEach(function (d) { if (!mo[d] && m[d]) mo[d] = m[d]; else if (!(d in mo)) mo[d] = m[d]; }); }); o.out = mo; }
       else if (n.type === 'sum') { var SI = sumItems(w, p.comp, p.deep === 'yes', 0), fld = p.field || 'amount'; if (p.match) SI = SI.filter(function (r) { var v = fv(rec(w, r), p.match); return String(v == null ? '' : v) === String(p.value == null ? '' : p.value); });
-        o.count = SI.length; o.total = +SI.reduce(function (t, r) { return t + num(fv(rec(w, r), fld)); }, 0).toFixed(6); }
+        o.count = SI.length; o.total = +SI.reduce(function (t, r) { var x = num(fv(rec(w, r), fld)); return x === undefined ? t : t + x; }, 0).toFixed(6); }
       else if (n.type === 'formula') { var FI = sumItems(w, p.comp, p.deep === 'yes', 0), ex = compile(p.expr || '0'), FV = {}, ft = 0, fm = -Infinity, key = p.out || 'calc';
         /* paid('field','linkField'): Σ field over every atlas item whose linkField names this item (e.g. expenses paying a debt) */
-        var PM = {}; function paid(key, r) { if (!PM[key]) { var q = key.split('|'), f = q[1], lf = q[2], m = {}; Object.keys(w.items || {}).forEach(function (id) { var o = w.items[id], to = String(fv(o, lf) || ''); if (to) m[to] = (m[to] || 0) + num(fv(o, f)); }); PM[key] = m; }
-          var id = String(r).replace(/^item:/, ''); return +(PM[key][id] || 0).toFixed(6); }
+        var PM = {}; function paid(key, r) { if (!PM[key]) { var q = key.split('|'), f = q[1], lf = q[2], m = {}; Object.keys(rd(w.items)).forEach(function (id) { var o = w.items[id], to = fv(o, lf), x = num(fv(o, f)); if (to == null || to === '' || to === false || x === undefined) return; to = String(to); m[to] = to in m ? m[to] + x : x; }); PM[key] = m; }
+          /* paid is a sum: nothing paying this item sums to 0 */ var id = String(r).replace(/^item:/, ''); return id in PM[key] ? +PM[key][id].toFixed(6) : 0; }
         /* pmax('field','linkField'): max of field over the items whose linkField names this item */
-        var PX = {}; function pmax(key, r) { if (!PX[key]) { var q = key.split('|'), f = q[1], lf = q[2], m = {}; Object.keys(w.items || {}).forEach(function (id) { var o = w.items[id], to = String(fv(o, lf) || ''); if (to) m[to] = Math.max(m[to] || 0, num(fv(o, f))); }); PX[key] = m; }
-          return m0(PX[key][String(r).replace(/^item:/, '')]); } function m0(x) { return +(x || 0); }
+        var PX = {}; function pmax(key, r) { if (!PX[key]) { var q = key.split('|'), f = q[1], lf = q[2], m = {}; Object.keys(rd(w.items)).forEach(function (id) { var o = w.items[id], to = fv(o, lf), x = num(fv(o, f)); if (to == null || to === '' || to === false || x === undefined) return; to = String(to); m[to] = to in m ? Math.max(m[to], x) : x; }); PX[key] = m; }
+          /* 1.8.109: a max over nothing is no number */ return PX[key][String(r).replace(/^item:/, '')]; }
         /* grank('field','tieField'): 1-based rank of this item in the formula's component by field descending, ties by tieField ascending */
         var RK = {}; function grank(key, r) { if (!RK[key]) { var q = key.split('|'), f = q[1], tf = q[2], L = FI.map(function (x, i) { var o = rec(w, x); return { r: x, v: num(o && fv(o, f)), t: num(o && fv(o, tf)), i: i }; });
-            L.sort(function (a, b) { return (b.v - a.v) || (a.t - b.t) || (a.i - b.i); }); RK[key] = {}; L.forEach(function (x, i) { RK[key][x.r] = i + 1; }); } return RK[key][r] || 0; }
+            /* 1.8.109: an item with no number for the field or the tie is ranked after those with one */ var by = function (a, b) { return a === undefined ? (b === undefined ? 0 : 1) : b === undefined ? -1 : 0; };
+            L.sort(function (a, b) { return by(a.v, b.v) || (b.v - a.v) || by(a.t, b.t) || (a.t - b.t) || (a.i - b.i); }); RK[key] = {}; L.forEach(function (x, i) { RK[key][x.r] = i + 1; }); } return RK[key][r]; }
         /* linked('linkField','nameField'): names of the items whose linkField names this item, joined ', ' (insertion order) */
-        var LM = {}; function linked(key, r) { if (!LM[key]) { var q = key.split('|'), lf = q[1], nf = q[2], m = {}; Object.keys(w.items || {}).forEach(function (id) { var o = w.items[id], to = String(fv(o, lf) || ''); if (to) (m[to] = m[to] || []).push(nf === 'name' ? o.name : fv(o, nf)); }); LM[key] = m; }
-          return (LM[key][String(r).replace(/^item:/, '')] || []).join(', '); }
+        var LM = {}; function linked(key, r) { if (!LM[key]) { var q = key.split('|'), lf = q[1], nf = q[2], m = {}; Object.keys(rd(w.items)).forEach(function (id) { var o = w.items[id], to = fv(o, lf); if (to == null || to === '' || to === false) return; to = String(to); if (!(to in m)) m[to] = []; m[to].push(nf === 'name' ? o.name : fv(o, nf)); }); LM[key] = m; }
+          return ls(LM[key][String(r).replace(/^item:/, '')]).join(', '); }
         /* hshare('posField','offField',inv): harmonic share (1/r)/Σ(1/r) of this item among the component's items with offField falsy and posField>0, ordered by posField; r = active position, or n−pos+1 when inv (live harmonicShares + activeRankOrder) */
         var HS = {}; function hshare(key, r) { if (!HS[key]) { var q = key.split('|'), pf = q[1], of = q[2], inv = q[3] === '1' || q[3] === 'true', L = [];
             FI.forEach(function (x, i) { var o = rec(w, x); if (o && !fv(o, of) && num(fv(o, pf)) > 0) L.push({ r: x, p: num(fv(o, pf)), i: i }); }); L.sort(function (a, b) { return (a.p - b.p) || (a.i - b.i); });
-            var n = L.length, sw = 0; L.forEach(function (x, i) { x.w = 1 / (inv ? Math.max(1, n - i) : i + 1); sw += x.w; }); HS[key] = {}; L.forEach(function (x) { HS[key][x.r] = sw > 0 ? x.w / sw : 0; }); } return HS[key][r] || 0; }
+            var n = L.length, sw = 0; L.forEach(function (x, i) { x.w = 1 / (inv ? Math.max(1, n - i) : i + 1); sw += x.w; }); HS[key] = {}; L.forEach(function (x) { HS[key][x.r] = sw > 0 ? x.w / sw : 0; }); }
+          /* an item outside the active set (off, or no position) has no share: 0 */ return r in HS[key] ? HS[key][r] : 0; }
         /* gsum('field'): Σ field over the formula's component items */
-        var GS = {}; function gsum(key) { if (!(key in GS)) { var f = key.split('|')[1]; GS[key] = FI.reduce(function (t, x) { var o = rec(w, x); return t + num(o && fv(o, f)); }, 0); } return GS[key]; }
-        var GM = {}; function gmax(key, it) { var q = key.split('|'), f = q[1], gf = q[2], gv = String(fv(it, gf)); GM[key] = GM[key] || {};
-          if (!(gv in GM[key])) GM[key][gv] = FI.reduce(function (m, r2) { var o2 = rec(w, r2); return o2 && String(fv(o2, gf)) === gv ? Math.max(m, num(fv(o2, f))) : m; }, 0); return GM[key][gv]; }
-        FI.forEach(function (r) { var it = rec(w, r); if (!it) return; var v = ex(function (name) { if (name.indexOf('J.') === 0) { var j = (w.joys || {})[name.slice(2)]; return j ? j.value : 0; } if (name === 'TOTAL') return ft; if (name === 'DAYS') return occurrences(it, monthOf(rec(w, p.monthOf || p.comp))).length; if (name.indexOf('@gmax|') === 0) return gmax(name, it); if (name.indexOf('@paid|') === 0) return paid(name, r); if (name.indexOf('@pmax|') === 0) return pmax(name, r); if (name.indexOf('@grank|') === 0) return grank(name, r); if (name.indexOf('@linked|') === 0) return linked(name, r); if (name.indexOf('@hshare|') === 0) return hshare(name, r); if (name.indexOf('@gsum|') === 0) return gsum(name); if (name.indexOf('@via|') === 0) { var vq = name.split('|'), vto = String(fv(it, vq[1]) || '').replace(/^item:/, ''), vo = vto && w.items[vto]; var vv = vo ? fv(vo, vq[2]) : 0; return vv == null ? 0 : vv; } return fv(it, name); });
-          v = typeof v === "number" && isFinite(v) ? Math.round(v * 1e10) / 1e10 : v; FV[parse(r).id] = v; if (typeof v === 'number' && isFinite(v)) { ft += v; if (v > fm) fm = v; } W(r, ['state', key], 'set', v, nid); });
-        o.values = FV; o.total = +ft.toFixed(6); o.max = fm === -Infinity ? 0 : fm; }
-      else if (n.type === 'walk') { var WI = sumItems(w, p.comp, false, 0), tj = p.target && (w.joys || {})[p.target], tgt = pdate(tj && tj.value) || today(), WV = {}, wt = 0;
-        WI.forEach(function (r) { var it = rec(w, r); if (!it) return; var res = walkOne(num(fv(it, p.start || 'initial')), pdate(fv(it, p.from || 'asOf')) || tgt, num(fv(it, p.rate || 'apr')) / 100, Math.max(1, num(fv(it, p.day || 'payDay')) || 1), num(fv(it, p.pay || 'cashPay')), num(fv(it, p.count || 'terms0')), tgt);
+        var GS = {}; function gsum(key) { if (!(key in GS)) { var f = key.split('|')[1]; GS[key] = FI.reduce(function (t, x) { var o = rec(w, x), y = num(o && fv(o, f)); return y === undefined ? t : t + y; }, 0); } return GS[key]; }
+        var GM = {}; function gmax(key, it) { var q = key.split('|'), f = q[1], gf = q[2], gv = String(fv(it, gf)); if (!(key in GM)) GM[key] = {};
+          if (!(gv in GM[key])) GM[key][gv] = FI.reduce(function (m, r2) { var o2 = rec(w, r2), y = o2 && String(fv(o2, gf)) === gv ? num(fv(o2, f)) : undefined; return y === undefined ? m : m === undefined ? y : Math.max(m, y); }, undefined); return GM[key][gv]; }
+        FI.forEach(function (r) { var it = rec(w, r); if (!it) return; var v = ex(function (name) { if (name.indexOf('J.') === 0) { var j = rd(w.joys)[name.slice(2)]; return j ? j.value : undefined; } if (name === 'TOTAL') return ft; if (name === 'DAYS') return occurrences(it, monthOf(rec(w, p.monthOf || p.comp))).length; if (name.indexOf('@gmax|') === 0) return gmax(name, it); if (name.indexOf('@paid|') === 0) return paid(name, r); if (name.indexOf('@pmax|') === 0) return pmax(name, r); if (name.indexOf('@grank|') === 0) return grank(name, r); if (name.indexOf('@linked|') === 0) return linked(name, r); if (name.indexOf('@hshare|') === 0) return hshare(name, r); if (name.indexOf('@gsum|') === 0) return gsum(name); if (name.indexOf('@via|') === 0) { var vq = name.split('|'), vt = fv(it, vq[1]), vto = vt == null || vt === '' || vt === false ? '' : String(vt).replace(/^item:/, ''), vo = vto ? rec(w, 'item:' + vto) : null; /* via of no link, or a field the linked item lacks, reads as 0 as before (a via sum adds pick and simPick, one of which is not there) */ var vv = vo ? fv(vo, vq[2]) : 0; return vv == null ? 0 : vv; } return fv(it, name); });
+          /* 1.8.109: a result that is not a number or text is left out for this item: its earlier result is dropped */ if ((typeof v === 'number' && !isFinite(v)) || (typeof v !== 'number' && typeof v !== 'string')) { W(r, ['state', key], 'drop', undefined, nid); return; }
+          v = typeof v === "number" ? Math.round(v * 1e10) / 1e10 : v; FV[parse(r).id] = v; if (typeof v === 'number' && isFinite(v)) { ft += v; if (v > fm) fm = v; } W(r, ['state', key], 'set', v, nid); });
+        o.values = FV; o.total = +ft.toFixed(6); if (fm !== -Infinity) o.max = fm; }
+      else if (n.type === 'walk') { var WI = sumItems(w, p.comp, false, 0), tj = p.target && rd(w.joys)[p.target], tgt = pdate(tj && tj.value) || today(), WV = {}, wt = 0;
+        WI.forEach(function (r) { var it = rec(w, r); if (!it) return;
+          /* 1.8.109: an item missing a number the walk needs is left out of it */ var b0 = num(fv(it, p.start || 'initial')), rt = num(fv(it, p.rate || 'apr')), dy = num(fv(it, p.day || 'payDay')), py = num(fv(it, p.pay || 'cashPay')), ct = num(fv(it, p.count || 'terms0'));
+          if (b0 === undefined || rt === undefined || dy === undefined || py === undefined || ct === undefined) return;
+          var res = walkOne(b0, pdate(fv(it, p.from || 'asOf')) || tgt, rt / 100, Math.max(1, dy), py, ct, tgt);
           WV[parse(r).id] = res.live; wt += res.live; W(r, ['state', 'live'], 'set', res.live, nid); W(r, ['state', 'left'], 'set', res.left, nid); W(r, ['state', 'gap'], 'set', res.gap, nid); W(r, ['state', 'events'], 'set', res.events, nid); });
         o.values = WV; o.total = Math.round(wt * 100) / 100; }
       else if (n.type === 'days') { o.values = dayMap(w, p.comp, p.measure || 'count', p.field); o.total = Object.keys(o.values).reduce(function (t, k) { return t + o.values[k]; }, 0); }
       else if (n.type === 'component') { o.comp = rec(w, p.comp) ? p.comp : null; }
-      else if (n.type === 'position') { var c = inp(nid, 'comp'); o.placed = c || null; if (c && rec(w, c)) W(c, ['state', 'pos', parse(p.parent || '') ? parse(p.parent).id : '_'], 'set', { x: num(p.x), y: num(p.y), w: num(p.w) }, nid); }
+      else if (n.type === 'position') { var c = inp(nid, 'comp'); o.placed = c; if (c && rec(w, c) && num(p.x) !== undefined && num(p.y) !== undefined && num(p.w) !== undefined) W(c, ['state', 'pos', parse(p.parent) ? parse(p.parent).id : '_'], 'set', { x: num(p.x), y: num(p.y), w: num(p.w) }, nid); }
       else if (n.type === 'view') { var vc = p.comp, comp = rec(w, vc); if (comp) {
           var sty = inp(nid, 'style'), itm = inp(nid, 'item'), its = inp(nid, 'items'), cps = inp(nid, 'comps');
           if (sty && typeof sty === 'object') W(vc, ['state', 'dayStyles'], 'set', sty, nid); else if (sty !== undefined) { if (itm && parse(itm)) W(vc, ['state', 'styles', parse(itm).id], 'set', sty, nid); else W(vc, ['state', 'style'], 'set', sty, nid); }
           var lab = inp(nid, 'label'); if (lab && typeof lab === 'object') W(vc, ['state', 'dayLabels'], 'set', lab, nid);
           if (its) W(vc, ['state', 'viewItems'], 'set', its.filter(Boolean), nid);
           if (cps) W(vc, ['state', 'viewComps'], 'set', cps.filter(Boolean), nid);
-          var mine = [vc].concat(comp.items || [], (comp.sub || []).map(function (s) { return s.comp; }));
-          o.changed = (ctx.changed || []).filter(function (r) { return mine.indexOf(r) >= 0; });
+          var mine = [vc].concat(ls(comp.items), ls(comp.sub).map(function (s) { return rd(s).comp; }));
+          o.changed = ls(ctx.changed).filter(function (r) { return mine.indexOf(r) >= 0; });
           o.events = events.filter(function (e) { return e.comp === vc || !e.comp; }); } } });
     return { writes: writes, outs: outs };
   }
   /** pure part of a pass: evaluate dirty blueprints in parallel against one snapshot */
   function computePass(snap, dirty, events, changed) {
     var D = deps(snap), res = [];
-    D.order.forEach(function (id) { if (dirty === 'all' || dirty.indexOf(id) >= 0) { var r = evalBlueprint(snap, id, { events: events, changed: changed }); res.push({ bp: id, writes: r.writes, error: r.error || null }); } });
+    D.order.forEach(function (id) { if (dirty === 'all' || dirty.indexOf(id) >= 0) { var r = evalBlueprint(snap, id, { events: events, changed: changed }); var one = { bp: id, writes: r.writes }; if (r.error) one.error = r.error; res.push(one); } });
     return { order: D.order, results: res };
   }
   function setPath(o, path, v) { for (var i = 0; i < path.length - 1; i++) { if (o[path[i]] == null || typeof o[path[i]] !== 'object') o[path[i]] = {}; o = o[path[i]]; } o[path[path.length - 1]] = v; }
+  function dropPath(o, path) { for (var i = 0; i < path.length - 1; i++) { if (o == null || typeof o !== 'object') return; o = o[path[i]]; } if (o != null && typeof o === 'object') delete o[path[path.length - 1]]; }
   function getPath(o, path) { for (var i = 0; i < path.length; i++) { if (o == null) return undefined; o = o[path[i]]; } return o; }
   /** apply all writes of a pass together: deltas summed; sets in fixed order (blueprint order, node id), last wins; conflicts noted */
   function apply(w, comp) {
@@ -5951,32 +5970,35 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
     var changed = {}, conflicts = [];
     keys.forEach(function (k) { var L = byKey[k], t = L[0], o = rec(w, t.target); if (!o) return;
       var before = JSON.stringify(getPath(o, t.path)), sets = L.filter(function (x) { return x.op === 'set'; }), adds = L.filter(function (x) { return x.op === 'add'; });
+      /* 1.8.109: a drop removes the value, unless a set or add writes it in the same pass */ if (!sets.length && !adds.length && L.some(function (x) { return x.op === 'drop'; })) dropPath(o, t.path);
       if (sets.length) setPath(o, t.path, clone(sets[sets.length - 1].v));
-      if (adds.length) setPath(o, t.path, num(getPath(o, t.path)) + adds.reduce(function (s, x) { return s + x.v; }, 0));
+      /* 1.8.109: an add lands on a number, or on nothing (it starts the value); a value there that is not a number is left as it is */
+      if (adds.length) { var cur = getPath(o, t.path), sumAdd = adds.reduce(function (s, x) { return s + x.v; }, 0); if (cur === undefined) setPath(o, t.path, sumAdd); else if (num(cur) !== undefined) setPath(o, t.path, num(cur) + sumAdd); }
       var setters = sets.map(function (x) { return x.bp; }).filter(function (b, i, a) { return a.indexOf(b) === i; });
       if (setters.length > 1) conflicts.push({ target: t.target, path: t.path.join('.'), writers: setters, applied: sets[sets.length - 1].bp });
       if (JSON.stringify(getPath(o, t.path)) !== before) changed[t.target] = 1; });
     return { changed: Object.keys(changed).sort(), conflicts: conflicts };
   }
   /** score of an item = its blueprint's score output with self = the item */
-  function scoreItem(w, ref) { var it = rec(w, ref); if (!it || !it.blueprint || !rec(w, it.blueprint)) return 0; var r = evalBlueprint(w, parse(it.blueprint).id, { self: ref }); return num(r.outs.score); }
+  /* 1.8.109: an item with no scoring blueprint, or whose blueprint gives no score, has no score (undefined), and ranks with no score */
+  function scoreItem(w, ref) { var it = rec(w, ref); if (!it || !it.blueprint || !rec(w, it.blueprint)) return undefined; var r = evalBlueprint(w, parse(it.blueprint).id, { self: ref }); return num(r.outs.score); }
   /** alternatives (ADR 0079): userPick > pref > best score; commit to state.pick (best) or state.simPick (sim) */
   function pickAlts(w, M) {
     var changed = [];
     Object.keys(w.items).forEach(function (id) { var it = w.items[id]; if (!it.alts) return; var r = M.pickAlt(w, id, function (m) { return scoreItem(w, m); });
-      var key = it.alts.method === 'sim' ? 'simPick' : 'pick', v = r ? r.pick : null; it.state = it.state || {};
+      var key = it.alts.method === 'sim' ? 'simPick' : 'pick', v = r ? r.pick : null; /* the pick is written with its state: a missing state is added in the same write */ if (!isObj(it.state)) it.state = {};
       if (it.state[key] !== v || it.state.pickWhy !== (r ? r.why : null)) { it.state[key] = v; it.state.pickWhy = r ? r.why : null; changed.push('item:' + id); } });
     return changed;
   }
   /** resolve an item's jreq sequence, following conditional (blueprint) prerequisites */
-  function sequence(w, itemId) { var out = [], seen = {}, x = (w.items[itemId] || {}).jreq;
+  function sequence(w, itemId) { var out = [], seen = {}, x = rd(rd(w.items)[itemId]).jreq;
     while (x && !seen[x]) { seen[x] = 1; var p = parse(x); if (!p) break;
-      if (p.kind === 'bp') { x = evalBlueprint(w, p.id, {}).outs.jreq || null; continue; }
-      out.push(x); x = (rec(w, x) || {}).jreq; }
+      if (p.kind === 'bp') { x = evalBlueprint(w, p.id, {}).outs.jreq; continue; }
+      out.push(x); x = rd(rec(w, x)).jreq; }
     return out; }
   /** a full pass on a live atlas (main thread). st: {dirty:'all'|[ids], events:[], changed:[]}; computeFn may be a worker result */
   function pass(w, st, M, computed) {
-    var snap = clone(w), comp = computed || computePass(snap, st.dirty, st.events || [], st.changed || []);
+    var snap = clone(w), comp = computed || computePass(snap, st.dirty, ls(st.events), ls(st.changed));
     var ap = apply(w, comp), alt = M ? pickAlts(w, M) : [], changed = ap.changed.concat(alt.filter(function (r) { return ap.changed.indexOf(r) < 0; })).sort();
     var D = deps(w), next = D.order.filter(function (id) { return hits(D.access[id].reads, changed); });
     return { ran: comp.results.map(function (r) { return r.bp; }), errors: comp.results.filter(function (r) { return r.error; }).map(function (r) { return { bp: r.bp, error: r.error }; }),
@@ -5987,8 +6009,8 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
   function dirtyFor(w, changed, hasEvents) { var D = deps(w); return D.order.filter(function (id) { var R = D.access[id].reads; return (hasEvents && R.indexOf('events') >= 0) || hits(R, changed); }); }
   /** state names a component's view can receive: condition then/else wired into a view node for that component (ADR 0089) */
   function stateNames(w, compRef) { var out = [];
-    Object.keys(w.blueprints || {}).forEach(function (id) { var b = w.blueprints[id], by = {}; (b.nodes || []).forEach(function (n) { by[n.id] = n; });
-      (b.wires || []).forEach(function (x) { var f = by[x.from[0]], t = by[x.to[0]]; if (!f || !t || t.type !== 'view' || (t.p || {}).comp !== compRef || x.to[1] !== 'style') return;
+    Object.keys(rd(w.blueprints)).forEach(function (id) { var b = rd(w.blueprints[id]), by = {}; ls(b.nodes).forEach(function (n) { by[n.id] = n; });
+      ls(b.wires).forEach(function (x) { var f = by[x.from[0]], t = by[x.to[0]]; if (!f || !t || t.type !== 'view' || rd(t.p).comp !== compRef || x.to[1] !== 'style') return;
         if (f.type === 'condition') [f.p.then || 'on', f.p.else].forEach(function (s) { if (s && out.indexOf(s) < 0) out.push(s); }); }); });
     return out; }
   var api = { valuesOn: valuesOn, phases: phases, charges: charges, ledger: ledger, sign: sign, monthOf: monthOf, monthDays: monthDays, occurrences: occurrences, itemFlags: itemFlags, dayMap: dayMap, stateNames: stateNames, NODES: NODES, graphOrder: graphOrder, access: access, deps: deps, evalBlueprint: evalBlueprint, computePass: computePass, apply: apply, pass: pass, scoreItem: scoreItem, pickAlts: pickAlts, sequence: sequence, dirtyFor: dirtyFor, clone: clone };
@@ -18930,7 +18952,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.108",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.109",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
