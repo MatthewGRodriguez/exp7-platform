@@ -10270,7 +10270,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
 (function (root) {
   'use strict';
   var F = root.Exp7Fail, FAIL = F.FAIL, HALF = 2, EPS = 1e-6, BIG = 65536;
-  var FITS = ['stretch', 'nine', 'fit', 'tile'], TILE_MAX = 1024, LOOP_MS = [100, 60000], LOOP_PARTS = 16, LOOP_KEYS = 32, KINDS = { rect: 6, rrect: 7, border: 8, path: 3, stroke: 4 }, CMD = { M: 2, L: 2, Q: 4, C: 6, Z: 0 };
+  var FITS = ['stretch', 'nine', 'fit', 'tile'], TILE_MAX = 1024, LOOP_MS = [100, 60000], LOOP_PARTS = 16, LOOP_KEYS = 32, LOOP_TILE_RUNS = 256, KINDS = { rect: 6, rrect: 7, border: 8, path: 3, stroke: 4 }, CMD = { M: 2, L: 2, Q: 4, C: 6, Z: 0 };
   var apps = new Map(); /* app -> { pack, screens: Map(screen -> Map(id -> piece)), instances: Map(screen + '|' + nodeKey -> Map(id -> piece)) } */
 
   function pid(component, slot) { return component + '/' + slot; }
@@ -10325,8 +10325,12 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     /* a loop (1.8.121): its form, and every part's items in every drawing */
     var L = loopOf(p); if (L) { var lb = loopBad(L); if (lb) return invalid(p, 'loop: ' + lb);
       /* 1.8.123: a loop plays by group pose, which moves the placed items as one: exact only where placing is a scale and a move
-       * on each axis (fit, stretch). A nine piece bends at its insets and a tile piece is placed once per tile. */
-      if (p.fit !== 'fit' && p.fit !== 'stretch') return invalid(p, 'loop: a looping piece is drawn by fit or stretch, not ' + p.fit);
+       * on each axis (fit, stretch, and each tile of a tile piece, whose parts move about their own tile's pivot). A nine piece
+       * bends at its insets. A tile piece's moving runs (each tile's runs of one part's items) are bounded at the largest size
+       * it supports: at most LOOP_TILE_RUNS, one group each. */
+      if (p.fit === 'nine') return invalid(p, 'loop: a looping piece is drawn by fit, stretch or tile, not nine');
+      if (p.fit === 'tile') { var tn = count(s.w[1], vb[2]) * count(s.h[1], vb[3]), rn = loopRuns(L);
+        if (tn * rn > LOOP_TILE_RUNS) return invalid(p, 'loop: at up to ' + s.w[1] + 'x' + s.h[1] + ' the piece makes ' + tn + ' tiles of ' + rn + ' moving runs, ' + (tn * rn) + ' in all; at most ' + LOOP_TILE_RUNS); }
       for (var x = 0; x < names.length; x++) { var vx = p.variants[names[x]], sx = Object.keys(vx);
         for (var y = 0; y < sx.length; y++) { var dx = drawing(vx, sx[y]), most = Math.max.apply(null, L.parts.map(function (q) { return q.items[q.items.length - 1]; }));
           if (most >= dx.length) return invalid(p, 'loop: ' + names[x] + '/' + sx[y] + ' has ' + dx.length + ' items, and a part moves item ' + most); } } }
@@ -10399,6 +10403,10 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   /* ---------- looping (7.5, 1.8.121) ---------- */
   function loopOf(p) { return has(p, 'motion') && p.motion !== null && typeof p.motion === 'object' && p.motion.loop !== null && p.motion.loop !== undefined ? p.motion.loop : null; }
   function intOk(v) { return num(v) && v >= 0 && Math.floor(v) === v; }
+  /* which part moves each item index (owner), and the highest index a part moves (most) */
+  function owners(L) { var owner = {}, most = 0; L.parts.forEach(function (q, qi) { q.items.forEach(function (i) { owner[i] = qi; if (i > most) most = i; }); }); return { owner: owner, most: most }; }
+  /* how many runs of one part's items a drawing's items 0 .. most make, in order (1.8.123): each is one group a tile */
+  function loopRuns(L) { var O = owners(L), n = 0; for (var i = 0; i <= O.most; i++) if (has(O.owner, i) && (i === 0 || O.owner[i - 1] !== O.owner[i])) n++; return n; }
   /* what is wrong with a loop's form, or null */
   function loopBad(L) {
     if (typeof L !== 'object' || Array.isArray(L) || Object.keys(L).length !== 3 || !has(L, 'ms') || !has(L, 'still') || !has(L, 'parts')) return 'a loop is { ms, still, parts }';
@@ -10616,30 +10624,38 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
    * the node's own. The cut is the same in every state: a part moves the same item indices in every state, and a looping slot's
    * items after its last part item are a seg of their own (empty in a state that has none). items(state): each seg's items in
    * that state, a part's as drawn at no phase. at(ms): each part seg's pose ms into its loop (null for the others), in the node's
-   * pixels: scale s about o, then move t, at opacity a. A looping piece is fit or stretch (ART_INVALID otherwise), where
-   * placing is a scale and a move on each axis, so the pose of the placed items is the pose of the piece's items placed. */
+   * pixels: scale s about o, then move t, at opacity a. A looping piece is fit, stretch or tile (ART_INVALID for nine), where
+   * placing (each tile's, for tile) is a scale and a move on each axis, so the pose of the placed items is the pose of the
+   * piece's items placed. A tile piece's part segs carry their tile, posed about that tile's pivot. */
   function unit(n) {
     if (!looping(n)) return null;
     function walk(st) { var segs = [{ part: null, items: [] }];
       function to(part) { var last = segs[segs.length - 1];
-        if (part === null ? last.part === null : last.part !== null && last.part.slot === part.slot && last.part.q === part.q) return last;
+        if (part === null ? last.part === null : last.part !== null && last.part.slot === part.slot && last.part.q === part.q && last.part.tile === part.tile) return last;
         var g = { part: part, items: [] }; segs.push(g); return g; }
       n.items.forEach(function (it) {
         for (var j = 0; j < n.art.length; j++) { var s = n.art[j], k = s.drawn[n.rest].indexOf(it); if (k < 0) continue; if (k > 0) return;
           var sst = has(s.drawn, st) ? st : n.rest;
           if (!has(s, 'loop')) { Array.prototype.push.apply(to(null).items, s.drawn[sst]); return; }
-          var L = loopOf(s.loop.piece), d = s.loop.base[sst], owner = {}, most = 0;
-          L.parts.forEach(function (q, qi) { q.items.forEach(function (i) { owner[i] = qi; if (i > most) most = i; }); });
-          for (var i = 0; i <= most; i++) to(has(owner, i) ? { slot: j, q: owner[i] } : null).items.push(d[i]);
-          Array.prototype.push.apply(to(null).items, d.slice(most + 1)); return; }
+          /* a tile piece's base is its drawing once per tile, in order: each tile's runs are cut the same way, its parts posed
+           * about that tile's pivots (1.8.123) */
+          var p = s.loop.piece, L = loopOf(p), d = s.loop.base[sst], O = owners(L), nt = p.fit === 'tile' ? tiles(p, s.rect).length : 1, dl = d.length / nt;
+          for (var tk = 0; tk < nt; tk++) { var d0 = tk * dl;
+            for (var i = 0; i <= O.most; i++) to(has(O.owner, i) ? { slot: j, q: O.owner[i], tile: tk } : null).items.push(d[d0 + i]);
+            Array.prototype.push.apply(to(null).items, d.slice(d0 + O.most + 1, d0 + dl)); }
+          return; }
         to(null).items.push(it); });
       return segs; }
     function list(segs) { return segs.map(function (g) { return g.items; }); }
     var rest = walk(n.rest), segs = rest.map(function (g) { return { part: g.part }; });
+    /* each looping slot's placing, worked out once: its frame, or its tiles (1.8.123) */
+    var placing = {};
+    function placer(part) { var s = n.art[part.slot], p = s.loop.piece; if (!has(placing, part.slot)) placing[part.slot] = p.fit === 'tile' ? tiles(p, s.rect) : frame(p, s.rect);
+      return p.fit === 'tile' ? placing[part.slot][part.tile] : placing[part.slot]; }
     return { segs: segs,
       items: function (st) { return list(st === n.rest ? rest : walk(st)); },
       at: function (ms) { return segs.map(function (g) { if (g.part === null) return null;
-        var s = n.art[g.part.slot], p = s.loop.piece, L = loopOf(p), q = L.parts[g.part.q], T = frame(p, s.rect), v = poseAt(q.keys, phaseOf(L, ms)), o = [T.x(q.pivot[0]), T.y(q.pivot[1])];
+        var s = n.art[g.part.slot], p = s.loop.piece, L = loopOf(p), q = L.parts[g.part.q], T = placer(g.part), v = poseAt(q.keys, phaseOf(L, ms)), o = [T.x(q.pivot[0]), T.y(q.pivot[1])];
         return { s: v[2], o: o, t: [T.x(q.pivot[0] + v[0]) - o[0], T.y(q.pivot[1] + v[1]) - o[1]], a: v[3] }; }); } }; }
   /* browser(): the page's clock, its one shared frame (JRender.frame, 1.8.123), reduced-motion setting and tab visibility, for
    * player() */
