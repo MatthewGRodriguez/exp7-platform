@@ -10098,6 +10098,12 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
  * of every component, in every variant the component draws and every state it declares. Packs are authored as SVG with the
  * studies, compiled by exp7-jrender tools/art (exp7-art-pack/1) and embedded here as data. A piece's items are the JRViews
  * item contract (rect, rrect, border, path, stroke) in the piece's own coordinates; colours are a colour token or #rrggbb.
+ * 1.8.119: a colour may also be a gradient, { gradient: linear | radial, spread: pad | repeat | reflect, p, stops: [[offset,
+ * colour, opacity]] } (linear p: x0 y0 x1 y1; radial p: the canvas's two circles, focus first, fx fy fr cx cy r), in the
+ * piece's coordinates. It is placed with the art: its points move as the art's points do, and its radii scale with the
+ * art's even scale (so a radial keeps its size when a stretch or nine piece grows inside what it supports). It is drawn as a
+ * JRender paint, each stop's colour resolved and its opacity multiplied in. Text over a gradient keeps its contrast against
+ * every stop.
  * Strict fail and carry on (1.8.94, Matthew): each piece of art is its own fail point. load(pack) checks every piece alone
  * (ART_INVALID, ART_OUTSIDE): a piece that fails is recorded and left out, and the pack loads with the rest. assign(app, pack)
  * checks the pack against every component the app draws, each slot, variant and state alone (ART_MISSING): a gap is recorded
@@ -10123,13 +10129,23 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   /* a colour is #rrggbb, #rrggbbaa (see-through), or a colour token of the journal set or the view set */
   function colourOk(c) { if (typeof c === 'string') return /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(c);
     var TK = root.Exp7Tokens; return has(c, 'token') && Object.keys(c).length === 1 && (TK.SCHEMA[c.token] === 'colour' || TK.VIEW_SCHEMA[c.token] === 'colour' || TK.VIEW_SCHEMA[c.token] === 'colourA'); }
+  /* 1.8.119: a gradient: its kind, spread, points, and two or more stops in order, each a colour above and an opacity 0..1 */
+  var SPREADS = ['pad', 'repeat', 'reflect'], GKIND = { linear: 4, radial: 6 };
+  function gradientOk(c) { if (!c || typeof c !== 'object' || Array.isArray(c) || Object.keys(c).length !== 4 || !has(GKIND, c.gradient) || SPREADS.indexOf(c.spread) < 0) return false;
+    if (!Array.isArray(c.p) || c.p.length !== GKIND[c.gradient] || !c.p.every(num)) return false;
+    if (c.gradient === 'radial' && !(c.p[2] >= 0 && c.p[5] > 0)) return false;
+    if (!Array.isArray(c.stops) || c.stops.length < HALF) return false;
+    for (var i = 0; i < c.stops.length; i++) { var k = c.stops[i];
+      if (!Array.isArray(k) || k.length !== 3 || !num(k[0]) || k[0] < 0 || k[0] > 1 || (i > 0 && k[0] < c.stops[i - 1][0]) || !colourOk(k[1]) || !num(k[2]) || k[2] < 0 || k[2] > 1) return false; }
+    return true; }
+  function paintOk(c) { return colourOk(c) || gradientOk(c); }
   function cmdsOk(cmds) { if (!Array.isArray(cmds) || !cmds.length || cmds[0][0] !== 'M') return false;
     for (var i = 0; i < cmds.length; i++) { var k = cmds[i]; if (!Array.isArray(k) || !has(CMD, k[0]) || k.length !== CMD[k[0]] + 1) return false;
       for (var j = 1; j < k.length; j++) if (!num(k[j])) return false; }
     return true; }
   function itemOk(it) { if (!Array.isArray(it) || !has(KINDS, it[0]) || it.length !== KINDS[it[0]]) return 'item ' + JSON.stringify(it);
     var k = it[0], c = k === 'path' || k === 'stroke' ? it[2] : it[it.length - 1];
-    if (!colourOk(c)) return 'colour ' + JSON.stringify(c) + ' is neither #rrggbb(aa) nor a colour token';
+    if (!paintOk(c)) return 'colour ' + JSON.stringify(c) + ' is neither #rrggbb(aa), a colour token nor a gradient';
     if (k === 'path' || k === 'stroke') { if (!cmdsOk(it[1])) return k + ' commands'; if (k === 'stroke') { var o = it[3]; if (!o || !num(o.width) || !(o.width > 0)) return 'stroke width'; } return null; }
     for (var i = 1; i < it.length - 1; i++) if (!num(it[i])) return k + ' geometry';
     if (it[3] < 0 || it[4] < 0) return k + ' size';
@@ -10184,17 +10200,21 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     return { x: function (u) { return ox + Xd.pos(u - vb[0]) * s; }, y: function (u) { return oy + Yd.pos(u - vb[1]) * s; },
       w: function (a, b) { return Xd.span(a - vb[0], b - vb[0]) * s; }, h: function (a, b) { return Yd.span(a - vb[1], b - vb[1]) * s; }, s: s };
   }
+  /* a colour placed with the art: a gradient's points move with the art, its radii scale with its even scale (1.8.119) */
+  function paintAt(T, c) { if (!gradientOk(c)) return c; var q = c.p;
+    var p = c.gradient === 'linear' ? [T.x(q[0]), T.y(q[1]), T.x(q[2]), T.y(q[3])] : [T.x(q[0]), T.y(q[1]), q[2] * T.s, T.x(q[3]), T.y(q[4]), q[5] * T.s];
+    return { gradient: c.gradient, spread: c.spread, p: p, stops: c.stops }; }
   function cmdsAt(T, cmds) { return cmds.map(function (k) { var o = [k[0]]; for (var i = 1; i < k.length; i += HALF) o.push(T.x(k[i]), T.y(k[i + 1])); return o; }); }
   /* items of one drawing placed in box; colours stay as the piece wrote them */
   function place(p, items, box) {
     var T = frame(p, box);
     return items.map(function (it) { var k = it[0];
-      if (k === 'rect') return ['rect', T.x(it[1]), T.y(it[2]), T.w(it[1], it[1] + it[3]), T.h(it[2], it[2] + it[4]), it[5]];
-      if (k === 'rrect') return ['rrect', T.x(it[1]), T.y(it[2]), T.w(it[1], it[1] + it[3]), T.h(it[2], it[2] + it[4]), it[5] * T.s, it[6]];
-      if (k === 'border') return ['border', T.x(it[1]), T.y(it[2]), T.w(it[1], it[1] + it[3]), T.h(it[2], it[2] + it[4]), it[5] * T.s, it[6] * T.s, it[7]];
-      if (k === 'path') return ['path', cmdsAt(T, it[1]), it[2]];
+      if (k === 'rect') return ['rect', T.x(it[1]), T.y(it[2]), T.w(it[1], it[1] + it[3]), T.h(it[2], it[2] + it[4]), paintAt(T, it[5])];
+      if (k === 'rrect') return ['rrect', T.x(it[1]), T.y(it[2]), T.w(it[1], it[1] + it[3]), T.h(it[2], it[2] + it[4]), it[5] * T.s, paintAt(T, it[6])];
+      if (k === 'border') return ['border', T.x(it[1]), T.y(it[2]), T.w(it[1], it[1] + it[3]), T.h(it[2], it[2] + it[4]), it[5] * T.s, it[6] * T.s, paintAt(T, it[7])];
+      if (k === 'path') return ['path', cmdsAt(T, it[1]), paintAt(T, it[2])];
       var o = Object.assign({}, it[3]); o.width = o.width * T.s; if (o.dash) o.dash = o.dash.map(function (d) { return d * T.s; });
-      return ['stroke', cmdsAt(T, it[1]), it[2], o]; });
+      return ['stroke', cmdsAt(T, it[1]), paintAt(T, it[2]), o]; });
   }
 
   /* ---------- the extent of drawn items, strokes included (ART_OUTSIDE) ---------- */
@@ -10290,6 +10310,19 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     var p = inst && inst.has(id) ? inst.get(id) : scr && scr.has(id) ? scr.get(id) : a.pack.pieces.get(id);
     if (!p) return F.with('ART_MISSING', { app: S.app, screen: S.screen, component: component, slot: slot, detail: 'no piece' });
     return p; }
+  /* a colour as the renderer takes it: #rrggbb(aa) or a colour token as rgba, a gradient as a JRender paint whose stops are
+   * resolved the same way with each stop's opacity multiplied in (1.8.119), or FAIL */
+  function hexOf(S, c) { return typeof c === 'string' ? c : S.token(c.token); }
+  function resolve(S, c) {
+    if (!gradientOk(c)) return typeof c === 'string' ? root.JRender.hex(c) : S.color(c.token);
+    var J = root.JRender, stops = [];
+    for (var i = 0; i < c.stops.length; i++) { var k = c.stops[i], h = hexOf(S, k[1]); if (h === FAIL) return FAIL;
+      var v = /^#([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})?$/.exec(h);
+      if (!v) return invalid(null, 'gradient stop colour ' + JSON.stringify(h) + ' is not #rrggbb(aa)');
+      var a = v[4] === undefined ? 255 : parseInt(v[4], 16);
+      stops.push([k[0], J.rgba(parseInt(v[1], 16), parseInt(v[2], 16), parseInt(v[3], 16), Math.round(a * k[2]))]); }
+    var q = c.p, o = { spread: c.spread };
+    return c.gradient === 'linear' ? J.linear(q[0], q[1], q[2], q[3], stops, o) : J.radial(q[0], q[1], q[2], q[3], q[4], q[5], stops, o); }
   /* fitArt(S, piece, variant, state, rect): the drawing placed in the rect with its colours resolved, or FAIL */
   function fitArt(S, p, variant, state, rect, where) {
     if (!(rect[2] > 0) || !(rect[3] > 0)) return F.with('BOX_EMPTY', Object.assign({ app: S.app, screen: S.screen, slot: p.slot, offered: { w: rect[2], h: rect[3] } }, where));
@@ -10297,7 +10330,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if (d === null) return F.with('ART_MISSING', Object.assign({ app: S.app, screen: S.screen, component: p.component, slot: p.slot, state: state, detail: 'variant ' + variant }, where));
     var items = place(p, d, rect); if (outside(items, rect, p, variant, state) === FAIL) return FAIL;
     for (var i = 0; i < items.length; i++) { var it = items[i], ci = it[0] === 'path' || it[0] === 'stroke' ? 2 : it.length - 1, c = it[ci];
-      var col = typeof c === 'string' ? root.JRender.hex(c) : S.color(c.token); if (col === FAIL) return FAIL; it[ci] = col; }
+      var col = resolve(S, c); if (col === FAIL) return FAIL; it[ci] = col; }
     return items; }
 
   /* draw(S, n, component, slot, variant, rect, at): the slot's art in node n, in every state the component declares, or no items
@@ -10320,7 +10353,9 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     var drawn = {}, fills = {}, shows = {};
     for (var i = 0; i < def.states.length; i++) { var st = def.states[i], d = fitArt(S, p, variant, st, rect, where); if (d === FAIL) return FAIL; drawn[st] = d;
       shows[st] = resolved(p.variants[variant], st);
-      fills[st] = drawing(p.variants[variant], st).map(function (it) { var c = it[0] === 'path' || it[0] === 'stroke' ? it[2] : it[it.length - 1]; return typeof c === 'string' ? c : S.token(c.token); }); }
+      /* each item's fill as #rrggbb(aa) for the contrast check; a gradient's is the list of its stops' colours (1.8.119) */
+      fills[st] = drawing(p.variants[variant], st).map(function (it) { var c = it[0] === 'path' || it[0] === 'stroke' ? it[2] : it[it.length - 1];
+        return gradientOk(c) ? c.stops.map(function (k) { return hexOf(S, k[1]); }) : hexOf(S, c); }); }
     var idle = drawn.idle; if (!idle) return F.with('COMPONENT_INVALID', { component: component, detail: 'no idle state' });
     var rest = drawn[n.rest];
     if (at == null) Array.prototype.push.apply(n.items, rest); else n.items.splice.apply(n.items, [at, 0].concat(rest));
@@ -10356,7 +10391,9 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
         for (var k = 0; k < states.length; k++) { var d = s.drawn[states[k]];
           for (var m = d.length - 1; m >= 0; m--) { var it = d[m]; if (it[0] !== 'rect' && it[0] !== 'rrect' && it[0] !== 'path') continue;
             var e = extent([it]); if (px < e[0] || px > e[2] || py < e[1] || py > e[3]) continue;
-            var fill = s.fills[states[k]][m], r = ratio(ink, fill); under = true;
+            /* a gradient keeps the contrast at every stop: the lowest counts (1.8.119) */
+            var fs = [].concat(s.fills[states[k]][m]), fill = fs[0], r = ratio(ink, fill); under = true;
+            for (var q = 1; q < fs.length; q++) { var rq = ratio(ink, fs[q]); if (rq < r) { r = rq; fill = fs[q]; } }
             if (r < min) return F.with('CONTRAST_LOW', { app: S.app, screen: S.screen, slot: s.slot, state: states[k], id: n.id,
               offered: Math.round(r * 100) / 100, needed: min, detail: JSON.stringify(t.text) + ' in ' + t.ink + ' over ' + fill });
             break; } }
@@ -13752,7 +13789,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.118",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.119",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
