@@ -954,6 +954,8 @@ The motion states (`motion-config`) and the lifecycle (`gpu-motion`) fill in not
 
 On screen, for every app: nothing changes; the probe gives exactly the same results as 1.8.115. For saved data: nothing changes.
 
+Checked in Chrome on Matthew's Mac (2026-11-22, made-up data only): the lean fetched at this release's commit matched `release.json`. With the Exp7 demo and then a blank Budget open at 390 wide, the slabs of the demo's Calendar, Board and Plan views were the same as 1.8.115 (1, 17 and 1 slabs, the same bounds and nodes), and a pointer move set the same view angle on both releases. With the pointer moved, the slabs drew at the same rate (121 frames in 2 seconds on both) and moved the same nodes. In the new release the state table has no edge from idle to dragging, where 1.8.115 made one up. Budget ran its date button twice, and Budget and the demo at 1024 wide opened, took a pointer move and a scroll, with no failure records or page errors. Storage was cleared afterwards.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
