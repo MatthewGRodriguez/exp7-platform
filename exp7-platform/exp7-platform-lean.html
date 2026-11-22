@@ -5736,11 +5736,11 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
     if (parse(it.jreq).kind === 'item') { var a = pdate(rd(it.values).date), b = pdate(rd(j.values).date); if (a && b && b >= a) f.conflict = true; } return f; }
   function dayMap(w, compRef, measure, field) { var c = rec(w, compRef), out = {}; if (!c) return out; var month = monthOf(c);
     monthDays(month).forEach(function (d) { out[d] = 0; });
-    ls(c.items).forEach(function (r) { var it = rec(w, r); if (!it) return; var add = measure === 'sum' ? num(rd(it.values)[field || 'hours']) : measure === 'conflicts' ? (itemFlags(w, r).conflict ? 1 : 0) : 1; if (!add) return;
+    ls(c.items).forEach(function (r) { var it = rec(w, r); if (!it) return; var add = measure === 'sum' ? (typeof field === 'string' ? num(rd(it.values)[field]) : undefined) : measure === 'conflicts' ? (itemFlags(w, r).conflict ? 1 : 0) : measure === 'count' ? 1 : undefined; if (!add) return; /* 1.8.110: a sum with no field, or a measure that is not sum, conflicts or count, adds nothing */
       (measure === 'conflicts' ? [rd(it.values).date].filter(function (d) { return typeof d === 'string' && d in out; }) : occurrences(it, month)).forEach(function (d) { out[d] += add; }); });
     return out; }
-  /** M19 (ADR 0095): money-free amounts per day. values.amount per month, values.charge each|last|first|per (default each = amount split
-   *  evenly over the month's occurrences), values.flow in|out (sign) */
+  /** M19 (ADR 0095): money-free amounts per day. values.amount per month, values.charge each|last|first|per (each = amount split
+   *  evenly over the month's occurrences; 1.8.110: no default, an item with no charge moves no money), values.flow in|out (sign) */
   function charges(it, month) { var v0 = rd(rd(it).values), ph = phases(v0);
     if (ph) { var sum = {}; ph.forEach(function (pv) { var c = charges({ values: pv }, month); Object.keys(c).forEach(function (d) { sum[d] = d in sum ? sum[d] + c[d] : c[d]; }); }); return sum; }
     /* charge 'per' = the amount on every occurrence; its lastAmount applies to the occurrence on the until day only (1.8.55) */
@@ -5754,7 +5754,8 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
         occurrences({ values: one }, mm).forEach(function (sd) { var s0 = pdate(sd), es = ymd(new Date(s0.getFullYear(), s0.getMonth(), s0.getDate() + dur - 1)); if (es.slice(0, 7) === month && ends.indexOf(es) < 0) ends.push(es); }); }
       occ = ends.sort(); }
     if (!occ.length) return out;
-    var mode = v.charge || 'each';
+    /* 1.8.110: how the amount is charged is the item's own charge (per, each, first or last); an item with no charge, or another one, moves no money */
+    var mode = v.charge; if (mode !== 'per' && mode !== 'each' && mode !== 'first' && mode !== 'last') return {};
     if (a) { if (mode === 'last') out[occ[occ.length - 1]] = a; else if (mode === 'first') out[occ[0]] = a; else occ.forEach(function (d) { out[d] = mode === 'per' ? a : a / occ.length; }); }
     if (mode === 'per' && v.lastAmount != null && v.until && out[v.until] != null) out[v.until] = num(v.lastAmount);
     /* one occurrence's own amount (values.ex[date].amount); a moved occurrence carries the amount set on its original day */
@@ -5804,9 +5805,9 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
       if (n.type === 'accumulate' && p.comp) { R['members:' + p.comp] = 1; R['items*'] = 1; }
       if ((n.type === 'formula' || n.type === 'walk') && p.comp) { R['members:' + p.comp] = 1; R['items*'] = 1; if (p.target) R['joy:' + p.target] = 1;
         /* field-level state keys: a formula writes state:<out>, reads state:<identifier> for each name in its expression; walk writes state:live/left/gap/events */
-        if (n.type === 'formula') { Wr['state:' + (p.out || 'calc')] = 1; own['state:' + (p.out || 'calc')] = 1; (typeof p.expr === 'string' ? p.expr : '').replace(/'[^']*'/g, '').replace(/(J\.)?([A-Za-z_][A-Za-z0-9_]*)/g, function (_, jj, id) { if (jj) R['joy:' + id] = 1; else if (!FN[id] && id !== 'gmax' && id !== 'paid' && id !== 'grank' && id !== 'linked' && id !== 'hshare' && id !== 'gsum' && id !== 'DAYS' && id !== 'pmax' && id !== 'via') R['state:' + id] = 1; }); }
+        if (n.type === 'formula') { if (typeof p.out === 'string' && p.out) { Wr['state:' + p.out] = 1; own['state:' + p.out] = 1; } (typeof p.expr === 'string' ? p.expr : '').replace(/'[^']*'/g, '').replace(/(J\.)?([A-Za-z_][A-Za-z0-9_]*)/g, function (_, jj, id) { if (jj) R['joy:' + id] = 1; else if (!FN[id] && id !== 'gmax' && id !== 'paid' && id !== 'grank' && id !== 'linked' && id !== 'hshare' && id !== 'gsum' && id !== 'DAYS' && id !== 'pmax' && id !== 'via') R['state:' + id] = 1; }); }
         else { ['live', 'left', 'gap', 'events'].forEach(function (f) { Wr['state:' + f] = 1; own['state:' + f] = 1; }); ['start', 'from', 'rate', 'day', 'pay', 'count'].forEach(function (q) { if (p[q]) R['state:' + p[q]] = 1; }); R['state:initial'] = R['state:asOf'] = R['state:apr'] = R['state:payDay'] = R['state:cashPay'] = R['state:terms0'] = 1; } }
-      if (n.type === 'sum' && p.comp) { R['members:' + p.comp] = 1; R['items*'] = 1; R['state:' + (p.field || 'amount')] = 1; if (p.match) R['state:' + p.match] = 1; }
+      if (n.type === 'sum' && p.comp) { R['members:' + p.comp] = 1; R['items*'] = 1; if (typeof p.field === 'string' && p.field) R['state:' + p.field] = 1; if (p.match) R['state:' + p.match] = 1; }
       if (n.type === 'days' && p.comp) { R['members:' + p.comp] = 1; R['items*'] = 1; } });
     return { reads: Object.keys(R), writes: Object.keys(Wr), own: Object.keys(own) };
   }
@@ -5883,28 +5884,28 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
     function W(target, path, op, v, nid) { writes.push({ target: target, path: path, op: op, v: v, bp: bpId, node: nid }); }
     order.forEach(function (nid) { var n = byId[nid], p = rd(n.p), o = V[nid] = {};
       if (n.type === 'item') { var ref = p.item === 'event' ? (events.filter(function (e) { return e.item; }).map(function (e) { return e.item; })[0]) : p.item === 'self' ? ctx.self : p.item;
-        var it = rec(w, ref); o.ref = it ? ref : null; var f = p.field || 'name';
+        var it = rec(w, ref); o.ref = it ? ref : null; var f = p.field; /* 1.8.110: an item node with no field reads and writes nothing; its ref still goes out */ if (typeof f !== 'string' || !f) it = null;
         o.value = it ? (it.values && f in it.values ? it.values[f] : (it.state && f in it.state ? it.state[f] : (f === 'name' ? it.name : undefined))) : undefined;
         if (it) { var s = inp(nid, 'set'), a = inp(nid, 'add'), st = inp(nid, 'state');
           if (s !== undefined) W(ref, ['values', f], 'set', s, nid); if (a !== undefined && num(a) !== undefined) W(ref, ['values', f], 'add', num(a), nid); if (st !== undefined) W(ref, ['state', f], 'set', st, nid); }
         if (p.out === 'jreq') outs.jreq = o.ref; }
       else if (n.type === 'joy') { var j = rd(w.joys)[p.joy]; o.value = j ? j.value : undefined;
         if (j) { var ja = inp(nid, 'add'), js = inp(nid, 'set'); if (num(ja) !== undefined) W('joy:' + p.joy, ['value'], 'add', num(ja), nid); if (num(js) !== undefined) W('joy:' + p.joy, ['value'], 'set', num(js), nid); } }
-      else if (n.type === 'math') { var A = num(inp(nid, 'a')), B = num(inp(nid, 'b')), op = p.op || 'const'; if (op === 'if') { o.out = B ? A : undefined; return; }
+      else if (n.type === 'math') { var A = num(inp(nid, 'a')), B = num(inp(nid, 'b')), op = p.op; /* 1.8.110: math with no op gives no output */ if (typeof op !== 'string') return; if (op === 'if') { o.out = B ? A : undefined; return; }
         /* 1.8.109: an input that is not a number leaves the output out */ if (op === 'const' ? num(p.value) === undefined : A === undefined || (op !== 'neg' && op !== 'clamp01' && B === undefined)) return;
         o.out = op === 'const' ? num(p.value) : op === 'add' ? A + B : op === 'sub' ? A - B : op === 'mul' ? A * B : op === 'div' ? (B ? A / B : 0) : op === 'min' ? Math.min(A, B) : op === 'max' ? Math.max(A, B) : op === 'neg' ? -A : Math.max(0, Math.min(1, A));
         if (typeof o.out === 'number' && isFinite(o.out)) o.out = +o.out.toFixed(9);
         if (p.out === 'score') outs.score = o.out; }
       else if (n.type === 'condition') { var ok;
         if (p.op === 'event') { var src = inp(nid, 'a'), evs = Array.isArray(src) ? src : events; var m = evs.filter(function (e) { return !p.event || e.type === p.event; }); ok = m.length > 0; o.item = ok ? m[0].item : undefined; o.target = ok ? m[0].target : undefined; }
-        else { var av = inp(nid, 'a'), bv = inp(nid, 'b'); if (av && typeof av === 'object' && !Array.isArray(av)) { var sm = {}, cnt = 0; Object.keys(av).forEach(function (k) { var y = cmp(p.op || '>', av[k], bv === undefined ? p.value : (bv && typeof bv === 'object' ? bv[k] : bv)); if (y) cnt++; var sv = y ? (p.then || 'on') : p.else; if (typeof sv === 'string') sm[k] = sv; });
-            o.ok = cnt; o.state = sm; return; } ok = cmp(p.op || '>', av, bv === undefined ? p.value : bv); }
-        o.ok = ok ? 1 : 0; o.state = ok ? (p.then || 'on') : p.else; }
+        else { var av = inp(nid, 'a'), bv = inp(nid, 'b'); if (av && typeof av === 'object' && !Array.isArray(av)) { var sm = {}, cnt = 0; Object.keys(av).forEach(function (k) { var y = cmp(p.op, av[k], bv === undefined ? p.value : (bv && typeof bv === 'object' ? bv[k] : bv)); if (y) cnt++; var sv = y ? p.then : p.else; if (typeof sv === 'string') sm[k] = sv; });
+            o.ok = cnt; o.state = sm; return; } ok = cmp(p.op, av, bv === undefined ? p.value : bv); } /* 1.8.110: a condition with no op is false (cmp of no op) */
+        o.ok = ok ? 1 : 0; /* 1.8.110: the state is then or else as given; one not given is left out */ var cs = ok ? p.then : p.else; if (typeof cs === 'string') o.state = cs; }
       else if (n.type === 'accumulate') { var op0 = inp(nid, 'opening'), LG = ledger(w, p.comp, op0 === undefined ? p.opening : op0); o.values = LG.values; o.flows = LG.flows; o.ahead = LG.ahead; o.min = LG.min; o.end = LG.end; }
       else if (n.type === 'merge') { var mo = {}; ['a', 'b', 'c', 'd'].forEach(function (k) { var m = inp(nid, k); if (m && typeof m === 'object') Object.keys(m).forEach(function (d) { if (!mo[d] && m[d]) mo[d] = m[d]; else if (!(d in mo)) mo[d] = m[d]; }); }); o.out = mo; }
-      else if (n.type === 'sum') { var SI = sumItems(w, p.comp, p.deep === 'yes', 0), fld = p.field || 'amount'; if (p.match) SI = SI.filter(function (r) { var v = fv(rec(w, r), p.match); return String(v == null ? '' : v) === String(p.value == null ? '' : p.value); });
-        o.count = SI.length; o.total = +SI.reduce(function (t, r) { var x = num(fv(rec(w, r), fld)); return x === undefined ? t : t + x; }, 0).toFixed(6); }
-      else if (n.type === 'formula') { var FI = sumItems(w, p.comp, p.deep === 'yes', 0), ex = compile(p.expr || '0'), FV = {}, ft = 0, fm = -Infinity, key = p.out || 'calc';
+      else if (n.type === 'sum') { var SI = sumItems(w, p.comp, p.deep === 'yes', 0), fld = p.field; if (p.match) SI = SI.filter(function (r) { var v = fv(rec(w, r), p.match); return String(v == null ? '' : v) === String(p.value == null ? '' : p.value); });
+        o.count = SI.length; /* 1.8.110: a sum with no field has a count and no total */ if (typeof fld === 'string' && fld) o.total = +SI.reduce(function (t, r) { var x = num(fv(rec(w, r), fld)); return x === undefined ? t : t + x; }, 0).toFixed(6); }
+      else if (n.type === 'formula') { var FI = sumItems(w, p.comp, p.deep === 'yes', 0), ex = typeof p.expr === 'string' && p.expr.trim() ? compile(p.expr) : null, FV = {}, ft = 0, fm = -Infinity, key = p.out; /* 1.8.110: a formula with no expression or no out is left out */ if (!ex || typeof key !== 'string' || !key) return;
         /* paid('field','linkField'): Σ field over every atlas item whose linkField names this item (e.g. expenses paying a debt) */
         var PM = {}; function paid(key, r) { if (!PM[key]) { var q = key.split('|'), f = q[1], lf = q[2], m = {}; Object.keys(rd(w.items)).forEach(function (id) { var o = w.items[id], to = fv(o, lf), x = num(fv(o, f)); if (to == null || to === '' || to === false || x === undefined) return; to = String(to); m[to] = to in m ? m[to] + x : x; }); PM[key] = m; }
           /* paid is a sum: nothing paying this item sums to 0 */ var id = String(r).replace(/^item:/, ''); return id in PM[key] ? +PM[key][id].toFixed(6) : 0; }
@@ -5932,13 +5933,15 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
           v = typeof v === "number" ? Math.round(v * 1e10) / 1e10 : v; FV[parse(r).id] = v; if (typeof v === 'number' && isFinite(v)) { ft += v; if (v > fm) fm = v; } W(r, ['state', key], 'set', v, nid); });
         o.values = FV; o.total = +ft.toFixed(6); if (fm !== -Infinity) o.max = fm; }
       else if (n.type === 'walk') { var WI = sumItems(w, p.comp, false, 0), tj = p.target && rd(w.joys)[p.target], tgt = pdate(tj && tj.value) || today(), WV = {}, wt = 0;
+        /* 1.8.110: a walk names each field it reads (start, from, rate, day, pay, count); one not named leaves the walk out */
+        var WF = ['start', 'from', 'rate', 'day', 'pay', 'count'].every(function (k) { return typeof p[k] === 'string' && p[k]; }); if (!WF) WI = [];
         WI.forEach(function (r) { var it = rec(w, r); if (!it) return;
-          /* 1.8.109: an item missing a number the walk needs is left out of it */ var b0 = num(fv(it, p.start || 'initial')), rt = num(fv(it, p.rate || 'apr')), dy = num(fv(it, p.day || 'payDay')), py = num(fv(it, p.pay || 'cashPay')), ct = num(fv(it, p.count || 'terms0'));
+          /* 1.8.109: an item missing a number the walk needs is left out of it */ var b0 = num(fv(it, p.start)), rt = num(fv(it, p.rate)), dy = num(fv(it, p.day)), py = num(fv(it, p.pay)), ct = num(fv(it, p.count));
           if (b0 === undefined || rt === undefined || dy === undefined || py === undefined || ct === undefined) return;
-          var res = walkOne(b0, pdate(fv(it, p.from || 'asOf')) || tgt, rt / 100, Math.max(1, dy), py, ct, tgt);
+          var res = walkOne(b0, pdate(fv(it, p.from)) || tgt, rt / 100, Math.max(1, dy), py, ct, tgt);
           WV[parse(r).id] = res.live; wt += res.live; W(r, ['state', 'live'], 'set', res.live, nid); W(r, ['state', 'left'], 'set', res.left, nid); W(r, ['state', 'gap'], 'set', res.gap, nid); W(r, ['state', 'events'], 'set', res.events, nid); });
         o.values = WV; o.total = Math.round(wt * 100) / 100; }
-      else if (n.type === 'days') { o.values = dayMap(w, p.comp, p.measure || 'count', p.field); o.total = Object.keys(o.values).reduce(function (t, k) { return t + o.values[k]; }, 0); }
+      else if (n.type === 'days') { o.values = dayMap(w, p.comp, p.measure, p.field); o.total = Object.keys(o.values).reduce(function (t, k) { return t + o.values[k]; }, 0); }
       else if (n.type === 'component') { o.comp = rec(w, p.comp) ? p.comp : null; }
       else if (n.type === 'position') { var c = inp(nid, 'comp'); o.placed = c; if (c && rec(w, c) && num(p.x) !== undefined && num(p.y) !== undefined && num(p.w) !== undefined) W(c, ['state', 'pos', parse(p.parent) ? parse(p.parent).id : '_'], 'set', { x: num(p.x), y: num(p.y), w: num(p.w) }, nid); }
       else if (n.type === 'view') { var vc = p.comp, comp = rec(w, vc); if (comp) {
@@ -6011,7 +6014,7 @@ if (typeof JFEngine !== "undefined") JFEngine.init({});
   function stateNames(w, compRef) { var out = [];
     Object.keys(rd(w.blueprints)).forEach(function (id) { var b = rd(w.blueprints[id]), by = {}; ls(b.nodes).forEach(function (n) { by[n.id] = n; });
       ls(b.wires).forEach(function (x) { var f = by[x.from[0]], t = by[x.to[0]]; if (!f || !t || t.type !== 'view' || rd(t.p).comp !== compRef || x.to[1] !== 'style') return;
-        if (f.type === 'condition') [f.p.then || 'on', f.p.else].forEach(function (s) { if (s && out.indexOf(s) < 0) out.push(s); }); }); });
+        if (f.type === 'condition') [rd(f.p).then, rd(f.p).else].forEach(function (s) { if (s && out.indexOf(s) < 0) out.push(s); }); }); });
     return out; }
   var api = { valuesOn: valuesOn, phases: phases, charges: charges, ledger: ledger, sign: sign, monthOf: monthOf, monthDays: monthDays, occurrences: occurrences, itemFlags: itemFlags, dayMap: dayMap, stateNames: stateNames, NODES: NODES, graphOrder: graphOrder, access: access, deps: deps, evalBlueprint: evalBlueprint, computePass: computePass, apply: apply, pass: pass, scoreItem: scoreItem, pickAlts: pickAlts, sequence: sequence, dirtyFor: dirtyFor, clone: clone };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.JAtlasEval = api;
@@ -18952,7 +18955,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.109",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.110",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
