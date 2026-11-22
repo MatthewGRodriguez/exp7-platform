@@ -962,6 +962,8 @@ Two pieces are gone. The JMotion state class in `motion-config` (`Exp7Motion`, w
 
 On screen, for every app: nothing changes; the probe gives exactly the same results as 1.8.116. For saved data: nothing changes.
 
+Checked in Chrome on Matthew's Mac (2026-11-22, made-up data only): the lean fetched at this release's commit matched `release.json`, and 1.8.116 was loaded beside it. In the new release there is no `gpu-motion` script and no `Exp7Motion`, and `JRender.ViewStates` is JRender's own class. With the Exp7 demo open at 390 wide, the demo's Calendar, Board and Plan views drew the same nodes (111, 173 and 143) and the same slabs as 1.8.116; a pointer move set the same view angle, and the slabs drew at the same rate (121 frames in 2 seconds on both) and moved the same nodes. A hover, press and click on a Board button went through exactly as on 1.8.116 (hover, press, one action, release). A blank Budget ran its date button twice, and Budget and the demo at 1024 wide opened, took a pointer move and a scroll, with no failure records or page errors. Storage was cleared afterwards.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
