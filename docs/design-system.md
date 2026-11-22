@@ -912,7 +912,7 @@ Four `catch` blocks stay, and each one records: the runtime's timer, action and 
 
 On screen, for every app: nothing changes, and no failure is recorded in Budget or the Exp7 demo. For saved data: nothing changes.
 
-Checked in Chrome on Matthew's Mac: CHROME_111
+Checked in Chrome on Matthew's Mac (2026-11-22, made-up data only): the lean fetched at this release's commit matched `release.json`. The Exp7 demo's Calendar, Board and Plan views drew at 390 wide with exactly the same view models and the same nodes (111, 173, 143) and heights as 1.8.110, and closing all three (`Exp7Views.dispose`) went through with no fault. A blank Budget opened at 390 wide on Home and its date picker opened and closed; Budget and the demo at 1024 wide opened with no failure records or page errors. Storage was cleared afterwards.
 
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
