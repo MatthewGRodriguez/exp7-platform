@@ -970,6 +970,8 @@ Checked in Chrome on Matthew's Mac (2026-11-22, made-up data only): the lean fet
 
 On screen, for every app: nothing changes; the probe gives exactly the same results as 1.8.116. For saved data: nothing changes.
 
+Checked in Chrome on Matthew's Mac (2026-11-22, made-up data only): the lean fetched at this release's commit matched `release.json`, and 1.8.117 was loaded beside it. In the new release the motion settings hold only the version, the element poses and the state table. With the Exp7 demo open at 390 wide, the demo's Calendar, Board and Plan views drew the same slabs as 1.8.117, and the slabs drew at the same rate (137 and 138 frames in 2 seconds) after a pointer move. A hover, press and click on a Board button went through exactly as on 1.8.117, with the same tween steps. A blank Budget ran its date button twice, opening and closing its picker, and Budget and the demo at 1024 wide opened with no failure records or page errors. Storage was cleared afterwards.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
