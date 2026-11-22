@@ -6398,570 +6398,75 @@ window.x7 = window.x7 || function (t) {
 
 </script>
 <script data-exp7-shared="jrviews-ux-states">
-/* Coherent UX states for JRViews layout - retains Exp7 light language.
- * Stamps data-jr-state onto universal Cal/Board/Plan/chrome controls, then
- * applies wash + contour ring + geometry (scale/opacity) from art/design/state-table.
- * More than wash tokens: pressed scale-in, disabled opacity, focus/selected rings,
- * emphasis for title hierarchy. No builder forks / second renderer.
+/* Button states: the runtime pose of a design node. JRViews draws a node's every state from its looks (1.8.91); this script only
+ * moves a node that carries a pose: n.pose { kind: 'free', rest } (the chrome's buttons and Apps cards, design-chrome). It rises on
+ * hover, sinks when pressed and comes back, and rises and grows while dragged, easing for the state-table duration.
  *
- * Hit sync: JRViews stores n.hit as [x,y,w,h] arrays — must scale array form (not only {x,w}).
- * Re-infer: do not sticky-return data-jr-state except avatar paint modes / locked.
- */
+ * Exp7 1.8.114: it fills in nothing. A node whose pose is missing a part (a kind it knows, a rest that is a number, a hit box of four
+ * numbers) does not move, and the rest carry on. The HTML-era layout pass (state stamps on elements, washes, rings, inset light,
+ * glass rims, ground shadows and their node ids, the HTML pose kinds), which nothing has reached since views became vector models
+ * (1.8.39), is gone, as design-system.md planned once the art is in slots. */
 (function (root) {
   'use strict';
-  var V = root.JRViews;
-  var T = root.EXP7_LIGHT_THEME;
-  if (!V || !V.layout || !T) return;
+  var V = root.JRViews, J = root.JRender;
 
-  var WASH = {
-    idle: null,
-    hover: [36, 88, 166, 36],
-    focus: [36, 88, 166, 28],
-    pressed: [36, 88, 166, 56],
-    selected: [117, 81, 15, 36],
-    dragging: [36, 88, 166, 20],
-    'drop-pending': [117, 81, 15, 28],
-    invalid: [170, 0, 0, 22],
-    /* Debt payment: yellow wash on the row. Ink stays #1c2333. Not the gold selected ring. */
-    payto: [250, 204, 21, 88],
-    settling: [36, 88, 166, 12],
-    disabled: [154, 163, 178, 96],
-    loading: [244, 246, 250, 255],
-    empty: [244, 246, 250, 255],
-    error: [170, 0, 0, 16],
-    photo: null,
-    pending: null,
-    initials: null
-  };
+  /* Lifts (px) and scales from docs/design/state-table.json, the states a pose uses. A free control translates by at most 2px. */
+  var LIFT = { hover: 1.5, selected: 2, dragging: 4 };
+  var GEO = { pressed: { scale: 0.97 }, dragging: { scale: 1.02 } };
+  var CAP = 2;
+  /* The state-table durations (ms). */
+  var CLICK_MS = { hover: 90, leave: 100, press: 60, up: 80, drag: 80, drop: 120, cancel: 120 };
+  /* The camera: a lift of a wide control scales it once the change reaches half a pixel. */
+  var CAMERA = { focalMm: 85, scalePerPx: 0.0006, halfPx: 0.5 };
 
-  var RING = {
-    focus: [36, 88, 166, 255],
-    selected: [117, 81, 15, 255],
-    invalid: [170, 0, 0, 255],
-    'drop-pending': [117, 81, 15, 255],
-    pressed: [36, 88, 166, 200]
-  };
-
-  /* Lifts from docs/design/state-table.json (px). Calendar days and stacked rows do not
-     translate: the gap is 4px and 2px, and a shift covers the neighbor. Free controls
-     (buttons, Apps cards, tabs) translate by at most 2px. Days get a shadow in the gap. */
-  var LIFT = {
-    idle: 0, hover: 1.5, focus: 1.5, pressed: 0, selected: 2,
-    dragging: 4, 'drop-pending': 3, invalid: 0, settling: 1, disabled: 0
-  };
-
-  var GEO = {
-    idle: { scale: 1, opacity: 1 },
-    hover: { scale: 1, opacity: 1 },
-    focus: { scale: 1, opacity: 1 },
-    pressed: { scale: 0.97, opacity: 1 },
-    selected: { scale: 1, opacity: 1 },
-    dragging: { scale: 1.02, opacity: 0.96 },
-    'drop-pending': { scale: 1.01, opacity: 0.9 },
-    invalid: { scale: 1, opacity: 1 },
-    payto: { scale: 1, opacity: 1 },
-    settling: { scale: 1, opacity: 1 },
-    disabled: { scale: 1, opacity: 0.38 }
-  };
-
-  /* Avatar exclusive paint modes — sticky until PlatformChrome updates / unlocks */
-  var AVATAR_MODES = { photo: 1, pending: 1, initials: 1, loading: 1 };
-
-  var INTERACTIVE = 'button,.ja-joy,.ja-chip,.ja-alt,.ja-sw,.ja-tog,.ja-day,[data-jv-act],[data-day],.ja-brow,.ja-prow,.empty,.loading,.jrerr';
-
-  function inferState(el) {
-    if (!el || el.nodeType !== 1) return 'idle';
-    if (el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true') return 'disabled';
-    if (el.getAttribute('aria-invalid') === 'true' || el.classList.contains('invalid') || el.classList.contains('err')) return 'invalid';
-    if (el.classList.contains('dragging') || el.classList.contains('ja-drag') || el.getAttribute('data-drag') === '1') return 'dragging';
-    if (el.classList.contains('drop') || el.getAttribute('data-drop') === 'pending') return 'drop-pending';
-    /* Paying a debt: yellow row wash. It is not Selected and it does not lift the row. */
-    if (el.classList.contains('ja-payto') || el.getAttribute('data-payto') === '1') return 'payto';
-    var ds = el.getAttribute('data-jr-state');
-    /* Avatar modes stay sticky. Class "best" is a ranking mark and is not a Selected signal. */
-    if (ds && AVATAR_MODES[ds]) return ds;
-    if (el.classList.contains('ja-sel') || el.classList.contains('on') || el.getAttribute('data-sm') === 'selected' || el.getAttribute('aria-selected') === 'true' || el.getAttribute('aria-current') === 'page' || el.getAttribute('aria-current') === 'true') return 'selected';
-    if (el.classList.contains('hov') || el.getAttribute('data-hov') === '1' || (el.matches && el.matches(':focus'))) return el.matches && el.matches(':focus') ? 'focus' : 'hover';
-    if (el.classList.contains('empty') || el.getAttribute('data-empty') === '1') return 'empty';
-    if (el.classList.contains('loading') || el.getAttribute('data-loading') === '1') return 'loading';
-    if (el.classList.contains('jrerr') || el.getAttribute('role') === 'alert') return 'error';
-    return 'idle';
-  }
-
-  function stampTree(rootEl) {
-    if (!rootEl || !rootEl.querySelectorAll) return { stamped: 0 };
-    var n = 0;
-    var nodes = rootEl.querySelectorAll(INTERACTIVE);
-    for (var i = 0; i < nodes.length; i++) {
-      var el = nodes[i];
-      if (el.hasAttribute('data-jr-state-locked')) continue;
-      var st = inferState(el);
-      if (!el.hasAttribute('data-jr-state') || el.getAttribute('data-jr-state') !== st) {
-        el.setAttribute('data-jr-state', st);
-        n++;
-      }
-      if (st === 'selected' || st === 'focus') el.setAttribute('data-jr-emphasis', '1');
-      else el.removeAttribute('data-jr-emphasis');
-      var g = GEO[st];
-      if (g && g.scale !== 1) el.setAttribute('data-jr-scale', String(g.scale));
-      else el.removeAttribute('data-jr-scale');
-      if (g && g.opacity < 1) el.setAttribute('data-jr-opacity', String(g.opacity));
-      else el.removeAttribute('data-jr-opacity');
-    }
-    return { stamped: n };
-  }
-
-  function stateOf(el) {
-    if (!el || el.nodeType !== 1) return 'idle';
-    return inferState(el);
-  }
-
-  function scaleBox(it, scale, xIdx, yIdx, wIdx, hIdx) {
-    if (scale === 1) return;
-    var x = it[xIdx], y = it[yIdx], w = it[wIdx], h = it[hIdx];
-    if (typeof x !== 'number' || typeof w !== 'number') return;
-    var cx = x + w / 2, cy = y + h / 2;
-    var nw = w * scale, nh = h * scale;
-    it[xIdx] = cx - nw / 2;
-    it[yIdx] = cy - nh / 2;
-    it[wIdx] = nw;
-    it[hIdx] = nh;
-  }
-
-  function scaleHit(hit, scale) {
-    if (!hit || scale === 1) return false;
-    if (Array.isArray(hit) && typeof hit[0] === 'number' && typeof hit[2] === 'number') {
-      var x = hit[0], y = hit[1], w = hit[2], h = hit[3];
-      var cx = x + w / 2, cy = y + h / 2;
-      hit[2] = w * scale;
-      hit[3] = h * scale;
-      hit[0] = cx - hit[2] / 2;
-      hit[1] = cy - hit[3] / 2;
-      return true;
-    }
-    if (typeof hit.x === 'number' && typeof hit.w === 'number') {
-      var hx = hit.x, hy = hit.y, hw = hit.w, hh = hit.h;
-      var hcx = hx + hw / 2, hcy = hy + hh / 2;
-      hit.w = hw * scale;
-      hit.h = hh * scale;
-      hit.x = hcx - hit.w / 2;
-      hit.y = hcy - hit.h / 2;
-      return true;
-    }
-    return false;
-  }
-
-  function mulAlpha(packed, opacity) {
-    if (opacity >= 0.999) return packed;
-    var c = unpack(packed);
-    c[3] = Math.max(0, Math.min(255, Math.round(c[3] * opacity)));
-    return packRgba(c);
-  }
-
-  /* Published trace (STUDY.md): offset 0.79 px and blur 0.93 px per px of lift, core alpha 0.55, elevation 50.
-     CSS blur radius; sigma is half of that. Inner items rest 1.15 px above the plane. */
-  var LIGHT = {
-    elevationDeg: 50, azimuthDeg: 90, offsetPerPx: 0.79, blurPerPx: 0.93, coreAlpha: 0.55, restPx: 1.15,
-    focalMm: 85, distancePx: 2099.1, scalePerPx: 0.0006, halfPx: 0.5,
-    ca1Top: 10, ca1Body: 12, ca1Bot: 16
-  };
-  var CLICK_MS = { hover: 90, leave: 100, focus: 90, press: 60, up: 80, select: 100, drag: 80, drop: 120, cancel: 120, invalid: 120 };
-
-  function erf(x) {
-    var s = x < 0 ? -1 : 1, a = Math.abs(x), t = 1 / (1 + 0.3275911 * a);
-    var y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-a * a);
-    return s * y;
-  }
-  function lum(rgb) {
-    function f(c) { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
-    return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]);
-  }
-  function contrastRatio(fg, bg) {
-    var hi = Math.max(lum(fg), lum(bg)), lo = Math.min(lum(fg), lum(bg));
-    return (hi + 0.05) / (lo + 0.05);
-  }
-  function disc(el) {
-    if (!el || !el.getAttribute) return false;
-    var ds = el.getAttribute('data-jr-state');
-    if (ds === 'photo' || ds === 'pending' || ds === 'initials') return true;
-    var rad = /border-radius:\s*([0-9.]+)/.exec(el.getAttribute('style') || '');
-    return !!(rad && parseFloat(rad[1]) >= 999);
-  }
-  function liftPx(el, st) {
-    var lift = LIFT[st] || 0;
-    if (!lift || !el || !el.classList || disc(el)) return 0;
-    if (el.classList.contains('ja-day') || el.classList.contains('ja-brow') || el.classList.contains('ja-prow') || el.classList.contains('ja-section')) return 0;
-    return Math.min(lift, 2);
-  }
-  function shadowGap(el) {
-    if (!el || !el.classList) return 0;
-    if (el.classList.contains('ja-day')) return 4;
-    if (el.classList.contains('ja-brow') || el.classList.contains('ja-prow') || el.classList.contains('ja-section')) return 2;
-    return 0;
-  }
-  /* 1.8.35: y-sorted index of the rects roomBelow considers. Same predicate and arithmetic as roomBelow.
-     refresh(n) re-reads one node's rects after the layout loop has finished with it. Entries whose y is not a
-     finite number go to a side list that every query scans, as the old full scan would have. */
-  function roomIndex(nodes) {
-    var sorted = [], odd = [], byNode = new Map();
-    function qual(it) { return (it[0] === 'rect' || it[0] === 'rrect') && !(it[3] < 12 || it[4] < 8); }
-    function lower(y) { var lo = 0, hi = sorted.length; while (lo < hi) { var mid = (lo + hi) >> 1; if (sorted[mid].y < y) lo = mid + 1; else hi = mid; } return lo; }
-    function entriesOf(o) { var out = []; if (!o.items) return out; for (var j = 0; j < o.items.length; j++) { var it = o.items[j]; if (qual(it)) out.push({ y: it[2], x: it[1], w: it[3], node: o }); } return out; }
-    function add(e) { if (typeof e.y === 'number' && isFinite(e.y)) sorted.splice(lower(e.y + 0) + 0, 0, e); else odd.push(e); }
-    function remove(e) { if (typeof e.y === 'number' && isFinite(e.y)) { for (var k = lower(e.y); k < sorted.length && sorted[k].y === e.y; k++) if (sorted[k] === e) { sorted.splice(k, 1); return; } } else { var q = odd.indexOf(e); if (q >= 0) odd.splice(q, 1); } }
-    for (var i = 0; i < nodes.length; i++) { var es = entriesOf(nodes[i]); byNode.set(nodes[i], es); for (var a = 0; a < es.length; a++) { if (typeof es[a].y === 'number' && isFinite(es[a].y)) sorted.push(es[a]); else odd.push(es[a]); } }
-    sorted.sort(function (p, q) { return p.y - q.y; });
-    function same(a, b) { if (a.length !== b.length) return false; for (var k = 0; k < a.length; k++) if (!(a[k].y === b[k].y || (a[k].y !== a[k].y && b[k].y !== b[k].y)) || a[k].x !== b[k].x || a[k].w !== b[k].w) return false; return true; }
-    return {
-      refresh: function (o) { var old = byNode.get(o) || [], now = entriesOf(o); if (same(old, now)) return; for (var a = 0; a < old.length; a++) remove(old[a]); for (var b = 0; b < now.length; b++) add(now[b]); byNode.set(o, now); },
-      room: function (n, fx, fw, bottom) {
-        var room = 8, e, overlap;
-        for (var k = lower(bottom - 0.5); k < sorted.length && sorted[k].y < bottom + 8; k++) { e = sorted[k]; if (e.node === n) continue; overlap = Math.min(e.x + e.w, fx + fw) - Math.max(e.x, fx); if (overlap < 8) continue; room = Math.min(room, e.y - bottom); }
-        for (var m = 0; m < odd.length; m++) { e = odd[m]; if (e.node === n) continue; if (e.y < bottom - 0.5) continue; overlap = Math.min(e.x + e.w, fx + fw) - Math.max(e.x, fx); if (overlap < 8) continue; room = Math.min(room, e.y - bottom); }
-        if (!(room > 0)) return 0; return Math.floor(room + 1e-6); } };
-  }
-  function roomBelow(nodes, n, fx, fw, bottom) {
-    var room = 8;
-    for (var i = 0; i < nodes.length; i++) {
-      var o = nodes[i];
-      if (o === n || !o.items) continue;
-      for (var j = 0; j < o.items.length; j++) {
-        var it = o.items[j];
-        if ((it[0] !== 'rect' && it[0] !== 'rrect') || it[3] < 12 || it[4] < 8) continue;
-        if (it[2] < bottom - 0.5) continue;
-        var overlap = Math.min(it[1] + it[3], fx + fw) - Math.max(it[1], fx);
-        if (overlap < 8) continue;
-        room = Math.min(room, it[2] - bottom);
-      }
-    }
-    if (!(room > 0)) return 0;
-    return Math.floor(room + 1e-6);
-  }
-  function physicalLift(el, st) {
-    if (disc(el)) return 0;
-    var table = LIFT[st] || 0;
-    if (table > 0) return table;
-    if (el && el.classList && (el.classList.contains('ja-day') || el.classList.contains('ja-brow') || el.classList.contains('ja-prow') || el.classList.contains('ja-section'))) return LIGHT.restPx;
-    return 0;
-  }
-  /* Sampled penumbra. Each row is one pixel of the gaussian, not one flat rectangle and not a GPU blur. */
-  function penumbraStrips(lift, gap) {
-    var offset = LIGHT.offsetPerPx * lift, blur = LIGHT.blurPerPx * lift, sigma = Math.max(0.35, blur / 2);
-    var reach = Math.ceil(offset + 3 * sigma), strips = [], clipped = false;
-    for (var d = 0; d < reach; d++) {
-      var z = (offset - (d + 0.5)) / (sigma * Math.SQRT2);
-      var a = 0.5 * (1 + erf(z)) * LIGHT.coreAlpha;
-      if (a < 0.03) continue;
-      if (d >= gap) { clipped = true; continue; }
-      strips.push({ d: d, h: 1, a: a });
-    }
-    return { strips: strips, clipped: clipped, offset: offset, blur: blur, sigma: sigma };
+  function num(v) { return typeof v === 'number' && isFinite(v); }
+  /* the pose a node carries, or null when a part of it is missing */
+  function poseOf(n) {
+    var p = n.pose, h = n.hit;
+    if (p === null || typeof p !== 'object' || p.kind !== 'free' || !num(p.rest)) return null;
+    if (!Array.isArray(h) || h.length < 4 || !num(h[0]) || !num(h[1]) || !num(h[2]) || !num(h[3])) return null;
+    return p;
   }
   function perspScale(lift, width) {
-    var delta = Math.abs((width || 0) * LIGHT.scalePerPx * (lift || 0));
-    if (!(delta >= LIGHT.halfPx)) return { scale: 1, delta: delta, applied: false, focalMm: LIGHT.focalMm };
-    return { scale: 1 + LIGHT.scalePerPx * (lift || 0), delta: delta, applied: true, focalMm: LIGHT.focalMm };
+    var delta = Math.abs(width * CAMERA.scalePerPx * lift);
+    if (!(delta >= CAMERA.halfPx)) return { scale: 1, delta: delta, applied: false, focalMm: CAMERA.focalMm };
+    return { scale: 1 + CAMERA.scalePerPx * lift, delta: delta, applied: true, focalMm: CAMERA.focalMm };
   }
-  function shiftItems(n, dy) {
-    if (!dy) return;
-    var items = n.items || [];
-    for (var i = 0; i < items.length; i++) {
-      var it = items[i];
-      var k = it[0];
-      if (k === 'rect' || k === 'rrect' || k === 'border' || k === 'hit' || k === 'text' || k === 'tbox' || k === 'label' || k === 'glyph' || k === 'rich') {
-        if (typeof it[2] === 'number') it[2] += dy;
-      }
-    }
-    if (n.hit && typeof n.hit[1] === 'number') n.hit[1] += dy;
-  }
-
-  var origLayout = V.layout;
-  V.layout = function (rootEl, width, opt) {
-    opt = opt || {};
-    var stamp = stampTree(rootEl);
-    var L = origLayout(rootEl, width, opt);
-    if (!L || !L.nodes) return L;
-    var touched = 0;
-    var geoTouched = 0;
-    var lifted = 0;
-    var contacts = 0;
-    var RB = roomIndex(L.nodes);
-    for (var i = 0; i < L.nodes.length; i++) {
-      var n = L.nodes[i];
-      if (!n.el) continue;
-      var st = stateOf(n.el);
-      var wash = WASH[st];
-      var ring = RING[st];
-      var geo = GEO[st] || GEO.idle;
-      var interactive = n.el.matches && n.el.matches(INTERACTIVE);
-      var materialHost = n.el.matches && n.el.matches('.ja-section,.ja-deps,.ja-detail,.ja-comp,.ja-rails');
-      if (!interactive && !materialHost && !n.el.hasAttribute('data-jr-state')) continue;
-      var emphasis = n.el.getAttribute('data-jr-emphasis') === '1';
-      if (!(geo.scale > 1 && n.el.classList && n.el.classList.contains('ja-day')) && scaleHit(n.hit, geo.scale)) geoTouched++;
-      for (var j = 0; j < n.items.length; j++) {
-        var it = n.items[j];
-        var kind = it[0];
-        if (wash && (kind === 'rrect' || kind === 'rect') && st !== 'idle' && st !== 'photo' && st !== 'pending' && st !== 'initials') {
-          if (kind === 'rrect') it[6] = packRgba(over(wash, unpack(it[6])));
-          else it[5] = packRgba(over(wash, unpack(it[5])));
-          touched++;
-        }
-        if (ring && kind === 'border' && (st === 'focus' || st === 'selected' || st === 'invalid' || st === 'drop-pending' || st === 'pressed')) {
-          it[it.length - 1] = packRgba(ring);
-          if (typeof it[5] === 'number' && it[5] > 0 && it[5] < 8) it[5] = Math.max(it[5], emphasis ? 2 : 1.5);
-          touched++;
-        }
-        var sc = geo.scale;
-        if (sc > 1 && n.el.classList && n.el.classList.contains('ja-day')) sc = 1;
-        if (kind === 'rrect' || kind === 'rect' || kind === 'border') {
-          if (kind === 'rrect') scaleBox(it, sc, 1, 2, 3, 4);
-          else if (kind === 'rect') scaleBox(it, sc, 1, 2, 3, 4);
-          else if (kind === 'border' && typeof it[1] === 'number') scaleBox(it, sc, 1, 2, 3, 4);
-          if (sc !== 1) geoTouched++;
-        }
-        if (kind === 'hit' && sc !== 1 && typeof it[1] === 'number') {
-          scaleBox(it, sc, 1, 2, 3, 4);
-          geoTouched++;
-        }
-        if (geo.opacity < 1) {
-          if (kind === 'rrect') { it[6] = mulAlpha(it[6], geo.opacity); geoTouched++; }
-          else if (kind === 'rect') { it[5] = mulAlpha(it[5], geo.opacity); geoTouched++; }
-          else if (kind === 'text' || kind === 'tbox' || kind === 'label' || kind === 'glyph') {
-            /* color is slot 4; the tail is max-width / line-height, not a color.
-               Disabled keeps the ink. Fading it by 0.38 lands near 2.2:1, under 4.5. */
-            if (st !== 'disabled' && typeof it[4] === 'number') { it[4] = mulAlpha(it[4], geo.opacity); geoTouched++; }
-          } else if (kind === 'border') {
-            it[it.length - 1] = mulAlpha(it[it.length - 1], geo.opacity);
-            geoTouched++;
-          }
-        }
-        if (emphasis && (kind === 'text' || kind === 'tbox' || kind === 'label') && typeof it[4] === 'number') {
-          var tc = unpack(it[4]);
-          if (tc[0] + tc[1] + tc[2] < 600) {
-            tc[3] = 255;
-            it[4] = packRgba(tc);
-            geoTouched++;
-          }
-        }
-      }
-      /* One light (params elevation 50, from above): inset highlight + contact shade.
-         Stays inside the fill so neighbors do not overlap. Not a Blender bitmap. */
-      /* A circular avatar is a photo clip. Square inset bands sit on top of it and flash when the bar redraws. */
-      var avatarDisc = st === 'photo' || st === 'pending' || st === 'initials' || /border-radius:\s*999/.test((n.el.getAttribute && n.el.getAttribute('style')) || '');
-      if ((interactive || materialHost) && n.items.length && !avatarDisc) {
-        var fill = null, fillAt = -1, hasBorder = false;
-        for (var fi = 0; fi < n.items.length; fi++) {
-          var fk = n.items[fi][0];
-          if (!fill && (fk === 'rrect' || fk === 'rect')) { fill = n.items[fi]; fillAt = fi; }
-          if (fk === 'border') hasBorder = true;
-        }
-        if ((interactive || materialHost) && fill && fill[3] >= 16 && fill[4] >= 16) {
-          var fx = fill[1], fy = fill[2], fw = fill[3], fh = fill[4], fr = fill[0] === 'rrect' ? (fill[5] || 0) : 0;
-          /* Same kernel as the cast shadow. The lit edge fades down from the top. The lip fades up from the bottom. Both stay inside the cell. */
-          var faceLift = Math.max(physicalLift(n.el, st), LIGHT.restPx);
-          var face = penumbraStrips(faceLift, Math.min(3, Math.max(1, Math.floor(fh / 6))));
-          var peak = 0;
-          for (var pk = 0; pk < face.strips.length; pk++) if (face.strips[pk].a > peak) peak = face.strips[pk].a;
-          var fillCol = unpack(fill[fill.length - 1]);
-          var extra = [];
-          var topAlphas = [];
-          for (var ti = 0; ti < face.strips.length; ti++) {
-            var trow = face.strips[ti];
-            var ta = peak > 0 ? Math.round(trow.a / peak * 96) : 0;
-            if (ta < 8) continue;
-            var ty = fy + 1 + trow.d;
-            if (ty + 1 >= fy + fh - 4) continue;
-            var litBg = over([255, 255, 255, ta], fillCol);
-            var litOk = true;
-            for (var tc = 0; tc < n.items.length; tc++) {
-              var tx = n.items[tc];
-              if (tx[0] !== 'text' && tx[0] !== 'tbox' && tx[0] !== 'label' && tx[0] !== 'glyph') continue;
-              if (typeof tx[4] !== 'number' || typeof tx[2] !== 'number') continue;
-              if (tx[2] < ty - 1 || tx[2] > ty + 2) continue;
-              if (contrastRatio(unpack(tx[4]), litBg) < 4.5) { litOk = false; break; }
-            }
-            if (!litOk) continue;
-            extra.push(['rect', fx + 3, ty, Math.max(1, fw - 6), 1, packRgba([255, 255, 255, ta])]);
-            topAlphas.push(ta);
-          }
-          n.uxTop = topAlphas;
-          for (var frw = 0; frw < face.strips.length; frw++) {
-            var frow = face.strips[frw];
-            extra.push(['rect', fx + 3, fy + fh - 1 - frow.d, Math.max(1, fw - 6), 1, packRgba([20, 30, 50, Math.round(frow.a * 255)])]);
-          }
-          n.uxFace = face.strips.map(function (row) { return Math.round(row.a * 255); });
-          /* Idle days were borderless fills, so the state-table border never showed. */
-          if (!hasBorder) {
-            var edge = ring || [138, 150, 170, 255];
-            extra.push(['border', fx, fy, fw, fh, fr, ring ? 2 : 1.5, packRgba(edge)]);
-          }
-          n.items.splice.apply(n.items, [fillAt + 1, 0].concat(extra));
-          touched += extra.length;
-          /* Hover color the GPU swaps onto item 0 must match the state-table wash, not the pre-hook tint. */
-          if (n.hov != null && WASH.hover && st !== 'photo' && st !== 'pending' && st !== 'initials') {
-            n.hov = packRgba(over(WASH.hover, unpack(fill[fill.length - 1])));
-          }
-          /* Glass rims are part of the fill, so they rise with it. The penumbra stays at the original bottom. */
-          var glass = glassRead(n, fill);
-          n.uxGlass = glass.kind;
-          n.uxGlassBody = glass.body || 0;
-          if (glass.rims.length) {
-            n.items.push.apply(n.items, glass.rims);
-            touched += glass.rims.length;
-          }
-          var rise = liftPx(n.el, st);
-          var phys = physicalLift(n.el, st);
-          var origBottom = fy + fh;
-          var room = RB.room(n, fx, fw, origBottom);
-          var cap = shadowGap(n.el);
-          var gap = cap ? Math.min(cap, room) : (rise > 0 ? room : 0);
-          if (rise) {
-            shiftItems(n, -rise);
-            n.uxLiftPx = rise;
-            lifted++;
-          }
-          if (phys > 0 && gap > 0) {
-            var pen = penumbraStrips(phys, gap);
-            var groundRows = [];
-            for (var si = 0; si < pen.strips.length; si++) {
-              var row = pen.strips[si];
-              groundRows.push(['rect', fx + 4, origBottom + row.d, Math.max(1, fw - 8), row.h, packRgba([20, 30, 50, Math.round(row.a * 255)])]);
-            }
-            if (groundRows.length) {
-              n.uxGroundItems = groundRows;
-              n.uxContact = groundRows.length;
-              n.uxPenumbra = { offset: pen.offset, blur: pen.blur, clipped: pen.clipped, alphas: pen.strips.map(function (row) { return Math.round(row.a * 255); }) };
-              contacts++;
-              touched += groundRows.length;
-              if (pen.clipped) L._penClip = (L._penClip || 0) + 1;
-            }
-          }
-        }
-      }
-      n.uxBorderAt = -1;
-      var borderItems = n.items || [];
-      for (var bi = 0; bi < borderItems.length; bi++) {
-        if (borderItems[bi][0] === 'border') {
-          n.uxBorderAt = bi;
-          n.baseBorder = borderItems[bi][borderItems[bi].length - 1];
-          break;
-        }
-      }
-      RB.refresh(n);
-    }
-    /* The cast shadow is its own node, painted behind the face. A live lift moves the face and leaves the shadow on the ground. */
-    /* 1.8.35: ids are allocated back to front with one growing used-set (same ids as one groundId call per owner
-       over the growing node list); the list is then rebuilt once, each ground node just before its owner. */
-    var usedIds = {}, gnodes = new Map();
-    for (var ui = 0; ui < L.nodes.length; ui++) usedIds[L.nodes[ui].id] = 1;
-    for (var gi = L.nodes.length - 1; gi >= 0; gi--) {
-      var owner = L.nodes[gi];
-      if (!owner.uxGroundItems || !owner.uxGroundItems.length) continue;
-      var gid = groundIdIn(usedIds, owner.id); usedIds[gid] = 1;
-      gnodes.set(owner, { key: (owner.key || 'n') + '/ground', id: gid, flags: 0, items: owner.uxGroundItems, hit: null, el: null, act: null, uxGroundFor: owner.id });
-      owner.uxGround = gid;
-    }
-    if (gnodes.size) { var withGround = []; for (var wi = 0; wi < L.nodes.length; wi++) { var gn = gnodes.get(L.nodes[wi]); if (gn) withGround.push(gn); withGround.push(L.nodes[wi]); } L.nodes.length = 0; Array.prototype.push.apply(L.nodes, withGround); }
-    L.uxStates = true;
-    L.uxLight = 'penumbra-0.79-0.93-elev50';
-    L.uxPenumbraClipped = L._penClip || 0;
-    L.uxCamera = { focalMm: LIGHT.focalMm, distancePx: LIGHT.distancePx, scalePerPx: LIGHT.scalePerPx, halfPx: LIGHT.halfPx };
-    L.uxRefraction = 'blocked-no-dl-op';
-    L.uxMoho = 'blocked-no-svg-op';
-    L.uxCaustics = 'not-emitted';
-    L.uxMotion = 'ground-shadow-fast-id';
-    L.uxStamped = stamp.stamped;
-    L.uxTouched = touched;
-    L.uxGeoTouched = geoTouched;
-    L.uxLifted = lifted;
-    L.uxContacts = contacts;
-    return L;
-  };
-
-  function groundId(nodes, owner) {
-    var used = {};
-    for (var i = 0; i < nodes.length; i++) used[nodes[i].id] = 1;
-    return groundIdIn(used, owner);
-  }
-  function groundIdIn(used, owner) {
-    var id = (owner + 0x01000003) >>> 0;
-    function reserved(band) { return band === 0x1 || band === 0x2 || band === 0x4 || band === 0x5 || band === 0x6 || band === 0x7; }
-    /* A reserved band is 256 million ids. Stepping one id at a time stalls the first draw. Jump the whole band, the same way layout allocates node ids. */
-    var guard = 0;
-    while ((used[id] || id === 0xffffffff || reserved(id >>> 28)) && guard < 64) {
-      if (id === 0xffffffff || reserved(id >>> 28)) id = ((id & 0xf0000000) + 0x10000000) >>> 0 || 1;
-      else id = (id + 1) >>> 0 || 1;
-      guard++;
-    }
-    return id;
-  }
-  function reducedMotion() {
-    try { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; }
-  }
-  /* Board rows are the only surface that lists drop-pending. The ring is gold, never the invalid red. */
-  function dropHost(el) {
-    return !!(el && el.classList && el.classList.contains('ja-brow'));
-  }
-  function dropFill(n) {
-    if (n.base == null) return null;
-    var washed = over(WASH['drop-pending'], unpack(n.base));
-    var items = n.items || [];
-    for (var i = 0; i < items.length; i++) {
-      var it = items[i];
-      if (it[0] !== 'text' && it[0] !== 'tbox' && it[0] !== 'label' && it[0] !== 'glyph') continue;
-      if (typeof it[4] !== 'number') continue;
-      if (contrastRatio(unpack(it[4]), washed) < 4.5) return null;
-    }
-    return packRgba(washed);
-  }
-  function poseKind(el) {
-    if (!el || !el.classList) return 'skip';
-    if (el.classList.contains('ja-day')) return 'day';
-    if (el.classList.contains('ja-brow') || el.classList.contains('ja-prow') || el.classList.contains('ja-section')) return 'stack';
-    var ds = el.getAttribute('data-jr-state');
-    if (ds === 'photo' || ds === 'pending' || ds === 'initials') return 'skip';
-    if (/border-radius:\s*999/.test(el.getAttribute('style') || '')) return 'skip';
-    return 'free';
-  }
+  /* about the hit box's centre, raised by the lift */
   function poseMatrix(n, scale, lift) {
-    var h = n.hit;
-    var cx = 0, cy = 0, w = 0;
-    if (h && typeof h[0] === 'number') { cx = h[0] + h[2] / 2; cy = h[1] + h[3] / 2; w = h[2]; }
-    var persp = perspScale(lift, w);
-    var s = (scale || 1) * persp.scale;
-    return { m: [s, 0, 0, s, cx * (1 - s), cy * (1 - s) - (lift || 0)], persp: persp };
+    var h = n.hit, cx = h[0] + h[2] / 2, cy = h[1] + h[3] / 2;
+    var persp = perspScale(lift, h[2]), s = scale * persp.scale;
+    return { m: [s, 0, 0, s, cx * (1 - s), cy * (1 - s) - lift], persp: persp };
   }
-  function pageHidden() {
-    try { return !!(root.document && root.document.hidden); } catch (e) { return false; }
-  }
+  function reducedMotion() { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+  function pageHidden() { return !!(root.document && root.document.hidden); }
+
   V.View.prototype._uxApply = function (n, scale, lift) {
-    if (!this.s || !n || !root.JRender || !root.JRender.Patch) return;
-    var p = new root.JRender.Patch();
+    if (!this.s) return;
+    var p = new J.Patch();
     p.xform(n.id, poseMatrix(n, scale, lift).m);
-    try { this.s.patch(p); if (this.r) this.r.draw(); } catch (e) {}
+    this.s.patch(p);
+    if (this.r) this.r.draw();
     n._uxScale = scale;
     n._uxLift = lift;
   };
   V.View.prototype._uxStop = function (id) {
-    if (this._uxJobs) this._uxJobs.delete(id);
-    if (this._uxJobs && this._uxJobs.size === 0 && this._uxRaf && typeof root.cancelAnimationFrame === 'function') {
-      root.cancelAnimationFrame(this._uxRaf);
-      this._uxRaf = 0;
-    }
+    if (!this._uxJobs) return;
+    this._uxJobs.delete(id);
+    if (this._uxJobs.size === 0 && this._uxRaf) { root.cancelAnimationFrame(this._uxRaf); this._uxRaf = 0; }
   };
   V.View.prototype._uxKick = function () {
     var view = this;
-    if (view._uxRaf || typeof root.requestAnimationFrame !== 'function') return;
+    if (view._uxRaf) return;
     var step = function () {
       view._uxRaf = 0;
-      if (!view._uxJobs || view._uxJobs.size === 0) return;
+      if (view._uxJobs.size === 0) return;
       if (pageHidden() || reducedMotion()) {
         view._uxJobs.forEach(function (job) { view._uxApply(job.n, 1, 0); });
         view._uxJobs.clear();
         return;
       }
-      var now = (root.performance && root.performance.now()) || Date.now();
-      var live = false;
+      var now = root.performance.now(), live = false;
       view._uxJobs.forEach(function (job, id) {
         var u = job.ms > 0 ? Math.min(1, (now - job.t0) / job.ms) : 1;
         var e = u >= 1 ? 1 : (1 - Math.pow(1 - u, 3));
@@ -6973,32 +6478,14 @@ window.x7 = window.x7 || function (t) {
     };
     view._uxRaf = root.requestAnimationFrame(step);
   };
-  /* Color snaps. The transform eases for the state-table duration and the frame loop stops when it arrives. The click handler has already run. */
-  V.View.prototype._uxPose = function (n, scale, lift, fill, ms, ring) {
-    if (!this.s || !n || !root.JRender || !root.JRender.Patch) return;
-    if (fill != null || (ring != null && n.uxBorderAt >= 0)) {
-      try {
-        var pc = new root.JRender.Patch();
-        if (fill != null) pc.colorItem(n.id, 0, fill);
-        if (ring != null && n.uxBorderAt >= 0) pc.colorItem(n.id, n.uxBorderAt, ring);
-        this.s.patch(pc);
-      } catch (e) {}
-    }
-    var toS = scale || 1, toL = lift || 0;
-    if (reducedMotion() || pageHidden()) {
-      this._uxStop(n.id);
-      this._uxApply(n, 1, 0);
-      return;
-    }
-    if (!(ms > 0) || typeof root.requestAnimationFrame !== 'function') {
-      this._uxStop(n.id);
-      this._uxApply(n, toS, toL);
-      return;
-    }
-    var fromS = n._uxScale == null ? 1 : n._uxScale;
-    var fromL = n._uxLift == null ? 0 : n._uxLift;
-    this._uxJobs = this._uxJobs || new Map();
-    this._uxJobs.set(n.id, { n: n, fromS: fromS, fromL: fromL, toS: toS, toL: toL, t0: (root.performance && root.performance.now()) || Date.now(), ms: ms });
+  /* The transform eases for the state-table duration and the frame loop stops when it arrives. The click handler has already run.
+     A node never posed is where it was drawn: scale 1, lift 0. */
+  V.View.prototype._uxPose = function (n, scale, lift, ms) {
+    if (!this.s) return;
+    if (reducedMotion() || pageHidden()) { this._uxStop(n.id); this._uxApply(n, 1, 0); return; }
+    if (!(ms > 0) || typeof root.requestAnimationFrame !== 'function') { this._uxStop(n.id); this._uxApply(n, scale, lift); return; }
+    if (!this._uxJobs) this._uxJobs = new Map();
+    this._uxJobs.set(n.id, { n: n, fromS: n._uxScale == null ? 1 : n._uxScale, fromL: n._uxLift == null ? 0 : n._uxLift, toS: scale, toL: lift, t0: root.performance.now(), ms: ms });
     this._uxKick();
   };
   var origWire = V.View.prototype.wire;
@@ -7007,126 +6494,30 @@ window.x7 = window.x7 || function (t) {
     var view = this, s = this.s;
     if (!s || s._uxPoseWired) return;
     s._uxPoseWired = true;
-    var prev = s.onevent;
-    var EV = (root.JRender && root.JRender.EV) || { ENTER: 1, LEAVE: 2, DOWN: 3, UP: 4, KEYDOWN: 8, KEYUP: 9, CANCEL: 11, DRAGSTART: 12, DRAG: 13, DRAGEND: 14 };
+    var prev = s.onevent, EV = J.EV;
     s.onevent = function (e) {
       if (prev) prev(e);
       var n = e.id != null && view.byId && view.byId.get(e.id);
-      /* An HTML node's pose comes from its element. A design node (phase 4: the chrome) carries its own: n.pose { kind, rest }.
-         A design node with no pose does not move. A design node's art draws its every state (JRViews' View, from n.looks,
-         1.8.91), so its pose only moves it; an HTML node's pose recolours its fill and edge too. */
-      if (!n || !(n.el || n.pose)) return;
-      var kind = n.el ? poseKind(n.el) : n.pose.kind;
-      if (kind === 'skip') return;
-      var cap = 2;
-      var rest = n.el ? (LIFT[stateOf(n.el)] || 0) : n.pose.rest;
-      var hoverLift = (kind === 'free' && rest <= 0) ? Math.min(LIFT.hover, cap) : 0;
-      var drawn = !n.el;
-      var pressedFill = drawn || n.base == null ? null : packRgba(over(WASH.pressed, unpack(n.base)));
-      var pressedRing = drawn ? null : packRgba(RING.pressed);
+      if (!n) return;
+      var p = poseOf(n);
+      if (!p) return;
+      var hoverLift = p.rest <= 0 ? Math.min(LIFT.hover, CAP) : 0;
       var keyPress = (e.code === 13 || e.code === 32);
-      /* Days and rows do not grow or rise while dragging. A 1.02 scale would cover the next cell. */
-      var dragScale = (kind === 'day' || kind === 'stack') ? 1 : GEO.dragging.scale;
-      var dragLift = kind === 'free' ? Math.min(LIFT.dragging, cap) : 0;
-      var restoreRing = n._uxDrop ? n.baseBorder : null;
-      if (e.kind === EV.ENTER && kind === 'free' && rest <= 0) view._uxPose(n, 1, hoverLift, null, CLICK_MS.hover);
-      else if (e.kind === EV.LEAVE || e.kind === EV.CANCEL) {
-        var leaveRing = (n._uxDrop || n._uxPress) ? n.baseBorder : null;
-        n._uxDrop = false;
-        n._uxPress = false;
-        view._uxPose(n, 1, 0, drawn ? null : n.base, e.kind === EV.CANCEL ? CLICK_MS.cancel : CLICK_MS.leave, drawn ? null : leaveRing);
-      }
-      else if (e.kind === EV.DOWN || (e.kind === EV.KEYDOWN && keyPress)) {
-        n._uxPress = true;
-        view._uxPose(n, GEO.pressed.scale, 0, pressedFill, CLICK_MS.press, n._uxDrop ? null : pressedRing);
-      }
-      else if (e.kind === EV.UP || (e.kind === EV.KEYUP && keyPress)) {
-        var upRing = (n._uxPress || n._uxDrop) ? n.baseBorder : null;
-        n._uxPress = false;
-        n._uxDrop = false;
-        view._uxPose(n, 1, hoverLift, drawn ? null : n.hov != null ? n.hov : n.base, CLICK_MS.up, drawn ? null : upRing);
-      }
-      else if (e.kind === EV.DRAGSTART) {
-        var dragRing = n._uxPress ? n.baseBorder : null;
-        n._uxPress = false;
-        view._uxPose(n, dragScale, dragLift, null, CLICK_MS.drag, drawn ? null : dragRing);
-      }
-      /* The first move snaps to drop-pending. Later moves do not start another ease. */
-      else if (e.kind === EV.DRAG && dropHost(n.el) && !n._uxDrop) {
-        n._uxDrop = true;
-        view._uxPose(n, 1, 0, dropFill(n), 0, packRgba(RING['drop-pending']));
-      }
-      else if (e.kind === EV.DRAGEND) {
-        n._uxDrop = false;
-        view._uxPose(n, 1, hoverLift, drawn ? null : n.hov != null ? n.hov : n.base, CLICK_MS.drop, drawn ? null : restoreRing);
-      }
+      if (e.kind === EV.ENTER && p.rest <= 0) view._uxPose(n, 1, hoverLift, CLICK_MS.hover);
+      else if (e.kind === EV.LEAVE || e.kind === EV.CANCEL) view._uxPose(n, 1, 0, e.kind === EV.CANCEL ? CLICK_MS.cancel : CLICK_MS.leave);
+      else if (e.kind === EV.DOWN || (e.kind === EV.KEYDOWN && keyPress)) view._uxPose(n, GEO.pressed.scale, 0, CLICK_MS.press);
+      else if (e.kind === EV.UP || (e.kind === EV.KEYUP && keyPress)) view._uxPose(n, 1, hoverLift, CLICK_MS.up);
+      else if (e.kind === EV.DRAGSTART) view._uxPose(n, GEO.dragging.scale, Math.min(LIFT.dragging, CAP), CLICK_MS.drag);
+      else if (e.kind === EV.DRAGEND) view._uxPose(n, 1, hoverLift, CLICK_MS.drop);
     };
   };
 
-  function unpack(c) {
-    if (typeof c !== 'number') return [255, 255, 255, 255];
-    return [c & 255, (c >> 8) & 255, (c >> 16) & 255, (c >> 24) & 255];
-  }
-  function packRgba(a) {
-    return (a[0] & 255) | ((a[1] & 255) << 8) | ((a[2] & 255) << 16) | ((a[3] & 255) << 24);
-  }
-  function over(fg, bg) {
-    var a = fg[3] / 255;
-    return [
-      Math.round(fg[0] * a + bg[0] * (1 - a)),
-      Math.round(fg[1] * a + bg[1] * (1 - a)),
-      Math.round(fg[2] * a + bg[2] * (1 - a)),
-      255
-    ];
-  }
-  /* Published CA1 is a static brightening on dark glass: a faint top, a slightly stronger body, and a bottom line.
-     On a near-white fill the body is under 3% and is not drawn. Specks are not included.
-     This is not a refraction shader and not a new caustic proof. */
-  function glassRead(n, fill) {
-    var col = unpack(fill[fill.length - 1]);
-    if (lum(col) >= 0.25) return { kind: 'below-perception', rims: [], body: 0 };
-    var fx = fill[1], fy = fill[2], fw = fill[3], fh = fill[4];
-    var top = over([255, 255, 255, LIGHT.ca1Top], col);
-    var body = over([255, 255, 255, LIGHT.ca1Body], col);
-    var bot = over([255, 255, 255, LIGHT.ca1Bot], col);
-    var bodyTop = fy + 3, bodyBot = fy + fh - 2, bodyH = bodyBot - bodyTop;
-    var items = n.items || [];
-    for (var i = 0; i < items.length; i++) {
-      var it = items[i];
-      if (it[0] !== 'text' && it[0] !== 'tbox' && it[0] !== 'label' && it[0] !== 'glyph') continue;
-      if (typeof it[4] !== 'number' || typeof it[2] !== 'number') continue;
-      var ink = unpack(it[4]);
-      var bg = it[2] < fy + 3 ? top : (it[2] > fy + fh - 3 ? bot : (bodyH >= 8 ? body : col));
-      if (contrastRatio(ink, bg) < 4.5) return { kind: 'skipped-contrast', rims: [], body: 0 };
-    }
-    var rims = [
-      ['rect', fx + 2, fy + 1, Math.max(1, fw - 4), 2, packRgba([255, 255, 255, LIGHT.ca1Top])]
-    ];
-    if (bodyH >= 8) rims.push(['rect', fx + 2, bodyTop, Math.max(1, fw - 4), bodyH, packRgba([255, 255, 255, LIGHT.ca1Body])]);
-    rims.push(['rect', fx + 2, fy + fh - 2, Math.max(1, fw - 4), 1, packRgba([255, 255, 255, LIGHT.ca1Bot])]);
-    return { kind: 'ca1-static', rims: rims, body: bodyH >= 8 ? LIGHT.ca1Body : 0 };
-  }
-  function photoDecision(state) {
-    var photoReady = !!(state && state.avatarUrl && state.avatarMode === 'photo' && state.avatarHandle && state.avatarHandle.state === 'ready');
-    return { photoReady: photoReady, kept: photoReady, reload: !!(state && state.avatarUrl && !photoReady) };
-  }
-
-  V.uxStateOf = stateOf;
-  V.uxStampTree = stampTree;
-  V.uxInferState = inferState;
-  V.uxScaleHit = scaleHit;
-  V.UX_WASH = WASH;
-  V.UX_RING = RING;
-  V.UX_GEO = GEO;
   V.UX_LIFT = LIFT;
-  V.UX_LIGHT = LIGHT;
+  V.UX_GEO = GEO;
   V.UX_CLICK_MS = CLICK_MS;
-  V.uxPenumbra = penumbraStrips;
+  V.uxPoseOf = poseOf;
   V.uxPerspScale = perspScale;
   V.uxPoseMatrix = poseMatrix;
-  V.uxContrast = contrastRatio;
-  V.uxPhotoDecision = photoDecision;
-  root.JRViews = V;
 })(typeof window !== 'undefined' ? window : globalThis);
 
 </script>
@@ -14393,7 +13784,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.113",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.114",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
