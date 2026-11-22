@@ -7048,6 +7048,7 @@ window.x7 = window.x7 || function (t) {
       /* 1.8.111: each step is called as it is, with no try: a step that throws is a fault to see, not to hide */
       if (V.sess && V.sess.dispose) V.sess.dispose();
       if (V.view && V.view._slabs && V.view._slabs.detach) V.view._slabs.detach();
+      if (V.view && V.view.__exp7Loop) { V.view.__exp7Loop.stop(); V.view.__exp7Loop = null; } /* 1.8.121: its looping art stops */
       if (V.view && V.view.dispose) V.view.dispose();
       if (V.view && V.view.s && V.view.s.free) V.view.s.free();
       if (V.view && V.view.r && V.view.r.destroy) V.view.r.destroy();
@@ -7560,6 +7561,7 @@ function setView(id,w,root,cb,ro,mopt){ const box=$(id); if(!box) return;
     let r; V._tfTear=1; try{ r=await V.view.show(cv,model,V.w,{rebuild:why==="reveal"}); } finally{ V._tfTear=0; }
     if(V.sess!==S) return;
     if(r.mode==='failed'){ const fs=window.Exp7Fail.records(), f=fs[fs.length-1]; V.err='not laid out: '+(f?f.code+(f.detail?' ('+f.detail+')':''):'no record'); V.code=f?f.code:null; if(V.cb) V.cb(V); return window.Exp7Fail.FAIL; }
+    window.Exp7Art.playView(V.view); /* 1.8.121: the view's looping art plays (nothing when none loops) */
     if(V.form||isBoardRoot(V)) attachFormFields(V); const J=hostRd(S.J), L=r.L, I=V.vmInfo; /* buildModel sets vmInfo before every draw */ V.html=S.html; V.model=model; V.lastMode=r.mode;
     Object.assign(V,{n:V.n+1,err:'',code:null,tboxes:L.tboxes.length,tlines:L.tboxes.reduce((s,t)=>s+t.count,0),tbl:L.tboxes,notdef:L.notdef,why,items:L.items,rows:L.rows,glyphs:L.glyphs,nodes:L.nodes.length,hits:L.hits,H:L.H,VH:r.VH,ms:r.ms,px:r.px,handle:r.handle,loads:V.view.loads,patches:V.view.patches,lastOps:r.mode==='patch'?r.ops:V.lastOps,mode:r.mode,rev,
       passes:J.passes,backend:J.backend,engine:J.engine,rerrs:S.errs.concat(hostLs(J.last&&J.last.errors)).map(String),conflicts:hostLs(J.conflicts).length,cycles:hostLs(J.cycles).length,deps:I.deps,
@@ -10104,6 +10106,23 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
  * art's even scale (so a radial keeps its size when a stretch or nine piece grows inside what it supports). It is drawn as a
  * JRender paint, each stop's colour resolved and its opacity multiplied in. Text over a gradient keeps its contrast against
  * every stop.
+ * 1.8.120: the tile fit repeats a piece across its slot. The viewBox is one tile and supports is the slot's range, as for
+ * stretch. The slot (or the nearest size it supports, shrunk evenly and centred) takes round(width / tile width) tiles
+ * across and round(height / tile height) down, at least one each way, and the tiles stretch a little on each axis so that
+ * whole tiles fill it exactly, with no tile cut at an edge. Each tile is the drawing placed as stretch places it. At the
+ * largest size supports allows, a piece makes at most 1024 tiles (TILE_MAX), so a slot's art stays bounded.
+ * 1.8.121: a piece may loop (7.5). motion.loop is null or { ms, still, parts }: the cycle's length (100 to 60000 ms), the phase
+ * (0 up to 1) drawn when the art is still (at layout, under reduced motion), and up to 16 parts, each { items, pivot, keys }:
+ * the indices of the items it moves in every drawing (no item in two parts), the point it scales about, and 2 to 32 keys
+ * [t, dx, dy, s, o] from t 0 to t 1, the last the same as the first so the loop closes: a move, an even scale and an opacity,
+ * eased between keys. Each value is an affine function of the ease between two keys, so every frame's extent lies between the
+ * extents at the keys: checking each state at every key time, at the slot's sizes and again where it is drawn, checks every
+ * frame exactly (ART_OUTSIDE). A move and an even scale keep a rect a rect; turning is not in the format. draw() draws the
+ * still phase; frame(n, state, ms) (frameOf) gives a node's items at ms into its loops, and player() plays a set of nodes on animation
+ * frames, still under reduced motion and paused on a hidden tab. A frame that fails is recorded and not drawn, and the rest
+ * carry on.
+ * 1.8.122: a pack may be authored with shared shapes (defs and use, 7.3). The compiler writes each use out as the shape's items
+ * placed there, so a piece here is plain items as before and nothing in this script changes for it.
  * Strict fail and carry on (1.8.94, Matthew): each piece of art is its own fail point. load(pack) checks every piece alone
  * (ART_INVALID, ART_OUTSIDE): a piece that fails is recorded and left out, and the pack loads with the rest. assign(app, pack)
  * checks the pack against every component the app draws, each slot, variant and state alone (ART_MISSING): a gap is recorded
@@ -10112,12 +10131,12 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
  * levels: the app's pack, a screen's override, one component instance's override; an override is one piece, so a piece that
  * fails its check leaves the art that was there. fitArt(piece, rect) places a piece
  * in a slot rect: stretch scales each axis, nine keeps the insets and stretches the middle, fit draws at its drawn size about
- * its anchor (the rect's centre); art shrinks evenly to fit and never spills out of its slot (BOX_EMPTY only with no room).
+ * its anchor (the rect's centre), tile repeats whole tiles across the rect; art shrinks evenly to fit and never spills out of its slot (BOX_EMPTY only with no room).
  * No throw, no try/catch, no defaults. */
 (function (root) {
   'use strict';
   var F = root.Exp7Fail, FAIL = F.FAIL, HALF = 2, EPS = 1e-6, BIG = 65536;
-  var FITS = ['stretch', 'nine', 'fit'], KINDS = { rect: 6, rrect: 7, border: 8, path: 3, stroke: 4 }, CMD = { M: 2, L: 2, Q: 4, C: 6, Z: 0 };
+  var FITS = ['stretch', 'nine', 'fit', 'tile'], TILE_MAX = 1024, LOOP_MS = [100, 60000], LOOP_PARTS = 16, LOOP_KEYS = 32, KINDS = { rect: 6, rrect: 7, border: 8, path: 3, stroke: 4 }, CMD = { M: 2, L: 2, Q: 4, C: 6, Z: 0 };
   var apps = new Map(); /* app -> { pack, screens: Map(screen -> Map(id -> piece)), instances: Map(screen + '|' + nodeKey -> Map(id -> piece)) } */
 
   function pid(component, slot) { return component + '/' + slot; }
@@ -10157,23 +10176,30 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
 
   function checkPiece(p) {
     if (!p || typeof p.component !== 'string' || typeof p.slot !== 'string') return invalid(p, 'a piece needs its component and slot');
-    if (FITS.indexOf(p.fit) < 0) return invalid(p, 'fit ' + p.fit + ' is not one of ' + FITS.join(', ') + ' (tile is not built yet)');
+    if (FITS.indexOf(p.fit) < 0) return invalid(p, 'fit ' + p.fit + ' is not one of ' + FITS.join(', '));
     var vb = p.viewBox; if (!Array.isArray(vb) || vb.length !== 4 || !vb.every(num) || !(vb[2] > 0) || !(vb[3] > 0)) return invalid(p, 'viewBox');
     if (p.fit === 'nine') { var ins = p.insets; if (!Array.isArray(ins) || ins.length !== 4 || !ins.every(function (v) { return num(v) && v >= 0; }) || ins[1] + ins[3] >= vb[2] || ins[0] + ins[2] >= vb[3]) return invalid(p, 'nine needs insets [top, right, bottom, left] smaller than the viewBox'); }
     if (p.fit === 'fit' && (Math.abs(vb[0] + vb[2] / HALF) > EPS || Math.abs(vb[1] + vb[3] / HALF) > EPS)) return invalid(p, 'a fit piece is drawn about its anchor: its viewBox is centred on 0,0');
     var s = p.supports; if (!s || !['w', 'h'].every(function (a) { return Array.isArray(s[a]) && s[a].length === 2 && num(s[a][0]) && s[a][1] >= s[a][0] && s[a][0] > 0; })) return invalid(p, 'supports { w: [min, max], h: [min, max] }');
     if (p.fit === 'nine' && (s.w[0] < p.insets[1] + p.insets[3] || s.h[0] < p.insets[0] + p.insets[2])) return invalid(p, 'supports must not go under the nine insets');
+    if (p.fit === 'tile') { var most = count(s.w[1], vb[2]) * count(s.h[1], vb[3]); if (most > TILE_MAX) return invalid(p, 'tile: supports up to ' + s.w[1] + 'x' + s.h[1] + ' makes ' + most + ' tiles of ' + vb[2] + 'x' + vb[3] + '; at most ' + TILE_MAX); }
     if (!p.variants || typeof p.variants !== 'object' || !Object.keys(p.variants).length) return invalid(p, 'no variants');
     var names = Object.keys(p.variants);
     for (var i = 0; i < names.length; i++) { var v = p.variants[names[i]], st = v && typeof v === 'object' ? Object.keys(v) : []; if (!st.length) return invalid(p, 'variant ' + names[i] + ' has no states');
       for (var j = 0; j < st.length; j++) { var d = drawing(v, st[j]); if (d === null) return invalid(p, names[i] + '/' + st[j] + ' is neither a drawing nor an alias of one');
         for (var k = 0; k < d.length; k++) { var bad = itemOk(d[k]); if (bad) return invalid(p, names[i] + '/' + st[j] + ': ' + bad); } } }
-    /* geometry stays inside the slot at the smallest, largest and drawn sizes, in every variant and state (7.6) */
-    var sizes = [[s.w[0], s.h[0]], [s.w[1], s.h[1]], [Math.min(Math.max(vb[2], s.w[0]), s.w[1]), Math.min(Math.max(vb[3], s.h[0]), s.h[1])]];
+    /* a loop (1.8.121): its form, and every part's items in every drawing */
+    var L = loopOf(p); if (L) { var lb = loopBad(L); if (lb) return invalid(p, 'loop: ' + lb);
+      for (var x = 0; x < names.length; x++) { var vx = p.variants[names[x]], sx = Object.keys(vx);
+        for (var y = 0; y < sx.length; y++) { var dx = drawing(vx, sx[y]), most = Math.max.apply(null, L.parts.map(function (q) { return q.items[q.items.length - 1]; }));
+          if (most >= dx.length) return invalid(p, 'loop: ' + names[x] + '/' + sx[y] + ' has ' + dx.length + ' items, and a part moves item ' + most); } } }
+    /* geometry stays inside the slot at the smallest, largest and drawn sizes, in every variant and state (7.6), and for a loop at
+     * every key time, which bounds every frame */
+    var sizes = [[s.w[0], s.h[0]], [s.w[1], s.h[1]], [Math.min(Math.max(vb[2], s.w[0]), s.w[1]), Math.min(Math.max(vb[3], s.h[0]), s.h[1])]], times = L ? keyTimes(L) : [null];
     for (var a = 0; a < names.length; a++) { var va = p.variants[names[a]], sts = Object.keys(va);
-      for (var b = 0; b < sts.length; b++) for (var z = 0; z < sizes.length; z++) {
-        var box = [0, 0, sizes[z][0], sizes[z][1]], out = place(p, drawing(va, sts[b]), box);
-        if (outside(out, box, p, names[a], sts[b]) === FAIL) return FAIL; } }
+      for (var b = 0; b < sts.length; b++) for (var z = 0; z < sizes.length; z++) for (var w = 0; w < times.length; w++) {
+        var box = [0, 0, sizes[z][0], sizes[z][1]], d0 = drawing(va, sts[b]), out = place(p, times[w] === null ? d0 : posed(L, d0, times[w]).items, box);
+        if (outside(out, box, p, names[a], sts[b] + (times[w] === null ? '' : ' at loop time ' + times[w])) === FAIL) return FAIL; } }
     return true;
   }
 
@@ -10185,6 +10211,18 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     function span(a, b) { if (a <= i0 && b >= V - i1) return (R - a) - (V - b); if (b <= i0 || a >= V - i1) return b - a; return pos(b) - pos(a); }
     return { pos: pos, span: span };
   }
+  /* the size a stretch, nine or tile piece is drawn at in box, and the even scale and offset that shrink it into the box when the
+   * box is outside what the piece supports */
+  function sized(p, box) { var dw = Math.min(Math.max(box[2], p.supports.w[0]), p.supports.w[1]), dh = Math.min(Math.max(box[3], p.supports.h[0]), p.supports.h[1]);
+    var s = Math.min(1, box[2] / dw, box[3] / dh); return { w: dw, h: dh, s: s, x: box[0] + (box[2] - dw * s) / HALF, y: box[1] + (box[3] - dh * s) / HALF }; }
+  /* how many whole tiles of size t fill a length L: the nearest whole number, at least one (1.8.120) */
+  function count(L, t) { return Math.max(1, Math.round(L / t)); }
+  /* the transforms of a tile piece in box, one per tile, row by row: each tile is the viewBox stretched onto its share of the
+   * drawn size; widths and radii take the even shrink scale, as stretch's do (1.8.120) */
+  function tiles(p, box) { var vb = p.viewBox, D = sized(p, box), nx = count(D.w, vb[2]), ny = count(D.h, vb[3]), tw = D.w * D.s / nx, th = D.h * D.s / ny, out = [];
+    for (var j = 0; j < ny; j++) for (var i = 0; i < nx; i++) out.push((function (x0, y0) { var kx = tw / vb[2], ky = th / vb[3];
+      return { x: function (u) { return x0 + (u - vb[0]) * kx; }, y: function (u) { return y0 + (u - vb[1]) * ky; }, w: function (a, b) { return (b - a) * kx; }, h: function (a, b) { return (b - a) * ky; }, s: D.s }; })(D.x + i * tw, D.y + j * th));
+    return out; }
   /* the transform for a piece in box [x, y, w, h]: map(px, py), span(a, b) on each axis, and the even scale s for widths and radii */
   /* box: [x, y, w, h] or, for a fit piece, [x, y, w, h, cx, cy] with its anchor given exactly */
   function frame(p, box) {
@@ -10192,10 +10230,10 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if (p.fit === 'fit') { var s0 = Math.min(1, box[2] / vb[2], box[3] / vb[3]), cx = box.length > 4 ? box[4] : box[0] + box[2] / HALF, cy = box.length > 5 ? box[5] : box[1] + box[3] / HALF;
       return { x: function (u) { return cx + u * s0; }, y: function (u) { return cy + u * s0; }, w: function (a, b) { return (b - a) * s0; }, h: function (a, b) { return (b - a) * s0; }, s: s0 }; }
     /* stretch and nine: drawn in the box when it is inside what the piece supports; otherwise at the nearest supported size, scaled evenly and centred */
-    var dw = Math.min(Math.max(box[2], p.supports.w[0]), p.supports.w[1]), dh = Math.min(Math.max(box[3], p.supports.h[0]), p.supports.h[1]);
+    var D = sized(p, box), dw = D.w, dh = D.h;
     if (dw === box[2] && dh === box[3]) { var X = axis(vb[2], ins[3], ins[1], box[0], box[2]), Y = axis(vb[3], ins[0], ins[2], box[1], box[3]);
       return { x: function (u) { return X.pos(u - vb[0]); }, y: function (u) { return Y.pos(u - vb[1]); }, w: function (a, b) { return X.span(a - vb[0], b - vb[0]); }, h: function (a, b) { return Y.span(a - vb[1], b - vb[1]); }, s: 1 }; }
-    var s = Math.min(1, box[2] / dw, box[3] / dh), ox = box[0] + (box[2] - dw * s) / HALF, oy = box[1] + (box[3] - dh * s) / HALF;
+    var s = D.s, ox = D.x, oy = D.y;
     var Xd = axis(vb[2], ins[3], ins[1], 0, dw), Yd = axis(vb[3], ins[0], ins[2], 0, dh);
     return { x: function (u) { return ox + Xd.pos(u - vb[0]) * s; }, y: function (u) { return oy + Yd.pos(u - vb[1]) * s; },
       w: function (a, b) { return Xd.span(a - vb[0], b - vb[0]) * s; }, h: function (a, b) { return Yd.span(a - vb[1], b - vb[1]) * s; }, s: s };
@@ -10205,9 +10243,13 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     var p = c.gradient === 'linear' ? [T.x(q[0]), T.y(q[1]), T.x(q[2]), T.y(q[3])] : [T.x(q[0]), T.y(q[1]), q[2] * T.s, T.x(q[3]), T.y(q[4]), q[5] * T.s];
     return { gradient: c.gradient, spread: c.spread, p: p, stops: c.stops }; }
   function cmdsAt(T, cmds) { return cmds.map(function (k) { var o = [k[0]]; for (var i = 1; i < k.length; i += HALF) o.push(T.x(k[i]), T.y(k[i + 1])); return o; }); }
-  /* items of one drawing placed in box; colours stay as the piece wrote them */
+  /* items of one drawing placed in box; colours stay as the piece wrote them. A tile piece's drawing is placed once per tile,
+   * the tiles in order, row by row (1.8.120) */
   function place(p, items, box) {
-    var T = frame(p, box);
+    if (p.fit === 'tile') return tiles(p, box).reduce(function (out, T) { return out.concat(placeWith(T, items)); }, []);
+    return placeWith(frame(p, box), items);
+  }
+  function placeWith(T, items) {
     return items.map(function (it) { var k = it[0];
       if (k === 'rect') return ['rect', T.x(it[1]), T.y(it[2]), T.w(it[1], it[1] + it[3]), T.h(it[2], it[2] + it[4]), paintAt(T, it[5])];
       if (k === 'rrect') return ['rrect', T.x(it[1]), T.y(it[2]), T.w(it[1], it[1] + it[3]), T.h(it[2], it[2] + it[4]), it[5] * T.s, paintAt(T, it[6])];
@@ -10216,6 +10258,47 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       var o = Object.assign({}, it[3]); o.width = o.width * T.s; if (o.dash) o.dash = o.dash.map(function (d) { return d * T.s; });
       return ['stroke', cmdsAt(T, it[1]), paintAt(T, it[2]), o]; });
   }
+
+  /* ---------- looping (7.5, 1.8.121) ---------- */
+  function loopOf(p) { return has(p, 'motion') && p.motion !== null && typeof p.motion === 'object' && p.motion.loop !== null && p.motion.loop !== undefined ? p.motion.loop : null; }
+  function intOk(v) { return num(v) && v >= 0 && Math.floor(v) === v; }
+  /* what is wrong with a loop's form, or null */
+  function loopBad(L) {
+    if (typeof L !== 'object' || Array.isArray(L) || Object.keys(L).length !== 3 || !has(L, 'ms') || !has(L, 'still') || !has(L, 'parts')) return 'a loop is { ms, still, parts }';
+    if (!num(L.ms) || L.ms < LOOP_MS[0] || L.ms > LOOP_MS[1]) return 'ms ' + L.ms + ' is not ' + LOOP_MS[0] + ' to ' + LOOP_MS[1];
+    if (!num(L.still) || L.still < 0 || L.still >= 1) return 'still ' + L.still + ' is not a phase from 0 up to 1';
+    if (!Array.isArray(L.parts) || !L.parts.length || L.parts.length > LOOP_PARTS) return 'parts: 1 to ' + LOOP_PARTS;
+    var taken = {};
+    for (var i = 0; i < L.parts.length; i++) { var q = L.parts[i], at = 'part ' + i + ': ';
+      if (!q || typeof q !== 'object' || Array.isArray(q) || Object.keys(q).length !== 3 || !has(q, 'items') || !has(q, 'pivot') || !has(q, 'keys')) return at + 'a part is { items, pivot, keys }';
+      if (!Array.isArray(q.items) || !q.items.length || !q.items.every(intOk)) return at + 'items are item indices';
+      for (var j = 0; j < q.items.length; j++) { if (j > 0 && q.items[j] <= q.items[j - 1]) return at + 'items go up, each once'; if (taken[q.items[j]]) return at + 'item ' + q.items[j] + ' is in two parts'; taken[q.items[j]] = true; }
+      if (!Array.isArray(q.pivot) || q.pivot.length !== 2 || !q.pivot.every(num)) return at + 'pivot is [x, y]';
+      var K = q.keys; if (!Array.isArray(K) || K.length < HALF || K.length > LOOP_KEYS) return at + 'keys: 2 to ' + LOOP_KEYS;
+      for (var k = 0; k < K.length; k++) { var e = K[k]; if (!Array.isArray(e) || e.length !== 5 || !e.every(num)) return at + 'a key is [t, dx, dy, s, o]';
+        if (!(e[3] > 0)) return at + 'scale ' + e[3] + ' is not above 0'; if (e[4] < 0 || e[4] > 1) return at + 'opacity ' + e[4] + ' is not 0 to 1';
+        if (k > 0 && !(e[0] > K[k - 1][0])) return at + 'key times go up'; }
+      if (K[0][0] !== 0 || K[K.length - 1][0] !== 1) return at + 'keys run from t 0 to t 1';
+      for (var c = 1; c < 5; c++) if (K[K.length - 1][c] !== K[0][c]) return at + 'the last key is not the first, so the loop does not close'; }
+    return null; }
+  /* every time a key of any part falls on: every frame's extent lies between the extents at these times */
+  function keyTimes(L) { var t = []; L.parts.forEach(function (q) { q.keys.forEach(function (e) { if (t.indexOf(e[0]) < 0) t.push(e[0]); }); }); return t.sort(function (a, b) { return a - b; }); }
+  function ease(u) { return 0.5 - 0.5 * Math.cos(Math.PI * u); }
+  /* a part's [dx, dy, s, o] at phase t, eased between the keys either side */
+  function poseAt(K, t) { for (var i = 1; i < K.length; i++) if (t <= K[i][0]) { var a = K[i - 1], b = K[i], w = ease((t - a[0]) / (b[0] - a[0]));
+      return [a[1] + (b[1] - a[1]) * w, a[2] + (b[2] - a[2]) * w, a[3] + (b[3] - a[3]) * w, a[4] + (b[4] - a[4]) * w]; }
+    return K[K.length - 1].slice(1); }
+  /* a drawing at phase t: each part's items moved and scaled about its pivot, in the piece's coordinates, and each item's opacity */
+  function posed(L, items, t) { var out = items.slice(), alpha = items.map(function () { return 1; });
+    L.parts.forEach(function (q) { var v = poseAt(q.keys, t), px = q.pivot[0], py = q.pivot[1];
+      var M = { x: function (u) { return px + (u - px) * v[2] + v[0]; }, y: function (u) { return py + (u - py) * v[2] + v[1]; }, w: function (a, b) { return (b - a) * v[2]; }, h: function (a, b) { return (b - a) * v[2]; }, s: v[2] };
+      q.items.forEach(function (k) { out[k] = placeWith(M, [items[k]])[0]; alpha[k] = v[3]; }); });
+    return { items: out, alpha: alpha }; }
+  function phaseOf(L, ms) { var x = (L.still + ms / L.ms) % 1; return x < 0 ? x + 1 : x; }
+  /* a resolved colour at opacity o: its alpha (and each gradient stop's) multiplied by o */
+  function fadeN(c, o) { return ((c & 0xFFFFFF) | (Math.round((c >>> 24) * o) << 24)) >>> 0; }
+  function fade(c, o) { if (o === 1) return c; if (typeof c === 'number') return fadeN(c, o);
+    return { gradient: c.gradient, kind: c.kind, spread: c.spread, p: c.p, stops: c.stops.map(function (k) { return [k[0], fadeN(k[1], o)]; }) }; }
 
   /* ---------- the extent of drawn items, strokes included (ART_OUTSIDE) ---------- */
   function points(cmds) { var pts = []; cmds.forEach(function (k) { for (var i = 1; i < k.length; i += HALF) pts.push([k[i], k[i + 1]]); }); return pts; }
@@ -10323,14 +10406,17 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       stops.push([k[0], J.rgba(parseInt(v[1], 16), parseInt(v[2], 16), parseInt(v[3], 16), Math.round(a * k[2]))]); }
     var q = c.p, o = { spread: c.spread };
     return c.gradient === 'linear' ? J.linear(q[0], q[1], q[2], q[3], stops, o) : J.radial(q[0], q[1], q[2], q[3], q[4], q[5], stops, o); }
-  /* fitArt(S, piece, variant, state, rect): the drawing placed in the rect with its colours resolved, or FAIL */
-  function fitArt(S, p, variant, state, rect, where) {
+  /* fitArt(S, piece, variant, state, rect): the drawing placed in the rect with its colours resolved, or FAIL. A looping piece is
+   * drawn at its still phase (1.8.121). */
+  function fitArt(S, p, variant, state, rect, where) { var L = loopOf(p); return frameArt(S, p, variant, state, rect, where, L ? L.still : null); }
+  /* frameArt(..., t): the same at phase t of the piece's loop (null: the drawing as it is), each item's opacity multiplied in */
+  function frameArt(S, p, variant, state, rect, where, t) {
     if (!(rect[2] > 0) || !(rect[3] > 0)) return F.with('BOX_EMPTY', Object.assign({ app: S.app, screen: S.screen, slot: p.slot, offered: { w: rect[2], h: rect[3] } }, where));
     var v = p.variants[variant], d = v ? drawing(v, state) : null;
     if (d === null) return F.with('ART_MISSING', Object.assign({ app: S.app, screen: S.screen, component: p.component, slot: p.slot, state: state, detail: 'variant ' + variant }, where));
-    var items = place(p, d, rect); if (outside(items, rect, p, variant, state) === FAIL) return FAIL;
+    var P = t === null ? null : posed(loopOf(p), d, t), items = place(p, P ? P.items : d, rect); if (outside(items, rect, p, variant, state) === FAIL) return FAIL;
     for (var i = 0; i < items.length; i++) { var it = items[i], ci = it[0] === 'path' || it[0] === 'stroke' ? 2 : it.length - 1, c = it[ci];
-      var col = resolve(S, c); if (col === FAIL) return FAIL; it[ci] = col; }
+      var col = resolve(S, c); if (col === FAIL) return FAIL; it[ci] = P ? fade(col, P.alpha[i % d.length]) : col; }
     return items; }
 
   /* draw(S, n, component, slot, variant, rect, at): the slot's art in node n, in every state the component declares, or no items
@@ -10354,14 +10440,64 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     for (var i = 0; i < def.states.length; i++) { var st = def.states[i], d = fitArt(S, p, variant, st, rect, where); if (d === FAIL) return FAIL; drawn[st] = d;
       shows[st] = resolved(p.variants[variant], st);
       /* each item's fill as #rrggbb(aa) for the contrast check; a gradient's is the list of its stops' colours (1.8.119) */
-      fills[st] = drawing(p.variants[variant], st).map(function (it) { var c = it[0] === 'path' || it[0] === 'stroke' ? it[2] : it[it.length - 1];
-        return gradientOk(c) ? c.stops.map(function (k) { return hexOf(S, k[1]); }) : hexOf(S, c); }); }
+      var one = drawing(p.variants[variant], st).map(function (it) { var c = it[0] === 'path' || it[0] === 'stroke' ? it[2] : it[it.length - 1];
+        return gradientOk(c) ? c.stops.map(function (k) { return hexOf(S, k[1]); }) : hexOf(S, c); });
+      /* a tile piece draws its drawing once per tile, so each drawn item's fill is its item's in the drawing (1.8.120) */
+      fills[st] = d.map(function (it, m) { return one[m % one.length]; }); }
+    /* a loop: every state at every key time stays inside this rect, so every frame does (1.8.121) */
+    var L = loopOf(p);
+    if (L) { var kt = keyTimes(L); for (var a = 0; a < def.states.length; a++) for (var b = 0; b < kt.length; b++) if (frameArt(S, p, variant, def.states[a], rect, where, kt[b]) === FAIL) return FAIL; }
     var idle = drawn.idle; if (!idle) return F.with('COMPONENT_INVALID', { component: component, detail: 'no idle state' });
     var rest = drawn[n.rest];
     if (at == null) Array.prototype.push.apply(n.items, rest); else n.items.splice.apply(n.items, [at, 0].concat(rest));
     if (!n.art) n.art = [];
-    n.art.push({ slot: slot, variant: variant, rect: rect.slice(), idle: idle, hover: drawn.hover ? drawn.hover : idle, own: Array.isArray(p.variants[variant].hover), drawn: drawn, fills: fills, shows: shows });
+    var entry = { slot: slot, variant: variant, rect: rect.slice(), idle: idle, hover: drawn.hover ? drawn.hover : idle, own: Array.isArray(p.variants[variant].hover), drawn: drawn, fills: fills, shows: shows };
+    if (L) entry.loop = { S: S, piece: p, where: where };
+    n.art.push(entry);
     return rest; }
+  /* ---------- playing loops (7.5, 1.8.121) ---------- */
+  /* looping(n): whether any of the node's art loops */
+  function looping(n) { return !!n.art && n.art.some(function (s) { return has(s, 'loop'); }); }
+  /* frameOf(n, state, ms): the node's items in state with each looping slot at ms into its loop (the rest as drawn), null when the
+   * node does not loop, or FAIL */
+  function frameOf(n, state, ms) {
+    if (!looping(n)) return null; var out = [];
+    for (var i = 0; i < n.items.length; i++) { var it = n.items[i], mine = false;
+      for (var j = 0; j < n.art.length; j++) { var s = n.art[j], k = s.drawn[n.rest].indexOf(it); if (k < 0) continue; mine = true; if (k > 0) break;
+        var st = has(s.drawn, state) ? state : n.rest, got = has(s, 'loop') ? frameArt(s.loop.S, s.loop.piece, s.variant, st, s.rect, s.loop.where, phaseOf(loopOf(s.loop.piece), ms)) : s.drawn[st];
+        if (got === FAIL) return FAIL; Array.prototype.push.apply(out, got); break; }
+      if (!mine) out.push(it); }
+    return out; }
+  /* browser(): the page's clock, frames, reduced-motion setting and tab visibility, for player() */
+  function browser() { var W = root, mq = W.matchMedia('(prefers-reduced-motion: reduce)');
+    return { raf: function (fn) { return W.requestAnimationFrame(fn); }, caf: function (id) { W.cancelAnimationFrame(id); }, now: function () { return W.performance.now(); },
+      reduced: function () { return mq.matches; }, hidden: function () { return W.document.hidden; },
+      listen: function (fn) { W.document.addEventListener('visibilitychange', fn); mq.addEventListener('change', fn); return function () { W.document.removeEventListener('visibilitychange', fn); mq.removeEventListener('change', fn); }; } }; }
+  /* player(entries, flush, env): plays the loops of a set of nodes, each entry { n, state(): its art state now, draw(items) }, then
+   * flush() after each frame. Still at its still phase under reduced motion, paused on a hidden tab and carried on from where it
+   * was. A frame that fails is recorded (art.loop:<key>) and not drawn; the other nodes carry on. stop() ends it; redraw(n) draws
+   * one node now, in its state now (a hover or press while it plays). */
+  function player(entries, flush, env) {
+    var start = env.now(), ms = 0, raf = 0, on = true, byN = new Map(entries.map(function (e) { return [e.n, e]; }));
+    function one(e) { var items = F.context('art.loop:' + e.n.key, function () { return frameOf(e.n, e.state(), ms); }, function (failure) { F.record(failure); }); if (items !== FAIL) e.draw(items); }
+    function paint() { entries.forEach(one); flush(); }
+    function step(now) { raf = 0; if (!on || env.hidden() || env.reduced()) return; ms = now - start; paint(); raf = env.raf(step); }
+    function wake() { if (!on) return;
+      if (env.reduced()) { if (raf) { env.caf(raf); raf = 0; } ms = 0; paint(); return; }
+      if (env.hidden()) { if (raf) { env.caf(raf); raf = 0; } return; }
+      if (!raf) { start = env.now() - ms; raf = env.raf(step); } }
+    var unlisten = env.listen(wake); wake();
+    return { stop: function () { on = false; if (raf) env.caf(raf); raf = 0; unlisten(); }, ms: function () { return ms; }, has: function (n) { return byN.has(n); },
+      redraw: function (n) { if (byN.has(n)) one(byN.get(n)); }, playing: function () { return raf !== 0; } }; }
+  /* playView(view): plays the loops of the nodes a JRViews view shows (its scene, its art state per node), replacing what it played
+   * before; nothing when no node loops */
+  function playView(view) { if (view.__exp7Loop) { view.__exp7Loop.stop(); view.__exp7Loop = null; }
+    var J = root.JRender, JV = root.JRViews, nodes = view.L && view.L.nodes ? view.L.nodes.filter(looping) : [];
+    if (!nodes.length || !view.s) return null;
+    view.__exp7Loop = player(nodes.map(function (n) { return { n: n, state: function () { return view.artState(n); },
+      draw: function (items) { view.s.patch(new J.Patch().replace(n.id, function (b) { JV.items(b, { items: items, hit: n.hit, flags: n.flags }); })); } }; }),
+      function () { view.r.draw(); }, browser());
+    return view.__exp7Loop; }
   /* the states input puts a node in, drawn live over its rest (1.8.90) */
   var LIVE = ['hover', 'pressed', 'focus'];
   /* look(n, state): the node's items with each slot drawn in state, or null when the node looks in that state as it does at
@@ -10403,6 +10539,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   root.Exp7Art = Object.freeze({ load: load, assign: assign, override: override, clear: clear, art: art, fitArt: fitArt, draw: draw,
     look: look, looks: looks, live: LIVE.slice(),
     contrast: contrast, check: checkPiece, place: place, extent: extent, ratio: ratio,
+    looping: looping, frame: frameOf, player: player, playView: playView, browser: browser,
     pack: function (app) { var a = apps.get(app); return a ? a.pack : null; },
     components: function (app) { var a = apps.get(app); return a ? a.components.slice() : null; }, apps: function () { return Array.from(apps.keys()); } });
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -12294,7 +12431,16 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     this.over=null;this.down=null;var ft=this.focused();if(ft&&ft.node.looks)this.drawState(ft.kind,ft.node);
     if(this.live) this.attachLive(built.live,liveSel);
     this.r.draw();this.painted=true;this.error='';
+    this.loopPlay();
   };
+  /* 1.8.121: the looping art on the painted screen plays (Exp7Art.player): each looping node is drawn again on every animation
+     frame, in the state it is in, in the view it is in; nothing plays when no node loops. Painted again, it starts again. */
+  Home.prototype.loopPlay=function(){ var self=this, A=root.Exp7Art, entries=[];
+    if(this.loop){ this.loop.stop(); this.loop=null; }
+    this.drawOrder.forEach(function(k){ var nodes=k==='selector'?self.overlayNodes:self.layouts[k].nodes;
+      nodes.filter(A.looping).forEach(function(n){ entries.push({ n:n, state:function(){ return self.artState(n); },
+        draw:function(items){ self.views[k].scene.patch(new J.Patch().replace(n.id,function(b){JV.items(b,{items:items,hit:n.hit,flags:n.flags});})); } }); }); });
+    if(entries.length) this.loop=A.player(entries,function(){ self.r.draw(); },A.browser()); };
   Home.prototype.placeScenes=function(){if(this.dead||!this.r||!this.store||!this.drawOrder)return;
     var css=hostCssSize(this.host), scrollY=this.host.scrollTop, viewH=this.viewH, hostW=this.W, H=this.H, colW=this.colW, self=this, dpr=this.dpr; /* paint set all of these before drawOrder */
     if(this._pendingPlanY!=null&&this.route==='home'&&this._planRestoreLive()&&Math.abs(scrollY-this._pendingPlanY)>8){ if(this.wrap&&this.H){ this.wrap.style.minHeight=this.H+'px'; this.wrap.style.height=this.H+'px'; } void this.host.offsetHeight; this.host.scrollTop=this._pendingPlanY; scrollY=this.host.scrollTop; }
@@ -12315,6 +12461,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     var was=this.focused();
     this.focusKey=key; this.overlayNodes=ov.nodes; this.blobs.selector=ov.dl.bytes(); this.views.selector.scene.load(ov.dl); this.placeScenes();
     /* the target that lost the focus draws its rest again, the one that has it draws its focus look (1.8.90) */
+    this.loopPlay(); /* the focus ring's overlay is new: play what loops on it (1.8.121) */
     [was,this.focused()].forEach(function(t){ if(t&&t.node.looks) self.drawState(t.kind,t.node); });
     return true; };
   /* 1.8.90: every art state drawn live. A node is drawn pressed while the pointer is down on it, hover while the pointer is over
@@ -12333,7 +12480,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   /* artState(n): the state n is drawn in now; itemsOf(n): its items in that state */
   Home.prototype.artState=function(n){ if(this.down&&this.down.n===n) return 'pressed'; if(this.over&&this.over.n===n) return 'hover'; var f=this.focused(); return f&&f.node===n?'focus':n.rest; };
   Home.prototype.itemsOf=function(n){ var st=this.artState(n); return n.looks[st]?n.looks[st]:n.items; };
-  Home.prototype.drawState=function(k,n){ var items=this.itemsOf(n);
+  Home.prototype.drawState=function(k,n){ if(this.loop&&this.loop.has(n)){ this.loop.redraw(n); this.r.draw(); return true; } /* a looping node: its frame now, in its new state (1.8.121) */
+    var items=this.itemsOf(n);
     this.views[k].scene.patch(new J.Patch().replace(n.id,function(b){JV.items(b,{items:items,hit:n.hit,flags:n.flags});})); this.r.draw(); return true; };
   Home.prototype.point=function(e){var r=this.cv.getBoundingClientRect(),vh=this.viewH;return [(e.clientX-r.left)*this.W/r.width,(e.clientY-r.top)*vh/r.height+this.scrollY];};
   Home.prototype.openDate=function(n,hover){if(hover)return; /* phone-first: the picker is an inline expansion, not a hover popup */
@@ -12751,7 +12899,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if(e.key==='Tab'){var i=this.targets.findIndex(function(t){return t.key===this.focusKey;},this),next=i+(e.shiftKey?-1:1),key=next<0||next>=this.targets.length?null:this.targets[next].key;if(key!=null)e.preventDefault();if(this.focus(key)===root.Exp7Fail.FAIL||key==null)return;this.status.textContent=this.targets[next].node.vm.label;}
     else if(e.key==='Enter'||e.key===' '){var t=this.targets.find(function(t){return t.key===this.focusKey;},this);if(t){e.preventDefault();this.act(t.node.vm.act,t.kind,t.node);}}
   };
-  Home.prototype.dispose=function(){this.dead=true;this.closeField(false);this.detachLive();this.serial++;if(this.session)this.session.dispose();if(this.resize)this.resize.disconnect();this.abort.abort();if(root.__exp7ViewsPropose&&root.__exp7ViewsPropose[this.id]===this.proposalHook)delete root.__exp7ViewsPropose[this.id];Object.keys(this.views).forEach(function(k){var v=this.views[k];if(v.scene&&v.scene.h)v.scene.free();},this);if(this.r)this.r.destroy();if(this.cv)this.cv.remove();if(this.wrap)this.wrap.remove();if(this.status)this.status.remove();};
+  Home.prototype.dispose=function(){this.dead=true;if(this.loop){this.loop.stop();this.loop=null;}this.closeField(false);this.detachLive();this.serial++;if(this.session)this.session.dispose();if(this.resize)this.resize.disconnect();this.abort.abort();if(root.__exp7ViewsPropose&&root.__exp7ViewsPropose[this.id]===this.proposalHook)delete root.__exp7ViewsPropose[this.id];Object.keys(this.views).forEach(function(k){var v=this.views[k];if(v.scene&&v.scene.h)v.scene.free();},this);if(this.r)this.r.destroy();if(this.cv)this.cv.remove();if(this.wrap)this.wrap.remove();if(this.status)this.status.remove();};
 
   function fmtMoney(n){ n=+n; if(!isFinite(n)) return ''; /* 1.8.99: an amount that is not a number shows nothing, not 0.00 */ var sign=n<0?'-':''; n=Math.abs(n); return sign+n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
   function navigate(route, act){
@@ -12907,7 +13055,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
 
   /* a layout that fails keeps its frame; the failure is in Exp7Fail.records() and error() */
   function shown(r, surface) {
-    if (r.mode !== 'failed') return true;
+    /* 1.8.121: a drawn bar or picker plays its looping art (nothing when none loops) */
+    if (r.mode !== 'failed') { root.Exp7Art.playView(surface === 'bar' ? state.barView : state.appsView); return true; }
     var recs = root.Exp7Fail.records().filter(function (f) { return f.context === 'chrome.layout:' + surface; });
     state.failure = recs.length ? recs[recs.length - 1] : { code: 'CONTEXT_FAILED', context: 'chrome.layout:' + surface };
     return false;
@@ -13121,6 +13270,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     freeHandle();
     setBarMode(false);
     setAppsMode(false);
+    [state.barView, state.appsView].forEach(function (v) { if (v && v.__exp7Loop) { v.__exp7Loop.stop(); v.__exp7Loop = null; } }); /* 1.8.121 */
     state.barView = null;
     state.appsView = null;
     state.avatarMode = 'initials';
@@ -13789,7 +13939,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.119",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.122",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
