@@ -896,66 +896,79 @@ if (typeof JFEngine !== "undefined") JFEngine.init();
     'view.out': { label: 'view out', ins: ['curve', 'space3d', 'view'], outs: [], cat: 'Out', stage: 3, sink: true }
   };
   var STAGE_ENABLED = 1;
+  /* Exp7 1.8.115: it fills in no values. What may be missing is read through rd and ls (a frozen nothing). A node or edge that is
+     not whole is left out of the graph. A value that is not a number gives no number (NaN), so the score of that item is NaN and
+     ranking leaves that one alternative out; the rest rank as before. An input with no wire gives no number (it was 0, or 1 for
+     a multiplier, divisor or jfactor max). Division by zero still gives 0, as in the atlas evaluator. */
+  var NONE = Object.freeze({}), EMPTY = Object.freeze([]);
+  function isObj(o) { return o !== null && typeof o === 'object' && !Array.isArray(o); }
+  function rd(o) { return isObj(o) ? o : NONE; }
+  function ls(a) { return Array.isArray(a) ? a : EMPTY; }
+  /* a number, or a numeric string; anything else is no number */
+  function num(v) { if (typeof v === 'number') return v; if (typeof v === 'string' && v.trim() !== '') return Number(v); return NaN; }
+  function nodesOf(g) { return ls(rd(g).nodes).filter(function (n) { return isObj(n) && typeof n.id === 'string' && typeof n.type === 'string'; }); }
+  function edgesOf(g) { return ls(rd(g).edges).filter(function (e) { return isObj(e) && Array.isArray(e.from) && Array.isArray(e.to); }); }
   function portTypeOf(type, port, dir) { if (type === 'board.emit' && dir === 'out') return 'count'; if (/^view\./.test(type)) return 'view'; return 'num'; }
-  function byId(g) { var m = {}; (g.nodes || []).forEach(function (n) { m[n.id] = n; }); return m; }
-  function reaches(g, from, to) { var seen = {}, st = [from]; while (st.length) { var c = st.pop(); if (c === to) return true; if (seen[c]) continue; seen[c] = 1; (g.edges || []).forEach(function (e) { if (e.from[0] === c) st.push(e.to[0]); }); } return false; }
+  function byId(g) { var m = {}; nodesOf(g).forEach(function (n) { m[n.id] = n; }); return m; }
+  function reaches(g, from, to) { var E = edgesOf(g), seen = {}, st = [from]; while (st.length) { var c = st.pop(); if (c === to) return true; if (seen[c]) continue; seen[c] = 1; E.forEach(function (e) { if (e.from[0] === c) st.push(e.to[0]); }); } return false; }
   /** Can out-port (a,ap) connect to in-port (b,bp)? Returns {ok, why}. */
   function canConnect(g, a, ap, b, bp) {
     var M = byId(g), A = M[a], B = M[b]; if (!A || !B) return { ok: false, why: 'no node' }; if (a === b) return { ok: false, why: 'self' };
     var dA = N[A.type], dB = N[B.type]; if (!dA || !dB) return { ok: false, why: 'unknown type' };
     if (dA.outs.indexOf(ap) < 0 || dB.ins.indexOf(bp) < 0) return { ok: false, why: 'no port' };
     var ta = portTypeOf(A.type, ap, 'out'), tb = portTypeOf(B.type, bp, 'in'); if (!(ta === tb || (ta === 'count' && tb === 'num'))) return { ok: false, why: 'type ' + ta + '→' + tb };
-    if ((g.edges || []).some(function (e) { return e.to[0] === b && e.to[1] === bp; })) return { ok: false, why: 'input taken' };
+    if (edgesOf(g).some(function (e) { return e.to[0] === b && e.to[1] === bp; })) return { ok: false, why: 'input taken' };
     if (reaches(g, b, a)) return { ok: false, why: 'cycle' };
     return { ok: true };
   }
   /** Compile a graph for an item type. fields = [{id,...}]. Returns {ok, errors[], emits, score(item, ctx)} — ctx.max[field] = board max. */
   function compile(g, fields, opt) {
-    var errs = [], M = byId(g), fid = {}, fac = {}; (fields || []).forEach(function (f) { fid[f.id] = 1; if (f.factor) fac[f.id] = 1; }); opt = opt || {};
-    (g.nodes || []).forEach(function (n) { var d = N[n.type]; if (!d) errs.push(n.id + ': unknown ' + n.type); else if (d.stage > STAGE_ENABLED) errs.push(n.id + ': ' + n.type + ' is stage ' + d.stage + ' (not yet compiled)');
-      if (d && d.params && d.params.field && !fid[(n.p || {}).field]) errs.push(n.id + ': field "' + ((n.p || {}).field || '') + '" is not an item field');
-      if (d && n.type === 'item.factor' && fid[(n.p || {}).field] && !fac[(n.p || {}).field]) errs.push(n.id + ': "' + n.p.field + '" is a value, not a scoring factor');
-      if (d && /^joy\./.test(n.type) && (!opt.joys || !opt.joys[(n.p || {}).joy])) errs.push(n.id + ': unknown joy "' + ((n.p || {}).joy || '') + '"'); });
-    var outs = (g.nodes || []).filter(function (n) { return n.type === 'score.out'; }); if (outs.length !== 1) errs.push('needs exactly one score.out (has ' + outs.length + ')');
-    var inE = {}; (g.edges || []).forEach(function (e) { inE[e.to[0] + ':' + e.to[1]] = e.from; });
+    var errs = [], M = byId(g), NS = nodesOf(g), ES = edgesOf(g), fid = {}, fac = {}, joys = rd(rd(opt).joys);
+    ls(fields).forEach(function (f) { if (!isObj(f)) return; fid[f.id] = 1; if (f.factor) fac[f.id] = 1; });
+    NS.forEach(function (n) { var d = N[n.type], p = rd(n.p); if (!d) errs.push(n.id + ': unknown ' + n.type); else if (d.stage > STAGE_ENABLED) errs.push(n.id + ': ' + n.type + ' is stage ' + d.stage + ' (not yet compiled)');
+      if (d && d.params && d.params.field && !fid[p.field]) errs.push(n.id + (typeof p.field === 'string' ? ': field "' + p.field + '" is not an item field' : ': has no field'));
+      if (d && n.type === 'item.factor' && fid[p.field] && !fac[p.field]) errs.push(n.id + ': "' + p.field + '" is a value, not a scoring factor');
+      if (d && /^joy\./.test(n.type) && !joys[p.joy]) errs.push(n.id + (typeof p.joy === 'string' ? ': unknown joy "' + p.joy + '"' : ': has no joy')); });
+    var outs = NS.filter(function (n) { return n.type === 'score.out'; }); if (outs.length !== 1) errs.push('needs exactly one score.out (has ' + outs.length + ')');
+    var inE = {}; ES.forEach(function (e) { inE[e.to[0] + ':' + e.to[1]] = e.from; });
     if (outs.length === 1 && !inE[outs[0].id + ':in']) errs.push('score.out is not connected');
-    var emits = (g.nodes || []).some(function (n) { return n.type === 'board.emit'; });
+    var emits = NS.some(function (n) { return n.type === 'board.emit'; });
     if (errs.length) return { ok: false, errors: errs, emits: emits, score: null };
-    function val(id, port, it, ctx, memo) { var k = id + ':' + port; if (k in memo) return memo[k]; var n = M[id], p = n.p || {};
-      function inp(q, dflt) { var f = inE[id + ':' + q]; return f ? val(f[0], f[1], it, ctx, memo) : dflt; }
+    function val(id, port, it, ctx, memo) { var k = id + ':' + port; if (k in memo) return memo[k]; var n = M[id], p = rd(n.p), item = rd(it);
+      function inp(q) { var f = inE[id + ':' + q]; return f && M[f[0]] ? val(f[0], f[1], it, ctx, memo) : NaN; }
       var v, a, b;
       switch (n.type) {
-        case 'data.actField': v = Number(it[p.field]) || 0; break;
-        case 'data.boardMax': v = Number((ctx.max || {})[p.field]) || 0; break;
-        case 'data.const': v = Number(p.value) || 0; break;
-        case 'item.value': case 'item.factor': v = Number(it[p.field]) || 0; break;
-        case 'joy.value': v = ctx.joy ? Number(ctx.joy(p.joy, 'value', it)) || 0 : 0; break;
-        case 'joy.jmax': v = ctx.joy ? Number(ctx.joy(p.joy, 'jmax', it)) || 0 : 0; break;
-        case 'jfactor.xMax': case 'jfactor.yMax': v = inp('in', 1); break;
-        case 'jfactor.call': { v = jfKernel([{ x: inp('x', 0), y: inp('y', 0), xMax: inp('xMax', 1), yMax: inp('yMax', 1) }])[0]; break; } /* 1.8.33: the real Exp6 kernel, methodId 2, through JFEngine (Exp7Rank.jfactorRows) */
+        case 'data.actField': v = num(item[p.field]); break;
+        case 'data.boardMax': v = num(rd(ctx.max)[p.field]); break;
+        case 'data.const': v = num(p.value); break;
+        case 'item.value': case 'item.factor': v = num(item[p.field]); break;
+        case 'joy.value': v = typeof ctx.joy === 'function' ? num(ctx.joy(p.joy, 'value', it)) : NaN; break;
+        case 'joy.jmax': v = typeof ctx.joy === 'function' ? num(ctx.joy(p.joy, 'jmax', it)) : NaN; break;
+        case 'jfactor.xMax': case 'jfactor.yMax': v = inp('in'); break;
+        case 'jfactor.call': { v = jfKernel([{ x: inp('x'), y: inp('y'), xMax: inp('xMax'), yMax: inp('yMax') }])[0]; break; } /* 1.8.33: the real Exp6 kernel, methodId 2, through JFEngine (Exp7Rank.jfactorRows) */
         case 'board.emit': v = 1; break;
-        case 'op.add': v = inp('a', 0) + inp('b', 0); break; case 'op.sub': v = inp('a', 0) - inp('b', 0); break;
-        case 'op.mul': v = inp('a', 0) * inp('b', 1); break; case 'op.div': b = inp('b', 1); v = b ? inp('a', 0) / b : 0; break;
-        case 'op.min': v = Math.min(inp('a', 0), inp('b', 0)); break; case 'op.max': v = Math.max(inp('a', 0), inp('b', 0)); break;
-        case 'op.clamp01': a = inp('a', 0); v = Math.max(0, Math.min(1, a)); break;
-        case 'score.out': v = inp('in', 0); break;
+        case 'op.add': v = inp('a') + inp('b'); break; case 'op.sub': v = inp('a') - inp('b'); break;
+        case 'op.mul': v = inp('a') * inp('b'); break; case 'op.div': b = inp('b'); v = b === 0 ? 0 : inp('a') / b; break;
+        case 'op.min': v = Math.min(inp('a'), inp('b')); break; case 'op.max': v = Math.max(inp('a'), inp('b')); break;
+        case 'op.clamp01': a = inp('a'); v = Math.max(0, Math.min(1, a)); break;
+        case 'score.out': v = inp('in'); break;
         default: v = NaN;
       }
       memo[k] = v; return v; }
     /* 1.8.33 scoreBatch: every jfactor node of every item goes to JFEngine as one batch, then each item finishes
        with those results seeded in its memo. A graph whose jfactor inputs depend on another jfactor scores item by item. */
-    var jfIds = (g.nodes || []).filter(function (n) { return n.type === 'jfactor.call'; }).map(function (n) { return n.id; });
+    var jfIds = NS.filter(function (n) { return n.type === 'jfactor.call'; }).map(function (n) { return n.id; });
     var nested = jfIds.some(function (id) { var seen = {}, stack = ['x', 'y', 'xMax', 'yMax'].map(function (q) { return inE[id + ':' + q]; }).filter(Boolean).map(function (f) { return f[0]; });
       while (stack.length) { var u = stack.pop(); if (seen[u]) continue; seen[u] = 1; if (M[u] && M[u].type === 'jfactor.call') return true;
         Object.keys(inE).forEach(function (k) { if (k.indexOf(u + ':') === 0) stack.push(inE[k][0]); }); } return false; });
-    function score(it, ctx) { return val(outs[0].id, 'sink', it, ctx || {}, {}); }
-    function scoreBatch(items, ctx) { ctx = ctx || {}; if (!jfIds.length || nested) return items.map(function (it) { return score(it, ctx); });
+    function score(it, ctx) { return val(outs[0].id, 'sink', it, rd(ctx), {}); }
+    function scoreBatch(items, ctx) { var c = rd(ctx); if (!jfIds.length || nested) return items.map(function (it) { return score(it, c); });
       var memos = items.map(function () { return {}; }), rows = [];
       items.forEach(function (it, i) { jfIds.forEach(function (id) {
-        var arg = function (q, d) { var f = inE[id + ':' + q]; return f ? val(f[0], f[1], it, ctx, memos[i]) : d; };
-        rows.push({ x: arg('x', 0), y: arg('y', 0), xMax: arg('xMax', 1), yMax: arg('yMax', 1) }); }); });
+        var arg = function (q) { var f = inE[id + ':' + q]; return f && M[f[0]] ? val(f[0], f[1], it, c, memos[i]) : NaN; };
+        rows.push({ x: arg('x'), y: arg('y'), xMax: arg('xMax'), yMax: arg('yMax') }); }); });
       var res = jfKernel(rows), J = jfIds.length;
-      return items.map(function (it, i) { jfIds.forEach(function (id, j) { memos[i][id + ':out'] = res[i * J + j]; }); return val(outs[0].id, 'sink', it, ctx, memos[i]); }); }
+      return items.map(function (it, i) { jfIds.forEach(function (id, j) { memos[i][id + ':out'] = res[i * J + j]; }); return val(outs[0].id, 'sink', it, c, memos[i]); }); }
     return { ok: true, errors: [], emits: emits, score: score, scoreBatch: scoreBatch };
   }
   /* Exp6 kernel rows (methodId 2) through JFEngine via Exp7Rank. */
@@ -13784,7 +13797,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.114",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.115",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
