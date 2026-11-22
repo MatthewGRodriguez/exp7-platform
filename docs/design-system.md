@@ -944,6 +944,8 @@ It fills in nothing now. A graph's node or edge that is not whole (no id or type
 
 On screen, for every app: nothing changes; the demo's graphs wire every input and its items carry every field, so the scores and ranking are exactly the same as 1.8.114. For saved data: nothing changes. A saved graph with a node or edge that is not whole now loads without it instead of failing.
 
+Checked in Chrome on Matthew's Mac (2026-11-22, made-up data only): the lean fetched at this release's commit matched `release.json`. In the Exp7 demo, every one of its ten groups of alternatives, in both of its writers' atlases, compiled its score graph (16 nodes) and scored and ranked every alternative exactly as 1.8.114 did, to nine decimals. The demo's Calendar, Board and Plan views drew at 390 wide with exactly the same view models. A blank Budget at 390 wide ran its date button twice; Budget and the demo at 1024 wide opened with no failure records or page errors. Storage was cleared afterwards.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
