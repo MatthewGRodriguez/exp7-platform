@@ -1,10 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.117",
+  "version": "1.8.118",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "e4eb929637ab0d8cfabf6c576f94e639c9c9df674ddc5b489bbf748d69720126",
+  "sha256": "47bba3db0f0e025fd47800b2762db3bc9eb543c8e378eafde1cab15dabbb24a5",
   "minLauncherMajor": 1,
   "contains": {
+    "1.8.118": "Design system phase 5, twenty-ninth part: the motion settings nothing read are out, Matthew's \"Remove those too\" (2026-11-22): the easing curves, the app states and their transitions, and the motion rules. EXP7_MOTION_CONFIG keeps the version, the element poses and the state table, which the view model reads for hover lift, press scale and timings. Budget and the Exp7 demo look and move the same; saved data is unchanged.",
     "1.8.117": "Design system phase 5, twenty-eighth part: the motion code that nothing reached is out, Matthew's \"Unused motion code\" (2026-11-22). motion-config keeps only the motion settings (EXP7_MOTION_CONFIG) that the view model reads; its JMotion state class, which took the place of JRender.ViewStates but was never made because no view record binds nodes to states, is gone with Exp7Motion, its edge table, depth layers and ambient drift. The settings only it read (parallax depth layers, integration, the tiger sweep and the empty lighting source) are gone too, on Matthew's \"Remove those too\". The gpu-motion script, which stepped only that class and overlay views (no view has either), is gone. JRender.ViewStates is JRender's own class again. The slabs' parity check no longer touches gpu-motion's frames. Budget and the Exp7 demo look and move the same; saved data is unchanged.",
     "1.8.116": "Design system phase 5, twenty-seventh part: the motion scripts (slab-config, motion-config, gpu-motion) fill in no values and hide no faults, on Matthew's \"Yes, keep going\" (2026-11-22). A scroll position that is not a number leaves the slab band out; a pointer move in a window with no size moves nothing. A motion move with no edge in the state table, or into a state with no pose, does not happen and the node stays as it is; a state not in the table is not entered. Budget and the Exp7 demo look and move exactly as before.",
     "1.8.115": "Design system phase 5, twenty-sixth part: the blueprint graphs (jbp) fill in no values, Matthew's \"Yes, keep going\" (2026-11-22). A node or edge that is not whole is left out of the graph. A value that is not a number, an input with no wire and a joy with no reader give no number, so that one item's score is NaN and ranking leaves that alternative out; division by zero still gives 0. The Exp7 demo scores and ranks exactly as before.",
