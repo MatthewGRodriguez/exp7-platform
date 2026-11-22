@@ -936,6 +936,8 @@ What stays fills in nothing. A pose is read only when it is whole: a kind of `fr
 
 On screen, for every app: nothing changes; the TopBar's buttons and the Apps cards rise on hover, sink when pressed and come back as before, and the views draw exactly the same as 1.8.113. For saved data: nothing changes.
 
+Checked in Chrome on Matthew's Mac (2026-11-22, made-up data only): the lean fetched at this release's commit matched `release.json`. The TopBar's back button and the Apps cards were hovered, pressed, released or cancelled and left on both releases: each rose 1.5px on hover, sank to 0.97 when pressed and came back, the selected Budget card did not rise again, and the bar and picker laid out with the same items, hit boxes, poses and looks as 1.8.113. The Exp7 demo's Calendar, Board and Plan views drew at 390 wide with exactly the same view models and the same nodes (111, 173, 143) and heights. A blank Budget at 390 wide ran its date button twice; Budget and the demo at 1024 wide opened with no failure records or page errors. Storage was cleared afterwards.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
