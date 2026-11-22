@@ -10121,6 +10121,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
  * still phase; frame(n, state, ms) (frameOf) gives a node's items at ms into its loops, and player() plays a set of nodes on animation
  * frames, still under reduced motion and paused on a hidden tab. A frame that fails is recorded and not drawn, and the rest
  * carry on.
+ * 1.8.122: a pack may be authored with shared shapes (defs and use, 7.3). The compiler writes each use out as the shape's items
+ * placed there, so a piece here is plain items as before and nothing in this script changes for it.
  * Strict fail and carry on (1.8.94, Matthew): each piece of art is its own fail point. load(pack) checks every piece alone
  * (ART_INVALID, ART_OUTSIDE): a piece that fails is recorded and left out, and the pack loads with the rest. assign(app, pack)
  * checks the pack against every component the app draws, each slot, variant and state alone (ART_MISSING): a gap is recorded
@@ -13937,7 +13939,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.121",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.122",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
