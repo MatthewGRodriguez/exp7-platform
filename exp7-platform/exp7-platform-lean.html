@@ -10104,6 +10104,11 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
  * art's even scale (so a radial keeps its size when a stretch or nine piece grows inside what it supports). It is drawn as a
  * JRender paint, each stop's colour resolved and its opacity multiplied in. Text over a gradient keeps its contrast against
  * every stop.
+ * 1.8.120: the tile fit repeats a piece across its slot. The viewBox is one tile and supports is the slot's range, as for
+ * stretch. The slot (or the nearest size it supports, shrunk evenly and centred) takes round(width / tile width) tiles
+ * across and round(height / tile height) down, at least one each way, and the tiles stretch a little on each axis so that
+ * whole tiles fill it exactly, with no tile cut at an edge. Each tile is the drawing placed as stretch places it. At the
+ * largest size supports allows, a piece makes at most 1024 tiles (TILE_MAX), so a slot's art stays bounded.
  * Strict fail and carry on (1.8.94, Matthew): each piece of art is its own fail point. load(pack) checks every piece alone
  * (ART_INVALID, ART_OUTSIDE): a piece that fails is recorded and left out, and the pack loads with the rest. assign(app, pack)
  * checks the pack against every component the app draws, each slot, variant and state alone (ART_MISSING): a gap is recorded
@@ -10112,12 +10117,12 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
  * levels: the app's pack, a screen's override, one component instance's override; an override is one piece, so a piece that
  * fails its check leaves the art that was there. fitArt(piece, rect) places a piece
  * in a slot rect: stretch scales each axis, nine keeps the insets and stretches the middle, fit draws at its drawn size about
- * its anchor (the rect's centre); art shrinks evenly to fit and never spills out of its slot (BOX_EMPTY only with no room).
+ * its anchor (the rect's centre), tile repeats whole tiles across the rect; art shrinks evenly to fit and never spills out of its slot (BOX_EMPTY only with no room).
  * No throw, no try/catch, no defaults. */
 (function (root) {
   'use strict';
   var F = root.Exp7Fail, FAIL = F.FAIL, HALF = 2, EPS = 1e-6, BIG = 65536;
-  var FITS = ['stretch', 'nine', 'fit'], KINDS = { rect: 6, rrect: 7, border: 8, path: 3, stroke: 4 }, CMD = { M: 2, L: 2, Q: 4, C: 6, Z: 0 };
+  var FITS = ['stretch', 'nine', 'fit', 'tile'], TILE_MAX = 1024, KINDS = { rect: 6, rrect: 7, border: 8, path: 3, stroke: 4 }, CMD = { M: 2, L: 2, Q: 4, C: 6, Z: 0 };
   var apps = new Map(); /* app -> { pack, screens: Map(screen -> Map(id -> piece)), instances: Map(screen + '|' + nodeKey -> Map(id -> piece)) } */
 
   function pid(component, slot) { return component + '/' + slot; }
@@ -10157,12 +10162,13 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
 
   function checkPiece(p) {
     if (!p || typeof p.component !== 'string' || typeof p.slot !== 'string') return invalid(p, 'a piece needs its component and slot');
-    if (FITS.indexOf(p.fit) < 0) return invalid(p, 'fit ' + p.fit + ' is not one of ' + FITS.join(', ') + ' (tile is not built yet)');
+    if (FITS.indexOf(p.fit) < 0) return invalid(p, 'fit ' + p.fit + ' is not one of ' + FITS.join(', '));
     var vb = p.viewBox; if (!Array.isArray(vb) || vb.length !== 4 || !vb.every(num) || !(vb[2] > 0) || !(vb[3] > 0)) return invalid(p, 'viewBox');
     if (p.fit === 'nine') { var ins = p.insets; if (!Array.isArray(ins) || ins.length !== 4 || !ins.every(function (v) { return num(v) && v >= 0; }) || ins[1] + ins[3] >= vb[2] || ins[0] + ins[2] >= vb[3]) return invalid(p, 'nine needs insets [top, right, bottom, left] smaller than the viewBox'); }
     if (p.fit === 'fit' && (Math.abs(vb[0] + vb[2] / HALF) > EPS || Math.abs(vb[1] + vb[3] / HALF) > EPS)) return invalid(p, 'a fit piece is drawn about its anchor: its viewBox is centred on 0,0');
     var s = p.supports; if (!s || !['w', 'h'].every(function (a) { return Array.isArray(s[a]) && s[a].length === 2 && num(s[a][0]) && s[a][1] >= s[a][0] && s[a][0] > 0; })) return invalid(p, 'supports { w: [min, max], h: [min, max] }');
     if (p.fit === 'nine' && (s.w[0] < p.insets[1] + p.insets[3] || s.h[0] < p.insets[0] + p.insets[2])) return invalid(p, 'supports must not go under the nine insets');
+    if (p.fit === 'tile') { var most = count(s.w[1], vb[2]) * count(s.h[1], vb[3]); if (most > TILE_MAX) return invalid(p, 'tile: supports up to ' + s.w[1] + 'x' + s.h[1] + ' makes ' + most + ' tiles of ' + vb[2] + 'x' + vb[3] + '; at most ' + TILE_MAX); }
     if (!p.variants || typeof p.variants !== 'object' || !Object.keys(p.variants).length) return invalid(p, 'no variants');
     var names = Object.keys(p.variants);
     for (var i = 0; i < names.length; i++) { var v = p.variants[names[i]], st = v && typeof v === 'object' ? Object.keys(v) : []; if (!st.length) return invalid(p, 'variant ' + names[i] + ' has no states');
@@ -10185,6 +10191,18 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     function span(a, b) { if (a <= i0 && b >= V - i1) return (R - a) - (V - b); if (b <= i0 || a >= V - i1) return b - a; return pos(b) - pos(a); }
     return { pos: pos, span: span };
   }
+  /* the size a stretch, nine or tile piece is drawn at in box, and the even scale and offset that shrink it into the box when the
+   * box is outside what the piece supports */
+  function sized(p, box) { var dw = Math.min(Math.max(box[2], p.supports.w[0]), p.supports.w[1]), dh = Math.min(Math.max(box[3], p.supports.h[0]), p.supports.h[1]);
+    var s = Math.min(1, box[2] / dw, box[3] / dh); return { w: dw, h: dh, s: s, x: box[0] + (box[2] - dw * s) / HALF, y: box[1] + (box[3] - dh * s) / HALF }; }
+  /* how many whole tiles of size t fill a length L: the nearest whole number, at least one (1.8.120) */
+  function count(L, t) { return Math.max(1, Math.round(L / t)); }
+  /* the transforms of a tile piece in box, one per tile, row by row: each tile is the viewBox stretched onto its share of the
+   * drawn size; widths and radii take the even shrink scale, as stretch's do (1.8.120) */
+  function tiles(p, box) { var vb = p.viewBox, D = sized(p, box), nx = count(D.w, vb[2]), ny = count(D.h, vb[3]), tw = D.w * D.s / nx, th = D.h * D.s / ny, out = [];
+    for (var j = 0; j < ny; j++) for (var i = 0; i < nx; i++) out.push((function (x0, y0) { var kx = tw / vb[2], ky = th / vb[3];
+      return { x: function (u) { return x0 + (u - vb[0]) * kx; }, y: function (u) { return y0 + (u - vb[1]) * ky; }, w: function (a, b) { return (b - a) * kx; }, h: function (a, b) { return (b - a) * ky; }, s: D.s }; })(D.x + i * tw, D.y + j * th));
+    return out; }
   /* the transform for a piece in box [x, y, w, h]: map(px, py), span(a, b) on each axis, and the even scale s for widths and radii */
   /* box: [x, y, w, h] or, for a fit piece, [x, y, w, h, cx, cy] with its anchor given exactly */
   function frame(p, box) {
@@ -10192,10 +10210,10 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if (p.fit === 'fit') { var s0 = Math.min(1, box[2] / vb[2], box[3] / vb[3]), cx = box.length > 4 ? box[4] : box[0] + box[2] / HALF, cy = box.length > 5 ? box[5] : box[1] + box[3] / HALF;
       return { x: function (u) { return cx + u * s0; }, y: function (u) { return cy + u * s0; }, w: function (a, b) { return (b - a) * s0; }, h: function (a, b) { return (b - a) * s0; }, s: s0 }; }
     /* stretch and nine: drawn in the box when it is inside what the piece supports; otherwise at the nearest supported size, scaled evenly and centred */
-    var dw = Math.min(Math.max(box[2], p.supports.w[0]), p.supports.w[1]), dh = Math.min(Math.max(box[3], p.supports.h[0]), p.supports.h[1]);
+    var D = sized(p, box), dw = D.w, dh = D.h;
     if (dw === box[2] && dh === box[3]) { var X = axis(vb[2], ins[3], ins[1], box[0], box[2]), Y = axis(vb[3], ins[0], ins[2], box[1], box[3]);
       return { x: function (u) { return X.pos(u - vb[0]); }, y: function (u) { return Y.pos(u - vb[1]); }, w: function (a, b) { return X.span(a - vb[0], b - vb[0]); }, h: function (a, b) { return Y.span(a - vb[1], b - vb[1]); }, s: 1 }; }
-    var s = Math.min(1, box[2] / dw, box[3] / dh), ox = box[0] + (box[2] - dw * s) / HALF, oy = box[1] + (box[3] - dh * s) / HALF;
+    var s = D.s, ox = D.x, oy = D.y;
     var Xd = axis(vb[2], ins[3], ins[1], 0, dw), Yd = axis(vb[3], ins[0], ins[2], 0, dh);
     return { x: function (u) { return ox + Xd.pos(u - vb[0]) * s; }, y: function (u) { return oy + Yd.pos(u - vb[1]) * s; },
       w: function (a, b) { return Xd.span(a - vb[0], b - vb[0]) * s; }, h: function (a, b) { return Yd.span(a - vb[1], b - vb[1]) * s; }, s: s };
@@ -10205,9 +10223,13 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     var p = c.gradient === 'linear' ? [T.x(q[0]), T.y(q[1]), T.x(q[2]), T.y(q[3])] : [T.x(q[0]), T.y(q[1]), q[2] * T.s, T.x(q[3]), T.y(q[4]), q[5] * T.s];
     return { gradient: c.gradient, spread: c.spread, p: p, stops: c.stops }; }
   function cmdsAt(T, cmds) { return cmds.map(function (k) { var o = [k[0]]; for (var i = 1; i < k.length; i += HALF) o.push(T.x(k[i]), T.y(k[i + 1])); return o; }); }
-  /* items of one drawing placed in box; colours stay as the piece wrote them */
+  /* items of one drawing placed in box; colours stay as the piece wrote them. A tile piece's drawing is placed once per tile,
+   * the tiles in order, row by row (1.8.120) */
   function place(p, items, box) {
-    var T = frame(p, box);
+    if (p.fit === 'tile') return tiles(p, box).reduce(function (out, T) { return out.concat(placeWith(T, items)); }, []);
+    return placeWith(frame(p, box), items);
+  }
+  function placeWith(T, items) {
     return items.map(function (it) { var k = it[0];
       if (k === 'rect') return ['rect', T.x(it[1]), T.y(it[2]), T.w(it[1], it[1] + it[3]), T.h(it[2], it[2] + it[4]), paintAt(T, it[5])];
       if (k === 'rrect') return ['rrect', T.x(it[1]), T.y(it[2]), T.w(it[1], it[1] + it[3]), T.h(it[2], it[2] + it[4]), it[5] * T.s, paintAt(T, it[6])];
@@ -10354,8 +10376,10 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     for (var i = 0; i < def.states.length; i++) { var st = def.states[i], d = fitArt(S, p, variant, st, rect, where); if (d === FAIL) return FAIL; drawn[st] = d;
       shows[st] = resolved(p.variants[variant], st);
       /* each item's fill as #rrggbb(aa) for the contrast check; a gradient's is the list of its stops' colours (1.8.119) */
-      fills[st] = drawing(p.variants[variant], st).map(function (it) { var c = it[0] === 'path' || it[0] === 'stroke' ? it[2] : it[it.length - 1];
-        return gradientOk(c) ? c.stops.map(function (k) { return hexOf(S, k[1]); }) : hexOf(S, c); }); }
+      var one = drawing(p.variants[variant], st).map(function (it) { var c = it[0] === 'path' || it[0] === 'stroke' ? it[2] : it[it.length - 1];
+        return gradientOk(c) ? c.stops.map(function (k) { return hexOf(S, k[1]); }) : hexOf(S, c); });
+      /* a tile piece draws its drawing once per tile, so each drawn item's fill is its item's in the drawing (1.8.120) */
+      fills[st] = d.map(function (it, m) { return one[m % one.length]; }); }
     var idle = drawn.idle; if (!idle) return F.with('COMPONENT_INVALID', { component: component, detail: 'no idle state' });
     var rest = drawn[n.rest];
     if (at == null) Array.prototype.push.apply(n.items, rest); else n.items.splice.apply(n.items, [at, 0].concat(rest));
@@ -13789,7 +13813,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.119",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.120",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
