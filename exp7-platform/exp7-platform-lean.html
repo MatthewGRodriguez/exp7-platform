@@ -12024,7 +12024,7 @@ window.x7 = window.x7 || function (t) {
   var MCFG = vmRd(root.EXP7_MOTION_CONFIG), REST = [0, 0, 1], ORIGIN = [0, 0]; /* REST: a node at rest (no move, scale 1) */
   function trMs(from, to, d) { var L = vmLs(MCFG.transitions).find(function (x) { return x.from === from && x.to === to; }); return L && L.ms != null ? +L.ms : d; }
   var EASE = { out: function (t) { return 1 - Math.pow(1 - t, 3); }, soft: function (t) { return t * t * (3 - 2 * t); }, lin: function (t) { return t; } };
-  function reduced() { try { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; } }
+  function reduced() { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); }
   function Motion(view) { this.view = view; this.cur = new Map(); this.tw = new Map(); this.raf = 0; this.pressed = null; }
   Motion.prototype.to = function (ids, target, ms, ease, center) { if (!EASE[ease]) return; /* an ease the motion does not have: the tween is left out */ if (reduced()) ms = 0; var now = performance.now(), self = this;
     ids.forEach(function (id) { var from = self.cur.has(id) ? self.cur.get(id) : REST; self.tw.set(id, { a: from, b: target, t0: now, ms: Math.max(0, ms), e: EASE[ease], c: center }); });
@@ -12035,7 +12035,7 @@ window.x7 = window.x7 || function (t) {
         if (q.shake && k < 1) v[0] += Math.sin(k * Math.PI * 6) * q.shake * (1 - k);
         self.cur.set(id, v); var s = v[2], cx = q.c[0], cy = q.c[1]; if (self.view.byId && self.view.byId.has(id)) { p.xform(id, [s, 0, 0, s, cx * (1 - s) + v[0], cy * (1 - s) + v[1]]); n++; }
         if (k >= 1) { self.tw.delete(id); if (v[0] === 0 && v[1] === 0 && v[2] === 1) self.cur.delete(id); } });
-      if (n) { try { self.view.s.patch(p); self.view.r && self.view.r.draw(); } catch (e) { self.tw.clear(); } }
+      if (n) { self.view.s.patch(p); if (self.view.r) self.view.r.draw(); }
       if (self.tw.size) self.kick(); }); };
   function ctr(n) { var h = n.hit; return [h[0] + h[2] / 2, h[1] + h[3] / 2]; }
   function pair(view, n) { var ids = [n.id], sh = view.byId && view.L && view.L.nodes.find(function (q) { return q.key === n.key + ':sh'; }); if (sh) ids.push(sh.id); return ids; }
@@ -12248,17 +12248,14 @@ window.x7 = window.x7 || function (t) {
     if (!id) return;
     var V = root.JVS && root.JVS[id];
     if (V) {
-      try { if (V.sess && V.sess.dispose) V.sess.dispose(); } catch (e) {}
-      try { if (V.view && V.view._slabs && V.view._slabs.detach) V.view._slabs.detach(); } catch (e) {}
-      try { if (V.view && V.view.dispose) V.view.dispose(); } catch (e) {}
-      try { if (V.view && V.view.s && V.view.s.free) V.view.s.free(); } catch (e) {}
-      try { if (V.view && V.view.r && V.view.r.destroy) V.view.r.destroy(); } catch (e) {}
-      try {
-        if (root.JRO && V.obs && root.JRO.unobserve) root.JRO.unobserve(V.obs);
-      } catch (e) {}
-      if (V.cv && V.cv.parentNode) {
-        try { V.cv.remove(); } catch (e) {}
-      }
+      /* 1.8.111: each step is called as it is, with no try: a step that throws is a fault to see, not to hide */
+      if (V.sess && V.sess.dispose) V.sess.dispose();
+      if (V.view && V.view._slabs && V.view._slabs.detach) V.view._slabs.detach();
+      if (V.view && V.view.dispose) V.view.dispose();
+      if (V.view && V.view.s && V.view.s.free) V.view.s.free();
+      if (V.view && V.view.r && V.view.r.destroy) V.view.r.destroy();
+      if (root.JRO && V.obs && root.JRO.unobserve) root.JRO.unobserve(V.obs);
+      if (V.cv && V.cv.parentNode) V.cv.remove();
       var box = root.document.getElementById(id);
       if (box) {
         var pe = box.querySelector('.jrerr');
@@ -12689,7 +12686,7 @@ function proposeOps(V, ops, proc, src){
   if(typeof hook==='function') return hook(ops, proc, src);
   if(typeof submit==='function') return submit(ops, proc, src); /* every caller names its process */
   /* The demo consumer keeps submit inside its own scope and exports it as exp7.submit; use it only for views of its live atlas. */
-  const X=window.exp7; if(X&&typeof X.submit==='function'&&typeof X.W==='function'){ let live=null; try{ live=X.W(); }catch(e){} if(live&&live===activeAtlas(V)) return X.submit(ops, proc, src); }
+  const X=window.exp7; if(X&&typeof X.submit==='function'&&typeof X.W==='function'){ const live=X.W(); if(live&&live===activeAtlas(V)) return X.submit(ops, proc, src); }
   return null;
 }
 /* live runtime.js session on a snapshot */
@@ -12711,10 +12708,13 @@ function startRuntime(w,root,carry,onHtml,pins){ const s=JSON.parse(JSON.stringi
     querySelector(){ return null; }, querySelectorAll(){ return []; }, elementFromPoint(){ return null; },
     createElement(){ return { style:{}, setAttribute(){}, appendChild(){}, classList:bodyStub.classList }; } };
   const fw={ JAtlasModel:window.JAtlasModel, JAtlasEval:window.JAtlasEval };
-  const st=(f,ms)=>{ const t=setTimeout(()=>{ if(S.dead) return; try{ f(); }catch(e){ S.errs.push(String(e&&e.message||e)); } bump(); },ms); timers.push(t); return t; };
+  /* 1.8.111: the runtime's timer, action and event steps are its fail points: one that throws fails alone, is recorded
+     (CONTEXT_FAILED in views.runtime) and kept in the view's runtime errors, and the rest carries on */
+  const rerr=m=>{ S.errs.push(m); window.Exp7Fail.record({code:'CONTEXT_FAILED',context:'views.runtime',detail:m}); };
+  const st=(f,ms)=>{ const t=setTimeout(()=>{ if(S.dead) return; try{ f(); }catch(e){ rerr(String(e&&e.message||e)); } bump(); },ms); timers.push(t); return t; };
   S.dispose=()=>{ S.dead=true; timers.forEach(clearTimeout); clearTimeout(quiet); };
-  S.call=f=>{ S.clicks++; try{ f(); }catch(e){ S.errs.push('action: '+String(e&&e.message||e)); } bump(); };
-  S.dispatch=(type,el)=>{ S.clicks++; const ev={type,target:el,clientX:0,clientY:0,button:0,preventDefault(){},stopPropagation(){}}; hostLs(S.L[type]).forEach(f=>{ try{ f(ev); }catch(e){ S.errs.push(type+' handler: '+String(e&&e.message||e)); } }); bump(); };
+  S.call=f=>{ S.clicks++; try{ f(); }catch(e){ rerr('action: '+String(e&&e.message||e)); } bump(); };
+  S.dispatch=(type,el)=>{ S.clicks++; const ev={type,target:el,clientX:0,clientY:0,button:0,preventDefault(){},stopPropagation(){}}; hostLs(S.L[type]).forEach(f=>{ try{ f(ev); }catch(e){ rerr(type+' handler: '+String(e&&e.message||e)); } }); bump(); };
   window.JA_RUNTIME_FACTORY(fw,fd,st,()=>0,undefined); S.J=fw.JAtlas;
   setTimeout(()=>{ if(!S.settled&&!S.dead){ S.errs.push('runtime passes did not settle within 4 s (rendered what it had)'); fire(); } },4000); bump(); return S; }
 /* atlas paths a view action changed in its session snapshot -> proposal ops (view-local components/<id>/state excluded) */
@@ -12753,7 +12753,7 @@ function setView(id,w,root,cb,ro,mopt){ const box=$(id); if(!box) return;
   if(V.sess) V.sess.dispose();
   /* 1.8.81: a view that cannot be drawn shows no error page. The last frame stays, and the failure goes to Exp7Fail.records()
      (and the diagnostics) for the logs; nothing is drawn in its place. */
-  const fail=e=>{ V.err=String(e&&e.message||e)+(e&&e.code?' [code '+e.code+']':''); V.code=e&&e.code?e.code:null; window.Exp7Fail.record({code:'CONTEXT_FAILED',context:'views.draw:'+id,detail:V.err}); try{ if(window.__exp7Dbg) window.__exp7Dbg.push('view-fail',{id:id,err:V.err}); }catch(_){} if(V.cb) V.cb(V); };
+  const fail=e=>{ V.err=String(e&&e.message||e)+(e&&e.code?' [code '+e.code+']':''); V.code=e&&e.code?e.code:null; window.Exp7Fail.record({code:'CONTEXT_FAILED',context:'views.draw:'+id,detail:V.err}); if(window.__exp7Dbg) window.__exp7Dbg.push('view-fail',{id:id,err:V.err}); if(V.cb) V.cb(V); };
   V.queue=(S,why)=>{ V.chain=V.chain.then(()=>draw(S,why)).catch(fail); return V.chain; };
   const draw=async(S,why)=>{ if(V.sess!==S) return;
     /* A rename that commits on blur remounts the views. A click that lands before the new session settles waits for it, so no empty frame is drawn. */
@@ -12768,7 +12768,7 @@ function setView(id,w,root,cb,ro,mopt){ const box=$(id); if(!box) return;
       passes:J.passes,backend:J.backend,engine:J.engine,rerrs:S.errs.concat(hostLs(J.last&&J.last.errors)).map(String),conflicts:hostLs(J.conflicts).length,cycles:hostLs(J.cycles).length,deps:I.deps,
       secs:[],days:I.days,dayItems:I.dayItems,chips:L.items,brows:I.rows.length,brownames:I.rows,month:I.month,show:null,detail:!!I.detail,flags:I.flags,text:modelText(model).replace(/\s+/g,' ').slice(0,4000),at:Date.now()});
     cv.dataset.jrRev=rev; cv.dataset.jrDraw=V.n;
-    try{ if(window.__exp7Dbg&&(why==='reveal'||V.n===1)){ var sn=L&&L.nodes&&L.nodes.find(function(q){ return q.vm&&q.hov!=null; }); window.__exp7Dbg.push('draw',{id:id,why:why,mode:r.mode,n:V.n,vm:true,sample:sn?{key:sn.key,kinds:hostLs(sn.items).slice(0,6).map(function(it){ return it[0]; })}:null}); } }catch(_){}
+    if(window.__exp7Dbg&&(why==='reveal'||V.n===1)){ var sn=L&&L.nodes&&L.nodes.find(function(q){ return q.vm&&q.hov!=null; }); window.__exp7Dbg.push('draw',{id:id,why:why,mode:r.mode,n:V.n,vm:true,sample:sn?{key:sn.key,kinds:hostLs(sn.items).slice(0,6).map(function(it){ return it[0]; })}:null}); }
     if(V.cb) V.cb(V); };
   V.view.onact=(el,act,n,mods)=>{ const S=V.sess; if(!S) return; const vm=n&&n.vm; if(!vm) return; V.clicks++;
     if(vm.t==='day'){ if(isCalRoot(V)) hostDayClick(V,vm.day,mods); return; }
@@ -12925,7 +12925,7 @@ function budgetDayRisk(w,HT){ const E=window.JAtlasEval, ids=budgetRd(w.meta.boa
   return window.BudgetFlows.resilience(w,HT,flat); }
 function riskOf(w){ return planRisk(w||W); }
 
-function clearFormFields(V){ if(V&&V._tfOff){ try{ V._tfOff(); }catch(e){} V._tfOff=null; } if(V) V._tfLazy=null; if(V&&V.view){ V._tfTear=1; try{ V.view.clearFields(); } finally{ V._tfTear=0; } } V.tf={}; }
+function clearFormFields(V){ if(V&&V._tfOff){ V._tfOff(); V._tfOff=null; } if(V) V._tfLazy=null; if(V&&V.view){ V._tfTear=1; try{ V.view.clearFields(); } finally{ V._tfTear=0; } } V.tf={}; }
 /* 1.8.35: category-name fields exist only for Board rows near the viewport. lazy = rows sorted by y; band = one screen above to two below. */
 function tfBand(V,extra){ const L=V.view&&V.view.L, s=V.view&&V.view.s; if(!L||!(L.VH>0)||!s) return null; const p=s.scrollPos(JRViews.GID); if(!Array.isArray(p)) return null; const sy=+p[1], e=extra; return [sy-L.VH*(1+e), sy+L.VH*(2+e)]; }
 function syncLazyFields(V){ const Z=V&&V._tfLazy; if(!Z||!V.view) return; const band=tfBand(V,0), keep=tfBand(V,2); if(!band) return;
@@ -12933,25 +12933,25 @@ function syncLazyFields(V){ const Z=V&&V._tfLazy; if(!Z||!V.view) return; const 
   for(let k=lo;k<Z.rows.length&&Z.rows[k].y<band[1];k++){ const row=Z.rows[k]; if(!V.tf[row.f]) Z.make(row.n); }
   for(const f of Object.keys(V.tf)){ const row=Z.byF[f]; const tf=V.tf[f]; if(!row||!tf||tf.focused||V.formFocus===f) continue;
     if(row.y+row.h>=keep[0]&&row.y<keep[1]) continue;
-    try{ if(Z.slabs&&Z.slabs.release) Z.slabs.release(tf.id); }catch(e){}
-    V._tfTear=1; try{ tf.remove(); }catch(e){} finally{ V._tfTear=0; }
+    if(Z.slabs&&Z.slabs.release) Z.slabs.release(tf.id);
+    V._tfTear=1; try{ tf.remove(); } finally{ V._tfTear=0; }
     const fl=hostLs(V.view.fields), at=fl.indexOf(tf); if(at>=0) fl.splice(at,1); delete V.tf[f]; } }
 /* Library TextField owns Safari-safe opacity/z-index (jrender-exp7 v4). Host only keeps pointer-events off when blurred
    so canvas buttons under the shared textarea still receive hits (Create / Place). */
-function guardTextFieldPointer(){ try{ const t=document.querySelector('textarea[data-jrender="textfield"]'); if(!t) return;
+function guardTextFieldPointer(){ const t=document.querySelector('textarea[data-jrender="textfield"]'); if(!t) return;
   const on=document.activeElement===t; t.style.pointerEvents=on?'auto':'none';
   if(!t._jrPeHook){ t._jrPeHook=1; t.addEventListener('focus',()=>{ t.style.pointerEvents='auto'; }); t.addEventListener('blur',()=>{ t.style.pointerEvents='none'; }); }
-}catch(e){} }
-function blurTextFields(V){ try{ if(V&&V.tf) Object.keys(V.tf).forEach(k=>{ try{ V.tf[k].blur&&V.tf[k].blur(); }catch(e){} }); const t=document.querySelector('textarea[data-jrender="textfield"]'); if(t){ t.blur(); t.style.pointerEvents='none'; } }catch(e){} }
+}
+function blurTextFields(V){ if(V&&V.tf) Object.keys(V.tf).forEach(k=>{ if(V.tf[k].blur) V.tf[k].blur(); }); const t=document.querySelector('textarea[data-jrender="textfield"]'); if(t){ t.blur(); t.style.pointerEvents='none'; } }
 function firstFormField(tf){ const k=Object.keys(tf).find(k=>k.indexOf('ren:')!==0); return k?k:null; }
 function attachFormFields(V){ /* pull live values before tear-down so a re-layout mid-edit (use: chips, etc.) keeps what was typed */
-  if(V&&V.tf&&V.form) Object.keys(V.tf).forEach(f=>{ if(f.indexOf('ren:')===0) return; try{ const v=V.tf[f]&&V.tf[f].value; if(v!=null) V.form[f]=v; }catch(e){} });
+  if(V&&V.tf&&V.form) Object.keys(V.tf).forEach(f=>{ if(f.indexOf('ren:')===0) return; const v=V.tf[f]&&V.tf[f].value; if(v!=null) V.form[f]=v; });
   const wantFocus=V&&V.formFocus; clearFormFields(V); if(!V||!V.view||!V.view.L||!V.view.r) return;
   const rgba=window.JRender.rgba;
   const AW=hostRd(activeAtlas(V)), AI=hostRd(AW.items);
   let i=0; if(!V.tf) V.tf={};
   /* A popover is the last thing drawn. Fields go in under it. */
-  const popNode=V.view.L.nodes.find(n=>n.pop), slabs=V.view._slabs, wake=()=>{ try{ if(window.Exp7Slabs&&window.Exp7Slabs.notify) window.Exp7Slabs.notify(); }catch(e){} };
+  const popNode=V.view.L.nodes.find(n=>n.pop), slabs=V.view._slabs, wake=()=>{ if(window.Exp7Slabs&&window.Exp7Slabs.notify) window.Exp7Slabs.notify(); };
   const make=n=>{ if(!n.tf||!n.hit) return; const f=n.tf; const [x,y,w,h]=n.hit;
     /* ren:<id> is a category name on its Board row. It keeps what is typed across redraws and renames on Enter or when focus leaves. */
     const ren=f.indexOf('ren:')===0?f.slice(4):null; if(!ren&&!V.form) return;
@@ -12969,7 +12969,7 @@ function attachFormFields(V){ /* pull live values before tear-down so a re-layou
   V.view.L.nodes.forEach(n=>{ if(!n.tf||!n.hit) return; if(n.tf.indexOf('ren:')!==0||n.tf===wantFocus){ make(n); return; }
     const row={n,f:n.tf,y:+n.hit[1],h:+n.hit[3]}; /* a field's hit box is always four numbers */ lazyRows.push(row); byF[n.tf]=row; });
   if(lazyRows.length){ lazyRows.sort((a,b)=>a.y-b.y); V._tfLazy={rows:lazyRows,byF,make,slabs};
-    try{ V._tfOff=V.view.s.on(e=>{ if(e&&e.kind===JRender.EV.SCROLL) syncLazyFields(V); }); }catch(e){}
+    V._tfOff=V.view.s.on(e=>{ if(e&&e.kind===JRender.EV.SCROLL) syncLazyFields(V); });
     syncLazyFields(V); }
   guardTextFieldPointer();
   /* Focus only the remembered field; clicking a field focuses synchronously inside TextField.ev (user gesture).
@@ -12978,7 +12978,7 @@ function attachFormFields(V){ /* pull live values before tear-down so a re-layou
   const focusKey=wantFocus&&V.tf[wantFocus]?wantFocus:(V.form?firstFormField(V.tf):null);
   /* Keep the focused field on screen with its label. Do not pin it to y=0. */
   if(focusKey&&V.view&&V.view.s&&V.view.L){ const n=V.view.L.nodes.find(q=>q.tf===focusKey&&q.hit); if(n){ const y=n.hit[1], h=n.hit[3], VH=+V.view.L.VH, H=+V.view.L.H; if(VH>0&&H>VH){ const sp=V.view.s.scrollPos(JRViews.GID); if(Array.isArray(sp)&&(y<sp[1]+12||y+h>sp[1]+VH-12)){ const next=Math.max(0, Math.min(H-VH, y-72)); V.view.s.scroll(JRViews.GID, sp[0], next); } } } }
-  if(focusKey&&V.tf[focusKey]) try{ V.tf[focusKey].focus(); guardTextFieldPointer(); if(V.tf[focusKey].place) V.tf[focusKey].place(); }catch(e){} }
+  if(focusKey&&V.tf[focusKey]){ V.tf[focusKey].focus(); guardTextFieldPointer(); if(V.tf[focusKey].place) V.tf[focusKey].place(); } }
 
 function slugId(n){ return hostStr(n).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,28)||('i'+Date.now().toString(36)); }
 function uniqItemId(base,V){ const AI=hostRd(hostRd(activeAtlas(V)).items); let id=slugId(base), n=2; while(AI[id]) id=slugId(base)+'_'+(n++); return id; }
@@ -13319,7 +13319,7 @@ window.__budgetFactsHtml=function(w){ return budgetFactsInner(w); };
 window.budgetShiftMonth=budgetShiftMonth; window.budgetTodayKey=budgetTodayKey;
 function hostFormAct(V,a){ const W=hostRd(activeAtlas(V)); if(!W.items||!W.components) return; /* 1.8.103: with no atlas a form does nothing (no made-up empty atlas) */
   if(a==='form:sign'){ if(!V.form||V.form.kind!=='values'||!V.form.item) return;
-    let raw=V.form.amount; if(V.tf&&V.tf.amount){ try{ const v=V.tf.amount.value; if(v!=null) raw=v; }catch(e){} }
+    let raw=V.form.amount; if(V.tf&&V.tf.amount){ const v=V.tf.amount.value; if(v!=null) raw=v; }
     const next=negateAmount(raw); const id=V.form.item, it=W.items[id];
     if(!it){ V.note='missing item'; return V.sess&&V.queue(V.sess,'form'); }
     /* 1.8.103: an amount that is not a number is not saved (no made-up 0) */
@@ -13347,7 +13347,7 @@ function hostFormAct(V,a){ const W=hostRd(activeAtlas(V)); if(!W.items||!W.compo
   if(a.startsWith('form:calrep:')){ if(!V.form||!window.BudgetFlows) return; return window.BudgetFlows.calRepeatPick(V,a.slice(12),sortedDays(calSelOf(V).selected)); }
   if(a==='form:span'){ if(!V.form) return; V.form.kind='span'; return hostFormAct(V,'form:ok'); }
   if(a==='form:ok'&&V.form&&window.BudgetFlows&&window.BudgetFlows.submitForm(V)) return;
-  if(a==='form:ok'){ if(!V.form) return; /* pull live TextField values (keep non-empty form values if field still empty) */ if(V.tf) Object.keys(V.tf).forEach(f=>{ if(f.indexOf('ren:')===0) return; try{ const v=V.tf[f].value; if(v!=null&&String(v).length) V.form[f]=v; }catch(e){} });
+  if(a==='form:ok'){ if(!V.form) return; /* pull live TextField values (keep non-empty form values if field still empty) */ if(V.tf) Object.keys(V.tf).forEach(f=>{ if(f.indexOf('ren:')===0) return; const v=V.tf[f].value; if(v!=null&&String(v).length) V.form[f]=v; });
     /* 1.8.103: a new resource, item category or item needs a name (none is made up from its id); a unit or stock that is not
      * given is left out (no made-up 'u' or 0); a missing Resources list is added through the same write, not into the atlas first */
     const F=V.form;     if(F.kind==='resource'){ const name=hostStr(F.name).trim(); if(!name){ V.note='name the resource'; return V.sess&&V.queue(V.sess,'form'); } const id=uniqItemId(name,V);
@@ -13707,7 +13707,7 @@ function calVM(V,A,c,O){ const X=VMx(), M=window.JAtlasModel, E=window.JAtlasEva
   if(o.legend&&A.meta&&A.meta.budget&&window.BudgetFlows&&window.BudgetFlows.resLabel){ kids.push(X.row('legend',['L','M','C'].map(k=>X.text(k,window.BudgetFlows.resLetter(k)+'  '+window.BudgetFlows.resLabel(k),'small',{color:'riskText'+k,bold:true})),{gap:14})); kids.push(X.text('legendnote',window.BudgetFlows.RES_NOTE,'muted')); }
   else if(o.legend) kids.push(X.row('legend',R.legend.map(L=>X.text(L.k,L.k+' '+L.label,'small',{color:'riskText'+L.k,bold:true})),{gap:14}));
   V.calSelCount=n; V.calHasSwitch=false; V.calTabs=[]; V.hasOldModeText=false; V.hasCalHelp=false;
-  if(V._restoreScroll!=null){ const sy=V._restoreScroll; V._restoreScroll=null; setTimeout(()=>{ try{ if(V.view&&V.view.s){ V.view.s.scroll(JRViews.GID,0,sy); V.view.r&&V.view.r.draw(); } }catch(e){} },0); }
+  if(V._restoreScroll!=null){ const sy=V._restoreScroll; V._restoreScroll=null; setTimeout(()=>{ if(V.view&&V.view.s){ V.view.s.scroll(JRViews.GID,0,sy); if(V.view.r) V.view.r.draw(); } },0); }
   return card(kids); }
 function riskName(c,sel,drag){ const base=c==='C'?'critical':c==='M'?'moderate':'low'; if(drag) return 'drag'; if(sel) return base+'_sel'; return base; }
 /* 1.8.54: Calendar Add item. Three dropdowns (a Plan step, an existing item, a new item), then the item's time. */
@@ -18955,7 +18955,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.110",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.111",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
