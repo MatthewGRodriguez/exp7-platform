@@ -928,6 +928,8 @@ What stays fills in nothing. A component that is missing, or a part an action ne
 
 On screen, for every app: nothing changes; the evaluator gives exactly the same results as 1.8.112 on a new Budget atlas and the test atlases. For saved data: nothing changes. A Board, Calendar or Plan saved without its state, view or items list is no longer given one by these actions; every component Exp7 makes has all three.
 
+Checked in Chrome on Matthew's Mac (2026-11-22, made-up data only): the lean fetched at this release's commit matched `release.json`. The Exp7 demo's Calendar, Board and Plan views drew at 390 wide with exactly the same view models and the same nodes (111, 173, 143) and heights as 1.8.112. Pressing the Board's sort, filter and new and the Calendar's next month went through the runtime the same way on both releases: the Board's state became date and unscheduled, the Calendar moved to the same month, and the views drew the same, with no runtime errors. A blank Budget opened at 390 wide on Home and its date picker opened and closed; Budget and the demo at 1024 wide opened with no failure records or page errors. Storage was cleared afterwards.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
