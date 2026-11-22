@@ -904,7 +904,7 @@ Checked in Chrome on Matthew's Mac (2026-11-22, made-up data only): the lean fet
 
 On screen, for every app: nothing changes. Budget gives every money item its charge (`per`) when it makes or saves one, every blueprint Budget makes or the Exp7 demo holds names what it reads and writes (only the drop rule's condition had no then, and the `on` made up for it was read by nothing); the evaluator gives exactly the same results as 1.8.109 on a new Budget atlas and the test atlases. For saved data: a money item saved with no charge, which Budget's own forms never save but a hand-made or very old atlas might hold, now moves no money in the calendar, ledger and totals. Its date still shows. The test fixtures' paycheck and bus items had no charge; they now say `each`, the charge they were read with, so the tests keep their numbers.
 
-Checked in Chrome on Matthew's Mac: CHROME_110
+Checked in Chrome on Matthew's Mac (2026-11-22, made-up data only): the lean fetched at this release's commit matched `release.json`. The Exp7 demo's Calendar, Board and Plan views drew at 390 wide with exactly the same view models (every row and cell compared) and the same nodes (111, 173, 143) and heights as 1.8.109. A blank Budget opened at 390 wide on Home and its date picker opened and closed; Budget and the demo at 1024 wide opened with no failure records or page errors. Storage was cleared afterwards.
 
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
