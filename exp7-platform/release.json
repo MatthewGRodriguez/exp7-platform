@@ -2,7 +2,7 @@
   "format": "exp7-platform-release/1",
   "version": "1.8.109",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "a04f05a6f4fdc1bf26eef74c45dfb7104b79bb3cad5df4a1ce6af3d1d0c6219f",
+  "sha256": "44ee3d173a5df4a6fac7d12e93a2e62cce7beb3f00f609b4527ebd33711eedd0",
   "minLauncherMajor": 1,
   "contains": {
     "1.8.109": "Design system phase 5, twentieth part: the atlas evaluator (eval), which runs every app's calendars, ledgers and blueprints, has no || fill-ins (84). What may be missing is read through rd and ls (a frozen nothing); num gives a number or no number, never a made-up 0. A comparison with no number is false, math with an input missing gives no output, a formula whose inputs are missing writes nothing for that item and drops its earlier result (the new drop write), a walk leaves out an item missing a number it needs, a position needs its x, y and width, and an add lands on a number or starts one. A repeat of every N days without N stays on its start date (it was every day); an item with no span lasts its own day; a ledger with no opening has its flows but no balance, minimum or end; a component's max, rank, pmax or the score of an item with no scoring blueprint is left out rather than 0; a pass with no error carries no error field. Text defaults such as a missing charge read as each are left for a separate decision. Budget and the Exp7 demo look the same; the evaluator gives the same results on Budget's new atlas and the test atlases.",
