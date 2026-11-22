@@ -1006,6 +1006,8 @@ On screen, for every app: nothing changes, because no art in Budget, the Exp7 de
 
 On screen, for every app: nothing changes; no pack in the lean uses `use`, and the compiled packs are byte for byte as before. For saved data: nothing changes.
 
+Checked in Chrome on Matthew's Mac (2026-11-22, made-up data and test art only), for 1.8.120 to 1.8.122 together: the lean fetched at this release's commit matched `release.json`. A blank Budget opened at 390 wide with no failure records, and no loop asked for animation frames. With a looping test piece swapped in on Home's LinkRow backgrounds (a dot that grows 1.6 times and fades over 1.6 s), the GPU drew the dot at different sizes and strengths from moment to moment, about 60 frames a second; under the pointer the row drew its hover drawing and kept playing. With the tab marked hidden it asked for no frames and carried on when shown again; with reduced motion reported it held still and asked for none. With a tile test piece swapped in instead, each row drew whole tiles across its width and asked for no frames. With the swaps cleared, Home drew as before. Budget's date button opened and closed its picker, and Budget and the Exp7 demo at 1024 wide showed no failure records or page errors. Storage was cleared afterwards.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
