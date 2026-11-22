@@ -9183,7 +9183,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
    'Preferred' (alts.pref) is a mark. It never selects: it opens a proposal, kept outside the atlas, that the user accepts or discards. */
   function catIndex(w) { var hit = CIDX.get(w.items); if (hit && hit.rev === w.rev) return hit; var owner = {}, reqs = {};
     Object.keys(rd(w.items)).forEach(function (id) { var it = w.items[id]; if (!it) return; catMembers(it).forEach(function (m) { if (m !== 'item:' + id && !owner[m]) owner[m] = id; });
-      var f = it.values && it.values.forAlt; if (f) (reqs[bare(f)] = ls(reqs[bare(f)])).push(id); });
+      var f = it.values && it.values.forAlt, fk = f ? bare(f) : ''; if (f) (reqs[fk] ? reqs[fk] : (reqs[fk] = [])).push(id); }); /* 1.8.124: a list is started here, not taken from ls (its frozen nothing threw on push) */
     hit = { rev: w.rev, owner: owner, reqs: reqs }; CIDX.set(w.items, hit); return hit; }
   var CIDX = new WeakMap();
   function reqsOf(w, xid) { return (ls(catIndex(w).reqs[bare(xid)])).slice(); }
@@ -9633,7 +9633,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   var api = { handles: handles, act: act, submitForm: submitForm, finFormVM: finFormVM, rowExtras: rowExtras, isCashAsset: isCashAsset, calRepeatVM: calRepeatVM, calRepeatPick: calRepeatPick, repeatValues: repeatValues, firstMonthday: firstMonthday, startLinks: startLinks, dayVM: dayVM, compareVM: compareVM, actionsVM: actionsVM, addChooserVM: addChooserVM, seedReqs: seedReqs, undatedItems: undatedItems, entryOn: entryOn, occOps: occOps, applyOpsTo: applyOpsTo,
     eff: typeof eff === 'function' ? eff : null, effHas: typeof effHas === 'function' ? effHas : null, planList: typeof planList === 'function' ? planList : null, planInfo: typeof planInfo === 'function' ? planInfo : null, selLabel: typeof selLabel === 'function' ? selLabel : null,
     altPanelVM: typeof altPanelVM === 'function' ? altPanelVM : null, planAltsVM: typeof planAltsVM === 'function' ? planAltsVM : null, planTopVM: typeof planTopVM === 'function' ? planTopVM : null, chooseFromHome: typeof chooseFromHome === 'function' ? chooseFromHome : null, acceptChoice: typeof acceptChoice === 'function' ? acceptChoice : null,
-    proposals: typeof props === 'function' ? props : null, unresolved: typeof unresolved === 'function' ? unresolved : null, reqsOf: typeof reqsOf === 'function' ? reqsOf : null, afterAtlas: typeof afterAtlas === 'function' ? afterAtlas : null, handoffOf: typeof handoffOf === 'function' ? handoffOf : null,
+    proposals: typeof props === 'function' ? props : null, unresolved: typeof unresolved === 'function' ? unresolved : null, reqsOf: typeof reqsOf === 'function' ? reqsOf : null, ownerOf: typeof ownerOf === 'function' ? ownerOf : null, afterAtlas: typeof afterAtlas === 'function' ? afterAtlas : null, handoffOf: typeof handoffOf === 'function' ? handoffOf : null,
     resilience: typeof resilience === 'function' ? resilience : null, resLabel: typeof resLabel === 'function' ? resLabel : null, resLetter: typeof resLetter === 'function' ? resLetter : null, RES_NOTE: typeof RES_NOTE === 'string' ? RES_NOTE : '' };
   root.BudgetFlows = api;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -12223,6 +12223,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
   function gap(name){ return {gap:name}; }
   function choice(key,text,mark,on,act,height,extra){ return Object.assign({c:'Choice',key:key,text:text,mark:mark,on:!!on,bold:mark==='radio'&&!!on,act:act,height:height},extra); }
   function link(key,text,act){ return {c:'Choice',key:key,text:text,mark:'none',on:false,act:act,height:'row',chevron:true}; }
+  function action(key,text,act){ return {c:'Choice',key:key,text:text,mark:'none',on:false,act:act,height:'row',chevron:false}; }
   function fld(key,style,label,value,placeholder,act,bold){ return {c:'Field',key:key,style:style,label:label,value:String(value),placeholder:placeholder,act:act,bold:!!bold}; }
   function dateText(v){ return v===''?'':dateLabel(v); }
   /* the Repeat group every dated form shares; p.every and p.mdays open their own fields under the option in effect */
@@ -12316,8 +12317,14 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       if(need(d,['name','date','time','repeat','every','mdays','amount'])===FAIL) return FAIL;
       var rep=d.repeat==='every'?'Every '+d.every+' days':d.repeat==='mdays'?(d.mdays?'Monthly on '+d.mdays:'Monthly'):'', tm=formatTime24(d.time);
       parts.push(bar('Today','nav:agenda'),title(plain(d.name),fmtMoney(parseMoney(d.amount))),note('day',dateLabel(d.date),'secondary','captionInk'),note('when',(tm?tm:'All day')+(rep?'  -  '+rep:''),'secondary','muted'),gap('labelGap'));
-      parts.push(link('entry:change','Change','entry:change'),link('entry:alts','Alternatives and requirements','entry:alts'),link('entry:record','Record what happened','entry:record'),gap('labelGap'));
-      return {route:route,parts:parts.concat(notes('day-note',['Change edits the scheduled item.','Record says what happened on this day.']))};
+      parts.push(link('entry:change','Change','entry:change'),link('entry:alts','Alternatives and requirements','entry:alts'));
+      /* 1.8.124: Mark preferred and Mark unavailable (day-item-path study, State A): actions, so no chevron. They mark this item among its
+         alternatives; an item with none has nothing to mark, so both are left out. An unavailable choice is not marked preferred. */
+      var mk=markOf(ctx.atlas,ui.entry);
+      if(mk&&!mk.off) parts.push(action('entry:pref',mk.pref?'Clear preferred':'Mark preferred','entry:pref'));
+      if(mk) parts.push(action('entry:unavail',mk.off?'Mark available':'Mark unavailable','entry:unavail'));
+      parts.push(link('entry:record','Record what happened','entry:record'),gap('labelGap'));
+      return {route:route,parts:parts.concat(notes('day-note',mk?['Change edits the scheduled item.','Preferred is a mark, not a selection.','Record says what happened on this day.']:['Change edits the scheduled item.','Record says what happened on this day.']))};
     }
     if(route==='add-item-choose'){
       parts.push(bar(dayShort,'nav:home'),title('Add an item'),note('day',dayLong,'body','ink'),note('from','The date comes from the selected day.','secondary','captionInk'),gap('labelGap'));
@@ -12437,11 +12444,17 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       var sr=prow.filter(function(q){return q.id===ui.step;})[0]; if(!sr) return F.with('DATA_MISSING',{screen:route,detail:'step '+ui.step});
       function inUse(q){ return q.selectedName&&q.selectedName!=='No alternative'?q.selectedName:q.name; }
       var SRL=reviewReqs(ctx.atlas,ui), sreqs=reqAnswers(ui), sw={own:'Needs its own',reuse:'Reuse a copy',none:'Not needed'}, toNm=plain(ui.choiceName);
-      function steps(after){ return prow.map(function(q){ var changed=q.id===sr.id; return {id:q.id,name:plain(q.name),use:changed&&after?toNm:plain(inUse(q)),changed:changed,
-        reqs:changed&&after?SRL.map(function(x){ return plain(x.name)+': '+(sw[sreqs[x.key]]?sw[sreqs[x.key]]:'Not decided'); }):[]}; }); }
+      /* 1.8.124: After is the plan as Accept would leave it: the same switch Accept saves, applied to a copy of the atlas, so a requirement
+         of the choice being left (a Reuse copy such as "Gas (Tesla)") is no longer a step, and one the switch adds is. A switch that cannot
+         be prepared has no After and no Accept; its note says why. */
+      var arow=afterPlan(ctx.atlas,ui,ctx.plan), before={}; prow.forEach(function(q){ before[q.id]=1; });
+      function step(q,after){ var changed=q.id===sr.id||(after&&!before[q.id]); return {id:q.id,name:plain(q.name),use:plain(inUse(q)),changed:changed,
+        reqs:after&&q.id===sr.id?SRL.map(function(x){ return plain(x.name)+': '+(sw[sreqs[x.key]]?sw[sreqs[x.key]]:'Not decided'); }):[]}; }
       parts.push(bar('Requirements','nav:plan-c'),title('Review the switch'));
       parts=parts.concat(notes('n',[plain(sr.name)+' switches from '+plain(inUse(sr))+' to '+toNm+' from '+dayLong+'.','The current plan is unchanged until you accept.'])); parts.push(gap('labelGap'));
-      parts.push({c:'BeforeAfter',key:'before',label:'Before',tint:'wash',steps:steps(false)},gap('controlGap'),{c:'BeforeAfter',key:'after',label:'After',tint:'mint',steps:steps(true)},gap('controlGap'));
+      parts.push({c:'BeforeAfter',key:'before',label:'Before',tint:'wash',steps:prow.map(function(q){ return step(q,false); })},gap('controlGap'));
+      if(!arow.ok){ parts.push(note('n2',arow.note,'body','ink'),gap('labelGap'),{c:'LinkRow',key:'keep',label:'Keep current',act:'keep',chevron:false,height:'target',role:'body'}); return {route:route,parts:parts}; }
+      parts.push({c:'BeforeAfter',key:'after',label:'After',tint:'mint',steps:arow.rows.map(function(q){ return step(q,true); })},gap('controlGap'));
       parts.push(note('n2','Lavender is the step now; green is the step after you accept.','secondary','captionInk'),gap('labelGap'),{c:'PrimaryBand',key:'accept',label:'Accept',act:'accept',enabled:true},gap('controlGap'));
       parts.push({c:'LinkRow',key:'keep',label:'Keep current',act:'keep',chevron:false,height:'target',role:'body'},gap('labelGap'),note('n3','Accept makes '+toNm+' the choice in use.','secondary','captionInk'));
       return {route:route,parts:parts};
@@ -12730,7 +12743,8 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       root.__budgetUi=Object.assign({},root.__budgetUi,{step:sid,stepName:sr&&sr.name?sr.name:rd(this.atlas&&this.atlas.items&&this.atlas.items[sid]).name,selected:sr&&sr.selected,choices:sr&&sr.choices});
       rememberPlan(root.__budgetUi);
     }
-    if(a.indexOf('entry:')===0){ var eid=a.slice(6); if(eid&&eid!=='actions'&&eid!=='change'&&eid!=='alts'&&eid!=='record'&&eid!=='comparison'&&eid!=='pref'&&eid!=='unavail'){ this.draftEntry(eid); } this.route=navigate(this.route,a); if(this.o.onNavigate) this.o.onNavigate(this.route,budgetDateKey(),{entry:eid}); return this.models?this.render():this.update();}
+    if(a==='entry:pref'||a==='entry:unavail') return this.markEntry(a.slice(6));
+    if(a.indexOf('entry:')===0){ var eid=a.slice(6); if(eid&&eid!=='actions'&&eid!=='change'&&eid!=='alts'&&eid!=='record'&&eid!=='comparison'){ this.draftEntry(eid); } this.route=navigate(this.route,a); if(this.o.onNavigate) this.o.onNavigate(this.route,budgetDateKey(),{entry:eid}); return this.models?this.render():this.update();}
     if(a.indexOf('nav:')===0){
       var dest=navigate(this.route,a);
       if(dest==='home'||a==='nav:home'||a==='nav:back'||a==='nav:plan') return this.returnHomeToPlanStep();
@@ -12830,6 +12844,26 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     if(!out.length&&ui.stepName) out.push({key:'n0',name:'Needs from '+ui.stepName,id:null,added:null});
     reqAdded(ui).forEach(function(r){ if(r&&r.name&&r.id&&!seen['a.'+r.id]){ seen['a.'+r.id]=1; out.push({key:'a.'+r.id,name:r.name,id:null,added:r}); } });
     return out; }
+  /* 1.8.124: the switch Accept saves, from the review's answers and added requirements: BudgetFlows.acceptChoice's result
+     ({ ok, ops, note, done }), or { ok:false, note } while a requirement is unanswered. Nothing is written here. */
+  function switchFor(AT, V, ui){ var RL=reviewReqs(AT, ui), ans=reqAnswers(ui);
+    if(RL.some(function(q){ return !ans[q.key]; })) return {ok:false, note:'Resolve every requirement before you accept.'};
+    var answers=RL.filter(function(q){ return q.id; }).map(function(q){ return {id:q.id,d:ans[q.key]}; });
+    var extra=RL.filter(function(q){ return q.added&&ans[q.key]!=='none'&&/^\d{4}-\d{2}-\d{2}$/.test(q.added.date)&&isFinite(+q.added.amount); }).map(function(q){ var r=q.added, d0=r.date; /* 1.8.99: an added requirement without its date or amount is left out */
+      return {name:r.name, values:journalRepeat({repeat:r.repeat,every:r.every,mdays:r.mdays,time:r.time},{type:'expense',flow:'out',consume:true,charge:'per',amount:-Math.abs(+r.amount),date:d0},d0)}; });
+    return root.BudgetFlows.acceptChoice(AT, V, ui.step, ui.choice, answers, extra); }
+  /* the plan's rows as Accept would leave them: { ok:true, rows } (the plan model's rows on a copy of the atlas with the switch's ops,
+     placed as a save places them), or { ok:false, note } when the switch cannot be prepared */
+  function afterPlan(AT, ui, pm){ var V={atlasW:AT}, res=switchFor(AT, V, ui);
+    if(!res||!res.ok) return {ok:false, note:res&&res.note?res.note:'The switch cannot be prepared. The current plan is unchanged.'};
+    var c=AT.components&&pm&&AT.components[pm.component]; if(!c) return {ok:false, note:'The plan is not in this budget.'};
+    var A2=JSON.parse(JSON.stringify(AT)); root.BudgetFlows.applyOpsTo(A2, syncCalPlanOps(ls(res.ops).map(function(o){ return Object.assign({},o); }), V));
+    return {ok:true, rows:planModel({atlasW:A2,journalDay:pm.day,journalMonth:pm.month}, A2, A2.components[pm.component]).rows}; }
+  /* 1.8.124: what Mark preferred and Mark unavailable on a day item mark: that item among the alternatives it belongs to (its category,
+     or the item itself when it is a category listing itself), with its marks now; null when it belongs to none */
+  function markOf(AT, id){ AT=rd(AT); var it=id&&AT.items?AT.items[id]:null; if(!it) return null; var ref='item:'+id, cat=root.BudgetFlows.ownerOf(AT, id);
+    if(!cat&&catMembers(it).indexOf(ref)>=0) cat=id; var C=cat?AT.items[cat]:null; if(!C||!C.alts) return null;
+    return {cat:cat, mid:id, pref:C.alts.pref!=null&&memberRef(C.alts.pref)===ref, off:ls(C.alts.unavail).some(function(x){ return memberRef(x)===ref; })}; }
   Home.prototype.uiDraft=function(){ root.__budgetUi=restorePlan(root.__budgetUi); if(!root.__budgetUi.draft) root.__budgetUi.draft={}; /* a page's draft starts empty */ return root.__budgetUi.draft; };
 
   /* 1.8.89 (design system phase 5): the field being typed in. openField keeps it as this.live { key, act, value } and redraws:
@@ -13005,10 +13039,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       /* 1.8.75: Accept saves the switch. The answers go with it; the plan changes only if the save is accepted. */
       var RL=reviewReqs(this.atlas, ui), ans=reqAnswers(ui);
       if(RL.some(function(q){ return !ans[q.key]; })){ say('Resolve every requirement before you accept.'); this.route='plan-c'; if(this.o.onNavigate)this.o.onNavigate(this.route,budgetDateKey()); return this.models?this.render():this.update(); }
-      var answers=RL.filter(function(q){ return q.id; }).map(function(q){ return {id:q.id,d:ans[q.key]}; });
-      var extra=RL.filter(function(q){ return q.added&&ans[q.key]!=='none'&&/^\d{4}-\d{2}-\d{2}$/.test(q.added.date)&&isFinite(+q.added.amount); }).map(function(q){ var r=q.added, d0=r.date; /* 1.8.99: an added requirement without its date or amount is left out */
-        return {name:r.name, values:journalRepeat({repeat:r.repeat,every:r.every,mdays:r.mdays,time:r.time},{type:'expense',flow:'out',consume:true,charge:'per',amount:-Math.abs(+r.amount),date:d0},d0)}; });
-      var res=BF.acceptChoice(this.atlas,this.context,step,ref,answers,extra); /* 1.8.92: a fault preparing the switch is not turned into a note */
+      var res=switchFor(this.atlas,this.context,ui); /* 1.8.92: a fault preparing the switch is not turned into a note. 1.8.124: the same switch the review's After shows */
       if(!res||!res.ok){ say(res&&res.note?res.note:'The switch was not saved. The current plan is unchanged.'); return; }
       if(res.ops&&res.ops.length){
         if(typeof submitViews!=='function'||!this.context){ say('The switch was not saved. The current plan is unchanged.'); return; }
@@ -13027,6 +13058,15 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
     }
     say('The switch was not saved. The current plan is unchanged.');
   };
+  /* 1.8.124: Mark preferred / Mark unavailable on the day item page. The mark is saved through the same BudgetFlows ops as the
+     alternatives panel (alt2:pref, alt2:unavail); the page stays, and the saved atlas redraws it. A save that is not taken says so. */
+  Home.prototype.markEntry=async function(which){ var self=this, id=root.__budgetUi?root.__budgetUi.entry:null, mk=markOf(this.atlas,id);
+    function say(m){ if(self.status) self.status.textContent=m; }
+    if(!mk||(which==='pref'&&mk.off)){ say('This item has nothing to mark.'); return; }
+    var ent=await root.BudgetFlows.act(this.context,(which==='pref'?'alt2:pref:':'alt2:unavail:')+mk.cat+'/'+mk.mid);
+    if(!ent||ent.ok===false||(ent.r&&ent.r.ok===false)){ say('The mark was not saved.'); return; }
+    say(which==='pref'?(mk.pref?'Preferred mark cleared.':'Marked preferred.'):(mk.off?'Marked available.':'Marked unavailable.'));
+    return this.chain; };
   Home.prototype._applyPlanStepScroll=function(y){
     if(!this.host||y==null) return 0;
     if(this.wrap){
@@ -13098,7 +13138,7 @@ window.whereDay = typeof whereDay==='function' ? whereDay : window.whereDay;
       'add:cash':'cash-entry','add:pay':'pay-entry','add:debt':'debt-entry',
       'add:alt':'add-alt-category','add-alt:list':'add-alt-list','add-alt:category':'add-alt-category','add-alt:form':'add-alt-form',
       'entry:actions':'day-actions','entry:uber':'day-actions','entry:record':'day-record','entry:comparison':'day-comparison',
-      'entry:change':'schedule-editor','entry:alts':'add-alt-list','entry:pref':'day-actions','entry:unavail':'day-actions','nav:proposal':'plan-switch-before','proposal:after':'plan-switch-after',
+      'entry:change':'schedule-editor','entry:alts':'add-alt-list','nav:proposal':'plan-switch-before','proposal:after':'plan-switch-after',
       'nav:debt':'debt-entry','nav:pay':'pay-entry'
     };
     if(A[act]) return A[act];
@@ -14125,7 +14165,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.122",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.124",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
