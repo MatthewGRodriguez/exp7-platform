@@ -1623,20 +1623,29 @@ if (typeof JFEngine !== "undefined") JFEngine.init();
 <script data-exp7-shared="runtime-factory">
 /* JEditor atlas/runtime.js (as emitted by atlas/build_atlas.js build()), wrapped as a per-view factory. Exp7 1.8.39: its HTML view builders are removed; Exp7 draws views from vector models (Exp7VM). */
 window.JA_RUNTIME_FACTORY=function(window,document,setTimeout,setInterval,Worker){
-/* JEditor atlas page runtime (M17, ADRs 0080-0084): renders root components from the embedded atlas, routes user events to
- * blueprints, runs passes (Blob-URL worker when allowed, else main thread), ticks the clock joy. No network. */
+/* JEditor atlas page runtime (M17, ADRs 0080-0084), one per view session: holds the session's atlas, routes the view's actions and
+ * events to blueprints, runs passes (Blob-URL worker when allowed, else main thread), ticks the clock joy. No network.
+ * Exp7 1.8.113: only what the views reach is kept: compAct (month, new, sort, filter, tocal), event and tick. The HTML-era page
+ * listeners and their actions (pad, pickers, alternatives, rows, drag, day clicks), which nothing has reached since 1.8.39, are
+ * gone. It fills in nothing: a step whose part is missing (a component's state, view or items, a joy's number, the clock's ms)
+ * is left out, and the rest carries on. */
 (function () {
   'use strict';
   var M = window.JAtlasModel, E = window.JAtlasEval, W = JSON.parse(document.getElementById('ja-atlas').textContent);
-  var pending = [], st = { dirty: "all", events: [], changed: [] }, queued = [], busy = false, scheduled = false, worker = null, backend = 'main';
-  /* Alternatives rank with JFEngine (Exp7Rank, webgpu > wasm-simd > wasm > js); see JAtlasModel.rankAlts. */
-  var JAtlas = window.JAtlas = window.JW = { /* window.JW + .world: legacy aliases for one release (ADR 0107) */ engine: window.JFEngine ? 'jfengine' : 'none', chain: (window.JFEngine && JFEngine.CHAIN) || ['webgpu', 'wasm-simd', 'wasm', 'js'], atlas: W, world: W, passes: 0, last: null, conflicts: [], cycles: [], backend: backend, log: [] };
+  var NONE = Object.freeze({});
+  function isObj(o) { return o !== null && typeof o === 'object' && !Array.isArray(o); }
+  function rd(o) { return isObj(o) ? o : NONE; }
+  /* the Board's start when neither the session nor the view names a sort or filter: the same start the views draw (BOARD_START) */
+  var BOARD_START = Object.freeze({ sort: 'name', filter: 'all' });
+  var pending = [], st = { dirty: "all", events: [], changed: [] }, queued = [], busy = false, scheduled = false, worker = null, backend = 'main', renders = 0;
+  var JAtlas = window.JAtlas = window.JW = { /* window.JW + .world: legacy aliases for one release (ADR 0107) */ engine: window.JFEngine ? 'jfengine' : 'none', atlas: W, world: W, passes: 0, last: null, conflicts: [], cycles: [], backend: backend, log: [] };
   try { var src = document.getElementById('ja-eval').textContent + '\nself.onmessage=function(e){var d=e.data;self.postMessage({id:d.id,c:JAtlasEval.computePass(d.snap,d.dirty,d.events,d.changed)});};';
     worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' }))); backend = 'worker'; worker.onerror = function () { worker = null; backend = 'main'; JAtlas.backend = 'main'; busy = false; schedule(); };
   } catch (e) { worker = null; backend = 'main'; }
   JAtlas.backend = backend;
-  try { if (window.JFEngine) { JFEngine.init(); JFEngine.detect().then(function (d) { JAtlas.scoreBackends = d; JAtlas.scoreBackend = JFEngine.CHAIN.filter(function (k) { return d[k]; })[0] || 'js'; }, function () { JAtlas.scoreBackend = 'js'; }); } } catch (e) { JAtlas.scoreBackend = 'js'; }
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  /* Alternatives rank with JFEngine (Exp7Rank, webgpu > wasm-simd > wasm > js); see JAtlasModel.rankAlts. A backend none of which
+     is found is left out. */
+  if (window.JFEngine) { JAtlas.chain = JFEngine.CHAIN; JFEngine.init(); JFEngine.detect().then(function (d) { JAtlas.scoreBackends = d; var b = JFEngine.CHAIN.filter(function (k) { return d[k]; })[0]; if (b) JAtlas.scoreBackend = b; }); }
   function schedule() { if (scheduled || busy) return; scheduled = true; setTimeout(run, 0); }
   function finish(comp) { var s = st; st = { dirty: [], events: [], changed: [] };
     var r = E.pass(W, s, M, comp); JAtlas.passes++; JAtlas.last = r; JAtlas.conflicts = r.conflicts; JAtlas.cycles = r.cycles; JAtlas.log.push({ pass: JAtlas.passes, ran: r.ran, changed: r.changed, backend: JAtlas.backend }); if (JAtlas.log.length > 50) JAtlas.log.shift();
@@ -1650,101 +1659,28 @@ window.JA_RUNTIME_FACTORY=function(window,document,setTimeout,setInterval,Worker
       worker.onmessage = function (e) { if (e.data.id !== id) return; clearTimeout(to); finish(e.data.c); };
       try { worker.postMessage({ id: id, snap: E.clone(W), dirty: st.dirty, events: st.events, changed: st.changed }); } catch (err) { clearTimeout(to); worker = null; JAtlas.backend = 'main'; finish(null); } }
     else finish(null); }
-  function external(changed, events) { var d = E.dirtyFor(W, changed, events && events.length);
-    if (busy) { queued.push({ dirty: d, events: events || [] }); return; }
-    st.dirty = st.dirty === 'all' ? 'all' : st.dirty.concat(d); st.events = st.events.concat(events || []); st.changed = changed; render(); schedule(); }
-  JAtlas.event = function (type, comp, item, target) { external([], [{ type: type, comp: comp, item: item, target: target || null }]); };
-  JAtlas.pickAlt = function (parent, member) { var it = W.items[parent]; if (!it) return; it.state = it.state || {}; it.state.userPick = it.state.userPick === member ? null : member;
-    external(['item:' + parent], [{ type: 'select', comp: null, item: member }]); };
-  JAtlas.tick = function () { var c = W.clock; if (!c || !W.joys[c.joy]) return; W.joys[c.joy].value = (+W.joys[c.joy].value || 0) + 1; external(['joy:' + c.joy], []); };
-  if (W.clock && W.clock.on && W.joys[W.clock.joy]) setInterval(JAtlas.tick, Math.max(50, +W.clock.ms || 1000));
-  /* ---- view ---- */
-  /* ---- calendar / board / plan views (ADR 0091) ---- */
-  /* ---- M19 (ADRs 0095-0097): month nav, joy steppers, as-of, range, day detail, legend, rails, day labels; all generic over atlas data ---- */
-  function asofOf(c) { var j = (c.view || {}).asof && M.get(W, c.view.asof), v = j && j.value; if (/^\d{4}-\d{2}-\d{2}$/.test(v || '')) return { day: v, joy: true }; var d = new Date(); return { day: d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1) + '-' + (d.getDate() < 10 ? '0' : '') + d.getDate(), joy: false }; }
-  /* One Board surface for every app (demo / Budget / standalone). No budget-mode design fork.
-     Each app still supplies its own atlas items — finance tags may live on item.values without changing this HTML. */
-  /* ---- M22 (ADR 0104): generic "Dependencies & sequence" over items' jreq chains. Order = full jreq chain (prerequisites first, then date,
-   *  then list order) unless view.order === 'given'. Flags are always computed from the data: broken jreq (points at nothing), conflict
-   *  (required item not dated earlier), order (required item listed after this one), cycle. Optional per-item text fields
-   *  (seq, step, when, reqText, neededBy, view.extra columns, view.btn) let an importer show a source's own wording. ---- */
-  /* ---- M20b (ADR 0101): generic table / kpi / text views + number pad input; all read atlas data, formats are view data ---- */
-  var PAD = null;
-  var PICK = null;
-  /* row drag reorder (live RANKS drag): grip pointerdown → pointerup over another row; renumbers drag.field 1..n in the new order (items outside the order keep 999) */
-  var RD = null;
-  document.addEventListener('pointerdown', function (e) { var g = e.target.closest && e.target.closest('[data-grip]'); if (g) { RD = { id: g.getAttribute('data-grip'), comp: g.getAttribute('data-comp'), f: g.getAttribute('data-f') }; e.preventDefault(); } }, true);
-  document.addEventListener('pointerup', function (e) { if (!RD) return; var d = RD; RD = null; var el = document.elementFromPoint(e.clientX, e.clientY), tr = el && el.closest && el.closest('tr[data-row]'); if (tr) dragRows(d.comp, d.id, tr.getAttribute('data-row'), d.f); }, true);
-  function asofDay() { return asofOf({ view: { asof: 'joy:asof' } }).day; }
-  function choicesOf(k) { if (k.choices) return k.choices; if (k.choicesFrom) { var cc = M.get(W, k.choicesFrom); return (k.choiceFirst || []).concat(((cc && cc.items) || []).map(function (r) { var it = M.get(W, r); return { v: M.parse(r).id, label: (k.choicePrefix || '') + (it ? it.name : r) }; })); } return []; }
-  /* alternatives attached to a table row (ADR 0103): an item in V.alts.comp whose values[V.alts.by] points at the row */
-  function altEntry(V, r) { var cc = M.get(W, V.alts.comp); if (!cc) return null; var hit = null; (cc.items || []).some(function (e) { var it = M.get(W, e); if (it && it.alts && (it.values || {})[V.alts.by || 'lineRef'] === r) { hit = it; return true; } return false; }); return hit; }
-  function altPick(e) { var st = e.state || {}; return st.userPick || st.pick || null; }
-  function altReq(V, e) { var me = 'item:' + e.id, req = ((e.values || {}).requires || []).map(function (r) { var o = M.get(W, r); return o ? ((o.state || {}).pick ? '✓ ' : '✗ ') + o.name : null; }).filter(Boolean), cc = M.get(W, V.alts.comp), nb = [];
-    ((cc && cc.items) || []).forEach(function (x) { var o = M.get(W, x); var hit = o && x !== me && (((o.values || {}).requires || []).indexOf(me) >= 0 || ((o.alts || {}).members || []).some(function (m) { var mi = M.get(W, m); return mi && ((mi.values || {}).needs || []).some(function (n) { return String(n).split('#')[0] === me; }); })); if (hit) nb.push(o.name); });
-    return (req.length ? '<div class="ja-alttag">Requires: ' + esc(req.join(' + ')) + '</div>' : '') + (nb.length ? '<div class="ja-alttag">Needed by: ' + esc(nb.join(', ')) + '</div>' : ''); }
-  function padKey(c, k) { if (!PAD) return; var b = PAD.buf || '';
-    if (k === 'esc') { PAD = null; render(); return; }
-    if (k === 'ok') { var it = W.items[PAD.item], n = +b; if (it && b !== '' && isFinite(n)) { it.values = it.values || {}; it.values[PAD.field] = n; PAD = null; external(['item:' + it.id], []); return; } PAD = null; render(); return; }
-    if (k === 'bs') b = b.slice(0, -1); else if (k === '-') b = b[0] === '-' ? b.slice(1) : '-' + b; else if (k === '.') { if (b.indexOf('.') < 0) b += b === '' || b === '-' ? '0.' : '.'; } else b += k;
-    PAD.buf = b; render(); }
-  function compAct(b) { var cid = b.getAttribute('data-comp'), c = W.components[cid], a = b.getAttribute('data-ja-act'), v = b.getAttribute('data-v'); if (!c) return; c.state = c.state || {};
-    if (a === 'show') { c.state.show = v; render(); return; }
-    if (a === 'pad') { var pit = W.items[v], f0 = b.getAttribute('data-f'); PAD = pit ? { comp: cid, item: v, field: f0, buf: '' } : null; render(); return; }
-    if (a === 'padkey') { padKey(c, v); return; }
-    if (a === 'choose' || a === 'datep') { var it0 = W.items[v], f1 = b.getAttribute('data-f'); if (PICK && PICK.item === v && PICK.field === f1) { PICK = null; render(); return; } var cv = it0 ? String(((it0.values || {})[f1]) || '') : '';
-      PICK = it0 ? { comp: cid, item: v, field: f1, cur: cv, month: (/^\d{4}-\d{2}/.test(cv) ? cv.slice(0, 7) : (asofDay() || '').slice(0, 7)) } : null; render(); return; }
-    if (a === 'joyset') { var jk = String(v).replace(/^joy:/, ''), jj = W.joys[jk]; if (!jj) return; jj.value = b.getAttribute('data-f'); external(['joy:' + jk], []); return; }
-    if (a === 'valtog') { var ti = W.items[v], tf = b.getAttribute('data-f'); if (!ti) return; ti.values = ti.values || {}; ti.values[tf] = +ti.values[tf] ? 0 : 1; external(['item:' + ti.id], []); return; }
-    if (a === 'pickv' || a === 'datev') { if (!PICK) return; var pi = W.items[PICK.item]; if (pi) { pi.values = pi.values || {}; pi.values[PICK.field] = v; } PICK = null; if (pi) external(['item:' + pi.id], []); return; }
-    if (a === 'datem') { if (!PICK) return; var yy = +PICK.month.slice(0, 4), mm = +PICK.month.slice(5, 7) - 1 + (+v), d0 = new Date(yy, mm, 1); PICK.month = d0.getFullYear() + '-' + (d0.getMonth() < 9 ? '0' : '') + (d0.getMonth() + 1); render(); return; }
-    if (a === 'altopen') { c.state.open = c.state.open || {}; c.state.open[v] = !c.state.open[v]; render(); return; }
-    if (a === 'altun' || a === 'altpref' || a === 'alttry') { var pr = v.split('|'), e = W.items[pr[0]], mref = pr[1]; if (!e || !e.alts) return; var A = e.alts;
-      if (a === 'altun') { A.unavail = A.unavail || []; A.unavail = A.unavail.indexOf(mref) >= 0 ? A.unavail.filter(function (x) { return x !== mref; }) : A.unavail.concat([mref]); }
-      if (a === 'altpref') A.pref = A.pref === mref ? null : mref;
-      if (a === 'alttry') { e.state = e.state || {}; e.state.userPick = e.state.userPick === mref ? null : mref; }
-      external(['item:' + e.id], []); return; }
-    if (a === 'altadd') { var row = M.get(W, v), V2 = c.view, ac = M.get(W, V2.alts.comp); if (!row || !ac) return; var ent = altEntry(V2, v);
-      if (!ent) { var er = M.newItem(W, row.name + ' alternatives'); ent = W.items[M.parse(er).id]; ent.values = { lineRef: v }; ent.alts = { members: [], pref: null, unavail: [], method: 'best' }; ac.items = (ac.items || []).concat([er]);
-        var a0 = M.newItem(W, row.name + ' · this line'); W.items[M.parse(a0).id].values = { key: 'A', label: 'this line', amount: +((row.values || {}).amount) || 0 }; ent.alts.members.push(a0); }
-      var k = String.fromCharCode(65 + ent.alts.members.length), nr2 = M.newItem(W, row.name + ' · ' + k); W.items[M.parse(nr2).id].values = { key: k, label: 'alternative ' + k, amount: 0 }; ent.alts.members.push(nr2);
-      c.state.open = c.state.open || {}; c.state.open[M.parse(v).id] = true; external(['item:' + ent.id, nr2, V2.alts.comp, 'members:' + V2.alts.comp], []); return; }
-    if (a === 'addrow') { var nr = M.newItem(W, (c.view.addName || 'Row') + ' ' + ((c.items || []).length + 1)), ni = W.items[M.parse(nr).id]; ni.values = JSON.parse(JSON.stringify(c.view.addValues || { amount: 0 })); c.items = (c.items || []).concat([nr]); external([nr, 'comp:' + cid, 'members:comp:' + cid], []); return; }
-    if (a === 'jump') { var je = document.querySelector('section[data-comp="' + v + '"]'); if (je && je.scrollIntoView) je.scrollIntoView({ block: 'start' }); if (je) { je.setAttribute('data-jumped', '1'); } return; }
-    if (a === 'mvrow' && c.view.move) { var tg = W.components[M.parse(c.view.move.to).id], mi = W.items[M.parse(v).id]; if (!tg) return; c.items = (c.items || []).filter(function (x) { return x !== v; }); tg.items = (tg.items || []).concat([v]);
-      if (mi) { mi.values = mi.values || {}; Object.keys(c.view.move.set || {}).forEach(function (f) { mi.values[f] = c.view.move.set[f]; }); } external([v, 'comp:' + cid, 'members:comp:' + cid, c.view.move.to, 'members:' + c.view.move.to], []); return; }
-    if (a === 'rmrow') { c.items = (c.items || []).filter(function (x) { return x !== v; }); external([v, 'comp:' + cid, 'members:comp:' + cid], []); return; }
-    if (a === 'month') { var mo = E.monthOf(c), y = +mo.slice(0, 4), m = +mo.slice(5, 7) - 1 + (+v); if (+v === 0) { var t = asofOf(c).day; y = +t.slice(0, 4); m = +t.slice(5, 7) - 1; } var nd = new Date(y, m, 1); c.view.month = nd.getFullYear() + '-' + (nd.getMonth() < 9 ? '0' : '') + (nd.getMonth() + 1); c.state.detail = null; external(['members:comp:' + cid], []); return; }
-    if (a === 'mode') { c.state.mode = c.state.mode === v ? '' : v; if (v === 'range' && c.state.mode) c.state.range = []; render(); return; }
-    if (a === 'clearrange') { c.state.range = []; render(); return; }
-    if (a === 'closedetail') { c.state.detail = null; render(); return; }
-    if (a === 'joy') { var J = W.joys[v]; if (!J) return; J.value = Math.round(((+J.value || 0) + (+b.getAttribute('data-d'))) * 1e6) / 1e6; external(['joy:' + v], []); return; }
-    if (a === 'sort') { c.state.sort = (c.state.sort || c.view.sort || 'name') === 'name' ? 'date' : 'name'; render(); return; }
-    if (a === 'filter') { var F = ['all', 'unscheduled', 'scheduled']; c.state.filter = F[(F.indexOf(c.state.filter || c.view.filter || 'all') + 1) % 3]; render(); return; }
-    if (a === 'new') { var r = M.newItem(W, 'Item ' + (Object.keys(W.items).length + 1)); c.items = (c.items || []).concat([r]); external([r, 'comp:' + cid], []); return; }
-    if (a === 'tocal') { var T = M.get(W, c.view.target); if (!T || (T.items || []).indexOf(v) >= 0) return; T.items = (T.items || []).concat([v]); external([v, c.view.target, 'members:' + c.view.target], []); } }
+  /* changed: the refs a step changed; events: the events it raises (each caller gives both lists) */
+  function external(changed, events) { var d = E.dirtyFor(W, changed, events.length);
+    if (busy) { queued.push({ dirty: d, events: events }); return; }
+    st.dirty = st.dirty === 'all' ? 'all' : st.dirty.concat(d); st.events = st.events.concat(events); st.changed = changed; render(); schedule(); }
+  /* an event carries its target only when it has one */
+  JAtlas.event = function (type, comp, item, target) { var ev = { type: type, comp: comp, item: item }; if (target != null) ev.target = target; external([], [ev]); };
+  /* the clock joy counts up by one; a clock with no joy, or a joy with no number, does not tick */
+  JAtlas.tick = function () { var c = W.clock, j = isObj(c) ? rd(W.joys)[c.joy] : null; if (!isObj(j) || typeof j.value !== 'number' || !isFinite(j.value)) return; j.value = j.value + 1; external(['joy:' + c.joy], []); };
+  if (isObj(W.clock) && W.clock.on && isObj(rd(W.joys)[W.clock.joy]) && typeof W.clock.ms === 'number' && W.clock.ms > 0) setInterval(JAtlas.tick, Math.max(50, W.clock.ms));
+  /* ---- M19 (ADRs 0095-0097): month nav and as-of, generic over atlas data ---- */
+  function asofOf(c) { var a = rd(c.view).asof, j = a ? M.get(W, a) : null, v = j ? j.value : undefined; if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) return { day: v, joy: true }; var d = new Date(); return { day: d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1) + '-' + (d.getDate() < 10 ? '0' : '') + d.getDate(), joy: false }; }
+  /* the view actions (Exp7 views send them through runtimeAct): month, new, sort, filter, tocal. A component that is missing, or
+     a part an action needs that is missing, leaves that action out. */
+  function compAct(b) { var cid = b.getAttribute('data-comp'), c = rd(W.components)[cid], a = b.getAttribute('data-ja-act'), v = b.getAttribute('data-v'); if (!isObj(c)) return;
+    if (a === 'month') { if (!isObj(c.view)) return; var mo = E.monthOf(c), y = +mo.slice(0, 4), m = +mo.slice(5, 7) - 1 + (+v); if (+v === 0) { var t = asofOf(c).day; y = +t.slice(0, 4); m = +t.slice(5, 7) - 1; } var nd = new Date(y, m, 1); c.view.month = nd.getFullYear() + '-' + (nd.getMonth() < 9 ? '0' : '') + (nd.getMonth() + 1); if (isObj(c.state)) c.state.detail = null; external(['members:comp:' + cid], []); return; }
+    if (a === 'sort') { if (!isObj(c.state)) return; var sv = rd(c.view), cs = c.state.sort ? c.state.sort : sv.sort ? sv.sort : BOARD_START.sort; c.state.sort = cs === 'name' ? 'date' : 'name'; render(); return; }
+    if (a === 'filter') { if (!isObj(c.state)) return; var fv = rd(c.view), F = ['all', 'unscheduled', 'scheduled'], cf = c.state.filter ? c.state.filter : fv.filter ? fv.filter : BOARD_START.filter; c.state.filter = F[(F.indexOf(cf) + 1) % 3]; render(); return; }
+    if (a === 'new') { if (!Array.isArray(c.items) || !isObj(W.items)) return; var r = M.newItem(W, 'Item ' + (Object.keys(W.items).length + 1)); c.items = c.items.concat([r]); external([r, 'comp:' + cid], []); return; }
+    if (a === 'tocal') { var tr = rd(c.view).target, T = tr ? M.get(W, tr) : null; if (!T || !Array.isArray(T.items) || T.items.indexOf(v) >= 0) return; T.items = T.items.concat([v]); external([v, tr, 'members:' + tr], []); } }
   JAtlas.compAct = compAct;
-  function dayClick(dd) { var cid = dd.getAttribute('data-comp'), c = W.components[cid], d = dd.getAttribute('data-day'); if (!c) return; c.state = c.state || {}; var md = c.state.mode;
-    if (md === 'range') { var r = c.state.range || []; c.state.range = r.length === 1 ? [r[0], d] : [d]; if (c.state.range.length === 2) c.state.mode = ''; render(); return; }
-    if (md === 'asof') { var j = c.view.asof && M.parse(c.view.asof), J = j && W.joys[j.id]; if (!J) return; c.state.asofPrev = asofOf(c).day; J.value = d; c.state.mode = ''; external(['joy:' + j.id], []); return; }
-    c.state.detail = c.state.detail === d ? null : d; render(); }
-  JAtlas.dayClick = dayClick;
   /* Exp7 1.8.39: views are vector models built by the host from the atlas; the runtime no longer writes HTML. render() only tells the session the atlas moved. */
-  function render() { var app = document.getElementById('app'); render.n = (render.n || 0) + 1; app.innerHTML = 'rev ' + render.n + ' pass ' + JAtlas.passes; }
-  /* ADR 0087: pointer drag + drop-on-target -> view event stream (drag from the source component, drop on the target component) */
-  var D = null, suppress = false;
-  document.addEventListener('pointerdown', function (e) { var it = e.target.closest('.ja-item[data-item]'); if (!it || e.target.closest('[data-alt]')) return; D = { el: it, x: e.clientX, y: e.clientY, on: false }; });
-  document.addEventListener('pointermove', function (e) { if (!D) return; if (!D.on && Math.abs(e.clientX - D.x) + Math.abs(e.clientY - D.y) > 6) { D.on = true; D.el.setAttribute('data-sm', 'dragging');
-      JAtlas.event('drag', 'comp:' + D.el.getAttribute('data-comp'), 'item:' + D.el.getAttribute('data-item')); }
-    if (D.on) { document.querySelectorAll('[data-drop-hot]').forEach(function (x) { x.removeAttribute('data-drop-hot'); }); var t = document.elementFromPoint(e.clientX, e.clientY), tc = t && t.closest('.ja-comp[data-comp]'); if (tc) tc.setAttribute('data-drop-hot', '1'); } });
-  document.addEventListener('pointerup', function (e) { var d = D; D = null; if (!d || !d.on) return; suppress = true; setTimeout(function () { suppress = false; }, 50);
-    var t = document.elementFromPoint(e.clientX, e.clientY), ti = t && t.closest('.ja-item[data-item]'), tc = t && t.closest('.ja-comp[data-comp]');
-    var dd = t && t.closest('[data-day]'), target = dd ? dd.getAttribute('data-day') : ti && ti !== d.el ? 'item:' + ti.getAttribute('data-item') : tc ? 'comp:' + tc.getAttribute('data-comp') : null;
-    if (dd && tc) { var C2 = W.components[tc.getAttribute('data-comp')], ir = 'item:' + d.el.getAttribute('data-item'); if (C2 && (C2.items || []).indexOf(ir) < 0) { C2.items = (C2.items || []).concat([ir]); external(['comp:' + C2.id, 'members:comp:' + C2.id], []); } }
-    JAtlas.event('drop', tc ? 'comp:' + tc.getAttribute('data-comp') : null, 'item:' + d.el.getAttribute('data-item'), target); });
-  document.addEventListener('click', function (e) { if (suppress) return; var ca = e.target.closest('[data-ja-act]'); if (ca) { compAct(ca); return; } var a = e.target.closest('[data-alt]'); if (a) { JAtlas.pickAlt(a.getAttribute('data-alt-parent'), a.getAttribute('data-alt')); return; }
-    var dd = e.target.closest('.ja-day[data-day]'); if (dd && !e.target.closest('.ja-item[data-item]')) { dayClick(dd); return; }
-    var it = e.target.closest('.ja-item[data-item]'); if (it) JAtlas.event('click', 'comp:' + it.getAttribute('data-comp'), 'item:' + it.getAttribute('data-item')); });
+  function render() { var app = document.getElementById('app'); renders++; app.innerHTML = 'rev ' + renders + ' pass ' + JAtlas.passes; }
   render(); schedule();
 })();
 
@@ -14457,7 +14393,7 @@ function wireReservedBarLayout(){
 }
 
 // ===== packages / direct mount =====
-const SHELL_VERSION="1.8.112",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
+const SHELL_VERSION="1.8.113",SHELL_MAJOR=1;let BUILTIN_SHA="",BUILTIN_TEXT=null,STAGED=null;
 function builtinText(){if(BUILTIN_TEXT===null){const b=atob(document.getElementById("apppkg").textContent.trim()),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);BUILTIN_TEXT=new TextDecoder().decode(u)}return BUILTIN_TEXT}
 async function sha256bytes(b64){const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const d=await crypto.subtle.digest("SHA-256",u);return Array.from(new Uint8Array(d),x=>x.toString(16).padStart(2,"0")).join("")}
 async function pkgState(){return(await kvGet("global|pkg"))||{active:{kind:"builtin",sha:BUILTIN_SHA,label:"Exp7 lean (built-in)"},previous:null,trial:false}}
