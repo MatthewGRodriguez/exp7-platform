@@ -1,10 +1,11 @@
 {
   "format": "exp7-platform-release/1",
-  "version": "1.8.120",
+  "version": "1.8.121",
   "file": "exp7-platform/exp7-platform-lean.html",
-  "sha256": "6195d6ae4f19abe80b60fa77a11ca20f9425fff214ba7a356c66d5ced954afa2",
+  "sha256": "53de9b7972740cfbfbf4adbc7f35d9548aa18666c838d0c4dab1c8630c4ad61a",
   "minLauncherMajor": 1,
   "contains": {
+    "1.8.121": "Design system phase 5, thirty-second part: art can loop, on the same branch as 1.8.120. A piece names parts of its drawing that move, scale and fade about a pivot through keys and close where they started; every frame is checked inside its slot, and Home, the views, the top bar and the apps picker play loops, still under reduced motion and paused on a hidden tab. No art in Budget, the Exp7 demo or the platform chrome loops yet, so nothing on screen changes.",
     "1.8.120": "Design system phase 5, thirty-first part: art can repeat across its slot as whole tiles (the tile fit), on Matthew's \"continue all of them\" (2026-11-22). A tile piece's viewBox is one tile; the slot takes the nearest whole number of tiles each way, stretched a little so whole tiles fill it, and a piece may make at most 1024 tiles. No art in Budget, the Exp7 demo or the platform chrome tiles yet, so nothing on screen changes.",
     "1.8.119": "Design system phase 5, thirtieth part: art can be filled and stroked with gradients, on Matthew's \"continue all of them\" (2026-11-22). The art compiler reads linear and radial gradients (pad, repeat or reflect, stops with opacity) from a piece's <defs>; a piece places them with its art and draws them as JRender paints, and text over one keeps its contrast at every stop. No art in Budget, the Exp7 demo or the platform chrome uses a gradient yet, so nothing on screen changes.",
     "1.8.118": "Design system phase 5, twenty-ninth part: the motion settings nothing read are out, Matthew's \"Remove those too\" (2026-11-22): the easing curves, the app states and their transitions, and the motion rules. EXP7_MOTION_CONFIG keeps the version, the element poses and the state table, which the view model reads for hover lift, press scale and timings. Budget and the Exp7 demo look and move the same; saved data is unchanged.",
