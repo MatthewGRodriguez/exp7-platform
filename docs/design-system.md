@@ -920,6 +920,8 @@ The scoring path that stays fills in no values: `jfactor`'s scorers read each ro
 
 On screen, for every app: nothing changes; the evaluator gives exactly the same results as 1.8.111 on a new Budget atlas and the test atlases. For saved data: nothing changes, except that a blueprint score whose jfactor input is missing now leaves that alternative out of the ranking instead of scoring it as 0.
 
+Checked in Chrome on Matthew's Mac (2026-11-22, made-up data only): the lean fetched at this release's commit matched `release.json`. The Exp7 demo's Calendar, Board and Plan views drew at 390 wide with exactly the same view models and the same nodes (111, 173, 143) and heights as 1.8.111, after the same 126 rankings on `wasm-simd`, and the kernel scores for test rows were the same. `Joy`, `JFExp6Frame`, `JFExp6Workers` and `fieldBest` are gone from the page. A blank Budget opened at 390 wide on Home and its date picker opened and closed; Budget and the demo at 1024 wide opened with no failure records or page errors. Storage was cleared afterwards.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
