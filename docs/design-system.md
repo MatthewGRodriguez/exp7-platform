@@ -1020,6 +1020,8 @@ Bound driven: the unit's nodes and groups are known from the layout before anyth
 
 Tests in exp7-jrender: a new layer, `idle`, checks that the lean ships `src/jrender.js` and that the slabs never sleep past a ring step (400 made-up pointers, clocks and offsets); the art layer drives the units on a real scene (poses, the fold of a node transform, a hover refill, a diff that removes them); `tests/gpu/lean.mjs` counts frames and compares pixels in headless Chrome. All of them fail on 1.8.122.
 
+Checked in Chrome on Matthew's Mac (2026-11-22, Browser 1, dpr 2, made-up art only), 1.8.122 and this release each fetched at its commit and matching its `release.json`, loaded in turn at 390 wide: a blank Budget opened with no failure records in both and drew the same. Still for 5 s, 1.8.122 asked for 261 frames and 1.8.123 for 4 (4 presents). With a made-up looping node, 2 s of loop asked for 366 frames at 1.8.122 and 99 at 1.8.123, one present a frame, and 2 in the second after it stopped (62 at 1.8.122). On the real GPU the posed loop drew what the old redraw drew except a few edge pixels in antialiasing (at most 16 of 68,000 pixels more than 24 off, the same node under every tap point). The date picker opened and closed, and the page went still again (2 frames in 5 s). Storage was cleared afterwards. This is also the first check of exp7-jrender #50 on Matthew's Mac.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
