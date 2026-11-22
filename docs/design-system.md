@@ -980,6 +980,8 @@ The art compiler reads linear and radial gradients from a piece's `<defs>`, and 
 
 On screen, for every app: nothing changes, because no art in Budget, the Exp7 demo or the platform chrome uses a gradient yet; the probe gives exactly the same results as 1.8.118. Art that uses one changes only through the art workflow, one approved piece at a time (7.2). For saved data: nothing changes.
 
+Checked in Chrome on Matthew's Mac (2026-11-22, made-up data only): the lean fetched at this release's commit matched `release.json`. A blank Budget opened at 390 wide with no failure records. With the test pack's two LinkRow pieces swapped in on Home (a white-to-mint linear background and a red-to-blue chevron stroke), the GPU drew the row's band and the chevron's stroke as gradients, and on hover the reflected radial wash; with the swap cleared, Home drew as before. Budget's date button opened and closed its picker, and Budget and the Exp7 demo at 1024 wide showed no failure records or page errors. Storage was cleared afterwards.
+
 Studies, as second priority: when a screen moves to components, its study (if any) gets component and slot layer names the next time it is drawn.
 
 ---
